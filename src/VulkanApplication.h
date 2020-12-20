@@ -164,14 +164,7 @@ private:
 
 	void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
 
-	VkSurfaceFormatKHR choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats);
-	VkPresentModeKHR choose_swapchain_present_mode(const std::vector<VkPresentModeKHR> &available_present_modes);
-	VkExtent2D choose_swapchain_extent(const VkSurfaceCapabilitiesKHR &capabilities);
-
-	VkShaderModule create_shader_module(const std::vector<char> &code);
-
 	// Cmd
-	void create_command_pool(Uint32 queue_family_index, VkCommandPoolCreateFlags flags, VkCommandPool *command_pool);
 	void create_command_buffer(VkCommandPool pool, VkCommandBuffer *c_buffer);
 	VkCommandBuffer begin_graphics_command_buffer();
 	void end_graphics_command_buffer(VkCommandBuffer c_buffer);

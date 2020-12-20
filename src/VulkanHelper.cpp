@@ -249,3 +249,54 @@ SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurf
 
 	return details;
 }
+
+VkSurfaceFormatKHR choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats) {
+	for (const auto &format : available_formats) {
+		if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+			//SDL_Log("Format: VK_FORMAT_B8G8R8A8_SRGB");
+			return format;
+		}
+	}
+	return available_formats[0];
+}
+
+VkPresentModeKHR choose_swapchain_present_mode(const std::vector<VkPresentModeKHR> &available_present_modes) {
+	for (const auto &mode : available_present_modes) {
+		if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+			//SDL_Log("Present mode: VK_PRESENT_MODE_MAILBOX_KHR");
+			return mode;
+		}
+	}
+	SDL_Log("Present mode: VK_PRESENT_MODE_FIFO_KHR");
+	return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D choose_swapchain_extent(const VkSurfaceCapabilitiesKHR &capabilities, SDL_Window *window) {
+	if (capabilities.currentExtent.width != UINT32_MAX) {
+		//SDL_Log("Resolution: %ix%i", capabilities.currentExtent.width, capabilities.currentExtent.height);
+		return capabilities.currentExtent;
+	} else {
+		int w, h;
+		SDL_Vulkan_GetDrawableSize(window, &w, &h);
+		VkExtent2D extent = { uint32_t(w), uint32_t(h) };
+		extent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, extent.width));
+		extent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, extent.height));
+		//SDL_Log("Resolution: %ix%i", extent.width, extent.height);
+		return extent;
+	}
+}
+
+VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &code) {
+	VkShaderModuleCreateInfo ci{
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.codeSize = code.size(),
+		.pCode = reinterpret_cast<const uint32_t *>(code.data())
+	};
+
+	VkShaderModule shader_module;
+
+	if (vkCreateShaderModule(device, &ci, nullptr, &shader_module) != VK_SUCCESS) {
+		throw std::runtime_error("Unable to create shader module!");
+	};
+	return shader_module;
+}

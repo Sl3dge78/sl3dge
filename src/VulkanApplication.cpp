@@ -1,8 +1,8 @@
 #include "VulkanApplication.h"
 
-/* 	
-* Init & Cleanup
-*/
+//
+// Init & Cleanup
+//
 void VulkanApplication::init_window() {
 	SDL_Init(SDL_INIT_EVERYTHING);
 	IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
@@ -72,9 +72,9 @@ void VulkanApplication::cleanup() {
 	SDL_Quit();
 }
 
-/*
-* Loop 
-*/
+//
+// Loop
+//
 void VulkanApplication::main_loop() {
 	bool run = true;
 	int last_time = SDL_GetTicks();
@@ -236,9 +236,9 @@ void VulkanApplication::draw_frame() {
 	semaphore_index = (semaphore_index + 1) % frames.size();
 }
 
-/*
-* Device
-*/
+//
+//	Device
+//
 
 void VulkanApplication::create_instance() {
 	if (enable_validation_layers && !check_validation_layer_support())
@@ -351,40 +351,51 @@ void VulkanApplication::create_logical_device() {
 	vkGetDeviceQueue(device, queue_family_indices.transfer_family.value(), 0, &transfer_queue);
 }
 
-VkSurfaceFormatKHR VulkanApplication::choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats) {
-	for (const auto &format : available_formats) {
-		if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-			//SDL_Log("Format: VK_FORMAT_B8G8R8A8_SRGB");
-			return format;
-		}
-	}
-	return available_formats[0];
-}
+//
+//	Swapchain
+//
 
-VkPresentModeKHR VulkanApplication::choose_swapchain_present_mode(const std::vector<VkPresentModeKHR> &available_present_modes) {
-	for (const auto &mode : available_present_modes) {
-		if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-			//SDL_Log("Present mode: VK_PRESENT_MODE_MAILBOX_KHR");
-			return mode;
-		}
-	}
-	SDL_Log("Present mode: VK_PRESENT_MODE_FIFO_KHR");
-	return VK_PRESENT_MODE_FIFO_KHR;
-}
+void VulkanApplication::init_swapchain(bool reset) {
+	vkDeviceWaitIdle(device);
 
-VkExtent2D VulkanApplication::choose_swapchain_extent(const VkSurfaceCapabilitiesKHR &capabilities) {
-	if (capabilities.currentExtent.width != UINT32_MAX) {
-		//SDL_Log("Resolution: %ix%i", capabilities.currentExtent.width, capabilities.currentExtent.height);
-		return capabilities.currentExtent;
-	} else {
-		int w, h;
-		SDL_Vulkan_GetDrawableSize(window, &w, &h);
-		VkExtent2D extent = { uint32_t(w), uint32_t(h) };
-		extent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, extent.width));
-		extent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, extent.height));
-		//SDL_Log("Resolution: %ix%i", extent.width, extent.height);
-		return extent;
+	if (reset)
+		cleanup_swapchain();
+
+	create_swapchain();
+	SDL_Log("Swapchain created");
+	uint32_t real_image_count = 0;
+	vkGetSwapchainImagesKHR(device, swapchain, &real_image_count, nullptr);
+	frames.resize(real_image_count);
+
+	create_render_pass();
+	SDL_Log("Render pass created");
+	create_descriptors();
+	SDL_Log("Descriptors created");
+	create_graphics_pipeline();
+	SDL_Log("Pipeline created");
+	create_depth_resources();
+	SDL_Log("Depth resources created");
+
+	// Create frames
+	std::vector<VkImage> swapchain_images;
+	swapchain_images.resize(real_image_count);
+	vkGetSwapchainImagesKHR(device, swapchain, &real_image_count, swapchain_images.data());
+
+	for (uint32_t i = 0; i < real_image_count; i++) {
+		frames[i].init_frame(device);
+		create_image_view(device, swapchain_images[i], swapchain_format, VK_IMAGE_ASPECT_COLOR_BIT, &frames[i].image_view);
+		frames[i].create_framebuffer(swapchain_extent, render_pass, depth_image_view);
+		frames[i].create_command_buffers(graphics_command_pool);
+		frames[i].create_sync_objects();
+		frames[i].create_uniform_buffer(physical_device);
+		frames[i].create_descriptor_set(descriptor_pool, descriptor_set_layout, texture_sampler, texture_image_view);
 	}
+
+	create_imgui_context();
+	//SDL_Log("imgui created");
+
+	create_sync_objects();
+	SDL_Log("Sync objects created!");
 }
 
 void VulkanApplication::create_swapchain() {
@@ -392,7 +403,7 @@ void VulkanApplication::create_swapchain() {
 
 	auto surface_fmt = choose_swapchain_surface_format(support.formats);
 	auto present_mode = choose_swapchain_present_mode(support.present_modes);
-	auto extent = choose_swapchain_extent(support.capabilities);
+	auto extent = choose_swapchain_extent(support.capabilities, window);
 
 	uint32_t image_count = support.capabilities.minImageCount + 1;
 	if (support.capabilities.maxImageCount > 0 && image_count > support.capabilities.maxImageCount) {
@@ -435,20 +446,36 @@ void VulkanApplication::create_swapchain() {
 	swapchain_extent = extent;
 }
 
-VkShaderModule VulkanApplication::create_shader_module(const std::vector<char> &code) {
-	VkShaderModuleCreateInfo ci{
-		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = code.size(),
-		.pCode = reinterpret_cast<const uint32_t *>(code.data())
-	};
+void VulkanApplication::cleanup_swapchain() {
+	for (auto &fs : frame_semaphores) {
+		vkDestroySemaphore(device, fs.image_aquired, nullptr);
+		vkDestroySemaphore(device, fs.render_complete, nullptr);
+	}
 
-	VkShaderModule shader_module;
+	cleanup_imgui_context();
 
-	if (vkCreateShaderModule(device, &ci, nullptr, &shader_module) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to create shader module!");
-	};
-	return shader_module;
+	for (auto frame : frames) {
+		frame.delete_frame();
+	}
+	frames.clear();
+
+	vkDestroyImageView(device, depth_image_view, nullptr);
+	vkDestroyImage(device, depth_image, nullptr);
+	vkFreeMemory(device, depth_image_memory, nullptr);
+
+	vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
+	vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
+
+	vkDestroyPipeline(device, graphics_pipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+
+	vkDestroyRenderPass(device, render_pass, nullptr);
+	vkDestroySwapchainKHR(device, swapchain, nullptr);
 }
+
+//
+//	Rendering
+//
 
 void VulkanApplication::create_render_pass() {
 	VkAttachmentDescription color_attachment{
@@ -519,8 +546,8 @@ void VulkanApplication::create_graphics_pipeline() {
 	auto vertex_shader_code = read_file("resources/shaders/triangle.vert.spv");
 	auto fragment_shader_code = read_file("resources/shaders/triangle.frag.spv");
 
-	VkShaderModule vertex_shader_module = create_shader_module(vertex_shader_code);
-	VkShaderModule fragment_shader_module = create_shader_module(fragment_shader_code);
+	VkShaderModule vertex_shader_module = create_shader_module(device, vertex_shader_code);
+	VkShaderModule fragment_shader_module = create_shader_module(device, fragment_shader_code);
 
 	VkPipelineShaderStageCreateInfo vertex_shader_stage_ci{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -664,89 +691,28 @@ void VulkanApplication::create_graphics_pipeline() {
 	vkDestroyShaderModule(device, fragment_shader_module, nullptr);
 }
 
-void VulkanApplication::create_command_pool(Uint32 queue_family_index, VkCommandPoolCreateFlags flags, VkCommandPool *command_pool) {
-	VkCommandPoolCreateInfo ci{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags = flags,
-		.queueFamilyIndex = queue_family_index,
-	};
-
-	check_vk_result(vkCreateCommandPool(device, &ci, nullptr, command_pool));
-}
-
 void VulkanApplication::create_command_pools() {
-	create_command_pool(queue_family_indices.graphics_family.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &graphics_command_pool);
-	create_command_pool(queue_family_indices.transfer_family.value(), VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, &transfer_command_pool);
-}
+	// Graphics
+	{
+		VkCommandPoolCreateInfo ci{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			.queueFamilyIndex = queue_family_indices.graphics_family.value(),
+		};
 
-void VulkanApplication::create_command_buffer(VkCommandPool pool, VkCommandBuffer *c_buffer) {
-	VkCommandBufferAllocateInfo ai{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1,
-	};
-	check_vk_result(vkAllocateCommandBuffers(device, &ai, c_buffer));
-}
+		check_vk_result(vkCreateCommandPool(device, &ci, nullptr, &graphics_command_pool));
+	}
 
-VkCommandBuffer VulkanApplication::begin_graphics_command_buffer() {
-	VkCommandBufferAllocateInfo ai{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = graphics_command_pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1,
-	};
-	VkCommandBuffer c_buffer;
-	vkAllocateCommandBuffers(device, &ai, &c_buffer);
+	// Transfer
+	{
+		VkCommandPoolCreateInfo ci{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+			.queueFamilyIndex = queue_family_indices.transfer_family.value(),
+		};
 
-	VkCommandBufferBeginInfo bi{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-	vkBeginCommandBuffer(c_buffer, &bi);
-
-	return c_buffer;
-}
-
-void VulkanApplication::end_graphics_command_buffer(VkCommandBuffer c_buffer) {
-	vkEndCommandBuffer(c_buffer);
-
-	VkSubmitInfo submits{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &c_buffer,
-	};
-	vkQueueSubmit(graphics_queue, 1, &submits, VK_NULL_HANDLE);
-}
-
-VkCommandBuffer VulkanApplication::begin_transfer_command_buffer() {
-	VkCommandBufferAllocateInfo ai{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = transfer_command_pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1,
-	};
-	VkCommandBuffer c_buffer;
-	vkAllocateCommandBuffers(device, &ai, &c_buffer);
-
-	VkCommandBufferBeginInfo bi{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-	vkBeginCommandBuffer(c_buffer, &bi);
-
-	return c_buffer;
-}
-
-void VulkanApplication::end_transfer_command_buffer(VkCommandBuffer c_buffer) {
-	vkEndCommandBuffer(c_buffer);
-
-	VkSubmitInfo submits{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &c_buffer,
-	};
-	vkQueueSubmit(transfer_queue, 1, &submits, VK_NULL_HANDLE);
+		check_vk_result(vkCreateCommandPool(device, &ci, nullptr, &transfer_command_pool));
+	}
 }
 
 void VulkanApplication::create_sync_objects() {
@@ -762,44 +728,9 @@ void VulkanApplication::create_sync_objects() {
 	}
 }
 
-// Copy a buffer from a staging buffer in the transfer queue to a buffer in the graphics queue transferring ownership.
-void VulkanApplication::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) {
-	auto send_cbuffer = begin_transfer_command_buffer();
-
-	VkBufferCopy regions{
-		.srcOffset = 0,
-		.dstOffset = 0,
-		.size = size,
-	};
-	vkCmdCopyBuffer(send_cbuffer, src, dst, 1, &regions);
-
-	VkBufferMemoryBarrier barrier{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask = 0,
-		.srcQueueFamilyIndex = queue_family_indices.transfer_family.value(),
-		.dstQueueFamilyIndex = queue_family_indices.graphics_family.value(),
-		.buffer = dst,
-		.offset = 0,
-		.size = size,
-	};
-	vkCmdPipelineBarrier(send_cbuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
-	end_transfer_command_buffer(send_cbuffer);
-
-	auto receive_cbuffer = begin_graphics_command_buffer();
-
-	// reuse the old barrier create info
-	barrier.srcAccessMask = 0;
-	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	vkCmdPipelineBarrier(receive_cbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
-	end_graphics_command_buffer(receive_cbuffer);
-
-	vkQueueWaitIdle(transfer_queue);
-	vkFreeCommandBuffers(device, transfer_command_pool, 1, &send_cbuffer);
-
-	SDL_Log("Buffer copied!");
-}
-
+//
+//	Scene
+//
 void VulkanApplication::create_mesh_buffer() {
 	VkDeviceSize vertex_size = idx_offset = sizeof(vertices[0]) * uint32_t(vertices.size());
 	VkDeviceSize index_size = sizeof(indices[0]) * indices.size();
@@ -868,6 +799,9 @@ void VulkanApplication::create_descriptors() {
 	}
 }
 
+//
+//	Texture
+//
 void VulkanApplication::create_texture_image() {
 	// Load image
 	SDL_Surface *surf = IMG_Load("resources/textures/viking_room.png");
@@ -1048,6 +982,9 @@ void VulkanApplication::create_texture_sampler() {
 	}
 }
 
+//
+// Depth
+//
 void VulkanApplication::create_depth_resources() {
 	VkFormat depth_format = find_depth_format();
 
@@ -1081,7 +1018,9 @@ bool VulkanApplication::has_stencil_component(VkFormat format) {
 	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
-/* IMGUI */
+//
+//	Imgui
+//
 void VulkanApplication::init_imgui() {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -1180,72 +1119,113 @@ void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	ImGui_ImplVulkan_RenderDrawData(data, frame.command_buffer);
 }
 
-void VulkanApplication::cleanup_swapchain() {
-	for (auto &fs : frame_semaphores) {
-		vkDestroySemaphore(device, fs.image_aquired, nullptr);
-		vkDestroySemaphore(device, fs.render_complete, nullptr);
-	}
-
-	cleanup_imgui_context();
-
-	for (auto frame : frames) {
-		frame.delete_frame();
-	}
-	frames.clear();
-
-	vkDestroyImageView(device, depth_image_view, nullptr);
-	vkDestroyImage(device, depth_image, nullptr);
-	vkFreeMemory(device, depth_image_memory, nullptr);
-
-	vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
-	vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
-
-	vkDestroyPipeline(device, graphics_pipeline, nullptr);
-	vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
-
-	vkDestroyRenderPass(device, render_pass, nullptr);
-	vkDestroySwapchainKHR(device, swapchain, nullptr);
+//
+// Misc buffer fnc
+//
+void VulkanApplication::create_command_buffer(VkCommandPool pool, VkCommandBuffer *c_buffer) {
+	VkCommandBufferAllocateInfo ai{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1,
+	};
+	check_vk_result(vkAllocateCommandBuffers(device, &ai, c_buffer));
 }
 
-void VulkanApplication::init_swapchain(bool reset) {
-	vkDeviceWaitIdle(device);
+VkCommandBuffer VulkanApplication::begin_graphics_command_buffer() {
+	VkCommandBufferAllocateInfo ai{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = graphics_command_pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1,
+	};
+	VkCommandBuffer c_buffer;
+	vkAllocateCommandBuffers(device, &ai, &c_buffer);
 
-	if (reset)
-		cleanup_swapchain();
+	VkCommandBufferBeginInfo bi{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+	vkBeginCommandBuffer(c_buffer, &bi);
 
-	create_swapchain();
-	SDL_Log("Swapchain created");
-	uint32_t real_image_count = 0;
-	vkGetSwapchainImagesKHR(device, swapchain, &real_image_count, nullptr);
-	frames.resize(real_image_count);
+	return c_buffer;
+}
 
-	create_render_pass();
-	SDL_Log("Render pass created");
-	create_descriptors();
-	SDL_Log("Descriptors created");
-	create_graphics_pipeline();
-	SDL_Log("Pipeline created");
-	create_depth_resources();
-	SDL_Log("Depth resources created");
+void VulkanApplication::end_graphics_command_buffer(VkCommandBuffer c_buffer) {
+	vkEndCommandBuffer(c_buffer);
 
-	// Create frames
-	std::vector<VkImage> swapchain_images;
-	swapchain_images.resize(real_image_count);
-	vkGetSwapchainImagesKHR(device, swapchain, &real_image_count, swapchain_images.data());
+	VkSubmitInfo submits{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &c_buffer,
+	};
+	vkQueueSubmit(graphics_queue, 1, &submits, VK_NULL_HANDLE);
+}
 
-	for (uint32_t i = 0; i < real_image_count; i++) {
-		frames[i].init_frame(device);
-		create_image_view(device, swapchain_images[i], swapchain_format, VK_IMAGE_ASPECT_COLOR_BIT, &frames[i].image_view);
-		frames[i].create_framebuffer(swapchain_extent, render_pass, depth_image_view);
-		frames[i].create_command_buffers(graphics_command_pool);
-		frames[i].create_sync_objects();
-		frames[i].create_uniform_buffer(physical_device);
-		frames[i].create_descriptor_set(descriptor_pool, descriptor_set_layout, texture_sampler, texture_image_view);
-	}
+VkCommandBuffer VulkanApplication::begin_transfer_command_buffer() {
+	VkCommandBufferAllocateInfo ai{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = transfer_command_pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1,
+	};
+	VkCommandBuffer c_buffer;
+	vkAllocateCommandBuffers(device, &ai, &c_buffer);
 
-	create_imgui_context();
-	//SDL_Log("imgui created");
+	VkCommandBufferBeginInfo bi{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+	vkBeginCommandBuffer(c_buffer, &bi);
 
-	create_sync_objects();
-	SDL_Log("Sync objects created!");
+	return c_buffer;
+}
+
+void VulkanApplication::end_transfer_command_buffer(VkCommandBuffer c_buffer) {
+	vkEndCommandBuffer(c_buffer);
+
+	VkSubmitInfo submits{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &c_buffer,
+	};
+	vkQueueSubmit(transfer_queue, 1, &submits, VK_NULL_HANDLE);
+}
+
+// Copy a buffer from a staging buffer in the transfer queue to a buffer in the graphics queue transferring ownership.
+void VulkanApplication::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) {
+	auto send_cbuffer = begin_transfer_command_buffer();
+
+	VkBufferCopy regions{
+		.srcOffset = 0,
+		.dstOffset = 0,
+		.size = size,
+	};
+	vkCmdCopyBuffer(send_cbuffer, src, dst, 1, &regions);
+
+	VkBufferMemoryBarrier barrier{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+		.dstAccessMask = 0,
+		.srcQueueFamilyIndex = queue_family_indices.transfer_family.value(),
+		.dstQueueFamilyIndex = queue_family_indices.graphics_family.value(),
+		.buffer = dst,
+		.offset = 0,
+		.size = size,
+	};
+	vkCmdPipelineBarrier(send_cbuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
+	end_transfer_command_buffer(send_cbuffer);
+
+	auto receive_cbuffer = begin_graphics_command_buffer();
+
+	// reuse the old barrier create info
+	barrier.srcAccessMask = 0;
+	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	vkCmdPipelineBarrier(receive_cbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
+	end_graphics_command_buffer(receive_cbuffer);
+
+	vkQueueWaitIdle(transfer_queue);
+	vkFreeCommandBuffers(device, transfer_command_pool, 1, &send_cbuffer);
+
+	SDL_Log("Buffer copied!");
 }

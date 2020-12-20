@@ -50,3 +50,9 @@ bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface);
 QueueFamilyIndices find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface);
 bool check_device_extension_support(VkPhysicalDevice device);
 SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurfaceKHR surface);
+
+VkSurfaceFormatKHR choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats);
+VkPresentModeKHR choose_swapchain_present_mode(const std::vector<VkPresentModeKHR> &available_present_modes);
+VkExtent2D choose_swapchain_extent(const VkSurfaceCapabilitiesKHR &capabilities, SDL_Window *window);
+
+VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &code);
