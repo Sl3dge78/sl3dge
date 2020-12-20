@@ -52,11 +52,10 @@ void Camera::update(float delta_time) {
 			ImGui::End();
 		}
 		ImGui::Text("Position");
-		ImGui::InputFloat("x", &position.x, 0.01f, 1.0f, 3);
 		ImGui::InputScalar("x ", ImGuiDataType_Float, &position.x, NULL, NULL, "%.3f");
-		ImGui::InputFloat("y", &position.y, 0.01f, 1.0f, 3);
-		ImGui::InputFloat("z", &position.z, 0.01f, 1.0f, 3);
-
+		ImGui::InputScalar("y", ImGuiDataType_Float, &position.y, NULL, NULL, "%.3f");
+		ImGui::InputScalar("z", ImGuiDataType_Float, &position.z, NULL, NULL, "%.3f");
+		ImGui::Separator();
 		ImGui::InputFloat("yaw", &yaw, 0.01f, 1.0f, 3);
 		ImGui::InputFloat("pitch", &pitch, 0.01f, 1.0f, 3);
 		ImGui::End();

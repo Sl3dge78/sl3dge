@@ -12,12 +12,17 @@
 #include "vulkan/VulkanApplication.h"
 
 #include "Camera.h"
+#include "imgui_custom.h"
 
 class Sl3dge : public VulkanApplication {
 private:
 	Camera camera;
 	bool show_demo_window = false;
 	bool show_metrics = false;
+	bool light_options = true;
+
+	glm::vec3 light_position = glm::vec3(0.0f, 0.0f, 0.5f);
+	glm::vec3 light_color = glm::vec3(1.f, 1.f, 1.f);
 
 	void load(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) override {
 		tinyobj::attrib_t attrib;
@@ -62,15 +67,14 @@ private:
 	void start() override {
 		SDL_GetRelativeMouseState(NULL, NULL); // Called here to avoid the weird jump
 		camera.start();
-		transform.model = glm::mat4(1.0f);
-		camera.get_view_matrix(transform.view);
-		transform.proj = glm::perspective(glm::radians(80.f), float(swapchain_extent.width) / float(swapchain_extent.height), 0.1f, 1000.f);
-		transform.proj[1][1] *= -1;
+		vubo.model = glm::mat4(1.0f);
+		camera.get_view_matrix(vubo.view);
+		vubo.proj = glm::perspective(glm::radians(80.f), float(swapchain_extent.width) / float(swapchain_extent.height), 0.1f, 1000.f);
+		vubo.proj[1][1] *= -1;
 	}
 
 	void update(float delta_time) override {
 		camera.update(delta_time);
-		camera.get_view_matrix(transform.view);
 
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
@@ -85,12 +89,26 @@ private:
 		if (Input::get_key_down(SDL_SCANCODE_F11))
 			show_metrics = !show_metrics;
 
-		if (show_demo_window)
+		if (show_demo_window) {
 			ImGui::ShowDemoWindow(&show_demo_window);
+		}
 
 		if (show_metrics) {
 			show_metrics_window(show_metrics, delta_time);
 		}
+
+		if (light_options) {
+			if (!ImGui::Begin("Light", &light_options))
+				ImGui::End();
+
+			InputVec3("Position", &light_position);
+			ImGui::End();
+		}
+
+		camera.get_view_matrix(vubo.view);
+		fubo.view_position = camera.get_position();
+		fubo.light_position = light_position;
+		fubo.light_color = light_color;
 	}
 
 	void show_metrics_window(bool &opened, float delta_time) {

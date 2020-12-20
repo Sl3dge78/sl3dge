@@ -132,8 +132,14 @@ void VulkanApplication::main_loop() {
 
 void VulkanApplication::draw_scene(VulkanFrame &frame) {
 	void *data;
-	vkMapMemory(device, frame.uniform_buffer_memory, 0, sizeof(transform), 0, &data);
-	memcpy(data, &transform, sizeof(transform));
+	vkMapMemory(device, frame.uniform_buffer_memory, 0, sizeof(vubo), 0, &data);
+	memcpy(data, &vubo, sizeof(vubo));
+	vkUnmapMemory(device, frame.uniform_buffer_memory);
+
+	VkDeviceSize offset = sizeof(vubo);
+
+	vkMapMemory(device, frame.uniform_buffer_memory, offset, sizeof(fubo), 0, &data);
+	memcpy(data, &fubo, sizeof(fubo));
 	vkUnmapMemory(device, frame.uniform_buffer_memory);
 
 	vkCmdBindPipeline(frame.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
@@ -773,7 +779,14 @@ void VulkanApplication::create_descriptors() {
 			.pImmutableSamplers = nullptr,
 		};
 
-		std::array<VkDescriptorSetLayoutBinding, 2> bindings = { ubo_layout_binding, sampler_layout_binding };
+		VkDescriptorSetLayoutBinding frag_ubo_layout_binding{
+			.binding = 2,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+		};
+
+		std::array<VkDescriptorSetLayoutBinding, 3> bindings = { ubo_layout_binding, sampler_layout_binding, frag_ubo_layout_binding };
 		VkDescriptorSetLayoutCreateInfo ci{
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
 			.bindingCount = uint32_t(bindings.size()),

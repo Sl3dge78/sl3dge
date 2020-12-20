@@ -53,7 +53,8 @@ public:
 protected:
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
-	UniformBufferObject transform;
+	VtxUniformBufferObject vubo;
+	FragUniformBufferObject fubo;
 
 	VkExtent2D swapchain_extent;
 	SDL_Window *window = nullptr;

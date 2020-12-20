@@ -28,6 +28,7 @@ public:
 
 	void update_vectors();
 	void get_view_matrix(glm::mat4 &view);
+	glm::vec3 get_position() const { return position; }
 };
 
 #endif

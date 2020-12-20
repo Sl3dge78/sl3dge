@@ -60,20 +60,20 @@ void VulkanFrame::create_descriptor_set(VkDescriptorPool descriptor_pool, VkDesc
 	};
 	check_vk_result(vkAllocateDescriptorSets(device, &ai, &descriptor_set));
 
-	VkDescriptorBufferInfo bi{
+	VkDescriptorBufferInfo vbi{
 		.buffer = uniform_buffer,
 		.offset = 0,
-		.range = sizeof(UniformBufferObject),
+		.range = sizeof(VtxUniformBufferObject),
 	};
 
-	VkWriteDescriptorSet uniform_descriptor_write{
+	VkWriteDescriptorSet vtx_uniform_descriptor_write{
 		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 		.dstSet = descriptor_set,
 		.dstBinding = 0,
 		.dstArrayElement = 0,
 		.descriptorCount = 1,
 		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		.pBufferInfo = &bi,
+		.pBufferInfo = &vbi,
 	};
 
 	VkDescriptorImageInfo ii{
@@ -91,12 +91,28 @@ void VulkanFrame::create_descriptor_set(VkDescriptorPool descriptor_pool, VkDesc
 		.pImageInfo = &ii,
 	};
 
-	std::array<VkWriteDescriptorSet, 2> descriptor_writes = { uniform_descriptor_write, texture_descriptor_write };
+	VkDescriptorBufferInfo fbi{
+		.buffer = uniform_buffer,
+		.offset = sizeof(VtxUniformBufferObject),
+		.range = sizeof(FragUniformBufferObject),
+	};
+
+	VkWriteDescriptorSet frag_uniform_descriptor_write{
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.dstSet = descriptor_set,
+		.dstBinding = 2,
+		.dstArrayElement = 0,
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		.pBufferInfo = &fbi,
+	};
+
+	std::array<VkWriteDescriptorSet, 3> descriptor_writes = { vtx_uniform_descriptor_write, texture_descriptor_write, frag_uniform_descriptor_write };
 	vkUpdateDescriptorSets(device, uint32_t(descriptor_writes.size()), descriptor_writes.data(), 0, nullptr);
 }
 
 void VulkanFrame::create_uniform_buffer(VkPhysicalDevice physical_device) {
-	VkDeviceSize size = sizeof(UniformBufferObject);
+	VkDeviceSize size = sizeof(VtxUniformBufferObject) + sizeof(FragUniformBufferObject);
 	create_buffer(device, physical_device, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniform_buffer, uniform_buffer_memory);
 }
 

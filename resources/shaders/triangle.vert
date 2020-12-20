@@ -14,10 +14,14 @@ layout (location = 2) in vec2 in_tex_coords;
 
 layout(location = 0) out vec3 normal;
 layout(location = 1) out vec2 tex_coords;
+layout(location = 2) out vec3 frag_pos;
+
+
 
 void main() {
     gl_Position = ubo.proj *  ubo.view * ubo.model * vec4(in_position, 1.0);
+    frag_pos = vec3(ubo.model * vec4(in_position, 1.0));
     normal = in_normal;
     tex_coords = in_tex_coords;
-    
+
 }
