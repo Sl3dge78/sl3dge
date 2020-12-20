@@ -1,6 +1,7 @@
 #include "Camera.h"
 
 #include "imgui/imgui.h"
+#include "imgui_custom.h"
 
 void Camera::start() {
 	position = glm::vec3(1.5f, 1.5f, 1.f);
@@ -50,14 +51,13 @@ void Camera::update(float delta_time) {
 	if (show_window) {
 		if (!ImGui::Begin("Camera", &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
 			ImGui::End();
+			return;
 		}
-		ImGui::Text("Position");
-		ImGui::InputScalar("x ", ImGuiDataType_Float, &position.x, NULL, NULL, "%.3f");
-		ImGui::InputScalar("y", ImGuiDataType_Float, &position.y, NULL, NULL, "%.3f");
-		ImGui::InputScalar("z", ImGuiDataType_Float, &position.z, NULL, NULL, "%.3f");
+
+		ImGui::InputFloat3("Position", &position[0]);
 		ImGui::Separator();
-		ImGui::InputFloat("yaw", &yaw, 0.01f, 1.0f, 3);
-		ImGui::InputFloat("pitch", &pitch, 0.01f, 1.0f, 3);
+		ImGui::InputFloat("yaw", &yaw, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
+		ImGui::InputFloat("pitch", &pitch, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
 		ImGui::End();
 	}
 }

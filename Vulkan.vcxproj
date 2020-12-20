@@ -191,6 +191,7 @@
     <ClCompile Include="src\imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="src\imgui\imgui_stdlib.cpp" />
     <ClCompile Include="src\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\imgui_custom.cpp" />
     <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\vulkan\VulkanApplication.cpp" />
