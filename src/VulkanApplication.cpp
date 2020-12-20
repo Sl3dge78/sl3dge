@@ -79,7 +79,7 @@ static void check_vk_result(VkResult err) {
 			SDL_LogError(0, "Vulkan Error : VK_ERROR_OUT_OF_POOL_MEMORY");
 			break;
 		default:
-			SDL_LogError(0, "Unhandled exception : %s", err);
+			SDL_LogError(0, "Unhandled exception : %d", err);
 		}
 		throw std::runtime_error("Vulkan error");
 	}
@@ -233,7 +233,7 @@ void create_buffer(VkDevice device, VkPhysicalDevice physical_device, VkDeviceSi
 		};
 
 		std::array<VkWriteDescriptorSet, 2> descriptor_writes = {uniform_descriptor_write, texture_descriptor_write};
-		vkUpdateDescriptorSets(device, descriptor_writes.size(), descriptor_writes.data(), 0, nullptr);
+		vkUpdateDescriptorSets(device, uint32_t(descriptor_writes.size()), descriptor_writes.data(), 0, nullptr);
 	}
 
 	void VulkanFrame::create_uniform_buffer(VkPhysicalDevice physical_device) {
@@ -304,8 +304,8 @@ void VulkanApplication::create_imgui_context() {
 		VkDescriptorPoolCreateInfo pool_info = {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		pool_info.maxSets = 1000 * pool_sizes.size();
-		pool_info.poolSizeCount = (uint32_t) pool_sizes.size();
+		pool_info.maxSets = 1000 * uint32_t(pool_sizes.size());
+		pool_info.poolSizeCount = uint32_t(pool_sizes.size());
 		pool_info.pPoolSizes = pool_sizes.data();
 		check_vk_result(vkCreateDescriptorPool(device, &pool_info, nullptr, &imgui_descriptor_pool));
 	}
@@ -320,7 +320,7 @@ void VulkanApplication::create_imgui_context() {
 		init_info.DescriptorPool = imgui_descriptor_pool;
 		init_info.Allocator = nullptr;
 		init_info.MinImageCount = 2;
-		init_info.ImageCount = frames.size();
+		init_info.ImageCount = uint32_t(frames.size());
 		init_info.CheckVkResultFn = check_vk_result;
 
 		ImGui_ImplVulkan_Init(&init_info, render_pass);
@@ -379,6 +379,7 @@ void VulkanApplication::main_loop() {
 	int last_time = SDL_GetTicks();
 	float delta_time = 0;
 
+	Input::start();
 	start();
 
 	while(run) {
@@ -390,6 +391,8 @@ void VulkanApplication::main_loop() {
 				continue;
 		}
 		last_time = time;
+
+		Input::update();
 
 		SDL_Event event;
 		while(SDL_PollEvent(&event)) {
@@ -445,7 +448,7 @@ void VulkanApplication::draw_scene(VulkanFrame &frame) {
 	vkCmdBindVertexBuffers(frame.command_buffer, 0, 1, &mesh_buffer, offsets);
 	vkCmdBindIndexBuffer(frame.command_buffer, mesh_buffer, idx_offset, VK_INDEX_TYPE_UINT32);
 	vkCmdBindDescriptorSets(frame.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &frame.descriptor_set, 0, nullptr);
-	vkCmdDrawIndexed(frame.command_buffer, indices.size(), 1, 0, 0, 0);
+	vkCmdDrawIndexed(frame.command_buffer, uint32_t(indices.size()), 1, 0, 0, 0);
 }
 
 void VulkanApplication::draw_frame() {
@@ -482,7 +485,7 @@ void VulkanApplication::draw_frame() {
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 			.renderPass = render_pass,
 			.framebuffer = frame->framebuffer,
-			.clearValueCount = clear_values.size(),
+			.clearValueCount = uint32_t(clear_values.size()),
 			.pClearValues = clear_values.data(),
 		};
 		renderpass_ci.renderArea.offset = {0, 0};
@@ -541,6 +544,8 @@ void VulkanApplication::draw_frame() {
 void VulkanApplication::cleanup() {
 	SDL_Log("Cleaning up...");
 	SDL_HideWindow(window);
+
+	Input::cleanup();
 
 	// IMGUI
 	ImGui_ImplVulkan_Shutdown();
@@ -633,7 +638,7 @@ void VulkanApplication::init_swapchain(bool reset) {
 	swapchain_images.resize(real_image_count);
 	vkGetSwapchainImagesKHR(device, swapchain, &real_image_count, swapchain_images.data());
 
-	for(int i = 0; i < real_image_count; i++) {
+	for(uint32_t i = 0; i < real_image_count; i++) {
 		frames[i].init_frame(device);
 		create_image_view(device, swapchain_images[i], swapchain_format, VK_IMAGE_ASPECT_COLOR_BIT, &frames[i].image_view);
 		frames[i].create_framebuffer(swapchain_extent, render_pass, depth_image_view);
@@ -1080,7 +1085,7 @@ void VulkanApplication::create_render_pass() {
 	std::array<VkAttachmentDescription, 2> attachments = {color_attachment, depth_attachment};
 	VkRenderPassCreateInfo renderpass_ci{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount = attachments.size(),
+		.attachmentCount = uint32_t(attachments.size()),
 		.pAttachments = attachments.data(),
 		.subpassCount = 1,
 		.pSubpasses = &subpass,
@@ -1389,7 +1394,7 @@ void VulkanApplication::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize siz
 }
 
 void VulkanApplication::create_mesh_buffer() {
-	VkDeviceSize vertex_size = idx_offset = sizeof(vertices[0]) * vertices.size();
+	VkDeviceSize vertex_size = idx_offset = sizeof(vertices[0]) * uint32_t(vertices.size());
 	VkDeviceSize index_size = sizeof(indices[0]) * indices.size();
 
 	VkBuffer staging_buffer;
@@ -1437,7 +1442,7 @@ void VulkanApplication::create_descriptors() {
 		std::array<VkDescriptorSetLayoutBinding, 2> bindings = {ubo_layout_binding, sampler_layout_binding};
 		VkDescriptorSetLayoutCreateInfo ci{
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			.bindingCount = bindings.size(),
+			.bindingCount = uint32_t(bindings.size()),
 			.pBindings = bindings.data(),
 		};
 		vkCreateDescriptorSetLayout(device, &ci, nullptr, &descriptor_set_layout);
@@ -1452,7 +1457,7 @@ void VulkanApplication::create_descriptors() {
 		VkDescriptorPoolCreateInfo ci{
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 			.maxSets = uint32_t(frames.size()),
-			.poolSizeCount = pool_sizes.size(),
+			.poolSizeCount = uint32_t(pool_sizes.size()),
 			.pPoolSizes = pool_sizes.data(),
 		};
 

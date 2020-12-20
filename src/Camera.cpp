@@ -7,11 +7,10 @@ void Camera::start() {
 }
 
 void Camera::update(float delta_time) {
-	int mouse_x, mouse_y;
 
-	if (SDL_GetRelativeMouseState(&mouse_x, &mouse_y) == SDL_BUTTON_RIGHT) {
-		yaw += mouse_x * camera_speed * delta_time;
-		pitch -= mouse_y * camera_speed * delta_time;
+	if (Input::get_mouse(3)) {
+		yaw += Input::delta_mouse_x() * camera_speed * delta_time;
+		pitch -= Input::delta_mouse_y() * camera_speed * delta_time;
 
 		if (pitch > 89.0f)
 			pitch = 89.0f;
@@ -30,22 +29,21 @@ void Camera::update(float delta_time) {
 	}
 
 	float delta_speed = delta_time * move_speed;
-
-	auto keyboard = SDL_GetKeyboardState(NULL);
-	if (keyboard[SDL_SCANCODE_LSHIFT])
+	
+	if (Input::get_key(SDL_SCANCODE_LSHIFT))
 		delta_speed *= 2.0f;
 
-	if (keyboard[SDL_SCANCODE_W])
+	if (Input::get_key(SDL_SCANCODE_W))
 		position += delta_speed * front;
-	if (keyboard[SDL_SCANCODE_S])
+	if (Input::get_key(SDL_SCANCODE_S))
 		position -= delta_speed * front;
-	if (keyboard[SDL_SCANCODE_A])
+	if (Input::get_key(SDL_SCANCODE_A))
 		position -= delta_speed * glm::normalize(glm::cross(front, up));
-	if (keyboard[SDL_SCANCODE_D])
+	if (Input::get_key(SDL_SCANCODE_D))
 		position += delta_speed * glm::normalize(glm::cross(front, up));
-	if (keyboard[SDL_SCANCODE_Q])
+	if (Input::get_key(SDL_SCANCODE_Q))
 		position -= delta_speed * up;
-	if (keyboard[SDL_SCANCODE_E])
+	if (Input::get_key(SDL_SCANCODE_E))
 		position += delta_speed * up;
 }
 

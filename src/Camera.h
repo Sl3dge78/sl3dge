@@ -7,6 +7,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "Input.h"
+
 class Camera {
 private:
 	glm::vec3 position;

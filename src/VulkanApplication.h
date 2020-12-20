@@ -27,6 +27,7 @@
 #include "imgui/imgui_impl_sdl.h"
 #include "imgui/imgui_impl_vulkan.h"
 
+#include "Input.h"
 #include "Debug.h"
 
 const Uint32 WINDOW_WIDTH = 1280;

@@ -15,7 +15,7 @@
 class Sl3dge : public VulkanApplication {
 private:
 	Camera camera;
-	bool show_demo_window = true;
+	bool show_demo_window = false;
 
 	void load(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) override {
 		tinyobj::attrib_t attrib;
@@ -24,7 +24,7 @@ private:
 		std::string err;
 
 		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "resources/models/viking_room.obj")) {
-			SDL_LogError(0, "Unable to read model %s %s", err.c_str());
+			SDL_LogError(0, "Unable to read model %s", err.c_str());
 		}
 
 		std::unordered_map<Vertex, uint32_t> unique_vtx{};
@@ -48,7 +48,7 @@ private:
 				};
 
 				if (unique_vtx.count(vertex) == 0) {
-					unique_vtx[vertex] = vertices.size();
+					unique_vtx[vertex] = uint32_t(vertices.size());
 					vertices.push_back(vertex);
 				}
 
@@ -67,9 +67,14 @@ private:
 	}
 
 	void update(float delta_time) override {
-		ImGui::ShowDemoWindow();
-		camera.update(delta_time);
+		
+		if(Input::get_key_down(SDL_SCANCODE_F11))
+			show_demo_window = !show_demo_window;
 
+		if(show_demo_window)
+			ImGui::ShowDemoWindow(&show_demo_window);
+
+		camera.update(delta_time);
 		camera.get_view_matrix(transform.view);
 	}
 };

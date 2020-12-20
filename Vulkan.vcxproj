@@ -104,6 +104,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>D:\VulkanSDK\1.2.154.1\Include;$(SolutionDir)include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/wd26495 /wd26819 /wd26812 /wd26451 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -122,6 +123,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>D:\VulkanSDK\1.2.154.1\Include;$(SolutionDir)include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/wd26495 /wd26819 /wd26812 /wd26451 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -142,6 +144,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>D:\VulkanSDK\1.2.154.1\Include;$(SolutionDir)include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/wd26495 /wd26819 /wd26812 /wd26451 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -164,6 +167,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>D:\VulkanSDK\1.2.154.1\Include;$(SolutionDir)include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalOptions>/wd26495 /wd26819 /wd26812 /wd26451 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -183,6 +187,7 @@
     <ClCompile Include="src\imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="src\imgui\imgui_stdlib.cpp" />
     <ClCompile Include="src\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\VulkanApplication.cpp" />
   </ItemGroup>
@@ -198,6 +203,7 @@
     <ClInclude Include="src\imgui\imstb_rectpack.h" />
     <ClInclude Include="src\imgui\imstb_textedit.h" />
     <ClInclude Include="src\imgui\imstb_truetype.h" />
+    <ClInclude Include="src\Input.h" />
     <ClInclude Include="src\VulkanApplication.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
