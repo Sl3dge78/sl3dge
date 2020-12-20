@@ -23,10 +23,10 @@
 
 #include "Debug.h"
 #include "Input.h"
-#include "UniformBufferObject.h"
-#include "Vertex.h"
-#include "VulkanFrame.h"
-#include "VulkanHelper.h"
+#include "vulkan/UniformBufferObject.h"
+#include "vulkan/Vertex.h"
+#include "vulkan/VulkanFrame.h"
+#include "vulkan/VulkanHelper.h"
 
 const Uint32 WINDOW_WIDTH = 1280;
 const Uint32 WINDOW_HEIGHT = 720;
@@ -76,7 +76,6 @@ private:
 	VkRenderPass render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
-
 	VkCommandPool graphics_command_pool;
 
 	std::vector<FrameSemaphores> frame_semaphores;
@@ -104,6 +103,7 @@ private:
 	VkSurfaceKHR surface;
 
 	VkDescriptorPool imgui_descriptor_pool;
+
 	bool framebuffer_rezised = false;
 	bool wait_for_vsync = false;
 

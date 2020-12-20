@@ -1,35 +1,36 @@
 #include "Camera.h"
 
+#include "imgui/imgui.h"
+
 void Camera::start() {
-	position = glm::vec3(0.f, -2.f, 0.f);
-	front = glm::vec3(0., 1.f, 0.f);
-	up = glm::vec3(0.f, 0.f, 1.f);
+	position = glm::vec3(1.5f, 1.5f, 1.f);
+
+	yaw = 220.f;
+	pitch = -8.f;
+
+	update_vectors();
 }
 
 void Camera::update(float delta_time) {
-
 	if (Input::get_mouse(3)) {
 		yaw += Input::delta_mouse_x() * camera_speed * delta_time;
 		pitch -= Input::delta_mouse_y() * camera_speed * delta_time;
+
+		if (yaw > 360)
+			yaw = 0;
+		if (yaw < 0)
+			yaw = 360;
 
 		if (pitch > 89.0f)
 			pitch = 89.0f;
 		if (pitch < -89.0f)
 			pitch = -89.0f;
 
-		glm::vec3 direction;
-
-		direction.x = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-		direction.y = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-		direction.z = sin(glm::radians(pitch));
-
-		front = glm::normalize(direction);
-		glm::vec3 right = glm::cross(front, glm::vec3(0.f, 0.f, -1.f));
-		up = glm::cross(front, right);
+		update_vectors();
 	}
 
 	float delta_speed = delta_time * move_speed;
-	
+
 	if (Input::get_key(SDL_SCANCODE_LSHIFT))
 		delta_speed *= 2.0f;
 
@@ -45,6 +46,33 @@ void Camera::update(float delta_time) {
 		position -= delta_speed * up;
 	if (Input::get_key(SDL_SCANCODE_E))
 		position += delta_speed * up;
+
+	if (show_window) {
+		if (!ImGui::Begin("Camera", &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
+			ImGui::End();
+		}
+		ImGui::Text("Position");
+		ImGui::InputFloat("x", &position.x, 0.01f, 1.0f, 3);
+		ImGui::InputScalar("x ", ImGuiDataType_Float, &position.x, NULL, NULL, "%.3f");
+		ImGui::InputFloat("y", &position.y, 0.01f, 1.0f, 3);
+		ImGui::InputFloat("z", &position.z, 0.01f, 1.0f, 3);
+
+		ImGui::InputFloat("yaw", &yaw, 0.01f, 1.0f, 3);
+		ImGui::InputFloat("pitch", &pitch, 0.01f, 1.0f, 3);
+		ImGui::End();
+	}
+}
+
+void Camera::update_vectors() {
+	glm::vec3 direction;
+
+	direction.x = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	direction.y = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	direction.z = sin(glm::radians(pitch));
+
+	front = glm::normalize(direction);
+	glm::vec3 right = glm::cross(front, glm::vec3(0.f, 0.f, -1.f));
+	up = glm::cross(front, right);
 }
 
 void Camera::get_view_matrix(glm::mat4 &view) {

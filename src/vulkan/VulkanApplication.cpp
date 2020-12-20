@@ -1122,6 +1122,46 @@ void VulkanApplication::draw_ui(VulkanFrame &frame) {
 //
 // Misc buffer fnc
 //
+
+// Copy a buffer from a staging buffer in the transfer queue to a buffer in the graphics queue transferring ownership.
+void VulkanApplication::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) {
+	auto send_cbuffer = begin_transfer_command_buffer();
+
+	VkBufferCopy regions{
+		.srcOffset = 0,
+		.dstOffset = 0,
+		.size = size,
+	};
+	vkCmdCopyBuffer(send_cbuffer, src, dst, 1, &regions);
+
+	VkBufferMemoryBarrier barrier{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+		.dstAccessMask = 0,
+		.srcQueueFamilyIndex = queue_family_indices.transfer_family.value(),
+		.dstQueueFamilyIndex = queue_family_indices.graphics_family.value(),
+		.buffer = dst,
+		.offset = 0,
+		.size = size,
+	};
+	vkCmdPipelineBarrier(send_cbuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
+	end_transfer_command_buffer(send_cbuffer);
+
+	auto receive_cbuffer = begin_graphics_command_buffer();
+
+	// reuse the old barrier create info
+	barrier.srcAccessMask = 0;
+	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	vkCmdPipelineBarrier(receive_cbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
+	end_graphics_command_buffer(receive_cbuffer);
+
+	vkQueueWaitIdle(transfer_queue);
+	vkFreeCommandBuffers(device, transfer_command_pool, 1, &send_cbuffer);
+
+	SDL_Log("Buffer copied!");
+}
+
+/*
 void VulkanApplication::create_command_buffer(VkCommandPool pool, VkCommandBuffer *c_buffer) {
 	VkCommandBufferAllocateInfo ai{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -1131,6 +1171,9 @@ void VulkanApplication::create_command_buffer(VkCommandPool pool, VkCommandBuffe
 	};
 	check_vk_result(vkAllocateCommandBuffers(device, &ai, c_buffer));
 }
+*/
+
+// Todo : wrapper class for command buffers
 
 VkCommandBuffer VulkanApplication::begin_graphics_command_buffer() {
 	VkCommandBufferAllocateInfo ai{
@@ -1190,42 +1233,4 @@ void VulkanApplication::end_transfer_command_buffer(VkCommandBuffer c_buffer) {
 		.pCommandBuffers = &c_buffer,
 	};
 	vkQueueSubmit(transfer_queue, 1, &submits, VK_NULL_HANDLE);
-}
-
-// Copy a buffer from a staging buffer in the transfer queue to a buffer in the graphics queue transferring ownership.
-void VulkanApplication::copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) {
-	auto send_cbuffer = begin_transfer_command_buffer();
-
-	VkBufferCopy regions{
-		.srcOffset = 0,
-		.dstOffset = 0,
-		.size = size,
-	};
-	vkCmdCopyBuffer(send_cbuffer, src, dst, 1, &regions);
-
-	VkBufferMemoryBarrier barrier{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-		.dstAccessMask = 0,
-		.srcQueueFamilyIndex = queue_family_indices.transfer_family.value(),
-		.dstQueueFamilyIndex = queue_family_indices.graphics_family.value(),
-		.buffer = dst,
-		.offset = 0,
-		.size = size,
-	};
-	vkCmdPipelineBarrier(send_cbuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
-	end_transfer_command_buffer(send_cbuffer);
-
-	auto receive_cbuffer = begin_graphics_command_buffer();
-
-	// reuse the old barrier create info
-	barrier.srcAccessMask = 0;
-	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	vkCmdPipelineBarrier(receive_cbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, VK_NULL_HANDLE, 1, &barrier, 0, VK_NULL_HANDLE);
-	end_graphics_command_buffer(receive_cbuffer);
-
-	vkQueueWaitIdle(transfer_queue);
-	vkFreeCommandBuffers(device, transfer_command_pool, 1, &send_cbuffer);
-
-	SDL_Log("Buffer copied!");
 }

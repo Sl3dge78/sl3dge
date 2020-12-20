@@ -18,6 +18,28 @@ std::vector<char> read_file(const std::string &path) {
 	return buffer;
 }
 
+void check_vk_result(VkResult err) {
+	if (err != VK_SUCCESS) {
+		switch (err) {
+			case VK_ERROR_OUT_OF_HOST_MEMORY:
+				SDL_LogError(0, "Vulkan Error : VK_ERROR_OUT_OF_HOST_MEMORY");
+				break;
+			case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+				SDL_LogError(0, "Vulkan Error : VK_ERROR_OUT_OF_DEVICE_MEMORY ");
+				break;
+			case VK_ERROR_FRAGMENTED_POOL:
+				SDL_LogError(0, "Vulkan Error : VK_ERROR_FRAGMENTED_POOL");
+				break;
+			case VK_ERROR_OUT_OF_POOL_MEMORY:
+				SDL_LogError(0, "Vulkan Error : VK_ERROR_OUT_OF_POOL_MEMORY");
+				break;
+			default:
+				SDL_LogError(0, "Unhandled exception : %d", err);
+		}
+		throw std::runtime_error("Vulkan error");
+	}
+}
+
 VkFormat get_vk_format(SDL_PixelFormat *format) {
 	switch (format->format) {
 		case SDL_PIXELFORMAT_ABGR8888:
@@ -89,28 +111,6 @@ void create_buffer(VkDevice device, VkPhysicalDevice physical_device, VkDeviceSi
 		throw std::runtime_error("Unable to allocate vertex buffer memory");
 	}
 	vkBindBufferMemory(device, buffer, buffer_memory, 0);
-}
-
-void check_vk_result(VkResult err) {
-	if (err != VK_SUCCESS) {
-		switch (err) {
-			case VK_ERROR_OUT_OF_HOST_MEMORY:
-				SDL_LogError(0, "Vulkan Error : VK_ERROR_OUT_OF_HOST_MEMORY");
-				break;
-			case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-				SDL_LogError(0, "Vulkan Error : VK_ERROR_OUT_OF_DEVICE_MEMORY ");
-				break;
-			case VK_ERROR_FRAGMENTED_POOL:
-				SDL_LogError(0, "Vulkan Error : VK_ERROR_FRAGMENTED_POOL");
-				break;
-			case VK_ERROR_OUT_OF_POOL_MEMORY:
-				SDL_LogError(0, "Vulkan Error : VK_ERROR_OUT_OF_POOL_MEMORY");
-				break;
-			default:
-				SDL_LogError(0, "Unhandled exception : %d", err);
-		}
-		throw std::runtime_error("Vulkan error");
-	}
 }
 
 bool check_validation_layer_support() {

@@ -32,9 +32,9 @@ struct SwapChainSupportDetails {
 
 std::vector<char> read_file(const std::string &path);
 
-VkFormat get_vk_format(SDL_PixelFormat *format);
-
 void check_vk_result(VkResult err);
+
+VkFormat get_vk_format(SDL_PixelFormat *format);
 
 uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties);
 

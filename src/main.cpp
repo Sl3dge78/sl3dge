@@ -3,12 +3,13 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #define TINYOBJLOADER_IMPLEMENTATION
 
+#include <deque>
 #include <unordered_map>
 
 #include <SDL/SDL.h>
 #include <tiny_obj_loader.h>
 
-#include "VulkanApplication.h"
+#include "vulkan/VulkanApplication.h"
 
 #include "Camera.h"
 
@@ -16,6 +17,7 @@ class Sl3dge : public VulkanApplication {
 private:
 	Camera camera;
 	bool show_demo_window = false;
+	bool show_metrics = false;
 
 	void load(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) override {
 		tinyobj::attrib_t attrib;
@@ -67,14 +69,45 @@ private:
 	}
 
 	void update(float delta_time) override {
+		camera.update(delta_time);
+		camera.get_view_matrix(transform.view);
+
+		if (ImGui::BeginMainMenuBar()) {
+			if (ImGui::BeginMenu("Options")) {
+				ImGui::MenuItem("Display Metrics", "F11", &show_metrics);
+				ImGui::EndMenu();
+			}
+			ImGui::Separator();
+			ImGui::Text("%.1f FPS", 1.f / delta_time);
+		}
+		ImGui::EndMainMenuBar();
+
 		if (Input::get_key_down(SDL_SCANCODE_F11))
-			show_demo_window = !show_demo_window;
+			show_metrics = !show_metrics;
 
 		if (show_demo_window)
 			ImGui::ShowDemoWindow(&show_demo_window);
 
-		camera.update(delta_time);
-		camera.get_view_matrix(transform.view);
+		if (show_metrics) {
+			show_metrics_window(show_metrics, delta_time);
+		}
+	}
+
+	void show_metrics_window(bool &opened, float delta_time) {
+		static std::vector<float> frames;
+		frames.push_back(1.f / delta_time);
+		if (frames.size() > 100)
+			frames.erase(frames.begin());
+
+		ImGui::SetNextWindowPos(ImVec2(10.f, 50.f), ImGuiCond_Always);
+		ImGui::SetNextWindowBgAlpha(0.35f);
+		if (!ImGui::Begin("metrics", &show_metrics, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav)) {
+			ImGui::End();
+		}
+		ImGui::Text("%d vtx, %d idx (%d tri)", vertices.size(), indices.size(), indices.size() / 3);
+		ImGui::PlotLines("FPS", frames.data(), frames.size(), 0, NULL, 50.0f, 60.0f, ImVec2(0, 80.0f), 4);
+
+		ImGui::End();
 	}
 };
 

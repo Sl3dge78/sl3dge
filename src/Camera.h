@@ -20,9 +20,13 @@ private:
 	float yaw = 0.f;
 	float pitch = 0.f;
 
+	bool show_window = true;
+
 public:
 	void start();
 	void update(float delta_time);
+
+	void update_vectors();
 	void get_view_matrix(glm::mat4 &view);
 };
 
