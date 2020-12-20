@@ -27,8 +27,8 @@
 #include "imgui/imgui_impl_sdl.h"
 #include "imgui/imgui_impl_vulkan.h"
 
-#include "Input.h"
 #include "Debug.h"
+#include "Input.h"
 
 const Uint32 WINDOW_WIDTH = 1280;
 const Uint32 WINDOW_HEIGHT = 720;
@@ -130,20 +130,16 @@ struct VulkanFrame {
 
 	VkFence fence;
 
-	VkSemaphore semaphore_image_available;
-	VkSemaphore semaphore_render_finished;
-	VkFence inflight_fence;
-
 	VkDescriptorSet descriptor_set;
 	VkBuffer uniform_buffer;
 	VkDeviceMemory uniform_buffer_memory;
 
-	void init_frame(VkDevice device); 
-	void create_framebuffer(VkExtent2D swapchain_extent, VkRenderPass render_pass, VkImageView depth_image_view); 
-	void create_command_buffers(VkCommandPool command_pool); 
-	void create_sync_objects(); 
+	void init_frame(VkDevice device);
+	void create_framebuffer(VkExtent2D swapchain_extent, VkRenderPass &render_pass, VkImageView &depth_image_view);
+	void create_command_buffers(VkCommandPool command_pool);
+	void create_sync_objects();
 	void create_descriptor_set(VkDescriptorPool descriptor_pool, VkDescriptorSetLayout descriptor_set_layout, VkSampler texture_sampler, VkImageView texture_image_view);
-	void create_uniform_buffer(VkPhysicalDevice physical_device); 
+	void create_uniform_buffer(VkPhysicalDevice physical_device);
 	void delete_frame();
 };
 
@@ -151,7 +147,6 @@ struct FrameSemaphores {
 	VkSemaphore image_aquired;
 	VkSemaphore render_complete;
 };
-
 
 class VulkanApplication {
 public:
@@ -222,17 +217,13 @@ private:
 	bool wait_for_vsync = false;
 
 	void init_window();
-	void init_imgui();
-	void create_imgui_context();
-	void cleanup_imgui_context();
 	void init_vulkan();
-	void main_loop();
+	void cleanup();
+
 	virtual void load(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) = 0;
 	virtual void start() = 0;
 	virtual void update(float delta_time) = 0;
-	void cleanup();
-
-	void draw_ui(VulkanFrame &frame);
+	void main_loop();
 	void draw_scene(VulkanFrame &frame);
 	void draw_frame();
 
@@ -249,17 +240,13 @@ private:
 	void cleanup_swapchain();
 
 	// Rendering
-	void create_image_views();
 	void create_render_pass();
 	void create_graphics_pipeline();
-	void create_framebuffers();
 	void create_command_pools();
-	void create_command_buffers();
 	void create_sync_objects();
 
 	// Scene
 	void create_mesh_buffer();
-	void create_uniform_buffer();
 	void create_descriptors();
 
 	// Texture
@@ -275,6 +262,13 @@ private:
 	VkFormat find_supported_format(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 	VkFormat find_depth_format();
 	bool has_stencil_component(VkFormat format);
+
+	// IMGUI
+	void init_imgui();
+	void create_imgui_context();
+	void draw_ui(VulkanFrame &frame);
+	void cleanup_imgui_context();
+	void cleanup_imgui();
 
 	void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
 

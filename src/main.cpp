@@ -67,11 +67,10 @@ private:
 	}
 
 	void update(float delta_time) override {
-		
-		if(Input::get_key_down(SDL_SCANCODE_F11))
+		if (Input::get_key_down(SDL_SCANCODE_F11))
 			show_demo_window = !show_demo_window;
 
-		if(show_demo_window)
+		if (show_demo_window)
 			ImGui::ShowDemoWindow(&show_demo_window);
 
 		camera.update(delta_time);
