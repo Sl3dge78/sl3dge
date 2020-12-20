@@ -296,7 +296,7 @@ void VulkanApplication::pick_physical_device() {
 	vkEnumeratePhysicalDevices(instance, &device_count, devices.data());
 
 	for (const auto &device : devices) {
-		if (is_device_suitable(device)) {
+		if (is_device_suitable(device, surface)) {
 			physical_device = device;
 			break;
 		}
@@ -307,76 +307,8 @@ void VulkanApplication::pick_physical_device() {
 	}
 }
 
-bool VulkanApplication::is_device_suitable(VkPhysicalDevice device) {
-	VkPhysicalDeviceProperties device_properties;
-	vkGetPhysicalDeviceProperties(device, &device_properties);
-	VkPhysicalDeviceFeatures device_features;
-	vkGetPhysicalDeviceFeatures(device, &device_features);
-
-	QueueFamilyIndices indices = find_queue_families(device);
-
-	bool extensions_supported = check_device_extension_support(device);
-
-	bool swapchain_adequate = false;
-	if (extensions_supported) {
-		SwapChainSupportDetails swapchain_support = query_swap_chain_support(device);
-		swapchain_adequate = !swapchain_support.formats.empty() && !swapchain_support.present_modes.empty();
-	}
-
-	return indices.is_complete() && extensions_supported && swapchain_adequate && device_features.samplerAnisotropy;
-}
-
-bool VulkanApplication::check_device_extension_support(VkPhysicalDevice device) {
-	uint32_t extension_count;
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, nullptr);
-
-	std::vector<VkExtensionProperties> available_extensions(extension_count);
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, available_extensions.data());
-
-	std::set<std::string> required_extensions(device_extensions.begin(), device_extensions.end());
-
-	for (const auto &extension : available_extensions) {
-		required_extensions.erase(extension.extensionName);
-	}
-
-	return required_extensions.empty();
-}
-
-QueueFamilyIndices VulkanApplication::find_queue_families(VkPhysicalDevice device) {
-	QueueFamilyIndices indices;
-	uint32_t queue_family_count = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
-
-	auto queue_family_properties = std::vector<VkQueueFamilyProperties>(queue_family_count);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_family_properties.data());
-
-	int i = 0;
-	for (const auto &queue_family : queue_family_properties) {
-		if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			indices.graphics_family = i;
-		}
-
-		VkBool32 present_support = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &present_support);
-
-		if (present_support) {
-			indices.present_family = i;
-		}
-
-		if ((queue_family.queueFlags & VK_QUEUE_TRANSFER_BIT) && !(queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-			indices.transfer_family = i;
-		}
-
-		if (indices.is_complete())
-			break;
-
-		i++;
-	}
-	return indices;
-}
-
 void VulkanApplication::create_logical_device() {
-	queue_family_indices = find_queue_families(physical_device);
+	queue_family_indices = find_queue_families(physical_device, surface);
 
 	std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
 	std::set<uint32_t> unique_queue_families = { queue_family_indices.graphics_family.value(), queue_family_indices.present_family.value(), queue_family_indices.transfer_family.value() };
@@ -455,31 +387,8 @@ VkExtent2D VulkanApplication::choose_swapchain_extent(const VkSurfaceCapabilitie
 	}
 }
 
-SwapChainSupportDetails VulkanApplication::query_swap_chain_support(VkPhysicalDevice device) {
-	SwapChainSupportDetails details;
-
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-	uint32_t format_count;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, nullptr);
-	if (format_count != 0) {
-		details.formats.resize(format_count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, details.formats.data());
-	}
-
-	uint32_t present_mode_count;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_mode_count, nullptr);
-
-	if (present_mode_count != 0) {
-		details.present_modes.resize(present_mode_count);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_mode_count, details.present_modes.data());
-	}
-
-	return details;
-}
-
 void VulkanApplication::create_swapchain() {
-	SwapChainSupportDetails support = query_swap_chain_support(physical_device);
+	SwapChainSupportDetails support = query_swap_chain_support(physical_device, surface);
 
 	auto surface_fmt = choose_swapchain_surface_format(support.formats);
 	auto present_mode = choose_swapchain_present_mode(support.present_modes);
@@ -500,7 +409,7 @@ void VulkanApplication::create_swapchain() {
 	create_info.imageArrayLayers = 1;
 	create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-	auto indices = find_queue_families(physical_device);
+	auto indices = find_queue_families(physical_device, surface);
 	uint32_t queue_indices[] = { indices.graphics_family.value(), indices.present_family.value() };
 
 	if (indices.present_family != indices.graphics_family) {

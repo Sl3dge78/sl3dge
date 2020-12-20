@@ -5,8 +5,6 @@
 #include <array>
 #include <cstdlib>
 #include <fstream>
-#include <optional>
-#include <set>
 #include <stdexcept>
 #include <vector>
 
@@ -34,24 +32,6 @@ const Uint32 WINDOW_WIDTH = 1280;
 const Uint32 WINDOW_HEIGHT = 720;
 const Uint32 FRAME_RATE = 60;
 const Uint32 MAX_FRAMES_IN_FLIGHT = 2;
-
-const std::vector<const char *> device_extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-
-struct QueueFamilyIndices {
-	std::optional<Uint32> graphics_family;
-	std::optional<Uint32> present_family;
-	std::optional<Uint32> transfer_family;
-
-	bool is_complete() {
-		return graphics_family.has_value() && present_family.has_value() && transfer_family.has_value();
-	}
-};
-
-struct SwapChainSupportDetails {
-	VkSurfaceCapabilitiesKHR capabilities;
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> present_modes;
-};
 
 struct FrameSemaphores {
 	VkSemaphore image_aquired;
@@ -184,14 +164,9 @@ private:
 
 	void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
 
-	bool is_device_suitable(VkPhysicalDevice device);
-	bool check_device_extension_support(VkPhysicalDevice device);
-	QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
-
 	VkSurfaceFormatKHR choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats);
 	VkPresentModeKHR choose_swapchain_present_mode(const std::vector<VkPresentModeKHR> &available_present_modes);
 	VkExtent2D choose_swapchain_extent(const VkSurfaceCapabilitiesKHR &capabilities);
-	SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device);
 
 	VkShaderModule create_shader_module(const std::vector<char> &code);
 
