@@ -5,8 +5,6 @@
 #include <array>
 #include <cstdlib>
 #include <fstream>
-#include <functional>
-#include <iostream>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -20,29 +18,24 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/hash.hpp>
 
 #include "imgui/imgui.h"
-
 #include "imgui/imgui_impl_sdl.h"
 #include "imgui/imgui_impl_vulkan.h"
 
 #include "Debug.h"
 #include "Input.h"
+#include "UniformBufferObject.h"
+#include "Vertex.h"
+#include "VulkanFrame.h"
+#include "VulkanHelper.h"
 
 const Uint32 WINDOW_WIDTH = 1280;
 const Uint32 WINDOW_HEIGHT = 720;
 const Uint32 FRAME_RATE = 60;
 const Uint32 MAX_FRAMES_IN_FLIGHT = 2;
-const std::vector<const char *> validation_layers = { "VK_LAYER_KHRONOS_validation" };
+
 const std::vector<const char *> device_extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-
-#ifndef _DEBUG
-const bool enable_validation_layers = false;
-#else
-
-const bool enable_validation_layers = true;
-#endif
 
 struct QueueFamilyIndices {
 	std::optional<Uint32> graphics_family;
@@ -58,89 +51,6 @@ struct SwapChainSupportDetails {
 	VkSurfaceCapabilitiesKHR capabilities;
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> present_modes;
-};
-
-struct Vertex {
-	glm::vec3 pos;
-	glm::vec3 normal;
-	glm::vec2 tex_coord;
-
-	bool operator==(const Vertex &other) const {
-		return pos == other.pos && normal == other.normal && tex_coord == other.tex_coord;
-	}
-
-	static VkVertexInputBindingDescription get_binding_description() {
-		VkVertexInputBindingDescription description{
-			.binding = 0,
-			.stride = sizeof(Vertex),
-			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-		};
-
-		return description;
-	}
-
-	static std::array<VkVertexInputAttributeDescription, 3> get_attribute_descriptions() {
-		std::array<VkVertexInputAttributeDescription, 3> descriptions{};
-		descriptions[0].location = 0;
-		descriptions[0].binding = 0;
-		descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		descriptions[0].offset = offsetof(Vertex, pos);
-
-		descriptions[1].location = 1;
-		descriptions[1].binding = 0;
-		descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		descriptions[1].offset = offsetof(Vertex, normal);
-
-		descriptions[2].location = 2;
-		descriptions[2].binding = 0;
-		descriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-		descriptions[2].offset = offsetof(Vertex, tex_coord);
-
-		return descriptions;
-	}
-};
-namespace std {
-template <>
-struct hash<Vertex> {
-	size_t operator()(Vertex const &vertex) const {
-		return ((hash<glm::vec3>()(vertex.pos) ^
-						(hash<glm::vec3>()(vertex.normal) << 1)) >>
-					   1) ^
-			   (hash<glm::vec2>()(vertex.tex_coord) << 1);
-	}
-};
-} // namespace std
-
-struct UniformBufferObject {
-	alignas(16) glm::mat4 model;
-	alignas(16) glm::mat4 view;
-	alignas(16) glm::mat4 proj;
-	alignas(16) glm::vec3 view_position;
-};
-
-struct VulkanFrame {
-	VkDevice device;
-	VkImage image;
-	VkImageView image_view;
-
-	VkFramebuffer framebuffer;
-
-	VkCommandPool command_pool;
-	VkCommandBuffer command_buffer;
-
-	VkFence fence;
-
-	VkDescriptorSet descriptor_set;
-	VkBuffer uniform_buffer;
-	VkDeviceMemory uniform_buffer_memory;
-
-	void init_frame(VkDevice device);
-	void create_framebuffer(VkExtent2D swapchain_extent, VkRenderPass &render_pass, VkImageView &depth_image_view);
-	void create_command_buffers(VkCommandPool command_pool);
-	void create_sync_objects();
-	void create_descriptor_set(VkDescriptorPool descriptor_pool, VkDescriptorSetLayout descriptor_set_layout, VkSampler texture_sampler, VkImageView texture_image_view);
-	void create_uniform_buffer(VkPhysicalDevice physical_device);
-	void delete_frame();
 };
 
 struct FrameSemaphores {
@@ -172,6 +82,8 @@ private:
 	VkInstance instance;
 	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
 	VkDevice device;
+
+	DebugMessenger *debug_messenger = nullptr;
 
 	QueueFamilyIndices queue_family_indices;
 	VkQueue graphics_queue;
@@ -209,17 +121,18 @@ private:
 	VkDeviceMemory depth_image_memory;
 	VkImageView depth_image_view;
 
-	VkDebugUtilsMessengerEXT debug_messenger;
 	VkSurfaceKHR surface;
 
 	VkDescriptorPool imgui_descriptor_pool;
 	bool framebuffer_rezised = false;
 	bool wait_for_vsync = false;
 
+	// Init & Cleanup
 	void init_window();
 	void init_vulkan();
 	void cleanup();
 
+	// Loop
 	virtual void load(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) = 0;
 	virtual void start() = 0;
 	virtual void update(float delta_time) = 0;
@@ -229,7 +142,6 @@ private:
 
 	// Device
 	void create_instance();
-	void setup_debug_messenger();
 	void create_surface();
 	void pick_physical_device();
 	void create_logical_device();
@@ -263,18 +175,14 @@ private:
 	VkFormat find_depth_format();
 	bool has_stencil_component(VkFormat format);
 
-	// IMGUI
+	/* IMGUI */
 	void init_imgui();
-	void create_imgui_context();
-	void draw_ui(VulkanFrame &frame);
-	void cleanup_imgui_context();
 	void cleanup_imgui();
+	void create_imgui_context();
+	void cleanup_imgui_context();
+	void draw_ui(VulkanFrame &frame);
 
 	void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
-
-	std::vector<const char *> get_required_extensions();
-
-	bool check_validation_layer_support();
 
 	bool is_device_suitable(VkPhysicalDevice device);
 	bool check_device_extension_support(VkPhysicalDevice device);

@@ -190,6 +190,8 @@
     <ClCompile Include="src\Input.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\VulkanApplication.cpp" />
+    <ClCompile Include="src\VulkanFrame.cpp" />
+    <ClCompile Include="src\VulkanHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Camera.h" />
@@ -204,7 +206,11 @@
     <ClInclude Include="src\imgui\imstb_textedit.h" />
     <ClInclude Include="src\imgui\imstb_truetype.h" />
     <ClInclude Include="src\Input.h" />
+    <ClInclude Include="src\UniformBufferObject.h" />
+    <ClInclude Include="src\Vertex.h" />
     <ClInclude Include="src\VulkanApplication.h" />
+    <ClInclude Include="src\VulkanFrame.h" />
+    <ClInclude Include="src\VulkanHelper.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
