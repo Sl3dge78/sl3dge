@@ -335,6 +335,7 @@ void VulkanApplication::create_logical_device() {
 
 	VkDeviceCreateInfo create_info{};
 	create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
 	create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
 	create_info.pQueueCreateInfos = queue_create_infos.data();
 	create_info.pEnabledFeatures = &device_features;

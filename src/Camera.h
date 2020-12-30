@@ -20,8 +20,6 @@ private:
 	float yaw = 0.f;
 	float pitch = 0.f;
 
-	bool show_window = true;
-
 public:
 	void start();
 	void update(float delta_time);
@@ -29,6 +27,8 @@ public:
 	void update_vectors();
 	void get_view_matrix(glm::mat4 &view);
 	glm::vec3 get_position() const { return position; }
+
+	bool show_window = false;
 };
 
 #endif

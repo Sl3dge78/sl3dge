@@ -12,7 +12,15 @@
 #include "Debug.h"
 
 const std::vector<const char *> validation_layers = { "VK_LAYER_KHRONOS_validation" };
-const std::vector<const char *> device_extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+const std::vector<const char *> device_extensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+	VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+	VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+	VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+	VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
+};
 
 struct QueueFamilyIndices {
 	std::optional<Uint32> graphics_family;

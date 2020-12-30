@@ -84,6 +84,7 @@ private:
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Display Lighting Options", "F10", &show_lighting_options);
 				ImGui::MenuItem("Display Metrics", "F11", &show_metrics);
+				ImGui::MenuItem("Cam Info", "", &camera.show_window);
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();

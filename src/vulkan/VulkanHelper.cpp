@@ -162,8 +162,36 @@ std::vector<const char *> get_required_extensions(SDL_Window *window) {
 bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
 	VkPhysicalDeviceProperties device_properties;
 	vkGetPhysicalDeviceProperties(device, &device_properties);
-	VkPhysicalDeviceFeatures device_features;
-	vkGetPhysicalDeviceFeatures(device, &device_features);
+
+	/*
+	VkPhysicalDeviceAccelerationStructurePropertiesKHR acc_properties;
+	acc_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
+
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_properties;
+	rt_properties.pNext = &acc_properties;
+	rt_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+
+	VkPhysicalDeviceProperties2 device_properties2;
+	device_properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+	device_properties2.pNext = &rt_properties;
+
+	vkGetPhysicalDeviceProperties2(device, &device_properties2);
+	*/
+	//VkPhysicalDeviceFeatures device_features;
+	//vkGetPhysicalDeviceFeatures(device, &device_features);
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR acc_feature;
+	acc_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+	acc_feature.pNext = nullptr;
+
+	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_feature;
+	rt_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+	rt_feature.pNext = &acc_feature;
+
+	VkPhysicalDeviceFeatures2 device_features2;
+	device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	device_features2.pNext = &rt_feature;
+
+	vkGetPhysicalDeviceFeatures2(device, &device_features2);
 
 	QueueFamilyIndices indices = find_queue_families(device, surface);
 
@@ -175,7 +203,7 @@ bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
 		swapchain_adequate = !swapchain_support.formats.empty() && !swapchain_support.present_modes.empty();
 	}
 
-	return indices.is_complete() && extensions_supported && swapchain_adequate && device_features.samplerAnisotropy;
+	return indices.is_complete() && extensions_supported && swapchain_adequate && device_features2.features.samplerAnisotropy;
 }
 
 QueueFamilyIndices find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface) {
