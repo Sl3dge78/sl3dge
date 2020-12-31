@@ -1,5 +1,4 @@
-#ifndef VULKANAPPLICATION_H
-#define VULKANAPPLICATION_H
+#pragma once
 
 #include <algorithm>
 #include <array>
@@ -8,7 +7,8 @@
 #include <stdexcept>
 #include <vector>
 
-#include <vulkan/vulkan.h>
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <vulkan/vulkan.hpp>
 
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
@@ -60,11 +60,12 @@ protected:
 	SDL_Window *window = nullptr;
 
 private:
-	VkInstance instance;
-	VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-	VkDevice device;
+	vk::DynamicLoader dynamic_loader;
+	vk::UniqueInstance instance;
+	vk::PhysicalDevice physical_device;
+	vk::UniqueDevice device;
 
-	DebugMessenger *debug_messenger = nullptr;
+	vk::UniqueDebugUtilsMessengerEXT debug_messenger;
 
 	QueueFamilyIndices queue_family_indices;
 	VkQueue graphics_queue;
@@ -123,7 +124,6 @@ private:
 
 	// Device
 	void create_instance();
-	void create_surface();
 	void pick_physical_device();
 	void create_logical_device();
 
@@ -156,7 +156,7 @@ private:
 	VkFormat find_depth_format();
 	bool has_stencil_component(VkFormat format);
 
-	/* IMGUI */
+	// IMGUI
 	void init_imgui();
 	void cleanup_imgui();
 	void create_imgui_context();
@@ -172,5 +172,3 @@ private:
 	VkCommandBuffer begin_transfer_command_buffer();
 	void end_transfer_command_buffer(VkCommandBuffer c_buffer);
 };
-
-#endif

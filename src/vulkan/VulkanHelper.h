@@ -5,14 +5,14 @@
 #include <set>
 #include <vector>
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 #include <SDL/SDL.h>
 
 #include "Debug.h"
 
-const std::vector<const char *> validation_layers = { "VK_LAYER_KHRONOS_validation" };
-const std::vector<const char *> device_extensions = {
+const std::vector<const char *> req_validation_layers = { "VK_LAYER_KHRONOS_validation" };
+const std::vector<const char *> req_device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 	VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
 	VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
@@ -54,9 +54,7 @@ bool check_validation_layer_support();
 
 std::vector<const char *> get_required_extensions(SDL_Window *window);
 
-bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface);
-QueueFamilyIndices find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface);
-bool check_device_extension_support(VkPhysicalDevice device);
+QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface);
 SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurfaceKHR surface);
 
 VkSurfaceFormatKHR choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats);
