@@ -114,13 +114,9 @@ void create_buffer(VkDevice device, VkPhysicalDevice physical_device, VkDeviceSi
 }
 
 bool check_validation_layer_support() {
-	uint32_t layer_count;
-	vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
+	auto available_layers = vk::enumerateInstanceLayerProperties();
 
-	std::vector<VkLayerProperties> available_layers(layer_count);
-	vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
-
-	for (const char *layer_name : validation_layers) {
+	for (const char *layer_name : req_validation_layers) {
 		bool layer_found = false;
 		for (const auto &layer_properties : available_layers) {
 			if (strcmp(layer_name, layer_properties.layerName) == 0) {
@@ -143,9 +139,8 @@ std::vector<const char *> get_required_extensions(SDL_Window *window) {
 	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, nullptr);
 
 	std::vector<const char *> required_extension_names = {};
-	size_t sdl_additional_extension_count = required_extension_names.size();
-	required_extension_names.resize(sdl_additional_extension_count + sdl_extension_count);
-	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, required_extension_names.data() + sdl_additional_extension_count);
+	required_extension_names.resize(sdl_extension_count);
+	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, required_extension_names.data());
 
 	if (enable_validation_layers) {
 		required_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -159,75 +154,21 @@ std::vector<const char *> get_required_extensions(SDL_Window *window) {
 	return required_extension_names;
 }
 
-bool is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
-	VkPhysicalDeviceProperties device_properties;
-	vkGetPhysicalDeviceProperties(device, &device_properties);
-
-	/*
-	VkPhysicalDeviceAccelerationStructurePropertiesKHR acc_properties;
-	acc_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
-
-	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_properties;
-	rt_properties.pNext = &acc_properties;
-	rt_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-
-	VkPhysicalDeviceProperties2 device_properties2;
-	device_properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-	device_properties2.pNext = &rt_properties;
-
-	vkGetPhysicalDeviceProperties2(device, &device_properties2);
-	*/
-	//VkPhysicalDeviceFeatures device_features;
-	//vkGetPhysicalDeviceFeatures(device, &device_features);
-	VkPhysicalDeviceAccelerationStructureFeaturesKHR acc_feature;
-	acc_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-	acc_feature.pNext = nullptr;
-
-	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_feature;
-	rt_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-	rt_feature.pNext = &acc_feature;
-
-	VkPhysicalDeviceFeatures2 device_features2;
-	device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-	device_features2.pNext = &rt_feature;
-
-	vkGetPhysicalDeviceFeatures2(device, &device_features2);
-
-	QueueFamilyIndices indices = find_queue_families(device, surface);
-
-	bool extensions_supported = check_device_extension_support(device);
-
-	bool swapchain_adequate = false;
-	if (extensions_supported) {
-		SwapChainSupportDetails swapchain_support = query_swap_chain_support(device, surface);
-		swapchain_adequate = !swapchain_support.formats.empty() && !swapchain_support.present_modes.empty();
-	}
-
-	return indices.is_complete() && extensions_supported && swapchain_adequate && device_features2.features.samplerAnisotropy;
-}
-
-QueueFamilyIndices find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface) {
+QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface) {
 	QueueFamilyIndices indices;
-	uint32_t queue_family_count = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
-
-	auto queue_family_properties = std::vector<VkQueueFamilyProperties>(queue_family_count);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_family_properties.data());
+	auto queue_family_properties = device.getQueueFamilyProperties();
 
 	int i = 0;
 	for (const auto &queue_family : queue_family_properties) {
-		if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+		if (queue_family.queueFlags & vk::QueueFlagBits::eGraphics) {
 			indices.graphics_family = i;
 		}
 
-		VkBool32 present_support = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &present_support);
-
-		if (present_support) {
+		if (device.getSurfaceSupportKHR(i, surface)) {
 			indices.present_family = i;
 		}
 
-		if ((queue_family.queueFlags & VK_QUEUE_TRANSFER_BIT) && !(queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+		if ((queue_family.queueFlags & vk::QueueFlagBits::eTransfer) && !(queue_family.queueFlags & vk::QueueFlagBits::eGraphics)) {
 			indices.transfer_family = i;
 		}
 
@@ -237,22 +178,6 @@ QueueFamilyIndices find_queue_families(VkPhysicalDevice device, VkSurfaceKHR sur
 		i++;
 	}
 	return indices;
-}
-
-bool check_device_extension_support(VkPhysicalDevice device) {
-	uint32_t extension_count;
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, nullptr);
-
-	std::vector<VkExtensionProperties> available_extensions(extension_count);
-	vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, available_extensions.data());
-
-	std::set<std::string> required_extensions(device_extensions.begin(), device_extensions.end());
-
-	for (const auto &extension : available_extensions) {
-		required_extensions.erase(extension.extensionName);
-	}
-
-	return required_extensions.empty();
 }
 
 SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurfaceKHR surface) {
