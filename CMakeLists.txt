@@ -3,6 +3,10 @@ project(Vulkan)
 
 set(CMAKE_CXX_STANDARD 20)
 
+if(${CMAKE_BUILD_TYPE} EQUAL Debug)
+    add_compile_definitions(_DEBUG)
+endif()
+
 include_directories(src)
 include_directories(src/imgui)
 include_directories(src/vulkan)
@@ -10,7 +14,6 @@ include_directories(include)
 include_directories(D:/VulkanSDK/1.2.162.0/Include)
 link_directories(lib)
 link_directories(D:/VulkanSDK/1.2.162.0/Lib)
-
 
 add_executable(Vulkan
         src/imgui/imconfig.h

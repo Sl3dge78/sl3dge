@@ -40,13 +40,13 @@ void check_vk_result(VkResult err) {
 	}
 }
 
-VkFormat get_vk_format(SDL_PixelFormat *format) {
+vk::Format get_vk_format(SDL_PixelFormat *format) {
 	switch (format->format) {
 		case SDL_PIXELFORMAT_ABGR8888:
-			return VK_FORMAT_R8G8B8A8_SRGB;
+			return vk::Format::eR8G8B8A8Srgb;
 			break;
 		case SDL_PIXELFORMAT_RGBA8888:
-			return VK_FORMAT_R8G8B8A8_SRGB;
+			return vk::Format::eR8G8B8A8Srgb;
 			break;
 		default:
 			SDL_LogError(0, "Texture pixel format unsupported!");
@@ -66,13 +66,13 @@ uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter
 	throw std::runtime_error("Unable to find suitable memory type");
 }
 
-void create_image_view(VkDevice device, VkImage &image, VkFormat format, VkImageAspectFlags aspect, VkImageView *image_view) {
+void create_image_view(VkDevice device, VkImage &image, vk::Format format, VkImageAspectFlags aspect, VkImageView *image_view) {
 	VkImageViewCreateInfo create_info{};
 	create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	create_info.image = image;
 
 	create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	create_info.format = format;
+	create_info.format = static_cast<VkFormat>(format);
 
 	create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -154,7 +154,7 @@ std::vector<const char *> get_required_extensions(SDL_Window *window) {
 	return required_extension_names;
 }
 
-QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface) {
+QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface) {
 	QueueFamilyIndices indices;
 	auto queue_family_properties = device.getQueueFamilyProperties();
 

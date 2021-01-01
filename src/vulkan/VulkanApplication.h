@@ -62,6 +62,7 @@ protected:
 private:
 	vk::DynamicLoader dynamic_loader;
 	vk::UniqueInstance instance;
+	vk::UniqueSurfaceKHR surface;
 	vk::PhysicalDevice physical_device;
 	vk::UniqueDevice device;
 
@@ -79,7 +80,7 @@ private:
 
 	std::vector<VulkanFrame> frames;
 
-	VkRenderPass render_pass;
+	vk::UniqueRenderPass render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
 
@@ -104,7 +105,7 @@ private:
 	VkDeviceMemory depth_image_memory;
 	VkImageView depth_image_view;
 
-	vk::SurfaceKHR surface;
+
 
 	VkDescriptorPool imgui_descriptor_pool;
 
@@ -145,7 +146,7 @@ private:
 
 	// Texture
 	void create_texture_image();
-	void create_image(uint32_t w, uint32_t h, VkFormat fmt, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory);
+	void create_image(uint32_t w, uint32_t h, vk::Format fmt, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory);
 	void transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkFormat format, VkImageLayout from, VkImageLayout to);
 	void copy_buffer_to_image(VkCommandBuffer transfer_cbuffer, VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 	void create_texture_image_view();

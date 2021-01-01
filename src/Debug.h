@@ -4,7 +4,7 @@
 
 #include "VulkanHelper.h"
 
-#ifndef _DEBUG
+#ifdef NDEBUG
 const bool enable_validation_layers = false;
 #else
 const bool enable_validation_layers = true;

@@ -39,22 +39,16 @@ struct SwapChainSupportDetails {
 };
 
 std::vector<char> read_file(const std::string &path);
-
 void check_vk_result(VkResult err);
-
-VkFormat get_vk_format(SDL_PixelFormat *format);
-
+vk::Format get_vk_format(SDL_PixelFormat *format);
 uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties);
-
-void create_image_view(VkDevice device, VkImage &image, VkFormat format, VkImageAspectFlags aspect, VkImageView *image_view);
-
+void create_image_view(VkDevice device, VkImage &image, vk::Format format, VkImageAspectFlags aspect, VkImageView *image_view);
 void create_buffer(VkDevice device, VkPhysicalDevice physical_device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &buffer_memory);
-
 bool check_validation_layer_support();
 
 std::vector<const char *> get_required_extensions(SDL_Window *window);
 
-QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface);
+QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface);
 SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurfaceKHR surface);
 
 vk::SurfaceFormatKHR choose_swapchain_surface_format(const vk::PhysicalDevice physical_device, const VkSurfaceKHR surface);

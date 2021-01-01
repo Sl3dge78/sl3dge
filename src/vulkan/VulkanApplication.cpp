@@ -22,6 +22,7 @@ void VulkanApplication::init_vulkan() {
 
 	// Logger
 	if (enable_validation_layers) {
+		SDL_Log("DEBUG");
 		vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
 															 vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
 															 vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
@@ -38,7 +39,8 @@ void VulkanApplication::init_vulkan() {
 		if (SDL_Vulkan_CreateSurface(window, *instance, &surf) != SDL_TRUE) {
 			throw std::runtime_error("Unable to create window surface");
 		}
-		surface = vk::SurfaceKHR(surf);
+		vk::ObjectDestroy<vk::Instance, vk::DispatchLoaderDynamic> surface_deleter(*instance);
+		surface = vk::UniqueSurfaceKHR (surf,surface_deleter);
 		SDL_Log("Surface created!");
 	}
 
@@ -87,7 +89,7 @@ void VulkanApplication::cleanup() {
 	vkDestroyCommandPool(*device, graphics_command_pool, nullptr);
 	vkDestroyCommandPool(*device, transfer_command_pool, nullptr);
 	*/
-	vkDestroySurfaceKHR(*instance, surface, nullptr);
+	//vkDestroySurfaceKHR(*instance, surface, nullptr);
 
 	// IMGUI
 	cleanup_imgui();
@@ -211,7 +213,7 @@ void VulkanApplication::draw_frame() {
 		clear_values[1].depthStencil = { 1.f, 0 };
 		VkRenderPassBeginInfo renderpass_ci{
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass = render_pass,
+			.renderPass = *render_pass,
 			.framebuffer = frame->framebuffer,
 			.clearValueCount = uint32_t(clear_values.size()),
 			.pClearValues = clear_values.data(),
@@ -297,7 +299,7 @@ void VulkanApplication::pick_physical_device() {
 			continue;
 
 		// Queues
-		QueueFamilyIndices indices = find_queue_families(device, surface);
+		QueueFamilyIndices indices = find_queue_families(device, *surface);
 		if (!indices.is_complete())
 			continue;
 
@@ -311,7 +313,7 @@ void VulkanApplication::pick_physical_device() {
 			continue;
 
 		// Swapchain
-		bool swapchain_adequate = !device.getSurfaceFormatsKHR(surface).empty() && !device.getSurfacePresentModesKHR(surface).empty();
+		bool swapchain_adequate = !device.getSurfaceFormatsKHR(*surface).empty() && !device.getSurfacePresentModesKHR(*surface).empty();
 		if (!swapchain_adequate)
 			continue;
 
@@ -320,13 +322,13 @@ void VulkanApplication::pick_physical_device() {
 		break;
 	}
 
-	if (physical_device == VK_NULL_HANDLE) {
+	if (!physical_device) {
 		throw std::runtime_error("No GPUs with requested support");
 	}
 }
 
 void VulkanApplication::create_logical_device() {
-	queue_family_indices = find_queue_families(physical_device, surface);
+	queue_family_indices = find_queue_families(physical_device, *surface);
 
 	std::vector<vk::DeviceQueueCreateInfo> req_queues;
 	std::set<uint32_t> unique_queue_families = { queue_family_indices.graphics_family.value(), queue_family_indices.present_family.value(), queue_family_indices.transfer_family.value() };
@@ -385,7 +387,7 @@ void VulkanApplication::init_swapchain(bool reset) {
 	for (uint32_t i = 0; i < real_image_count; i++) {
 		frames[i].init_frame(*device);
 		create_image_view(*device, swapchain_images[i], swapchain_format, VK_IMAGE_ASPECT_COLOR_BIT, &frames[i].image_view);
-		frames[i].create_framebuffer(swapchain_extent, render_pass, depth_image_view);
+		frames[i].create_framebuffer(swapchain_extent, *render_pass, depth_image_view);
 		frames[i].create_command_buffers(*graphics_command_pool);
 		frames[i].create_sync_objects();
 		frames[i].create_uniform_buffer(physical_device);
@@ -400,21 +402,21 @@ void VulkanApplication::init_swapchain(bool reset) {
 }
 
 void VulkanApplication::create_swapchain() {
-	auto capabilities = physical_device.getSurfaceCapabilitiesKHR(surface);
+	auto capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
 
-	auto surface_fmt = choose_swapchain_surface_format(physical_device, surface);
-	auto present_mode = choose_swapchain_present_mode(physical_device, surface);
+	auto surface_fmt = choose_swapchain_surface_format(physical_device, *surface);
+	auto present_mode = choose_swapchain_present_mode(physical_device, *surface);
 	auto extent = choose_swapchain_extent(capabilities, window);
 
 	uint32_t image_count = capabilities.minImageCount + 1;
 	if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
 		image_count = capabilities.maxImageCount;
 	}
-	auto indices = find_queue_families(physical_device, surface);
+	auto indices = find_queue_families(physical_device, *surface);
 	std::array<const uint32_t, 2> queue_indices({ indices.graphics_family.value(), indices.present_family.value() });
 
 	vk::SwapchainCreateInfoKHR ci({},
-			surface,
+			*surface,
 			image_count,
 			surface_fmt.format,
 			surface_fmt.colorSpace,
@@ -455,8 +457,7 @@ void VulkanApplication::cleanup_swapchain() {
 	vkDestroyPipeline(*device, graphics_pipeline, nullptr);
 	vkDestroyPipelineLayout(*device, pipeline_layout, nullptr);
 
-	vkDestroyRenderPass(*device, render_pass, nullptr);
-	vkDestroySwapchainKHR(*device, *swapchain, nullptr);
+	//vkDestroySwapchainKHR(*device, *swapchain, nullptr);
 }
 
 //
@@ -491,10 +492,16 @@ void VulkanApplication::create_render_pass() {
 	vk::AttachmentReference depth_ref(1U, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 	attachments.push_back(depth_attachment);
 
-	vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, { color_ref }, nullptr, depth_ref, nullptr);
+	vk::SubpassDescription subpass(
+			{},
+			vk::PipelineBindPoint::eGraphics,
+			nullptr, color_ref,
+			nullptr, &depth_ref,
+			nullptr
+			);
 
 	vk::SubpassDependency dependency(
-			0U,
+			VK_SUBPASS_EXTERNAL,
 			0U,
 			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
 			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
@@ -502,7 +509,7 @@ void VulkanApplication::create_render_pass() {
 			{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
 			{});
 
-	device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
+	render_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
 	/*
 	VkSubpassDependency dependency{
 		.srcSubpass = VK_SUBPASS_EXTERNAL,
@@ -665,7 +672,7 @@ void VulkanApplication::create_graphics_pipeline() {
 		.pColorBlendState = &color_blending,
 		.pDynamicState = nullptr,
 		.layout = pipeline_layout,
-		.renderPass = render_pass,
+		.renderPass = *render_pass,
 		.subpass = 0,
 		.basePipelineHandle = VK_NULL_HANDLE,
 		.basePipelineIndex = -1,
@@ -783,7 +790,7 @@ void VulkanApplication::create_texture_image() {
 		throw std::runtime_error("Unable to create texture");
 	}
 
-	VkFormat format = get_vk_format(surf->format);
+	vk::Format format(get_vk_format(surf->format));
 	create_image(surf->w, surf->h, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory);
 
 	// Create data transfer buffer
@@ -834,10 +841,26 @@ void VulkanApplication::create_texture_image() {
 	vkFreeMemory(*device, staging_buffer_memory, nullptr);
 }
 
-void VulkanApplication::create_image(uint32_t w, uint32_t h, VkFormat fmt, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_memory) {
+void VulkanApplication::create_image(uint32_t w, uint32_t h, vk::Format fmt, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_memory) {
 	// Create VkImage
 
-	VkImageCreateInfo ci{
+	vk::ImageCreateInfo ci({},
+			vk::ImageType::e2D,
+			fmt,
+			vk::Extent3D(w,h,1),
+			1,
+			1,
+			vk::SampleCountFlagBits::e1,
+			vk::ImageTiling(tiling),
+			vk::ImageUsageFlags(usage),
+			vk::SharingMode::eExclusive,
+			nullptr,
+			vk::ImageLayout::eUndefined);
+
+	image = device->createImage(ci);
+
+	/*
+	 * VkImageCreateInfo ci{
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.imageType = VK_IMAGE_TYPE_2D,
 		.format = fmt,
@@ -850,9 +873,10 @@ void VulkanApplication::create_image(uint32_t w, uint32_t h, VkFormat fmt, VkIma
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 	};
-	if (vkCreateImage(*device, &ci, nullptr, &image) != VK_SUCCESS) {
+	 if (vkCreateImage(*device, &ci, nullptr, &image) != VK_SUCCESS) {
 		throw std::runtime_error("Unable to create texture");
 	}
+	 */
 
 	// Allocate VkImage memory
 	VkMemoryRequirements mem_reqs;
@@ -924,7 +948,7 @@ void VulkanApplication::copy_buffer_to_image(VkCommandBuffer c_buffer, VkBuffer 
 }
 
 void VulkanApplication::create_texture_image_view() {
-	create_image_view(*device, texture_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, &texture_image_view);
+	create_image_view(*device, texture_image, vk::Format::eR8G8B8A8Srgb, VK_IMAGE_ASPECT_COLOR_BIT, &texture_image_view);
 }
 
 void VulkanApplication::create_texture_sampler() {
@@ -1054,7 +1078,7 @@ void VulkanApplication::create_imgui_context() {
 		init_info.ImageCount = uint32_t(frames.size());
 		init_info.CheckVkResultFn = check_vk_result;
 
-		ImGui_ImplVulkan_Init(&init_info, render_pass);
+		ImGui_ImplVulkan_Init(&init_info, *render_pass);
 	}
 	{ // Create font
 		VkCommandBufferBeginInfo bi{

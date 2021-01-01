@@ -10,7 +10,7 @@ void VulkanFrame::init_frame(VkDevice device) {
 	this->device = device;
 }
 
-void VulkanFrame::create_framebuffer(VkExtent2D swapchain_extent, VkRenderPass &render_pass, VkImageView &depth_image_view) {
+void VulkanFrame::create_framebuffer(VkExtent2D swapchain_extent, vk::RenderPass &render_pass, VkImageView &depth_image_view) {
 	VkImageView attachments[] = {
 		image_view,
 		depth_image_view,
