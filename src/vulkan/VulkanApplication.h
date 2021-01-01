@@ -56,7 +56,7 @@ protected:
 	VtxUniformBufferObject vubo;
 	FragUniformBufferObject fubo;
 
-	VkExtent2D swapchain_extent;
+	vk::Extent2D swapchain_extent;
 	SDL_Window *window = nullptr;
 
 private:
@@ -67,24 +67,26 @@ private:
 
 	vk::UniqueDebugUtilsMessengerEXT debug_messenger;
 
+	vk::UniqueCommandPool graphics_command_pool;
+	vk::UniqueCommandPool transfer_command_pool;
+
 	QueueFamilyIndices queue_family_indices;
 	VkQueue graphics_queue;
 	VkQueue present_queue;
 
-	VkSwapchainKHR swapchain;
-	VkFormat swapchain_format;
+	vk::UniqueSwapchainKHR swapchain;
+	vk::Format swapchain_format;
+
 	std::vector<VulkanFrame> frames;
 
 	VkRenderPass render_pass;
 	VkPipelineLayout pipeline_layout;
 	VkPipeline graphics_pipeline;
-	VkCommandPool graphics_command_pool;
 
 	std::vector<FrameSemaphores> frame_semaphores;
 	size_t semaphore_index = 0;
 
 	VkQueue transfer_queue;
-	VkCommandPool transfer_command_pool;
 
 	VkBuffer mesh_buffer;
 	VkDeviceMemory mesh_buffer_memory;
@@ -102,7 +104,7 @@ private:
 	VkDeviceMemory depth_image_memory;
 	VkImageView depth_image_view;
 
-	VkSurfaceKHR surface;
+	vk::SurfaceKHR surface;
 
 	VkDescriptorPool imgui_descriptor_pool;
 
@@ -135,7 +137,6 @@ private:
 	// Rendering
 	void create_render_pass();
 	void create_graphics_pipeline();
-	void create_command_pools();
 	void create_sync_objects();
 
 	// Scene
@@ -152,8 +153,8 @@ private:
 
 	// Depth
 	void create_depth_resources();
-	VkFormat find_supported_format(const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
-	VkFormat find_depth_format();
+	vk::Format find_supported_format(const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
+	vk::Format find_depth_format();
 	bool has_stencil_component(VkFormat format);
 
 	// IMGUI

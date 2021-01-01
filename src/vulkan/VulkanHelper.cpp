@@ -203,38 +203,34 @@ SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurf
 	return details;
 }
 
-VkSurfaceFormatKHR choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats) {
-	for (const auto &format : available_formats) {
-		if (format.format == VK_FORMAT_B8G8R8A8_SRGB && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-			//SDL_Log("Format: VK_FORMAT_B8G8R8A8_SRGB");
+vk::SurfaceFormatKHR choose_swapchain_surface_format(const vk::PhysicalDevice physical_device, const VkSurfaceKHR surface) {
+	for (const auto &format : physical_device.getSurfaceFormatsKHR(surface)) {
+		if (format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eVkColorspaceSrgbNonlinear) {
 			return format;
 		}
 	}
-	return available_formats[0];
+	return physical_device.getSurfaceFormatsKHR(surface).front();
 }
 
-VkPresentModeKHR choose_swapchain_present_mode(const std::vector<VkPresentModeKHR> &available_present_modes) {
-	for (const auto &mode : available_present_modes) {
-		if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-			//SDL_Log("Present mode: VK_PRESENT_MODE_MAILBOX_KHR");
+vk::PresentModeKHR choose_swapchain_present_mode(const vk::PhysicalDevice physical_device, const VkSurfaceKHR surface) {
+	for (const auto &mode : physical_device.getSurfacePresentModesKHR(surface)) {
+		if (mode == vk::PresentModeKHR::eMailbox) {
 			return mode;
 		}
 	}
 	SDL_Log("Present mode: VK_PRESENT_MODE_FIFO_KHR");
-	return VK_PRESENT_MODE_FIFO_KHR;
+	return vk::PresentModeKHR::eFifo;
 }
 
-VkExtent2D choose_swapchain_extent(const VkSurfaceCapabilitiesKHR &capabilities, SDL_Window *window) {
+vk::Extent2D choose_swapchain_extent(const vk::SurfaceCapabilitiesKHR &capabilities, SDL_Window *window) {
 	if (capabilities.currentExtent.width != UINT32_MAX) {
-		//SDL_Log("Resolution: %ix%i", capabilities.currentExtent.width, capabilities.currentExtent.height);
 		return capabilities.currentExtent;
 	} else {
 		int w, h;
 		SDL_Vulkan_GetDrawableSize(window, &w, &h);
-		VkExtent2D extent = { uint32_t(w), uint32_t(h) };
+		vk::Extent2D extent = { uint32_t(w), uint32_t(h) };
 		extent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, extent.width));
 		extent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, extent.height));
-		//SDL_Log("Resolution: %ix%i", extent.width, extent.height);
 		return extent;
 	}
 }
