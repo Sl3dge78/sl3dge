@@ -57,8 +57,8 @@ std::vector<const char *> get_required_extensions(SDL_Window *window);
 QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, VkSurfaceKHR surface);
 SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-VkSurfaceFormatKHR choose_swapchain_surface_format(const std::vector<VkSurfaceFormatKHR> &available_formats);
-VkPresentModeKHR choose_swapchain_present_mode(const std::vector<VkPresentModeKHR> &available_present_modes);
-VkExtent2D choose_swapchain_extent(const VkSurfaceCapabilitiesKHR &capabilities, SDL_Window *window);
+vk::SurfaceFormatKHR choose_swapchain_surface_format(const vk::PhysicalDevice physical_device, const VkSurfaceKHR surface);
+vk::PresentModeKHR choose_swapchain_present_mode(const vk::PhysicalDevice physical_device, const VkSurfaceKHR surface);
+vk::Extent2D choose_swapchain_extent(const vk::SurfaceCapabilitiesKHR &capabilities, SDL_Window *window);
 
 VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &code);
