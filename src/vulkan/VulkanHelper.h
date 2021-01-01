@@ -5,7 +5,7 @@
 #include <set>
 #include <vector>
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 #include <SDL/SDL.h>
 
