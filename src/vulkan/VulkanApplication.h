@@ -72,8 +72,8 @@ private:
 	vk::UniqueCommandPool transfer_command_pool;
 
 	QueueFamilyIndices queue_family_indices;
-	VkQueue graphics_queue;
-	VkQueue present_queue;
+	vk::Queue graphics_queue;
+	vk::Queue present_queue;
 
 	vk::UniqueSwapchainKHR swapchain;
 	vk::Format swapchain_format;
@@ -81,8 +81,8 @@ private:
 	std::vector<VulkanFrame> frames;
 
 	vk::UniqueRenderPass render_pass;
-	VkPipelineLayout pipeline_layout;
-	VkPipeline graphics_pipeline;
+	vk::PipelineLayout pipeline_layout;
+	vk::UniquePipeline graphics_pipeline;
 
 	std::vector<FrameSemaphores> frame_semaphores;
 	size_t semaphore_index = 0;
@@ -93,19 +93,17 @@ private:
 	VkDeviceMemory mesh_buffer_memory;
 	uint32_t idx_offset;
 
-	VkDescriptorPool descriptor_pool;
-	VkDescriptorSetLayout descriptor_set_layout;
+	vk::UniqueDescriptorPool descriptor_pool;
+	vk::UniqueDescriptorSetLayout descriptor_set_layout;
 
 	VkImage texture_image;
 	VkDeviceMemory texture_image_memory;
-	VkImageView texture_image_view;
+	vk::UniqueImageView texture_image_view;
 	VkSampler texture_sampler;
 
 	VkImage depth_image;
 	VkDeviceMemory depth_image_memory;
-	VkImageView depth_image_view;
-
-
+	vk::UniqueImageView depth_image_view;
 
 	VkDescriptorPool imgui_descriptor_pool;
 
@@ -147,7 +145,7 @@ private:
 	// Texture
 	void create_texture_image();
 	void create_image(uint32_t w, uint32_t h, vk::Format fmt, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory);
-	void transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkFormat format, VkImageLayout from, VkImageLayout to);
+	void transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkImageLayout from, VkImageLayout to);
 	void copy_buffer_to_image(VkCommandBuffer transfer_cbuffer, VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 	void create_texture_image_view();
 	void create_texture_sampler();
@@ -156,7 +154,6 @@ private:
 	void create_depth_resources();
 	vk::Format find_supported_format(const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 	vk::Format find_depth_format();
-	bool has_stencil_component(VkFormat format);
 
 	// IMGUI
 	void init_imgui();
@@ -168,7 +165,6 @@ private:
 	void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
 
 	// Cmd
-	void create_command_buffer(VkCommandPool pool, VkCommandBuffer *c_buffer);
 	VkCommandBuffer begin_graphics_command_buffer();
 	void end_graphics_command_buffer(VkCommandBuffer c_buffer);
 	VkCommandBuffer begin_transfer_command_buffer();

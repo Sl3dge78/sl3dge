@@ -17,34 +17,17 @@ struct Vertex {
 		return pos == other.pos && normal == other.normal && tex_coord == other.tex_coord;
 	}
 
-	static VkVertexInputBindingDescription get_binding_description() {
-		VkVertexInputBindingDescription description{
-			.binding = 0,
-			.stride = sizeof(Vertex),
-			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-		};
-
-		return description;
+	static const vk::VertexInputBindingDescription get_binding_description() {
+		return vk::VertexInputBindingDescription(0, sizeof(Vertex), vk::VertexInputRate::eVertex);
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 3> get_attribute_descriptions() {
-		std::array<VkVertexInputAttributeDescription, 3> descriptions{};
-		descriptions[0].location = 0;
-		descriptions[0].binding = 0;
-		descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		descriptions[0].offset = offsetof(Vertex, pos);
-
-		descriptions[1].location = 1;
-		descriptions[1].binding = 0;
-		descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		descriptions[1].offset = offsetof(Vertex, normal);
-
-		descriptions[2].location = 2;
-		descriptions[2].binding = 0;
-		descriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-		descriptions[2].offset = offsetof(Vertex, tex_coord);
-
-		return descriptions;
+	static const std::array<const vk::VertexInputAttributeDescription, 3> get_attribute_descriptions() {
+		std::array<const vk::VertexInputAttributeDescription, 3> ret = {
+			vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos)),
+			vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, normal)),
+			vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, tex_coord)),
+		};
+		return ret;
 	}
 };
 namespace std {

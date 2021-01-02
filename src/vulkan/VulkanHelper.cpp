@@ -44,14 +44,13 @@ vk::Format get_vk_format(SDL_PixelFormat *format) {
 	switch (format->format) {
 		case SDL_PIXELFORMAT_ABGR8888:
 			return vk::Format::eR8G8B8A8Srgb;
-			break;
+
 		case SDL_PIXELFORMAT_RGBA8888:
 			return vk::Format::eR8G8B8A8Srgb;
-			break;
+
 		default:
 			SDL_LogError(0, "Texture pixel format unsupported!");
 			throw std::runtime_error("Unable to create texture");
-			break;
 	}
 }
 
@@ -66,28 +65,8 @@ uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter
 	throw std::runtime_error("Unable to find suitable memory type");
 }
 
-void create_image_view(VkDevice device, VkImage &image, vk::Format format, VkImageAspectFlags aspect, VkImageView *image_view) {
-	VkImageViewCreateInfo create_info{};
-	create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	create_info.image = image;
-
-	create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	create_info.format = static_cast<VkFormat>(format);
-
-	create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-	create_info.subresourceRange.aspectMask = aspect;
-	create_info.subresourceRange.baseMipLevel = 0;
-	create_info.subresourceRange.levelCount = 1;
-	create_info.subresourceRange.baseArrayLayer = 0;
-	create_info.subresourceRange.layerCount = 1;
-
-	if (vkCreateImageView(device, &create_info, nullptr, image_view) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to create image view!");
-	}
+vk::UniqueImageView create_image_view(vk::Device device, VkImage &image, vk::Format format, vk::ImageAspectFlags aspect) {
+	return std::move(device.createImageViewUnique(vk::ImageViewCreateInfo({}, image, vk::ImageViewType::e2D, format, vk::ComponentMapping(), vk::ImageSubresourceRange(aspect, 0, 1, 0, 1))));
 }
 
 void create_buffer(VkDevice device, VkPhysicalDevice physical_device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &buffer_memory) {
@@ -172,35 +151,13 @@ QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR
 			indices.transfer_family = i;
 		}
 
-		if (indices.is_complete())
+		if (indices.is_complete()) {
 			break;
+		}
 
 		i++;
 	}
 	return indices;
-}
-
-SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device, VkSurfaceKHR surface) {
-	SwapChainSupportDetails details;
-
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
-
-	uint32_t format_count;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, nullptr);
-	if (format_count != 0) {
-		details.formats.resize(format_count);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &format_count, details.formats.data());
-	}
-
-	uint32_t present_mode_count;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_mode_count, nullptr);
-
-	if (present_mode_count != 0) {
-		details.present_modes.resize(present_mode_count);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_mode_count, details.present_modes.data());
-	}
-
-	return details;
 }
 
 vk::SurfaceFormatKHR choose_swapchain_surface_format(const vk::PhysicalDevice physical_device, const VkSurfaceKHR surface) {
@@ -233,19 +190,4 @@ vk::Extent2D choose_swapchain_extent(const vk::SurfaceCapabilitiesKHR &capabilit
 		extent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, extent.height));
 		return extent;
 	}
-}
-
-VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &code) {
-	VkShaderModuleCreateInfo ci{
-		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = code.size(),
-		.pCode = reinterpret_cast<const uint32_t *>(code.data())
-	};
-
-	VkShaderModule shader_module;
-
-	if (vkCreateShaderModule(device, &ci, nullptr, &shader_module) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to create shader module!");
-	};
-	return shader_module;
 }

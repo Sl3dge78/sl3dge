@@ -40,7 +40,7 @@ void VulkanApplication::init_vulkan() {
 			throw std::runtime_error("Unable to create window surface");
 		}
 		vk::ObjectDestroy<vk::Instance, vk::DispatchLoaderDynamic> surface_deleter(*instance);
-		surface = vk::UniqueSurfaceKHR (surf,surface_deleter);
+		surface = vk::UniqueSurfaceKHR(surf, surface_deleter);
 		SDL_Log("Surface created!");
 	}
 
@@ -59,7 +59,7 @@ void VulkanApplication::init_vulkan() {
 	SDL_Log("Image created!");
 	create_texture_sampler();
 	SDL_Log("Texture sampler created!");
-	create_texture_image_view();
+	texture_image_view = create_image_view(*device, texture_image, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
 	SDL_Log("Image view created!");
 
 	init_swapchain();
@@ -78,7 +78,6 @@ void VulkanApplication::cleanup() {
 
 	vkDestroySampler(*device, texture_sampler, nullptr);
 
-	vkDestroyImageView(*device, texture_image_view, nullptr);
 	vkDestroyImage(*device, texture_image, nullptr);
 	vkFreeMemory(*device, texture_image_memory, nullptr);
 
@@ -107,7 +106,7 @@ void VulkanApplication::cleanup() {
 void VulkanApplication::main_loop() {
 	bool run = true;
 	int last_time = SDL_GetTicks();
-	float delta_time = 0;
+	float delta_time;
 
 	Input::start();
 	start();
@@ -117,8 +116,9 @@ void VulkanApplication::main_loop() {
 		int time = SDL_GetTicks();
 		delta_time = (time - last_time) / 1000.0f;
 		if (wait_for_vsync) {
-			if (delta_time <= 1.0f / float(FRAME_RATE))
+			if (delta_time <= 1.0f / float(FRAME_RATE)) {
 				continue;
+			}
 		}
 		last_time = time;
 
@@ -171,23 +171,22 @@ void VulkanApplication::draw_scene(VulkanFrame &frame) {
 	memcpy(data, &fubo, sizeof(fubo));
 	vkUnmapMemory(*device, frame.uniform_buffer_memory);
 
-	vkCmdBindPipeline(frame.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
-
-	VkDeviceSize offsets[] = { 0 };
-
-	vkCmdBindVertexBuffers(frame.command_buffer, 0, 1, &mesh_buffer, offsets);
-	vkCmdBindIndexBuffer(frame.command_buffer, mesh_buffer, idx_offset, VK_INDEX_TYPE_UINT32);
-	vkCmdBindDescriptorSets(frame.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &frame.descriptor_set, 0, nullptr);
-	vkCmdDrawIndexed(frame.command_buffer, uint32_t(indices.size()), 1, 0, 0, 0);
+	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
+	frame.command_buffer->bindVertexBuffers(0, { mesh_buffer }, { 0 });
+	frame.command_buffer->bindIndexBuffer(mesh_buffer, idx_offset, vk::IndexType::eUint32);
+	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layout, 0, frame.descriptor_set.get(), nullptr);
+	frame.command_buffer->drawIndexed(indices.size(), 1, 0, 0, 0);
 }
 
 void VulkanApplication::draw_frame() {
 	// Get the image
-	VkSemaphore image_acquired_semaphore = frame_semaphores[semaphore_index].image_aquired;
-	VkSemaphore render_complete_semaphore = frame_semaphores[semaphore_index].render_complete;
-	uint32_t image_id;
-	auto result = vkAcquireNextImageKHR(*device, *swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE, &image_id); // Get next image and trigger image_available once ready
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+	vk::Semaphore image_acquired_semaphore = frame_semaphores[semaphore_index].image_aquired;
+	vk::Semaphore render_complete_semaphore = frame_semaphores[semaphore_index].render_complete;
+
+	// Get next image and trigger image_available once ready
+	auto [result, image_id] = device->acquireNextImageKHR(*swapchain, UINT64_MAX, image_acquired_semaphore, nullptr);
+
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
 		init_swapchain(true);
 		return;
 	}
@@ -195,79 +194,41 @@ void VulkanApplication::draw_frame() {
 	VulkanFrame *frame = &frames[image_id];
 
 	// Wait for the frame to be finished
-	vkWaitForFences(*device, 1, &frame->fence, VK_TRUE, UINT64_MAX);
-	vkResetFences(*device, 1, &frame->fence);
-
-	{ // Begin cmd buffer
-		VkCommandBufferBeginInfo buffer_ci{
-			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags = 0,
-			.pInheritanceInfo = nullptr,
-		};
-		check_vk_result(vkBeginCommandBuffer(frame->command_buffer, &buffer_ci));
+	if (device->waitForFences(frame->fence.get(), true, UINT64_MAX) != vk::Result::eSuccess) {
+		throw std::runtime_error("Waiting for frame timed out!");
 	}
+	device->resetFences(frame->fence.get());
+	frame->command_buffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
 
 	{ // Start Render Pass
-		std::array<VkClearValue, 2> clear_values{};
-		clear_values[0].color = { 0.f, 0.f, 0.f, 1.f };
-		clear_values[1].depthStencil = { 1.f, 0 };
-		VkRenderPassBeginInfo renderpass_ci{
-			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass = *render_pass,
-			.framebuffer = frame->framebuffer,
-			.clearValueCount = uint32_t(clear_values.size()),
-			.pClearValues = clear_values.data(),
-		};
-		renderpass_ci.renderArea.offset = { 0, 0 };
-		renderpass_ci.renderArea.extent = swapchain_extent;
+		std::array<vk::ClearValue, 2> clear_values{};
+		clear_values[0].color = vk::ClearColorValue(std::array<float, 4>{ 0.f, 0.f, 0.f, 1.f });
+		clear_values[1].depthStencil = vk::ClearDepthStencilValue(1.f, 0);
+		vk::Rect2D rect(vk::Offset2D(0, 0), swapchain_extent);
 
-		vkCmdBeginRenderPass(frame->command_buffer, &renderpass_ci, VK_SUBPASS_CONTENTS_INLINE);
+		frame->command_buffer->beginRenderPass(vk::RenderPassBeginInfo(*render_pass, frame->framebuffer.get(), rect, clear_values), vk::SubpassContents::eInline);
 	}
 
 	draw_scene(*frame); // Render 3D objects in the scene
 	draw_ui(*frame); // Render UI
+	frame->command_buffer->endRenderPass();
+	frame->command_buffer->end();
 
-	vkCmdEndRenderPass(frame->command_buffer);
-	check_vk_result(vkEndCommandBuffer(frame->command_buffer));
-
-	{ // Submit Queue
-		VkSemaphore semaphores[] = { image_acquired_semaphore };
-		VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		VkSemaphore end_semaphores[] = { render_complete_semaphore };
-		// Submit the rendering queue
-		VkSubmitInfo si{
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = semaphores, // wait for the image to be available
-			.pWaitDstStageMask = wait_stages,
-			.commandBufferCount = 1,
-			.pCommandBuffers = &frame->command_buffer,
-			.signalSemaphoreCount = 1,
-			.pSignalSemaphores = end_semaphores, // Trigger the render finished semaphore once done
-		};
-		check_vk_result(vkQueueSubmit(graphics_queue, 1, &si, frame->fence));
+	// Submit Queue
+	{
+		vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		vk::SubmitInfo si(image_acquired_semaphore, flags, frame->command_buffer.get(), render_complete_semaphore);
+		graphics_queue.submit(si, frame->fence.get());
 	}
+	// Present
+	{
+		result = present_queue.presentKHR(vk::PresentInfoKHR(render_complete_semaphore, *swapchain, image_id, {}));
 
-	{ // Present the image
-
-		VkSemaphore end_semaphores[] = { render_complete_semaphore }; // Wait for the renderpass to be finished before rendering
-		VkSwapchainKHR swapchains[] = { *swapchain };
-		VkPresentInfoKHR present_info{
-			.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = end_semaphores,
-			.swapchainCount = 1,
-			.pSwapchains = swapchains,
-			.pImageIndices = &image_id,
-		};
-		result = vkQueuePresentKHR(present_queue, &present_info);
-
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebuffer_rezised) {
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || framebuffer_rezised) {
 			framebuffer_rezised = false;
 			init_swapchain(true);
 		}
 	}
-
 	semaphore_index = (semaphore_index + 1) % frames.size();
 }
 
@@ -276,8 +237,9 @@ void VulkanApplication::draw_frame() {
 //
 
 void VulkanApplication::create_instance() {
-	if (enable_validation_layers && !check_validation_layer_support())
+	if (enable_validation_layers && !check_validation_layer_support()) {
 		throw std::runtime_error("Validation layers requested, but none are available");
+	}
 
 	vk::ApplicationInfo app_info("Vulkan", 1, "sl3dge", 1, VK_API_VERSION_1_2);
 
@@ -293,32 +255,36 @@ void VulkanApplication::create_instance() {
 
 void VulkanApplication::pick_physical_device() {
 	auto devices = instance->enumeratePhysicalDevices();
-	SDL_Log("%d devices found", devices.size());
-	for (const auto &device : devices) {
-		if (!device.getFeatures2().features.samplerAnisotropy)
+	SDL_Log("%zu devices found", devices.size());
+	for (const auto &p_device : devices) {
+		if (!p_device.getFeatures2().features.samplerAnisotropy) {
 			continue;
+		}
 
 		// Queues
-		QueueFamilyIndices indices = find_queue_families(device, *surface);
-		if (!indices.is_complete())
+		QueueFamilyIndices family_indices = find_queue_families(p_device, *surface);
+		if (!family_indices.is_complete()) {
 			continue;
+		}
 
 		// Extensions
-		auto available_extensions = device.enumerateDeviceExtensionProperties();
+		auto available_extensions = p_device.enumerateDeviceExtensionProperties();
 		std::set<std::string> required_extensions(req_device_extensions.begin(), req_device_extensions.end());
 		for (const auto &extension : available_extensions) {
 			required_extensions.erase(extension.extensionName);
 		}
-		if (!required_extensions.empty())
+		if (!required_extensions.empty()) {
 			continue;
+		}
 
 		// Swapchain
-		bool swapchain_adequate = !device.getSurfaceFormatsKHR(*surface).empty() && !device.getSurfacePresentModesKHR(*surface).empty();
-		if (!swapchain_adequate)
+		bool swapchain_adequate = !p_device.getSurfaceFormatsKHR(*surface).empty() && !p_device.getSurfacePresentModesKHR(*surface).empty();
+		if (!swapchain_adequate) {
 			continue;
+		}
 
-		// This device is ok
-		physical_device = device;
+		// This p_device is ok
+		physical_device = p_device;
 		break;
 	}
 
@@ -362,8 +328,9 @@ void VulkanApplication::create_logical_device() {
 void VulkanApplication::init_swapchain(bool reset) {
 	vkDeviceWaitIdle(*device);
 
-	if (reset)
+	if (reset) {
 		cleanup_swapchain();
+	}
 
 	create_swapchain();
 	SDL_Log("Swapchain created");
@@ -374,28 +341,26 @@ void VulkanApplication::init_swapchain(bool reset) {
 	SDL_Log("Render pass created");
 	create_descriptors();
 	SDL_Log("Descriptors created");
-	create_graphics_pipeline();
-	SDL_Log("Pipeline created");
 	create_depth_resources();
 	SDL_Log("Depth resources created");
+	create_graphics_pipeline();
+	SDL_Log("Pipeline created");
 
 	// Create frames
 	std::vector<VkImage> swapchain_images;
 	swapchain_images.resize(real_image_count);
 	vkGetSwapchainImagesKHR(*device, *swapchain, &real_image_count, swapchain_images.data());
-
 	for (uint32_t i = 0; i < real_image_count; i++) {
 		frames[i].init_frame(*device);
-		create_image_view(*device, swapchain_images[i], swapchain_format, VK_IMAGE_ASPECT_COLOR_BIT, &frames[i].image_view);
-		frames[i].create_framebuffer(swapchain_extent, *render_pass, depth_image_view);
+		frames[i].image_view = create_image_view(*device, swapchain_images[i], swapchain_format, vk::ImageAspectFlagBits::eColor);
+		frames[i].create_framebuffer(swapchain_extent, *render_pass, *depth_image_view);
 		frames[i].create_command_buffers(*graphics_command_pool);
 		frames[i].create_sync_objects();
 		frames[i].create_uniform_buffer(physical_device);
-		frames[i].create_descriptor_set(descriptor_pool, descriptor_set_layout, texture_sampler, texture_image_view);
+		frames[i].create_descriptor_set(*descriptor_pool, *descriptor_set_layout, texture_sampler, *texture_image_view);
 	}
 
 	create_imgui_context();
-	//SDL_Log("imgui created");
 
 	create_sync_objects();
 	SDL_Log("Sync objects created!");
@@ -412,8 +377,8 @@ void VulkanApplication::create_swapchain() {
 	if (capabilities.maxImageCount > 0 && image_count > capabilities.maxImageCount) {
 		image_count = capabilities.maxImageCount;
 	}
-	auto indices = find_queue_families(physical_device, *surface);
-	std::array<const uint32_t, 2> queue_indices({ indices.graphics_family.value(), indices.present_family.value() });
+	auto family_indices = find_queue_families(physical_device, *surface);
+	std::array<const uint32_t, 2> queue_indices({ family_indices.graphics_family.value(), family_indices.present_family.value() });
 
 	vk::SwapchainCreateInfoKHR ci({},
 			*surface,
@@ -423,7 +388,7 @@ void VulkanApplication::create_swapchain() {
 			extent,
 			1,
 			{ vk::ImageUsageFlagBits::eColorAttachment },
-			{ vk::SharingMode::eExclusive },
+			vk::SharingMode::eExclusive,
 			queue_indices,
 			capabilities.currentTransform,
 			vk::CompositeAlphaFlagBitsKHR::eOpaque,
@@ -442,22 +407,13 @@ void VulkanApplication::cleanup_swapchain() {
 
 	cleanup_imgui_context();
 
-	for (auto frame : frames) {
+	for (auto &frame : frames) {
 		frame.delete_frame();
 	}
 	frames.clear();
 
-	vkDestroyImageView(*device, depth_image_view, nullptr);
 	vkDestroyImage(*device, depth_image, nullptr);
 	vkFreeMemory(*device, depth_image_memory, nullptr);
-
-	vkDestroyDescriptorSetLayout(*device, descriptor_set_layout, nullptr);
-	vkDestroyDescriptorPool(*device, descriptor_pool, nullptr);
-
-	vkDestroyPipeline(*device, graphics_pipeline, nullptr);
-	vkDestroyPipelineLayout(*device, pipeline_layout, nullptr);
-
-	//vkDestroySwapchainKHR(*device, *swapchain, nullptr);
 }
 
 //
@@ -497,8 +453,7 @@ void VulkanApplication::create_render_pass() {
 			vk::PipelineBindPoint::eGraphics,
 			nullptr, color_ref,
 			nullptr, &depth_ref,
-			nullptr
-			);
+			nullptr);
 
 	vk::SubpassDependency dependency(
 			VK_SUBPASS_EXTERNAL,
@@ -510,180 +465,62 @@ void VulkanApplication::create_render_pass() {
 			{});
 
 	render_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
-	/*
-	VkSubpassDependency dependency{
-		.srcSubpass = VK_SUBPASS_EXTERNAL,
-		.dstSubpass = 0,
-		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-		.srcAccessMask = 0,
-		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-	};
-
-	std::array<VkAttachmentDescription, 2> attachments = { color_attachment, depth_attachment };
-	VkRenderPassCreateInfo renderpass_ci{
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount = uint32_t(attachments.size()),
-		.pAttachments = attachments.data(),
-		.subpassCount = 1,
-		.pSubpasses = &subpass,
-		.dependencyCount = 1,
-		.pDependencies = &dependency,
-	};
-
-	if (vkCreateRenderPass(*device, &renderpass_ci, nullptr, &render_pass) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to create Render Pass!");
-	}
-	*/
 }
 
 void VulkanApplication::create_graphics_pipeline() {
 	auto vertex_shader_code = read_file("resources/shaders/triangle.vert.spv");
 	auto fragment_shader_code = read_file("resources/shaders/triangle.frag.spv");
 
-	VkShaderModule vertex_shader_module = create_shader_module(*device, vertex_shader_code);
-	VkShaderModule fragment_shader_module = create_shader_module(*device, fragment_shader_code);
+	auto vtx_shader = device->createShaderModule(vk::ShaderModuleCreateInfo({}, vertex_shader_code.size(), reinterpret_cast<uint32_t *>(vertex_shader_code.data())));
+	auto frag_shader = device->createShaderModule(vk::ShaderModuleCreateInfo({}, fragment_shader_code.size(), reinterpret_cast<uint32_t *>(fragment_shader_code.data())));
 
-	VkPipelineShaderStageCreateInfo vertex_shader_stage_ci{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage = VK_SHADER_STAGE_VERTEX_BIT,
-		.module = vertex_shader_module,
-		.pName = "main"
+	auto stages = {
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, vtx_shader, "main", nullptr),
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, frag_shader, "main", nullptr)
 	};
+	auto a = Vertex::get_binding_description();
+	auto b = Vertex::get_attribute_descriptions();
+	vk::PipelineVertexInputStateCreateInfo vertex_input({}, a, b);
 
-	VkPipelineShaderStageCreateInfo fragment_shader_stage_ci{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.module = fragment_shader_module,
-		.pName = "main"
-	};
+	vk::PipelineInputAssemblyStateCreateInfo input_ci({}, vk::PrimitiveTopology::eTriangleList, false);
 
-	VkPipelineShaderStageCreateInfo stages_ci[] = { vertex_shader_stage_ci, fragment_shader_stage_ci };
+	vk::Viewport viewport(0, 0, swapchain_extent.width, swapchain_extent.height, 0, 1);
+	vk::Rect2D scissor({ 0, 0 }, swapchain_extent);
+	vk::PipelineViewportStateCreateInfo viewport_state_ci({}, viewport, scissor);
 
-	uint32_t attribute_count = uint32_t(Vertex::get_attribute_descriptions().size());
-	VkVertexInputBindingDescription descriptions[] = { Vertex::get_binding_description() };
+	vk::PipelineRasterizationStateCreateInfo rasterizer({}, false, false, vk::PolygonMode::eFill, vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, false, 0, 0, 0, 1);
+	vk::PipelineMultisampleStateCreateInfo multisampling({}, vk::SampleCountFlagBits::e1, false, 1, nullptr, false, false);
+	vk::PipelineDepthStencilStateCreateInfo depth_stencil({}, true, true, vk::CompareOp::eLess, false, false, {}, {}, 0, 1);
 
-	VkPipelineVertexInputStateCreateInfo vertex_input_ci{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		.vertexBindingDescriptionCount = 1,
-		.pVertexBindingDescriptions = descriptions,
-		.vertexAttributeDescriptionCount = attribute_count,
-		.pVertexAttributeDescriptions = Vertex::get_attribute_descriptions().data(),
-	};
+	vk::PipelineColorBlendAttachmentState color_blend_attachment(
+			false,
+			vk::BlendFactor::eZero, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
+			vk::BlendFactor::eZero, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
+			{ vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA });
 
-	VkPipelineInputAssemblyStateCreateInfo input_ci{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		.primitiveRestartEnable = VK_FALSE
-	};
+	vk::PipelineColorBlendStateCreateInfo color_blending({}, false, vk::LogicOp::eCopy, color_blend_attachment, {});
 
-	VkViewport viewport{
-		.x = 0.f,
-		.y = 0.f,
-		.width = (float)swapchain_extent.width,
-		.height = (float)swapchain_extent.height,
-		.minDepth = 0.f,
-		.maxDepth = 1.f
-	};
+	pipeline_layout = device->createPipelineLayout(vk::PipelineLayoutCreateInfo({}, *descriptor_set_layout));
 
-	VkRect2D scissor{
-		.offset = { 0, 0 },
-		.extent = swapchain_extent
-	};
+	vk::GraphicsPipelineCreateInfo pipeline_ci(
+			{},
+			stages,
+			&vertex_input,
+			&input_ci,
+			nullptr,
+			&viewport_state_ci,
+			&rasterizer,
+			&multisampling,
+			&depth_stencil,
+			&color_blending,
+			nullptr,
+			pipeline_layout,
+			*render_pass,
+			0,
+			nullptr,
+			-1);
 
-	VkPipelineViewportStateCreateInfo viewport_state_ci{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-		.viewportCount = 1,
-		.pViewports = &viewport,
-		.scissorCount = 1,
-		.pScissors = &scissor
-	};
-
-	VkPipelineRasterizationStateCreateInfo rasterizer{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-		.depthClampEnable = VK_FALSE,
-		.polygonMode = VK_POLYGON_MODE_FILL,
-		.cullMode = VK_CULL_MODE_BACK_BIT,
-		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-		.depthBiasEnable = VK_FALSE,
-		.depthBiasConstantFactor = 0.f,
-		.depthBiasClamp = 0.f,
-		.depthBiasSlopeFactor = 0.f,
-		.lineWidth = 1.f,
-	};
-
-	VkPipelineMultisampleStateCreateInfo multisampling{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-		.sampleShadingEnable = VK_FALSE,
-		.minSampleShading = 1.f,
-		.pSampleMask = nullptr,
-		.alphaToCoverageEnable = VK_FALSE,
-		.alphaToOneEnable = VK_FALSE,
-	};
-
-	VkPipelineDepthStencilStateCreateInfo depth_stencil{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-		.depthTestEnable = VK_TRUE,
-		.depthWriteEnable = VK_TRUE,
-		.depthCompareOp = VK_COMPARE_OP_LESS,
-		.depthBoundsTestEnable = VK_FALSE,
-		.stencilTestEnable = VK_FALSE,
-		.front = {}, // Optional
-		.back = {}, // Optional
-		.minDepthBounds = 0.0f, // Optional
-		.maxDepthBounds = 1.0f, // Optional
-	};
-
-	VkPipelineColorBlendAttachmentState color_blend_attachement{
-		.blendEnable = VK_FALSE,
-		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-	};
-
-	VkPipelineColorBlendStateCreateInfo color_blending{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-		.logicOpEnable = VK_FALSE,
-		.logicOp = VK_LOGIC_OP_COPY,
-		.attachmentCount = 1,
-		.pAttachments = &color_blend_attachement,
-	};
-
-	VkPipelineLayoutCreateInfo pipeline_layout_ci{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount = 1,
-		.pSetLayouts = &descriptor_set_layout,
-	};
-
-	if (vkCreatePipelineLayout(*device, &pipeline_layout_ci, nullptr, &pipeline_layout) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to create pipeline layout!");
-	}
-
-	VkGraphicsPipelineCreateInfo pipeline_ci{
-		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.stageCount = 2,
-		.pStages = stages_ci,
-		.pVertexInputState = &vertex_input_ci,
-		.pInputAssemblyState = &input_ci,
-		.pTessellationState = nullptr,
-		.pViewportState = &viewport_state_ci,
-		.pRasterizationState = &rasterizer,
-		.pMultisampleState = &multisampling,
-		.pDepthStencilState = &depth_stencil,
-		.pColorBlendState = &color_blending,
-		.pDynamicState = nullptr,
-		.layout = pipeline_layout,
-		.renderPass = *render_pass,
-		.subpass = 0,
-		.basePipelineHandle = VK_NULL_HANDLE,
-		.basePipelineIndex = -1,
-	};
-
-	if (vkCreateGraphicsPipelines(*device, VK_NULL_HANDLE, 1, &pipeline_ci, nullptr, &graphics_pipeline) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to create Graphics Pipeline!");
-	}
-
-	vkDestroyShaderModule(*device, vertex_shader_module, nullptr);
-	vkDestroyShaderModule(*device, fragment_shader_module, nullptr);
+	graphics_pipeline = device->createGraphicsPipelineUnique(nullptr, pipeline_ci).value;
 }
 
 void VulkanApplication::create_sync_objects() {
@@ -729,51 +566,18 @@ void VulkanApplication::create_mesh_buffer() {
 
 void VulkanApplication::create_descriptors() {
 	{
-		VkDescriptorSetLayoutBinding ubo_layout_binding{
-			.binding = 0,
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-		};
+		vk::DescriptorSetLayoutBinding ubo(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
+		vk::DescriptorSetLayoutBinding sampler(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
+		vk::DescriptorSetLayoutBinding frag(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
+		std::array<vk::DescriptorSetLayoutBinding, 3> bindings = { ubo, sampler, frag };
 
-		VkDescriptorSetLayoutBinding sampler_layout_binding{
-			.binding = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-			.pImmutableSamplers = nullptr,
-		};
-
-		VkDescriptorSetLayoutBinding frag_ubo_layout_binding{
-			.binding = 2,
-			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		};
-
-		std::array<VkDescriptorSetLayoutBinding, 3> bindings = { ubo_layout_binding, sampler_layout_binding, frag_ubo_layout_binding };
-		VkDescriptorSetLayoutCreateInfo ci{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			.bindingCount = uint32_t(bindings.size()),
-			.pBindings = bindings.data(),
-		};
-		vkCreateDescriptorSetLayout(*device, &ci, nullptr, &descriptor_set_layout);
+		descriptor_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
 	}
 	{
-		std::array<VkDescriptorPoolSize, 2> pool_sizes{};
-		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		pool_sizes[0].descriptorCount = uint32_t(frames.size());
-		pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		pool_sizes[1].descriptorCount = uint32_t(frames.size());
-
-		VkDescriptorPoolCreateInfo ci{
-			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets = uint32_t(frames.size()),
-			.poolSizeCount = uint32_t(pool_sizes.size()),
-			.pPoolSizes = pool_sizes.data(),
-		};
-
-		check_vk_result(vkCreateDescriptorPool(*device, &ci, nullptr, &descriptor_pool));
+		vk::DescriptorPoolSize a(vk::DescriptorType::eUniformBuffer, frames.size());
+		vk::DescriptorPoolSize b(vk::DescriptorType::eCombinedImageSampler, frames.size());
+		std::array<vk::DescriptorPoolSize, 2> pool_sizes = { a, b };
+		descriptor_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({}, frames.size(), pool_sizes));
 	}
 }
 
@@ -785,7 +589,7 @@ void VulkanApplication::create_texture_image() {
 	SDL_Surface *surf = IMG_Load("resources/textures/viking_room.png");
 	surf = SDL_ConvertSurfaceFormat(surf, SDL_PIXELFORMAT_ABGR8888, 0);
 
-	if (surf == NULL) {
+	if (surf == nullptr) {
 		SDL_LogError(0, "%s", SDL_GetError());
 		throw std::runtime_error("Unable to create texture");
 	}
@@ -807,9 +611,9 @@ void VulkanApplication::create_texture_image() {
 
 	// Copy the buffer to the image and send it to graphics queue
 	auto transfer_cbuffer = begin_transfer_command_buffer();
-	transition_image_layout(transfer_cbuffer, texture_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	transition_image_layout(transfer_cbuffer, texture_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	copy_buffer_to_image(transfer_cbuffer, staging_buffer, texture_image, surf->w, surf->h);
-	transition_image_layout(transfer_cbuffer, texture_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	transition_image_layout(transfer_cbuffer, texture_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 	end_transfer_command_buffer(transfer_cbuffer);
 
 	// Receive the image on the graphics queue
@@ -847,7 +651,7 @@ void VulkanApplication::create_image(uint32_t w, uint32_t h, vk::Format fmt, VkI
 	vk::ImageCreateInfo ci({},
 			vk::ImageType::e2D,
 			fmt,
-			vk::Extent3D(w,h,1),
+			vk::Extent3D(w, h, 1),
 			1,
 			1,
 			vk::SampleCountFlagBits::e1,
@@ -894,7 +698,7 @@ void VulkanApplication::create_image(uint32_t w, uint32_t h, vk::Format fmt, VkI
 	vkBindImageMemory(*device, image, image_memory, 0);
 }
 
-void VulkanApplication::transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkFormat format, VkImageLayout from, VkImageLayout to) {
+void VulkanApplication::transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkImageLayout from, VkImageLayout to) {
 	VkImageMemoryBarrier barrier{
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
 		.oldLayout = from,
@@ -948,7 +752,7 @@ void VulkanApplication::copy_buffer_to_image(VkCommandBuffer c_buffer, VkBuffer 
 }
 
 void VulkanApplication::create_texture_image_view() {
-	create_image_view(*device, texture_image, vk::Format::eR8G8B8A8Srgb, VK_IMAGE_ASPECT_COLOR_BIT, &texture_image_view);
+	texture_image_view = create_image_view(*device, texture_image, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
 }
 
 void VulkanApplication::create_texture_sampler() {
@@ -984,7 +788,7 @@ void VulkanApplication::create_depth_resources() {
 	vk::Format depth_format = find_depth_format();
 
 	create_image(swapchain_extent.width, swapchain_extent.height, depth_format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_image, depth_image_memory);
-	create_image_view(*device, depth_image, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT, &depth_image_view);
+	depth_image_view = create_image_view(*device, depth_image, depth_format, vk::ImageAspectFlagBits::eDepth);
 }
 
 vk::Format VulkanApplication::find_supported_format(const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
@@ -1005,10 +809,6 @@ vk::Format VulkanApplication::find_depth_format() {
 			{ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint },
 			vk::ImageTiling::eOptimal,
 			vk::FormatFeatureFlagBits::eDepthStencilAttachment);
-}
-
-bool VulkanApplication::has_stencil_component(VkFormat format) {
-	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 //
@@ -1080,22 +880,14 @@ void VulkanApplication::create_imgui_context() {
 
 		ImGui_ImplVulkan_Init(&init_info, *render_pass);
 	}
-	{ // Create font
-		VkCommandBufferBeginInfo bi{
-			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-		};
-		vkBeginCommandBuffer(frames[0].command_buffer, &bi);
-		ImGui_ImplVulkan_CreateFontsTexture(frames[0].command_buffer);
-		vkEndCommandBuffer(frames[0].command_buffer);
+	{
+		frames[0].command_buffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
+		ImGui_ImplVulkan_CreateFontsTexture(frames[0].command_buffer.get());
+		frames[0].command_buffer->end();
 
-		VkSubmitInfo submits{
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.commandBufferCount = 1,
-			.pCommandBuffers = &frames[0].command_buffer,
-		};
-		vkQueueSubmit(graphics_queue, 1, &submits, VK_NULL_HANDLE);
-		vkQueueWaitIdle(graphics_queue);
+		vk::SubmitInfo submit(nullptr, nullptr, frames[0].command_buffer.get(), nullptr);
+		graphics_queue.submit(submit, nullptr);
+		graphics_queue.waitIdle();
 		ImGui_ImplVulkan_DestroyFontUploadObjects();
 	}
 }
@@ -1108,8 +900,7 @@ void VulkanApplication::cleanup_imgui_context() {
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	ImGui::Render();
 	auto data = ImGui::GetDrawData();
-
-	ImGui_ImplVulkan_RenderDrawData(data, frame.command_buffer);
+	ImGui_ImplVulkan_RenderDrawData(data, frame.command_buffer.get());
 }
 
 //
