@@ -76,7 +76,6 @@ void VulkanApplication::cleanup() {
 	// VULKAN
 	cleanup_swapchain();
 
-	vkDestroySampler(*device, texture_sampler, nullptr);
 
 	vkDestroyImage(*device, texture_image, nullptr);
 	vkFreeMemory(*device, texture_image_memory, nullptr);
@@ -154,22 +153,18 @@ void VulkanApplication::main_loop() {
 		if (!(SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)) {
 			draw_frame();
 		}
-
-		vkDeviceWaitIdle(*device);
+		device->waitIdle();
 	}
 }
 
 void VulkanApplication::draw_scene(VulkanFrame &frame) {
-	void *data;
-	vkMapMemory(*device, frame.uniform_buffer_memory, 0, sizeof(vubo), 0, &data);
+	void *data = device->mapMemory(frame.uniform_buffer_memory, 0, sizeof(vubo), {});
 	memcpy(data, &vubo, sizeof(vubo));
-	vkUnmapMemory(*device, frame.uniform_buffer_memory);
+	device->unmapMemory(frame.uniform_buffer_memory);
 
-	VkDeviceSize offset = sizeof(vubo);
-
-	vkMapMemory(*device, frame.uniform_buffer_memory, offset, sizeof(fubo), 0, &data);
+	data = device->mapMemory(frame.uniform_buffer_memory, sizeof(vubo), sizeof(fubo), {});
 	memcpy(data, &fubo, sizeof(fubo));
-	vkUnmapMemory(*device, frame.uniform_buffer_memory);
+	device->unmapMemory(frame.uniform_buffer_memory);
 
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
 	frame.command_buffer->bindVertexBuffers(0, { mesh_buffer }, { 0 });
@@ -180,8 +175,8 @@ void VulkanApplication::draw_scene(VulkanFrame &frame) {
 
 void VulkanApplication::draw_frame() {
 	// Get the image
-	vk::Semaphore image_acquired_semaphore = frame_semaphores[semaphore_index].image_aquired;
-	vk::Semaphore render_complete_semaphore = frame_semaphores[semaphore_index].render_complete;
+	vk::Semaphore image_acquired_semaphore = *frame_semaphores[semaphore_index].image_aquired;
+	vk::Semaphore render_complete_semaphore = *frame_semaphores[semaphore_index].render_complete;
 
 	// Get next image and trigger image_available once ready
 	auto [result, image_id] = device->acquireNextImageKHR(*swapchain, UINT64_MAX, image_acquired_semaphore, nullptr);
@@ -326,7 +321,7 @@ void VulkanApplication::create_logical_device() {
 //
 
 void VulkanApplication::init_swapchain(bool reset) {
-	vkDeviceWaitIdle(*device);
+	device->waitIdle();
 
 	if (reset) {
 		cleanup_swapchain();
@@ -357,7 +352,7 @@ void VulkanApplication::init_swapchain(bool reset) {
 		frames[i].create_command_buffers(*graphics_command_pool);
 		frames[i].create_sync_objects();
 		frames[i].create_uniform_buffer(physical_device);
-		frames[i].create_descriptor_set(*descriptor_pool, *descriptor_set_layout, texture_sampler, *texture_image_view);
+		frames[i].create_descriptor_set(*descriptor_pool, *descriptor_set_layout, *texture_sampler, *texture_image_view);
 	}
 
 	create_imgui_context();
@@ -400,10 +395,7 @@ void VulkanApplication::create_swapchain() {
 }
 
 void VulkanApplication::cleanup_swapchain() {
-	for (auto &fs : frame_semaphores) {
-		vkDestroySemaphore(*device, fs.image_aquired, nullptr);
-		vkDestroySemaphore(*device, fs.render_complete, nullptr);
-	}
+	frame_semaphores.clear();
 
 	cleanup_imgui_context();
 
@@ -530,9 +522,8 @@ void VulkanApplication::create_sync_objects() {
 		VkSemaphoreCreateInfo ci{
 			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 		};
-
-		vkCreateSemaphore(*device, &ci, nullptr, &fs.image_aquired);
-		vkCreateSemaphore(*device, &ci, nullptr, &fs.render_complete);
+		fs.image_aquired = device->createSemaphoreUnique(vk::SemaphoreCreateInfo());
+		fs.render_complete = device->createSemaphoreUnique(vk::SemaphoreCreateInfo());
 	}
 }
 
@@ -756,29 +747,14 @@ void VulkanApplication::create_texture_image_view() {
 }
 
 void VulkanApplication::create_texture_sampler() {
-	VkSamplerCreateInfo ci{};
-	ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	ci.magFilter = VK_FILTER_LINEAR;
-	ci.minFilter = VK_FILTER_LINEAR;
-	ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	ci.anisotropyEnable = VK_TRUE;
-	VkPhysicalDeviceProperties properties{};
-	vkGetPhysicalDeviceProperties(physical_device, &properties);
-	ci.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-	ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	ci.unnormalizedCoordinates = VK_FALSE;
-	ci.compareEnable = VK_FALSE;
-	ci.compareOp = VK_COMPARE_OP_ALWAYS;
-	ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	ci.mipLodBias = 0.0f;
-	ci.minLod = 0.0f;
-	ci.maxLod = 0.0f;
-
-	if (vkCreateSampler(*device, &ci, nullptr, &texture_sampler) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to create texture sampler!");
-	}
+	texture_sampler = device->createSamplerUnique(vk::SamplerCreateInfo(
+			{}, vk::Filter::eLinear, vk::Filter::eLinear,
+			vk::SamplerMipmapMode::eNearest,
+			vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
+			0,
+			true, physical_device.getProperties().limits.maxSamplerAnisotropy,
+			false, vk::CompareOp::eAlways, 0, 0,
+			vk::BorderColor::eIntOpaqueBlack, false));
 }
 
 //

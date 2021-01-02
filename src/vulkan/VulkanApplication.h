@@ -34,8 +34,8 @@ const Uint32 FRAME_RATE = 60;
 const Uint32 MAX_FRAMES_IN_FLIGHT = 2;
 
 struct FrameSemaphores {
-	VkSemaphore image_aquired;
-	VkSemaphore render_complete;
+	vk::UniqueSemaphore image_aquired;
+	vk::UniqueSemaphore render_complete;
 };
 
 class VulkanApplication {
@@ -99,7 +99,7 @@ private:
 	VkImage texture_image;
 	VkDeviceMemory texture_image_memory;
 	vk::UniqueImageView texture_image_view;
-	VkSampler texture_sampler;
+	vk::UniqueSampler texture_sampler;
 
 	VkImage depth_image;
 	VkDeviceMemory depth_image_memory;
