@@ -1,7 +1,6 @@
 #include "Camera.h"
 
 #include "imgui/imgui.h"
-#include "imgui_custom.h"
 
 void Camera::start() {
 	position = glm::vec3(1.5f, 1.5f, 1.f);

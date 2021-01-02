@@ -1,11 +1,5 @@
 #include "VulkanFrame.h"
 
-#include <array>
-#include <exception>
-
-#include "UniformBufferObject.h"
-#include "VulkanHelper.h"
-
 void VulkanFrame::init_frame(vk::Device device) {
 	this->device = device;
 }
@@ -31,8 +25,8 @@ void VulkanFrame::create_descriptor_set(vk::DescriptorPool descriptor_pool, vk::
 	auto dldl = device.allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(descriptor_pool, descriptor_set_layout));
 	descriptor_set = std::move(dldl.front());
 
-	auto v_bi = vk::DescriptorBufferInfo(uniform_buffer, 0, sizeof(VtxUniformBufferObject));
-	auto f_bi = vk::DescriptorBufferInfo(uniform_buffer, sizeof(VtxUniformBufferObject), sizeof(FragUniformBufferObject));
+	auto v_bi = vk::DescriptorBufferInfo(*uniform_buffer, 0, sizeof(VtxUniformBufferObject));
+	auto f_bi = vk::DescriptorBufferInfo(*uniform_buffer, sizeof(VtxUniformBufferObject), sizeof(FragUniformBufferObject));
 	auto image_info = vk::DescriptorImageInfo(texture_sampler, texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
 
 	auto descriptor_writes = {
@@ -45,13 +39,7 @@ void VulkanFrame::create_descriptor_set(vk::DescriptorPool descriptor_pool, vk::
 	device.updateDescriptorSets(descriptor_writes, nullptr);
 }
 
-void VulkanFrame::create_uniform_buffer(VkPhysicalDevice physical_device) {
-	VkDeviceSize size = sizeof(VtxUniformBufferObject) + sizeof(FragUniformBufferObject);
-	create_buffer(device, physical_device, size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniform_buffer, uniform_buffer_memory);
-}
-
-void VulkanFrame::delete_frame() {
-	vkFreeMemory(device, uniform_buffer_memory, nullptr);
-	vkDestroyBuffer(device, uniform_buffer, nullptr);
-
+void VulkanFrame::create_uniform_buffer(vk::PhysicalDevice physical_device) {
+	vk::DeviceSize size = sizeof(VtxUniformBufferObject) + sizeof(FragUniformBufferObject);
+	create_buffer(device, physical_device, size, vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent }, uniform_buffer, uniform_buffer_memory);
 }

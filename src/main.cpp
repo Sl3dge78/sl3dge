@@ -12,7 +12,6 @@
 #include "vulkan/VulkanApplication.h"
 
 #include "Camera.h"
-#include "imgui_custom.h"
 
 class Sl3dge : public VulkanApplication {
 private:

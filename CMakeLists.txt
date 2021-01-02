@@ -47,5 +47,5 @@ add_executable(Vulkan
         src/imgui_custom.h
         src/Input.cpp
         src/Input.h
-        src/main.cpp)
+        src/main.cpp src/vulkan/Swapchain.cpp src/vulkan/Swapchain.h)
 target_link_libraries(Vulkan mingw32 SDL2main SDL2 SDL2_image vulkan-1)

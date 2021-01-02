@@ -23,10 +23,10 @@
 
 #include "Debug.h"
 #include "Input.h"
-#include "vulkan/UniformBufferObject.h"
-#include "vulkan/Vertex.h"
-#include "vulkan/VulkanFrame.h"
-#include "vulkan/VulkanHelper.h"
+#include "UniformBufferObject.h"
+#include "Vertex.h"
+#include "VulkanFrame.h"
+#include "VulkanHelper.h"
 
 const Uint32 WINDOW_WIDTH = 1280;
 const Uint32 WINDOW_HEIGHT = 720;
@@ -87,22 +87,23 @@ private:
 	std::vector<FrameSemaphores> frame_semaphores;
 	size_t semaphore_index = 0;
 
-	VkQueue transfer_queue;
+	vk::Queue transfer_queue;
 
-	VkBuffer mesh_buffer;
-	VkDeviceMemory mesh_buffer_memory;
+	vk::UniqueBuffer mesh_buffer;
+	vk::UniqueDeviceMemory mesh_buffer_memory;
+
 	uint32_t idx_offset;
 
 	vk::UniqueDescriptorPool descriptor_pool;
 	vk::UniqueDescriptorSetLayout descriptor_set_layout;
 
-	VkImage texture_image;
-	VkDeviceMemory texture_image_memory;
+	vk::UniqueImage texture_image;
+	vk::UniqueDeviceMemory texture_image_memory;
 	vk::UniqueImageView texture_image_view;
 	vk::UniqueSampler texture_sampler;
 
-	VkImage depth_image;
-	VkDeviceMemory depth_image_memory;
+	vk::UniqueImage depth_image;
+	vk::UniqueDeviceMemory depth_image_memory;
 	vk::UniqueImageView depth_image_view;
 
 	VkDescriptorPool imgui_descriptor_pool;
@@ -144,7 +145,7 @@ private:
 
 	// Texture
 	void create_texture_image();
-	void create_image(uint32_t w, uint32_t h, vk::Format fmt, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &imageMemory);
+	void create_image(const uint32_t w, const uint32_t h, const vk::Format fmt, const vk::ImageTiling tiling, const vk::ImageUsageFlags usage, const vk::MemoryPropertyFlags properties, vk::UniqueImage &image, vk::UniqueDeviceMemory &image_memory);
 	void transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkImageLayout from, VkImageLayout to);
 	void copy_buffer_to_image(VkCommandBuffer transfer_cbuffer, VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 	void create_texture_image_view();
@@ -162,7 +163,7 @@ private:
 	void cleanup_imgui_context();
 	void draw_ui(VulkanFrame &frame);
 
-	void copy_buffer(VkBuffer src, VkBuffer dst, VkDeviceSize size);
+	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 
 	// Cmd
 	VkCommandBuffer begin_graphics_command_buffer();

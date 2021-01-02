@@ -54,9 +54,12 @@ vk::Format get_vk_format(SDL_PixelFormat *format) {
 	}
 }
 
-uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties) {
+uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t type_filter, vk::MemoryPropertyFlags properties) {
+	/*
 	VkPhysicalDeviceMemoryProperties mem_properties;
 	vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
+	*/
+	auto mem_properties = physical_device.getMemoryProperties();
 	for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++) {
 		if ((type_filter & (1 << i)) && ((mem_properties.memoryTypes[i].propertyFlags & properties) == properties)) {
 			return i;
@@ -65,31 +68,15 @@ uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter
 	throw std::runtime_error("Unable to find suitable memory type");
 }
 
-vk::UniqueImageView create_image_view(vk::Device device, VkImage &image, vk::Format format, vk::ImageAspectFlags aspect) {
+vk::UniqueImageView create_image_view(vk::Device device, vk::Image &image, vk::Format format, vk::ImageAspectFlags aspect) {
 	return std::move(device.createImageViewUnique(vk::ImageViewCreateInfo({}, image, vk::ImageViewType::e2D, format, vk::ComponentMapping(), vk::ImageSubresourceRange(aspect, 0, 1, 0, 1))));
 }
 
-void create_buffer(VkDevice device, VkPhysicalDevice physical_device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &buffer_memory) {
-	VkBufferCreateInfo buffer_info{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = size,
-		.usage = usage,
-		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-	};
-	vkCreateBuffer(device, &buffer_info, nullptr, &buffer);
-
-	VkMemoryRequirements requirements;
-	vkGetBufferMemoryRequirements(device, buffer, &requirements);
-
-	VkMemoryAllocateInfo alloc_info{
-		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize = requirements.size,
-		.memoryTypeIndex = find_memory_type(physical_device, requirements.memoryTypeBits, properties),
-	};
-	if (vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory) != VK_SUCCESS) {
-		throw std::runtime_error("Unable to allocate vertex buffer memory");
-	}
-	vkBindBufferMemory(device, buffer, buffer_memory, 0);
+void create_buffer(vk::Device device, vk::PhysicalDevice physical_device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::UniqueBuffer &buffer, vk::UniqueDeviceMemory &memory) {
+	buffer = std::move(device.createBufferUnique(vk::BufferCreateInfo({}, size, usage, vk::SharingMode::eExclusive, nullptr)));
+	auto requirements = device.getBufferMemoryRequirements(*buffer);
+	memory = std::move(device.allocateMemoryUnique(vk::MemoryAllocateInfo(requirements.size, find_memory_type(physical_device, requirements.memoryTypeBits, properties))));
+	device.bindBufferMemory(*buffer, *memory, 0);
 }
 
 bool check_validation_layer_support() {

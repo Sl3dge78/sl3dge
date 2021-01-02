@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VULKANHELPER_H
+#define VULKANHELPER_H
 
 #include <fstream>
 #include <optional>
@@ -35,9 +36,10 @@ struct QueueFamilyIndices {
 std::vector<char> read_file(const std::string &path);
 void check_vk_result(VkResult err);
 vk::Format get_vk_format(SDL_PixelFormat *format);
-uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties);
-vk::UniqueImageView create_image_view(vk::Device device, VkImage &image, vk::Format format, vk::ImageAspectFlags aspect);
-void create_buffer(VkDevice device, VkPhysicalDevice physical_device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &buffer_memory);
+uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t type_filter, vk::MemoryPropertyFlags properties);
+void create_buffer(vk::Device device, vk::PhysicalDevice physical_device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::UniqueBuffer &buffer, vk::UniqueDeviceMemory &memory);
+vk::UniqueImageView create_image_view(vk::Device device, vk::Image &image, vk::Format format, vk::ImageAspectFlags aspect);
+
 bool check_validation_layer_support();
 
 std::vector<const char *> get_required_extensions(SDL_Window *window);
@@ -49,3 +51,5 @@ vk::PresentModeKHR choose_swapchain_present_mode(const vk::PhysicalDevice physic
 vk::Extent2D choose_swapchain_extent(const vk::SurfaceCapabilitiesKHR &capabilities, SDL_Window *window);
 
 VkShaderModule create_shader_module(VkDevice device, const std::vector<char> &code);
+
+#endif
