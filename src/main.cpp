@@ -63,11 +63,11 @@ private:
 	}
 
 	void start() override {
-		SDL_GetRelativeMouseState(NULL, NULL); // Called here to avoid the weird jump
+		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		camera.start();
 		vubo.model = glm::mat4(1.0f);
 		camera.get_view_matrix(vubo.view);
-		vubo.proj = glm::perspective(glm::radians(80.f), float(swapchain_extent.width) / float(swapchain_extent.height), 0.1f, 1000.f);
+		vubo.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
 		vubo.proj[1][1] *= -1;
 
 		fubo.ambient_strength = .1f;
@@ -120,7 +120,7 @@ private:
 			return;
 		}
 		ImGui::Text("%d vtx, %d idx (%d tri)", vertices.size(), indices.size(), indices.size() / 3);
-		ImGui::PlotLines("FPS", frames.data(), frames.size(), 0, NULL, 50.0f, 60.0f, ImVec2(0, 80.0f), 4);
+		ImGui::PlotLines("FPS", frames.data(), frames.size(), 0, nullptr, 50.0f, 60.0f, ImVec2(0, 80.0f), 4);
 
 		ImGui::End();
 	}
@@ -146,13 +146,7 @@ private:
 
 int main(int argc, char *argv[]) {
 	Sl3dge app;
-
-	try {
-		app.run();
-	} catch (const std::exception &e) {
-		std::cerr << e.what() << std::endl;
-		return EXIT_FAILURE;
-	}
+	app.run();
 
 	return EXIT_SUCCESS;
 }
