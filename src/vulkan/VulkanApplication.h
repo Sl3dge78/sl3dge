@@ -8,7 +8,10 @@
 #include <stdexcept>
 #include <vector>
 
+#ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#endif
+
 #include <vulkan/vulkan.hpp>
 
 #include <SDL/SDL.h>
@@ -23,12 +26,14 @@
 #include "imgui/imgui_impl_vulkan.h"
 
 #include "Debug.h"
-#include "Input.h"
-#include "Swapchain.h"
+#include "Mesh.h"
 #include "UniformBufferObject.h"
-#include "Vertex.h"
+
+#include "Swapchain.h"
 #include "VulkanFrame.h"
 #include "VulkanHelper.h"
+
+#include "Input.h"
 
 const Uint32 WINDOW_WIDTH = 1280;
 const Uint32 WINDOW_HEIGHT = 720;
@@ -40,10 +45,11 @@ public:
 	~VulkanApplication();
 
 	void run();
+	vk::Device get_device() { return *device; }
+	vk::PhysicalDevice get_physical_device() { return physical_device; }
+	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 
 protected:
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
 	VtxUniformBufferObject vubo;
 	FragUniformBufferObject fubo;
 
@@ -66,19 +72,15 @@ private:
 	QueueFamilyIndices queue_family_indices;
 	vk::Queue graphics_queue;
 	vk::Queue present_queue;
-
-	size_t semaphore_index = 0;
-
 	vk::Queue transfer_queue;
-
-	std::unique_ptr<Buffer> mesh_buffer;
-
-	uint32_t idx_offset;
 
 	std::unique_ptr<Image> texture;
 	vk::UniqueSampler texture_sampler;
 
 	UniqueSwapchain swapchain;
+	size_t semaphore_index = 0;
+
+	std::vector<Mesh> meshes;
 
 	bool framebuffer_rezised = false;
 	bool wait_for_vsync = false;
@@ -87,7 +89,7 @@ private:
 	void init_vulkan();
 
 	// Loop
-	virtual void load(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) = 0;
+	virtual void load(std::vector<Mesh> &meshes) = 0;
 	virtual void start() = 0;
 	virtual void update(float delta_time) = 0;
 	void main_loop();
@@ -98,11 +100,8 @@ private:
 	void create_instance();
 	void pick_physical_device();
 	void create_logical_device();
-	void create_mesh_buffer();
 	void create_texture_image();
 	void create_texture_sampler();
-
-	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 };
 
 #endif

@@ -7,11 +7,11 @@
 #include <unordered_map>
 
 #include <SDL/SDL.h>
-#include <tiny_obj_loader.h>
 
 #include "vulkan/VulkanApplication.h"
 
 #include "Camera.h"
+#include "Mesh.h"
 
 class Sl3dge : public VulkanApplication {
 private:
@@ -22,44 +22,8 @@ private:
 
 	glm::vec3 light_position = glm::vec3(0.0f, 0.0f, 0.5f);
 
-	void load(std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) override {
-		tinyobj::attrib_t attrib;
-		std::vector<tinyobj::shape_t> shapes;
-		std::vector<tinyobj::material_t> materials;
-		std::string err;
-
-		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "resources/models/viking_room.obj")) {
-			SDL_LogError(0, "Unable to read model %s", err.c_str());
-		}
-
-		std::unordered_map<Vertex, uint32_t> unique_vtx{};
-
-		for (const auto &shape : shapes) {
-			for (const auto &index : shape.mesh.indices) {
-				Vertex vertex{};
-				vertex.pos = {
-					attrib.vertices[3 * index.vertex_index + 0],
-					attrib.vertices[3 * index.vertex_index + 1],
-					attrib.vertices[3 * index.vertex_index + 2]
-				};
-				vertex.normal = {
-					attrib.normals[3 * index.normal_index + 0],
-					attrib.normals[3 * index.normal_index + 1],
-					attrib.normals[3 * index.normal_index + 2]
-				};
-				vertex.tex_coord = {
-					attrib.texcoords[2 * index.texcoord_index + 0],
-					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-				};
-
-				if (unique_vtx.count(vertex) == 0) {
-					unique_vtx[vertex] = uint32_t(vertices.size());
-					vertices.push_back(vertex);
-				}
-
-				indices.push_back(unique_vtx[vertex]);
-			}
-		}
+	void load(std::vector<Mesh> &meshes) override {
+		meshes.emplace_back(Mesh("resources/models/viking_room.obj"));
 	}
 
 	void start() override {
@@ -119,7 +83,7 @@ private:
 			ImGui::End();
 			return;
 		}
-		ImGui::Text("%d vtx, %d idx (%d tri)", vertices.size(), indices.size(), indices.size() / 3);
+		//ImGui::Text("%d vtx, %d idx (%d tri)", vertices.size(), indices.size(), indices.size() / 3);
 		ImGui::PlotLines("FPS", frames.data(), frames.size(), 0, nullptr, 50.0f, 60.0f, ImVec2(0, 80.0f), 4);
 
 		ImGui::End();

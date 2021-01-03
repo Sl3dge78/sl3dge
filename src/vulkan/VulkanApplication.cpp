@@ -33,8 +33,10 @@ VulkanApplication::~VulkanApplication() {
 	SDL_Quit();
 }
 void VulkanApplication::run() {
-	load(vertices, indices);
-	create_mesh_buffer();
+	load(meshes);
+	for(auto &mesh :meshes) {
+		mesh.load(this);
+	}
 	SDL_Log("Resources loaded");
 
 	SDL_Log("Init done, starting main loop...");
@@ -169,10 +171,11 @@ void VulkanApplication::draw_scene(VulkanFrame &frame) {
 	frame.uniform_buffer->write_data(&fubo, sizeof(fubo), sizeof(vubo));
 
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline());
-	frame.command_buffer->bindVertexBuffers(0, { mesh_buffer->buffer }, { 0 });
-	frame.command_buffer->bindIndexBuffer(mesh_buffer->buffer, idx_offset, vk::IndexType::eUint32);
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.descriptor_set.get(), nullptr);
-	frame.command_buffer->drawIndexed(indices.size(), 1, 0, 0, 0);
+
+	for(auto& mesh : meshes) {
+		mesh.draw(frame.command_buffer.get());
+	}
 
 	// UI
 	ImGui::Render();
@@ -313,17 +316,6 @@ void VulkanApplication::create_logical_device() {
 	graphics_queue = device->getQueue(queue_family_indices.graphics_family.value(), 0);
 	present_queue = device->getQueue(queue_family_indices.present_family.value(), 0);
 	transfer_queue = device->getQueue(queue_family_indices.transfer_family.value(), 0);
-}
-void VulkanApplication::create_mesh_buffer() {
-	vk::DeviceSize vertex_size = idx_offset = sizeof(vertices[0]) * uint32_t(vertices.size());
-	vk::DeviceSize index_size = sizeof(indices[0]) * indices.size();
-
-	Buffer staging_buffer(*device, physical_device, vertex_size + index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
-	staging_buffer.write_data(vertices.data(), vertex_size);
-	staging_buffer.write_data(indices.data(), index_size, idx_offset);
-
-	mesh_buffer = std::unique_ptr<Buffer>(new Buffer(*device, physical_device, vertex_size + index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-	copy_buffer(staging_buffer.buffer, mesh_buffer->buffer, vertex_size + index_size);
 }
 void VulkanApplication::create_texture_image() {
 	// Load image
