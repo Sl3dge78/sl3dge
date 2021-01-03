@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.hpp>
 
 #include "UniformBufferObject.h"
+#include "VulkanHelper.h"
 
 struct VulkanFrame {
 	vk::Device device;
@@ -18,8 +19,7 @@ struct VulkanFrame {
 	vk::UniqueFence fence;
 	vk::UniqueDescriptorSet descriptor_set;
 
-	vk::UniqueBuffer uniform_buffer;
-	vk::UniqueDeviceMemory uniform_buffer_memory;
+	std::unique_ptr<Buffer> uniform_buffer;
 
 	void init_frame(vk::Device device);
 	void create_framebuffer(vk::Extent2D extent, vk::RenderPass &render_pass, vk::ImageView &depth_image_view);

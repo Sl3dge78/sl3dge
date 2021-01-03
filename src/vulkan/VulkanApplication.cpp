@@ -165,17 +165,12 @@ void VulkanApplication::main_loop() {
 }
 void VulkanApplication::draw_scene(VulkanFrame &frame) {
 	// Scene
-	void *data = device->mapMemory(frame.uniform_buffer_memory.get(), 0, sizeof(vubo), {});
-	memcpy(data, &vubo, sizeof(vubo));
-	device->unmapMemory(frame.uniform_buffer_memory.get());
-
-	data = device->mapMemory(frame.uniform_buffer_memory.get(), sizeof(vubo), sizeof(fubo), {});
-	memcpy(data, &fubo, sizeof(fubo));
-	device->unmapMemory(frame.uniform_buffer_memory.get());
+	frame.uniform_buffer->write_data(&vubo, sizeof(vubo));
+	frame.uniform_buffer->write_data(&fubo, sizeof(fubo), sizeof(vubo));
 
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline());
-	frame.command_buffer->bindVertexBuffers(0, { *mesh_buffer }, { 0 });
-	frame.command_buffer->bindIndexBuffer(*mesh_buffer, idx_offset, vk::IndexType::eUint32);
+	frame.command_buffer->bindVertexBuffers(0, { mesh_buffer->buffer }, { 0 });
+	frame.command_buffer->bindIndexBuffer(mesh_buffer->buffer, idx_offset, vk::IndexType::eUint32);
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.descriptor_set.get(), nullptr);
 	frame.command_buffer->drawIndexed(indices.size(), 1, 0, 0, 0);
 
@@ -305,13 +300,8 @@ void VulkanApplication::create_logical_device() {
 	std::set<uint32_t> unique_queue_families = { queue_family_indices.graphics_family.value(), queue_family_indices.present_family.value(), queue_family_indices.transfer_family.value() };
 	float queue_priority = 1.0f;
 	for (uint32_t queue_family : unique_queue_families) {
-		VkDeviceQueueCreateInfo queue_create_info{};
-		// TODO : VkHpp that
-		queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_create_info.queueFamilyIndex = queue_family;
-		queue_create_info.queueCount = 1;
-		queue_create_info.pQueuePriorities = &queue_priority;
-		req_queues.emplace_back(queue_create_info);
+		vk::DeviceQueueCreateInfo ci({}, queue_family, 1, &queue_priority);
+		req_queues.emplace_back(ci);
 	}
 
 	vk::PhysicalDeviceFeatures req_device_features;
@@ -328,39 +318,12 @@ void VulkanApplication::create_mesh_buffer() {
 	vk::DeviceSize vertex_size = idx_offset = sizeof(vertices[0]) * uint32_t(vertices.size());
 	vk::DeviceSize index_size = sizeof(indices[0]) * indices.size();
 
-	vk::UniqueBuffer staging_buffer = device->createBufferUnique(vk::BufferCreateInfo({}, vertex_size + index_size, vk::BufferUsageFlagBits::eTransferSrc, vk::SharingMode::eExclusive, nullptr));
-	auto requirements = device->getBufferMemoryRequirements(*staging_buffer);
-	vk::UniqueDeviceMemory staging_memory = device->allocateMemoryUnique(vk::MemoryAllocateInfo(requirements.size, find_memory_type(physical_device, requirements.memoryTypeBits, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible })));
-	device->bindBufferMemory(*staging_buffer, *staging_memory, 0);
+	Buffer staging_buffer(*device, physical_device, vertex_size + index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+	staging_buffer.write_data(vertices.data(), vertex_size);
+	staging_buffer.write_data(indices.data(), index_size, idx_offset);
 
-	//	create_buffer(
-	//			*device,physical_device,vertex_size+index_size,
-	//			vk::BufferUsageFlagBits::eTransferSrc,
-	//			{ vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible },
-	//			staging_buffer, staging_memory);
-
-	void *data;
-	// Copy vtx data
-	data = device->mapMemory(*staging_memory, 0, vertex_size, {});
-	memcpy(data, vertices.data(), size_t(vertex_size));
-	device->unmapMemory(*staging_memory);
-
-	// Copy idx data
-	data = device->mapMemory(*staging_memory, idx_offset, index_size, {});
-	memcpy(data, indices.data(), size_t(index_size));
-	device->unmapMemory(*staging_memory);
-
-	mesh_buffer = device->createBufferUnique(vk::BufferCreateInfo({}, vertex_size + index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer }, vk::SharingMode::eExclusive, nullptr));
-	requirements = device->getBufferMemoryRequirements(*staging_buffer);
-	mesh_buffer_memory = device->allocateMemoryUnique(vk::MemoryAllocateInfo(requirements.size, find_memory_type(physical_device, requirements.memoryTypeBits, { vk::MemoryPropertyFlagBits::eDeviceLocal })));
-	device->bindBufferMemory(*mesh_buffer, *mesh_buffer_memory, 0);
-
-	//	create_buffer(
-	//			*device, physical_device,vertex_size + index_size,
-	//			{ vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer },
-	//			{vk::MemoryPropertyFlagBits::eDeviceLocal},
-	//			mesh_buffer,mesh_buffer_memory);
-	copy_buffer(*staging_buffer, *mesh_buffer, vertex_size + index_size);
+	mesh_buffer = std::unique_ptr<Buffer>(new Buffer(*device, physical_device, vertex_size + index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eVertexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+	copy_buffer(staging_buffer.buffer, mesh_buffer->buffer, vertex_size + index_size);
 }
 void VulkanApplication::create_texture_image() {
 	// Load image
@@ -377,100 +340,35 @@ void VulkanApplication::create_texture_image() {
 
 	// Create data transfer buffer
 	vk::DeviceSize img_size = surf->w * surf->h * surf->format->BytesPerPixel;
-	vk::UniqueBuffer staging_buffer = device->createBufferUnique(vk::BufferCreateInfo({}, img_size, { vk::BufferUsageFlagBits::eTransferSrc }, vk::SharingMode::eExclusive, nullptr));
-	auto requirements = device->getBufferMemoryRequirements(*staging_buffer);
-	vk::UniqueDeviceMemory staging_memory = device->allocateMemoryUnique(vk::MemoryAllocateInfo(requirements.size, find_memory_type(physical_device, requirements.memoryTypeBits, { vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent })));
-	device->bindBufferMemory(*staging_buffer, *staging_memory, 0);
-
-	// Copy image data to buffer
-	void *data;
-	vkMapMemory(*device, *staging_memory, 0, img_size, 0, &data);
-	memcpy(data, surf->pixels, img_size);
-	vkUnmapMemory(*device, *staging_memory);
+	Buffer staging_buffer(*device, physical_device, img_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent });
+	staging_buffer.write_data(surf->pixels, img_size);
 
 	// Copy the buffer to the image and send it to graphics queue
-	auto transfer_cbuffer = begin_transfer_command_buffer();
-	transition_image_layout(transfer_cbuffer, texture->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	copy_buffer_to_image(transfer_cbuffer, *staging_buffer, texture->image, surf->w, surf->h);
-	transition_image_layout(transfer_cbuffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	end_transfer_command_buffer(transfer_cbuffer);
+	vk::UniqueCommandBuffer transfer_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*transfer_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
+	transfer_cbuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+	texture->transition_layout(*transfer_cbuffer, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value());
+	copy_buffer_to_image(*transfer_cbuffer, staging_buffer.buffer, texture->image, surf->w, surf->h);
+	texture->transition_layout(*transfer_cbuffer, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value());
+	transfer_cbuffer->end();
+	transfer_queue.submit(vk::SubmitInfo(nullptr, nullptr, *transfer_cbuffer, nullptr));
 
 	// Receive the image on the graphics queue
-	auto receive_cbuffer = begin_graphics_command_buffer();
-	VkImageMemoryBarrier barrier{
-		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.srcAccessMask = 0,
-		.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-		.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		.srcQueueFamilyIndex = queue_family_indices.transfer_family.value(),
-		.dstQueueFamilyIndex = queue_family_indices.graphics_family.value(),
-		.image = texture->image,
-		.subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 },
-	};
-	barrier.srcAccessMask = 0;
-	barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	vkCmdPipelineBarrier(receive_cbuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, VK_NULL_HANDLE, 0, VK_NULL_HANDLE, 1, &barrier);
-	end_graphics_command_buffer(receive_cbuffer);
+	vk::UniqueCommandBuffer graphics_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
+	graphics_cbuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+	vk::ImageMemoryBarrier barrier(
+			{}, vk::AccessFlagBits::eVertexAttributeRead,
+			vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
+			queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value(),
+			texture->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+	graphics_cbuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eVertexInput, {}, nullptr, nullptr, barrier);
+	graphics_cbuffer->end();
+	graphics_queue.submit(vk::SubmitInfo({}, {}, *graphics_cbuffer));
 
 	// Wait for everything to process
-	vkQueueWaitIdle(transfer_queue);
-	vkFreeCommandBuffers(*device, *transfer_command_pool, 1, &transfer_cbuffer);
-	vkQueueWaitIdle(graphics_queue);
-	vkFreeCommandBuffers(*device, *graphics_command_pool, 1, &receive_cbuffer);
+	transfer_queue.waitIdle();
+	graphics_queue.waitIdle();
 
 	SDL_FreeSurface(surf);
-}
-void VulkanApplication::transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkImageLayout from, VkImageLayout to) {
-	VkImageMemoryBarrier barrier{
-		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.oldLayout = from,
-		.newLayout = to,
-		.srcQueueFamilyIndex = queue_family_indices.transfer_family.value(),
-		.dstQueueFamilyIndex = queue_family_indices.transfer_family.value(),
-		.image = image,
-		.subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 },
-	};
-
-	VkPipelineStageFlags src_stage;
-	VkPipelineStageFlags dst_stage;
-	if (from == VK_IMAGE_LAYOUT_UNDEFINED && to == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-		barrier.srcAccessMask = 0;
-		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-		src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-		barrier.srcQueueFamilyIndex = queue_family_indices.transfer_family.value();
-		barrier.dstQueueFamilyIndex = queue_family_indices.transfer_family.value();
-
-	} else if (from == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && to == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier.dstAccessMask = 0;
-
-		barrier.srcQueueFamilyIndex = queue_family_indices.transfer_family.value();
-		barrier.dstQueueFamilyIndex = queue_family_indices.graphics_family.value();
-
-		src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-	} else {
-		throw std::runtime_error("Unsupported layout transition");
-	}
-
-	vkCmdPipelineBarrier(c_buffer, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-}
-void VulkanApplication::copy_buffer_to_image(VkCommandBuffer c_buffer, VkBuffer buffer, VkImage image, uint32_t w, uint32_t h) {
-	VkBufferImageCopy region{
-		.bufferOffset = 0,
-		.bufferRowLength = 0,
-		.bufferImageHeight = 0,
-
-		.imageSubresource = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 },
-		.imageOffset = { 0, 0, 0 },
-		.imageExtent = { w, h, 1 },
-	};
-	vkCmdCopyBufferToImage(c_buffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 void VulkanApplication::create_texture_sampler() {
 	texture_sampler = device->createSamplerUnique(vk::SamplerCreateInfo(
@@ -508,62 +406,4 @@ void VulkanApplication::copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSi
 
 	transfer_queue.waitIdle();
 	graphics_queue.waitIdle();
-}
-
-// Todo : wrapper class for command buffers
-VkCommandBuffer VulkanApplication::begin_graphics_command_buffer() {
-	VkCommandBufferAllocateInfo ai{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = *graphics_command_pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1,
-	};
-	VkCommandBuffer c_buffer;
-	vkAllocateCommandBuffers(*device, &ai, &c_buffer);
-
-	VkCommandBufferBeginInfo bi{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-	vkBeginCommandBuffer(c_buffer, &bi);
-
-	return c_buffer;
-}
-void VulkanApplication::end_graphics_command_buffer(VkCommandBuffer c_buffer) {
-	vkEndCommandBuffer(c_buffer);
-
-	VkSubmitInfo submits{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &c_buffer,
-	};
-	vkQueueSubmit(graphics_queue, 1, &submits, VK_NULL_HANDLE);
-}
-VkCommandBuffer VulkanApplication::begin_transfer_command_buffer() {
-	VkCommandBufferAllocateInfo ai{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = *transfer_command_pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1,
-	};
-	VkCommandBuffer c_buffer;
-	vkAllocateCommandBuffers(*device, &ai, &c_buffer);
-
-	VkCommandBufferBeginInfo bi{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-	};
-	vkBeginCommandBuffer(c_buffer, &bi);
-
-	return c_buffer;
-}
-void VulkanApplication::end_transfer_command_buffer(VkCommandBuffer c_buffer) {
-	vkEndCommandBuffer(c_buffer);
-
-	VkSubmitInfo submits{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount = 1,
-		.pCommandBuffers = &c_buffer,
-	};
-	vkQueueSubmit(transfer_queue, 1, &submits, VK_NULL_HANDLE);
 }

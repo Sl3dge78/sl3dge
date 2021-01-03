@@ -71,15 +71,13 @@ private:
 
 	vk::Queue transfer_queue;
 
-	vk::UniqueBuffer mesh_buffer;
-	vk::UniqueDeviceMemory mesh_buffer_memory;
+	std::unique_ptr<Buffer> mesh_buffer;
 
 	uint32_t idx_offset;
 
 	std::unique_ptr<Image> texture;
 	vk::UniqueSampler texture_sampler;
 
-	SwapchainCreateInfo swapchain_info;
 	UniqueSwapchain swapchain;
 
 	bool framebuffer_rezised = false;
@@ -100,24 +98,11 @@ private:
 	void create_instance();
 	void pick_physical_device();
 	void create_logical_device();
-
-	// Scene
 	void create_mesh_buffer();
-
-	// Texture
 	void create_texture_image();
 	void create_texture_sampler();
 
-	void transition_image_layout(VkCommandBuffer c_buffer, VkImage image, VkImageLayout from, VkImageLayout to);
-	void copy_buffer_to_image(VkCommandBuffer transfer_cbuffer, VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
-
 	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
-
-	// Cmd
-	VkCommandBuffer begin_graphics_command_buffer();
-	void end_graphics_command_buffer(VkCommandBuffer c_buffer);
-	VkCommandBuffer begin_transfer_command_buffer();
-	void end_transfer_command_buffer(VkCommandBuffer c_buffer);
 };
 
 #endif

@@ -41,10 +41,9 @@ Swapchain::~Swapchain() {
 }
 void Swapchain::create_swapchain(vk::Device device, vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, SDL_Window *window) {
 	auto capabilities = physical_device.getSurfaceCapabilitiesKHR(surface);
-
-	auto surface_fmt = choose_swapchain_surface_format(physical_device, surface);
-	auto present_mode = choose_swapchain_present_mode(physical_device, surface);
-	extent = choose_swapchain_extent(capabilities, window);
+	auto surface_fmt = choose_surface_format(physical_device, surface);
+	auto present_mode = choose_present_mode(physical_device, surface);
+	extent = choose_extent(capabilities, window);
 	uint32_t req_image_count = capabilities.minImageCount + 1;
 	if (capabilities.maxImageCount > 0 && req_image_count > capabilities.maxImageCount) {
 		req_image_count = capabilities.maxImageCount;
@@ -131,12 +130,7 @@ void Swapchain::create_descriptors(vk::Device device) {
 }
 void Swapchain::create_depth_resources(vk::Device device, vk::PhysicalDevice physical_device) {
 	vk::Format depth_format = find_depth_format(physical_device);
-
-	//create_image(device, physical_device,extent.width, extent.height, depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, *depth_image, *depth_image_memory);
-	depth_image = create_image(device, depth_format, extent.width, extent.height, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment);
-	depth_image_memory = create_memory(device, physical_device, device.getImageMemoryRequirements(*depth_image), vk::MemoryPropertyFlagBits::eDeviceLocal);
-	device.bindImageMemory(*depth_image, *depth_image_memory, 0);
-	depth_image_view = create_image_view(device, *depth_image, depth_format, vk::ImageAspectFlagBits::eDepth);
+	depth_image = std::unique_ptr<Image>(new Image(device, physical_device, extent.width, extent.height, depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
 }
 void Swapchain::create_graphics_pipeline(vk::Device device) {
 	auto vertex_shader_code = read_file("resources/shaders/triangle.vert.spv");
@@ -198,7 +192,7 @@ void Swapchain::create_frames(vk::Device device, vk::PhysicalDevice physical_dev
 	for (uint32_t i = 0; i < images.size(); i++) {
 		frames[i].init_frame(device);
 		frames[i].image_view = create_image_view(device, images[i], format, vk::ImageAspectFlagBits::eColor);
-		frames[i].create_framebuffer(extent, *render_pass, *depth_image_view);
+		frames[i].create_framebuffer(extent, *render_pass, depth_image->image_view);
 		frames[i].create_command_buffers(command_pool);
 		frames[i].create_sync_objects();
 		frames[i].create_uniform_buffer(physical_device);
@@ -266,4 +260,39 @@ void Swapchain::create_imgui_context(SwapchainCreateInfo info) {
 	info.queue.submit(submit, nullptr);
 	info.queue.waitIdle();
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+vk::SurfaceFormatKHR Swapchain::choose_surface_format(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface) {
+	for (const auto &fmt : physical_device.getSurfaceFormatsKHR(surface)) {
+		if (fmt.format == vk::Format::eB8G8R8A8Srgb && fmt.colorSpace == vk::ColorSpaceKHR::eVkColorspaceSrgbNonlinear) {
+			return fmt;
+		}
+	}
+	return physical_device.getSurfaceFormatsKHR(surface).front();
+}
+vk::PresentModeKHR Swapchain::choose_present_mode(const vk::PhysicalDevice physical_device, const vk::SurfaceKHR surface) {
+	for (const auto &mode : physical_device.getSurfacePresentModesKHR(surface)) {
+		if (mode == vk::PresentModeKHR::eMailbox) {
+			return mode;
+		}
+	}
+	SDL_Log("Present mode: VK_PRESENT_MODE_FIFO_KHR");
+	return vk::PresentModeKHR::eFifo;
+}
+vk::Extent2D Swapchain::choose_extent(const vk::SurfaceCapabilitiesKHR &capabilities, SDL_Window *window) {
+	if (capabilities.currentExtent.width != UINT32_MAX) {
+		return capabilities.currentExtent;
+	} else {
+		int w, h;
+		SDL_Vulkan_GetDrawableSize(window, &w, &h);
+		vk::Extent2D ext = { uint32_t(w), uint32_t(h) };
+		ext.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, extent.width));
+		ext.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, extent.height));
+		return ext;
+	}
+}
+vk::Format Swapchain::find_depth_format(vk::PhysicalDevice physical_device) {
+	return find_supported_format(physical_device,
+			{ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint },
+			vk::ImageTiling::eOptimal,
+			vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 }

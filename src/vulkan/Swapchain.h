@@ -63,9 +63,7 @@ private:
 	vk::UniqueDescriptorPool descriptor_pool;
 	vk::UniqueDescriptorSetLayout descriptor_set_layout;
 
-	vk::UniqueImage depth_image;
-	vk::UniqueDeviceMemory depth_image_memory;
-	vk::UniqueImageView depth_image_view;
+	std::unique_ptr<Image> depth_image;
 
 	vk::UniquePipelineLayout pipeline_layout;
 	vk::UniquePipeline graphics_pipeline;
@@ -83,6 +81,11 @@ private:
 	void create_frames(vk::Device device, vk::PhysicalDevice physical_device, vk::CommandPool command_pool, vk::Sampler texture_sampler, vk::ImageView texture_image_view);
 	void create_semaphores(vk::Device device);
 	void create_imgui_context(SwapchainCreateInfo info);
+
+	vk::SurfaceFormatKHR choose_surface_format(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
+	vk::PresentModeKHR choose_present_mode(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
+	vk::Extent2D choose_extent(const vk::SurfaceCapabilitiesKHR &capabilities, SDL_Window *window);
+	vk::Format find_depth_format(vk::PhysicalDevice physical_device);
 };
 
 typedef std::unique_ptr<Swapchain> UniqueSwapchain;
