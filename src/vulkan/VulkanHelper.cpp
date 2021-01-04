@@ -69,10 +69,14 @@ Image::~Image() {
 
 Buffer::Buffer(vk::Device device, vk::PhysicalDevice physical_device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
 	this->device = device;
-	buffer = device.createBuffer(vk::BufferCreateInfo({}, size, usage, vk::SharingMode::eExclusive, nullptr));
+	buffer = device.createBuffer(vk::BufferCreateInfo({}, size, { usage | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::SharingMode::eExclusive, nullptr));
 	auto requirements = device.getBufferMemoryRequirements(buffer);
-	memory = device.allocateMemory(vk::MemoryAllocateInfo(requirements.size, find_memory_type(physical_device, requirements.memoryTypeBits, properties)));
+	vk::MemoryAllocateInfo ai(requirements.size, find_memory_type(physical_device, requirements.memoryTypeBits, properties));
+	vk::MemoryAllocateFlagsInfo fi(vk::MemoryAllocateFlagBits::eDeviceAddress);
+	ai.setPNext(&fi);
+	memory = device.allocateMemory(ai);
 	device.bindBufferMemory(buffer, memory, 0);
+	address = device.getBufferAddress(vk::BufferDeviceAddressInfo(buffer));
 }
 Buffer::~Buffer() {
 	device.destroyBuffer(buffer);
@@ -84,44 +88,7 @@ void Buffer::write_data(void *data, vk::DeviceSize size, const uint32_t offset) 
 	device.unmapMemory(this->memory);
 }
 
-bool check_validation_layer_support() {
-	auto available_layers = vk::enumerateInstanceLayerProperties();
 
-	for (const char *layer_name : req_validation_layers) {
-		bool layer_found = false;
-		for (const auto &layer_properties : available_layers) {
-			if (strcmp(layer_name, layer_properties.layerName) == 0) {
-				layer_found = true;
-				break;
-			}
-		}
-
-		if (!layer_found) {
-			return false;
-		}
-	}
-
-	return true;
-}
-std::vector<const char *> get_required_extensions(SDL_Window *window) {
-	// Get extension count & names
-	uint32_t sdl_extension_count = 0;
-	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, nullptr);
-	std::vector<const char *> required_extension_names = {};
-	required_extension_names.resize(sdl_extension_count);
-	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, required_extension_names.data());
-
-	if (enable_validation_layers) {
-		required_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	}
-
-	SDL_Log("Required extensions:");
-	for (const auto &extension : required_extension_names) {
-		SDL_Log("\t %s", extension);
-	}
-
-	return required_extension_names;
-}
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device, const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
 	for (vk::Format format : candidates) {
@@ -205,11 +172,8 @@ uint32_t find_memory_type(vk::PhysicalDevice physical_device, uint32_t type_filt
 	}
 	throw std::runtime_error("Unable to find suitable memory type");
 }
-void create_buffer(vk::Device device, vk::PhysicalDevice physical_device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::UniqueBuffer &buffer, vk::UniqueDeviceMemory &memory) {
-	buffer = std::move(device.createBufferUnique(vk::BufferCreateInfo({}, size, usage, vk::SharingMode::eExclusive, nullptr)));
-	auto requirements = device.getBufferMemoryRequirements(*buffer);
-	memory = std::move(device.allocateMemoryUnique(vk::MemoryAllocateInfo(requirements.size, find_memory_type(physical_device, requirements.memoryTypeBits, properties))));
-	device.bindBufferMemory(*buffer, *memory, 0);
+vk::Buffer create_buffer(vk::Device device, vk::PhysicalDevice physical_device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+	return device.createBuffer(vk::BufferCreateInfo({}, size, usage, vk::SharingMode::eExclusive, nullptr));
 }
 vk::UniqueImage create_image(vk::Device device, vk::Format format, const uint32_t w, const uint32_t h, const vk::ImageTiling tiling, const vk::ImageUsageFlags usage) {
 	return std::move(device.createImageUnique(vk::ImageCreateInfo(

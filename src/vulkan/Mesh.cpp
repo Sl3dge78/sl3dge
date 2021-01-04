@@ -56,12 +56,31 @@ void Mesh::load(VulkanApplication *app) {
 		vk::DeviceSize index_size = sizeof(indices[0]) * indices.size();
 		Buffer staging_buffer(app->get_device(), app->get_physical_device(), index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(indices.data(), index_size);
-		index_buffer = std::unique_ptr<Buffer>(new Buffer(app->get_device(), app->get_physical_device(), index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer  }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		index_buffer = std::unique_ptr<Buffer>(new Buffer(app->get_device(), app->get_physical_device(), index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
 		app->copy_buffer(staging_buffer.buffer, index_buffer->buffer, index_size);
 	}
+
+	vk::AccelerationStructureGeometryTrianglesDataKHR triangles;
+	triangles.setVertexFormat(vk::Format::eR32G32B32A32Sfloat);
+	triangles.setVertexData(vertex_buffer->address);
+	triangles.setVertexStride(sizeof(Vertex));
+	triangles.setIndexType(vk::IndexType::eUint32);
+	triangles.setIndexData(index_buffer->address);
+	triangles.setTransformData({});
+	triangles.setMaxVertex(vertices.size());
+
+	geometry.setGeometryType(vk::GeometryTypeKHR::eTriangles);
+	geometry.setFlags(vk::GeometryFlagBitsKHR::eOpaque);
+	geometry.geometry.setTriangles(triangles);
+
+	range_info.setPrimitiveCount(indices.size() / 3);
+	range_info.setFirstVertex(0);
+	range_info.setPrimitiveOffset(0);
+	range_info.setTransformOffset(0);
 }
 void Mesh::draw(vk::CommandBuffer cmd_buf) {
 	cmd_buf.bindVertexBuffers(0, { vertex_buffer->buffer }, { 0 });
 	cmd_buf.bindIndexBuffer(index_buffer->buffer,0, vk::IndexType::eUint32);
 	cmd_buf.drawIndexed(indices.size(), 1, 0, 0, 0);
 }
+

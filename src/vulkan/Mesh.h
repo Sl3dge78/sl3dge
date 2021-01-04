@@ -15,7 +15,6 @@
 class VulkanApplication;
 
 class Mesh {
-
 	std::unique_ptr<Buffer> vertex_buffer;
 	std::unique_ptr<Buffer> index_buffer;
 
@@ -24,8 +23,11 @@ class Mesh {
 
 public:
 	Mesh(const std::string path);
-	void load(VulkanApplication* app);
+	void load(VulkanApplication *app);
 	void draw(vk::CommandBuffer cmd_buf);
+
+	vk::AccelerationStructureGeometryKHR geometry;
+	vk::AccelerationStructureBuildRangeInfoKHR range_info;
 };
 
 #endif //VULKAN_MESH_H

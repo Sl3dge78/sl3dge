@@ -39,6 +39,17 @@ const Uint32 WINDOW_WIDTH = 1280;
 const Uint32 WINDOW_HEIGHT = 720;
 const Uint32 FRAME_RATE = 60;
 
+const std::vector<const char *> req_validation_layers = { "VK_LAYER_KHRONOS_validation" };
+const std::vector<const char *> req_device_extensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+	VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+	VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+	VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+	VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
+};
+
 class VulkanApplication {
 public:
 	VulkanApplication();
@@ -96,12 +107,19 @@ private:
 	void draw_scene(VulkanFrame &frame);
 	void draw_frame();
 
-	// Device
 	void create_instance();
 	void pick_physical_device();
 	void create_logical_device();
 	void create_texture_image();
 	void create_texture_sampler();
+
+	bool check_validation_layer_support();
+	std::vector<const char *> get_required_extensions(SDL_Window *window);
+
+	// RTX
+	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
+	void init_rtx();
+	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
 };
 
 #endif
