@@ -3,8 +3,7 @@
 #include <glm/glm.hpp>
 
 // Todo : wrapper class
-struct VtxUniformBufferObject {
-	alignas(16) glm::mat4 model;
+struct SceneInfoUBO {
 	alignas(16) glm::mat4 view;
 	alignas(16) glm::mat4 proj;
 };

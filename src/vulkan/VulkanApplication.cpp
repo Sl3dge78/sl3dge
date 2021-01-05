@@ -22,6 +22,8 @@ VulkanApplication::~VulkanApplication() {
 	SDL_Log("Cleaning up...");
 	SDL_HideWindow(window);
 
+	meshes.clear();
+
 	Input::cleanup();
 
 	ImGui_ImplSDL2_Shutdown();
@@ -169,15 +171,16 @@ void VulkanApplication::main_loop() {
 	}
 }
 void VulkanApplication::draw_scene(VulkanFrame &frame) {
-	// Scene
+	// SCENE UBO
 	frame.uniform_buffer->write_data(&vubo, sizeof(vubo));
-	frame.uniform_buffer->write_data(&fubo, sizeof(fubo), sizeof(vubo));
+	// FRAG UBO
+	frame.uniform_buffer->write_data(&fubo, sizeof(fubo), sizeof(MeshUBO) + sizeof(vubo));
 
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline());
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.descriptor_set.get(), nullptr);
 
 	for (auto &mesh : meshes) {
-		mesh.draw(frame.command_buffer.get());
+		mesh.draw(frame);
 	}
 
 	// UI
@@ -472,7 +475,7 @@ void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags)
 
 		Buffer *buf = new Buffer(*device, physical_device, create_info.size, { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::MemoryPropertyFlagBits::eDeviceLocal);
 		create_info.buffer = buf->buffer;
-		auto as = device->createAccelerationStructureKHRUnique(create_info);
+		auto as = device->createAccelerationStructureKHRUnique(create_info); // TODO : wrapper class
 
 		build_info.setDstAccelerationStructure(*as);
 		max_scratch = std::max(max_scratch, size_info.buildScratchSize);

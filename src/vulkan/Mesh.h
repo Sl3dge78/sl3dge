@@ -9,10 +9,15 @@
 
 #include "tiny_obj_loader.h"
 
-#include "VulkanHelper.h"
 #include "Vertex.h"
+#include "VulkanHelper.h"
 
 class VulkanApplication;
+class VulkanFrame;
+
+struct MeshUBO {
+	alignas(16) glm::mat4 transform;
+};
 
 class Mesh {
 	std::unique_ptr<Buffer> vertex_buffer;
@@ -20,14 +25,24 @@ class Mesh {
 
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
+	glm::mat4 transform = glm::mat4(1.0f);
+
+	void update_matrix();
 
 public:
+	bool show_window = false;
+
 	Mesh(const std::string path);
 	void load(VulkanApplication *app);
-	void draw(vk::CommandBuffer cmd_buf);
+	void draw(VulkanFrame &frame);
+	void update(float delta_time);
 
 	vk::AccelerationStructureGeometryKHR geometry;
 	vk::AccelerationStructureBuildRangeInfoKHR range_info;
+
+	glm::vec3 position;
+	glm::vec3 rotation;
+	glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
 };
 
 #endif //VULKAN_MESH_H

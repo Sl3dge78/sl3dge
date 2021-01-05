@@ -117,10 +117,11 @@ void Swapchain::create_render_pass(vk::Device device, vk::PhysicalDevice physica
 	render_pass = device.createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
 }
 void Swapchain::create_descriptors(vk::Device device) {
-	vk::DescriptorSetLayoutBinding ubo(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
-	vk::DescriptorSetLayoutBinding sampler(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
-	vk::DescriptorSetLayoutBinding frag(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
-	std::array<vk::DescriptorSetLayoutBinding, 3> bindings = { ubo, sampler, frag };
+	vk::DescriptorSetLayoutBinding scene_ubo(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
+	vk::DescriptorSetLayoutBinding mesh_ubo(1, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
+	vk::DescriptorSetLayoutBinding sampler(2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
+	vk::DescriptorSetLayoutBinding frag(3, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
+	std::array<vk::DescriptorSetLayoutBinding, 4> bindings = { mesh_ubo, scene_ubo, sampler, frag };
 	descriptor_set_layout = device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
 
 	vk::DescriptorPoolSize a(vk::DescriptorType::eUniformBuffer, image_count);

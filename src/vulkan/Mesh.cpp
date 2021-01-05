@@ -21,18 +21,18 @@ Mesh::Mesh(const std::string path) {
 		for (const auto &index : shape.mesh.indices) {
 			Vertex vertex{};
 			vertex.pos = {
-					attrib.vertices[3 * index.vertex_index + 0],
-					attrib.vertices[3 * index.vertex_index + 1],
-					attrib.vertices[3 * index.vertex_index + 2]
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
 			};
 			vertex.normal = {
-					attrib.normals[3 * index.normal_index + 0],
-					attrib.normals[3 * index.normal_index + 1],
-					attrib.normals[3 * index.normal_index + 2]
+				attrib.normals[3 * index.normal_index + 0],
+				attrib.normals[3 * index.normal_index + 1],
+				attrib.normals[3 * index.normal_index + 2]
 			};
 			vertex.tex_coord = {
-					attrib.texcoords[2 * index.texcoord_index + 0],
-					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 			};
 
 			if (unique_vtx.count(vertex) == 0) {
@@ -78,9 +78,30 @@ void Mesh::load(VulkanApplication *app) {
 	range_info.setPrimitiveOffset(0);
 	range_info.setTransformOffset(0);
 }
-void Mesh::draw(vk::CommandBuffer cmd_buf) {
-	cmd_buf.bindVertexBuffers(0, { vertex_buffer->buffer }, { 0 });
-	cmd_buf.bindIndexBuffer(index_buffer->buffer,0, vk::IndexType::eUint32);
-	cmd_buf.drawIndexed(indices.size(), 1, 0, 0, 0);
+void Mesh::draw(VulkanFrame &frame) {
+	frame.uniform_buffer->write_data(&this->transform, sizeof(this->transform), sizeof(SceneInfoUBO));
+	frame.command_buffer->bindVertexBuffers(0, { vertex_buffer->buffer }, { 0 });
+	frame.command_buffer->bindIndexBuffer(index_buffer->buffer, 0, vk::IndexType::eUint32);
+	frame.command_buffer->drawIndexed(indices.size(), 1, 0, 0, 0);
 }
+void Mesh::update(float delta_time) {
+	if (show_window) {
+		if (!ImGui::Begin("Mesh", &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
+			ImGui::End();
+			return;
+		}
+		if (ImGui::InputFloat3("Position", &position[0]) ||
+				ImGui::InputFloat3("Rotation", &rotation[0]) ||
+				ImGui::InputFloat3("Scale", &scale[0])) {
+			update_matrix();
+		}
+		ImGui::End();
+	}
+}
+void Mesh::update_matrix() {
+	glm::mat4 rot = glm::mat4_cast(glm::quat(rotation));
+	glm::mat4 trans = glm::translate(glm::mat4(1.0f), position);
+	glm::mat4 size = glm::scale(glm::mat4(1.0f), scale);
 
+	transform = trans * rot * size;
+}

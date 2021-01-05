@@ -61,10 +61,12 @@ public:
 	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 
 protected:
-	VtxUniformBufferObject vubo;
+	SceneInfoUBO vubo;
 	FragUniformBufferObject fubo;
 
 	SDL_Window *window = nullptr;
+
+	std::vector<Mesh> meshes;
 
 	float get_aspect_ratio() const;
 
@@ -90,8 +92,6 @@ private:
 
 	UniqueSwapchain swapchain;
 	size_t semaphore_index = 0;
-
-	std::vector<Mesh> meshes;
 
 	bool framebuffer_rezised = false;
 	bool wait_for_vsync = false;

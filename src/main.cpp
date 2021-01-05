@@ -29,7 +29,6 @@ private:
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		camera.start();
-		vubo.model = glm::mat4(1.0f);
 		camera.get_view_matrix(vubo.view);
 		vubo.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
 		vubo.proj[1][1] *= -1;
@@ -43,11 +42,22 @@ private:
 	void update(float delta_time) override {
 		camera.update(delta_time);
 
+		for (auto &mesh : meshes) {
+			mesh.update(delta_time);
+		}
+
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Display Lighting Options", "F10", &show_lighting_options);
 				ImGui::MenuItem("Display Metrics", "F11", &show_metrics);
 				ImGui::MenuItem("Cam Info", "", &camera.show_window);
+				ImGui::EndMenu();
+			}
+			ImGui::Separator();
+			if (ImGui::BeginMenu("Meshes")) {
+				for (auto &mesh : meshes) {
+					ImGui::MenuItem("Info", "", &mesh.show_window);
+				}
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();

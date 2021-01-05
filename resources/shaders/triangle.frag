@@ -8,13 +8,13 @@ struct SunLight {
 };
 
 struct PointLight {
-	vec3 position;
-	vec3 color;
-	float strength;
+    vec3 position;
+    vec3 color;
+    float strength;
 };
 
-layout(binding = 1) uniform sampler2D tex_sampler;
-layout(binding = 2) uniform FragUniformBufferObject {
+layout(binding = 2) uniform sampler2D tex_sampler;
+layout(binding = 3) uniform FragUniformBufferObject {
     vec3 view_position;
 
     SunLight sun_light;
