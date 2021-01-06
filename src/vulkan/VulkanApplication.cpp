@@ -456,7 +456,6 @@ void VulkanApplication::init_rtx() {
 void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
 	uint32_t nb_blas = meshes.size();
 	std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> build_infos;
-	//std::vector<vk::UniqueAccelerationStructureKHR> acceleration_structures;
 	vk::DeviceSize max_scratch = 0;
 
 	std::vector<vk::DeviceSize> original_sizes;
