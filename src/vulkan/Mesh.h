@@ -20,6 +20,7 @@ struct MeshUBO {
 };
 
 class Mesh {
+private:
 	std::unique_ptr<Buffer> vertex_buffer;
 	std::unique_ptr<Buffer> index_buffer;
 
@@ -36,12 +37,14 @@ public:
 	void load(VulkanApplication *app);
 	void draw(VulkanFrame &frame);
 	void update(float delta_time);
+	~Mesh() = default;
 
 	vk::AccelerationStructureGeometryKHR geometry;
 	vk::AccelerationStructureBuildRangeInfoKHR range_info;
+	vk::UniqueAccelerationStructureKHR acceleration_structure;
 
-	glm::vec3 position;
-	glm::vec3 rotation;
+	glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);
+	glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
 };
 

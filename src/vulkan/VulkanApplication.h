@@ -8,9 +8,6 @@
 #include <stdexcept>
 #include <vector>
 
-#ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#endif
 
 #include <vulkan/vulkan.hpp>
 
@@ -66,7 +63,7 @@ protected:
 
 	SDL_Window *window = nullptr;
 
-	std::vector<Mesh> meshes;
+	std::vector<std::unique_ptr<Mesh>> meshes;
 
 	float get_aspect_ratio() const;
 
@@ -100,7 +97,7 @@ private:
 	void init_vulkan();
 
 	// Loop
-	virtual void load(std::vector<Mesh> &meshes) = 0;
+	virtual void load(std::vector<std::unique_ptr<Mesh>> &meshes) = 0;
 	virtual void start() = 0;
 	virtual void update(float delta_time) = 0;
 	void main_loop();
@@ -120,6 +117,7 @@ private:
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
 	void init_rtx();
 	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
+	void build_TLAS();
 };
 
 #endif

@@ -9,7 +9,6 @@
 #include <SDL/SDL.h>
 
 #include "vulkan/VulkanApplication.h"
-
 #include "Camera.h"
 #include "Mesh.h"
 
@@ -22,8 +21,8 @@ private:
 
 	glm::vec3 light_position = glm::vec3(0.0f, 0.0f, 0.5f);
 
-	void load(std::vector<Mesh> &meshes) override {
-		meshes.emplace_back(Mesh("resources/models/viking_room.obj"));
+	void load(std::vector<std::unique_ptr<Mesh>> &meshes) override {
+		meshes.emplace_back(std::make_unique<Mesh>("resources/models/viking_room.obj"));
 	}
 
 	void start() override {
@@ -43,7 +42,7 @@ private:
 		camera.update(delta_time);
 
 		for (auto &mesh : meshes) {
-			mesh.update(delta_time);
+			mesh->update(delta_time);
 		}
 
 		if (ImGui::BeginMainMenuBar()) {
@@ -56,7 +55,7 @@ private:
 			ImGui::Separator();
 			if (ImGui::BeginMenu("Meshes")) {
 				for (auto &mesh : meshes) {
-					ImGui::MenuItem("Info", "", &mesh.show_window);
+					ImGui::MenuItem("Info", "", &mesh->show_window);
 				}
 				ImGui::EndMenu();
 			}

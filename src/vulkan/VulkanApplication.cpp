@@ -38,7 +38,7 @@ VulkanApplication::~VulkanApplication() {
 void VulkanApplication::run() {
 	load(meshes);
 	for (auto &mesh : meshes) {
-		mesh.load(this);
+		mesh->load(this);
 	}
 	SDL_Log("Resources loaded");
 
@@ -180,7 +180,7 @@ void VulkanApplication::draw_scene(VulkanFrame &frame) {
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.descriptor_set.get(), nullptr);
 
 	for (auto &mesh : meshes) {
-		mesh.draw(frame);
+		mesh->draw(frame);
 	}
 
 	// UI
@@ -409,6 +409,142 @@ void VulkanApplication::copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSi
 
 	transfer_queue.waitIdle();
 	graphics_queue.waitIdle();
+}
+bool VulkanApplication::check_validation_layer_support() {
+	auto available_layers = vk::enumerateInstanceLayerProperties();
+
+	for (const char *layer_name : req_validation_layers) {
+		bool layer_found = false;
+		for (const auto &layer_properties : available_layers) {
+			if (strcmp(layer_name, layer_properties.layerName) == 0) {
+				layer_found = true;
+				break;
+			}
+		}
+
+		if (!layer_found) {
+			return false;
+		}
+	}
+
+	return true;
+}
+std::vector<const char *> VulkanApplication::get_required_extensions(SDL_Window *window) {
+	// Get extension count & names
+	uint32_t sdl_extension_count = 0;
+	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, nullptr);
+	std::vector<const char *> required_extension_names = {};
+	required_extension_names.resize(sdl_extension_count);
+	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, required_extension_names.data());
+
+	if (enable_validation_layers) {
+		required_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+	}
+
+	SDL_Log("Required extensions:");
+	for (const auto &extension : required_extension_names) {
+		SDL_Log("\t %s", extension);
+	}
+
+	return required_extension_names;
+}
+
+void VulkanApplication::init_rtx() {
+	auto properties = physical_device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+	rtx_properties = properties.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+}
+void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
+	uint32_t nb_blas = meshes.size();
+	std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> build_infos;
+	//std::vector<vk::UniqueAccelerationStructureKHR> acceleration_structures;
+	vk::DeviceSize max_scratch = 0;
+
+	std::vector<vk::DeviceSize> original_sizes;
+	std::vector<std::unique_ptr<Buffer>> buffers;
+
+	for (auto &mesh : meshes) {
+		vk::AccelerationStructureBuildGeometryInfoKHR build_info{};
+		build_info.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
+		build_info.setFlags(flags);
+		build_info.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
+		build_info.setGeometries(mesh->geometry);
+
+		uint32_t max_primitive_count = mesh->range_info.primitiveCount;
+		auto size_info = device->getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, max_primitive_count);
+		vk::AccelerationStructureCreateInfoKHR create_info({}, {}, {}, size_info.accelerationStructureSize, vk::AccelerationStructureTypeKHR::eBottomLevel, {});
+
+		Buffer *buf = new Buffer(*device, physical_device, create_info.size, { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::MemoryPropertyFlagBits::eDeviceLocal);
+		create_info.buffer = buf->buffer;
+		auto as = device->createAccelerationStructureKHRUnique(create_info); // TODO : wrapper class
+
+		build_info.setDstAccelerationStructure(*as);
+		max_scratch = std::max(max_scratch, size_info.buildScratchSize);
+		mesh->acceleration_structure = std::move(as);
+		build_infos.emplace_back(build_info);
+		original_sizes.emplace_back(size_info.accelerationStructureSize);
+		buffers.emplace_back(std::unique_ptr<Buffer>(buf));
+	}
+
+	Buffer scratch_buffer(*device, physical_device, max_scratch, { vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eStorageBuffer }, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+	bool do_compaction = (flags & vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction) == vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction;
+	auto query_pool = device->createQueryPoolUnique(vk::QueryPoolCreateInfo({}, vk::QueryType::eAccelerationStructureCompactedSizeKHR, nb_blas, {}));
+	{
+		std::vector<vk::CommandBuffer> cmd_buffs = device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, nb_blas));
+		for (int i = 0; i < nb_blas; i++) {
+			build_infos[i].scratchData.deviceAddress = scratch_buffer.address;
+
+			cmd_buffs[i].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+			cmd_buffs[i].buildAccelerationStructuresKHR(build_infos[i], &meshes[i]->range_info);
+
+			vk::MemoryBarrier barrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR, vk::AccessFlagBits::eAccelerationStructureReadKHR);
+			cmd_buffs[i].pipelineBarrier(
+					vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+					vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
+					{}, barrier, nullptr, nullptr);
+
+			if (do_compaction) {
+				cmd_buffs[i].writeAccelerationStructuresPropertiesKHR(meshes[i]->acceleration_structure.get(), vk::QueryType::eAccelerationStructureCompactedSizeKHR, *query_pool, i);
+			}
+
+			cmd_buffs[i].end();
+		}
+		graphics_queue.submit(vk::SubmitInfo(nullptr, {}, cmd_buffs, nullptr));
+		graphics_queue.waitIdle();
+		device->freeCommandBuffers(*graphics_command_pool, cmd_buffs);
+	}
+	if (do_compaction) {
+		vk::UniqueCommandBuffer cmd_buf = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
+		cmd_buf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
+
+		std::vector<vk::DeviceSize> compact_sizes = device->getQueryPoolResults<vk::DeviceSize>(*query_pool, 0, nb_blas, nb_blas * sizeof(vk::Device), sizeof(vk::Device), vk::QueryResultFlagBits::eWait).value;
+		std::vector<std::unique_ptr<Buffer>> compact_buffers;
+
+		int stat_total_ori_size = 0;
+		int stat_totat_compact_size = 0;
+		std::vector<vk::UniqueAccelerationStructureKHR> old_acceleration_structures(nb_blas);
+		for (int i = 0; i < nb_blas; i++) {
+			stat_total_ori_size += original_sizes[i];
+			stat_totat_compact_size += compact_sizes[i];
+
+			Buffer *buf = new Buffer(*device, physical_device, compact_sizes[i], { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::MemoryPropertyFlagBits::eDeviceLocal);
+			vk::AccelerationStructureCreateInfoKHR as_ci({}, buf->buffer, {}, compact_sizes[i], vk::AccelerationStructureTypeKHR::eBottomLevel, {});
+			auto as = device->createAccelerationStructureKHRUnique(as_ci);
+
+			cmd_buf->copyAccelerationStructureKHR(vk::CopyAccelerationStructureInfoKHR(meshes[i]->acceleration_structure.get(), *as, vk::CopyAccelerationStructureModeKHR::eCompact));
+			old_acceleration_structures[i] = std::move(meshes[i]->acceleration_structure);
+			meshes[i]->acceleration_structure = std::move(as);
+			compact_buffers.emplace_back(std::unique_ptr<Buffer>(buf));
+		}
+		cmd_buf->end();
+		graphics_queue.submit(vk::SubmitInfo(nullptr, {}, *cmd_buf, nullptr));
+		graphics_queue.waitIdle();
+		SDL_Log("RTX Blas: reducing from %u to %u = %u (%2.2f%s smaller) ",
+				stat_total_ori_size,
+				stat_totat_compact_size,
+				stat_total_ori_size - stat_totat_compact_size,
+				(stat_total_ori_size - stat_totat_compact_size) / float(stat_total_ori_size) * 100.f, "%");
+	}
 }
 bool VulkanApplication::check_validation_layer_support() {
 	auto available_layers = vk::enumerateInstanceLayerProperties();
