@@ -38,7 +38,7 @@ VulkanApplication::~VulkanApplication() {
 void VulkanApplication::run() {
 	load(meshes);
 	for (auto &mesh : meshes) {
-		mesh.load(this);
+		mesh->load(this);
 	}
 	SDL_Log("Resources loaded");
 
@@ -180,7 +180,7 @@ void VulkanApplication::draw_scene(VulkanFrame &frame) {
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.descriptor_set.get(), nullptr);
 
 	for (auto &mesh : meshes) {
-		mesh.draw(frame);
+		mesh->draw(frame);
 	}
 
 	// UI
@@ -456,8 +456,8 @@ void VulkanApplication::init_rtx() {
 void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
 	uint32_t nb_blas = meshes.size();
 	std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> build_infos;
-	std::vector<vk::UniqueAccelerationStructureKHR> acceleration_structures;
-	vk::DeviceSize max_scratch;
+	//std::vector<vk::UniqueAccelerationStructureKHR> acceleration_structures;
+	vk::DeviceSize max_scratch = 0;
 
 	std::vector<vk::DeviceSize> original_sizes;
 	std::vector<std::unique_ptr<Buffer>> buffers;
@@ -467,9 +467,9 @@ void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags)
 		build_info.setType(vk::AccelerationStructureTypeKHR::eBottomLevel);
 		build_info.setFlags(flags);
 		build_info.setMode(vk::BuildAccelerationStructureModeKHR::eBuild);
-		build_info.setGeometries(mesh.geometry);
+		build_info.setGeometries(mesh->geometry);
 
-		uint32_t max_primitive_count = mesh.range_info.primitiveCount;
+		uint32_t max_primitive_count = mesh->range_info.primitiveCount;
 		auto size_info = device->getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, max_primitive_count);
 		vk::AccelerationStructureCreateInfoKHR create_info({}, {}, {}, size_info.accelerationStructureSize, vk::AccelerationStructureTypeKHR::eBottomLevel, {});
 
@@ -479,8 +479,7 @@ void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags)
 
 		build_info.setDstAccelerationStructure(*as);
 		max_scratch = std::max(max_scratch, size_info.buildScratchSize);
-
-		acceleration_structures.emplace_back(std::move(as));
+		mesh->acceleration_structure = std::move(as);
 		build_infos.emplace_back(build_info);
 		original_sizes.emplace_back(size_info.accelerationStructureSize);
 		buffers.emplace_back(std::unique_ptr<Buffer>(buf));
@@ -496,7 +495,7 @@ void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags)
 			build_infos[i].scratchData.deviceAddress = scratch_buffer.address;
 
 			cmd_buffs[i].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-			cmd_buffs[i].buildAccelerationStructuresKHR(build_infos[i], &meshes[i].range_info);
+			cmd_buffs[i].buildAccelerationStructuresKHR(build_infos[i], &meshes[i]->range_info);
 
 			vk::MemoryBarrier barrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR, vk::AccessFlagBits::eAccelerationStructureReadKHR);
 			cmd_buffs[i].pipelineBarrier(
@@ -505,7 +504,7 @@ void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags)
 					{}, barrier, nullptr, nullptr);
 
 			if (do_compaction) {
-				cmd_buffs[i].writeAccelerationStructuresPropertiesKHR(acceleration_structures[i].get(), vk::QueryType::eAccelerationStructureCompactedSizeKHR, *query_pool, i);
+				cmd_buffs[i].writeAccelerationStructuresPropertiesKHR(meshes[i]->acceleration_structure.get(), vk::QueryType::eAccelerationStructureCompactedSizeKHR, *query_pool, i);
 			}
 
 			cmd_buffs[i].end();
@@ -532,9 +531,9 @@ void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags)
 			vk::AccelerationStructureCreateInfoKHR as_ci({}, buf->buffer, {}, compact_sizes[i], vk::AccelerationStructureTypeKHR::eBottomLevel, {});
 			auto as = device->createAccelerationStructureKHRUnique(as_ci);
 
-			cmd_buf->copyAccelerationStructureKHR(vk::CopyAccelerationStructureInfoKHR(acceleration_structures[i].get(), *as, vk::CopyAccelerationStructureModeKHR::eCompact));
-			old_acceleration_structures[i] = std::move(acceleration_structures[i]);
-			acceleration_structures[i] = std::move(as);
+			cmd_buf->copyAccelerationStructureKHR(vk::CopyAccelerationStructureInfoKHR(meshes[i]->acceleration_structure.get(), *as, vk::CopyAccelerationStructureModeKHR::eCompact));
+			old_acceleration_structures[i] = std::move(meshes[i]->acceleration_structure);
+			meshes[i]->acceleration_structure = std::move(as);
 			compact_buffers.emplace_back(std::unique_ptr<Buffer>(buf));
 		}
 		cmd_buf->end();
@@ -545,5 +544,14 @@ void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags)
 				stat_totat_compact_size,
 				stat_total_ori_size - stat_totat_compact_size,
 				(stat_total_ori_size - stat_totat_compact_size) / float(stat_total_ori_size) * 100.f, "%");
+	}
+}
+void VulkanApplication::build_TLAS() {
+	vk::BuildAccelerationStructureFlagBitsKHR flags = vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace;
+	{
+		vk::UniqueCommandBuffer cmd_buf = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
+		for (auto &mesh : meshes) {
+			//vk::AccelerationStructureInstanceKHR instance(mesh.)
+		}
 	}
 }
