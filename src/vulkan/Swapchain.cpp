@@ -118,16 +118,19 @@ void Swapchain::create_render_pass(vk::Device device, vk::PhysicalDevice physica
 }
 void Swapchain::create_descriptors(vk::Device device) {
 	vk::DescriptorSetLayoutBinding scene_ubo(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
-	vk::DescriptorSetLayoutBinding mesh_ubo(1, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
-	vk::DescriptorSetLayoutBinding sampler(2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
-	vk::DescriptorSetLayoutBinding frag(3, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
-	std::array<vk::DescriptorSetLayoutBinding, 4> bindings = { mesh_ubo, scene_ubo, sampler, frag };
-	descriptor_set_layout = device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
+	vk::DescriptorSetLayoutBinding sampler(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
+	vk::DescriptorSetLayoutBinding frag(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
+	std::array<vk::DescriptorSetLayoutBinding, 3> bindings = { scene_ubo, sampler, frag };
+	scene_descriptor_set_layout = device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
+
+	vk::DescriptorSetLayoutBinding mesh_ubo(0, vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
+	mesh_descriptor_set_layout = device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, mesh_ubo));
 
 	vk::DescriptorPoolSize a(vk::DescriptorType::eUniformBuffer, image_count);
+	vk::DescriptorPoolSize c(vk::DescriptorType::eUniformBufferDynamic, 1000);
 	vk::DescriptorPoolSize b(vk::DescriptorType::eCombinedImageSampler, image_count);
-	std::array<vk::DescriptorPoolSize, 2> pool_sizes = { a, b };
-	descriptor_pool = device.createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, image_count, pool_sizes));
+	std::array<vk::DescriptorPoolSize, 3> pool_sizes = { a, b, c };
+	descriptor_pool = device.createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, image_count * 2, pool_sizes));
 }
 void Swapchain::create_depth_resources(vk::Device device, vk::PhysicalDevice physical_device) {
 	vk::Format depth_format = find_depth_format(physical_device);
@@ -166,7 +169,8 @@ void Swapchain::create_graphics_pipeline(vk::Device device) {
 
 	vk::PipelineColorBlendStateCreateInfo color_blending({}, false, vk::LogicOp::eCopy, color_blend_attachment, {});
 
-	pipeline_layout = device.createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *descriptor_set_layout));
+	auto layouts = { scene_descriptor_set_layout.get(), mesh_descriptor_set_layout.get() };
+	pipeline_layout = device.createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts));
 
 	vk::GraphicsPipelineCreateInfo pipeline_ci(
 			{},
@@ -197,7 +201,7 @@ void Swapchain::create_frames(vk::Device device, vk::PhysicalDevice physical_dev
 		frames[i].create_command_buffers(command_pool);
 		frames[i].create_sync_objects();
 		frames[i].create_uniform_buffer(physical_device);
-		frames[i].create_descriptor_set(*descriptor_pool, *descriptor_set_layout, texture_sampler, texture_image_view);
+		frames[i].create_descriptor_set(*descriptor_pool, *scene_descriptor_set_layout, *mesh_descriptor_set_layout, texture_sampler, texture_image_view);
 	}
 }
 void Swapchain::create_semaphores(vk::Device device) {

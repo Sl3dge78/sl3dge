@@ -3,14 +3,16 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #define TINYOBJLOADER_IMPLEMENTATION
 
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+
 #include <deque>
 #include <unordered_map>
 
 #include <SDL/SDL.h>
 
-#include "vulkan/VulkanApplication.h"
 #include "Camera.h"
 #include "Mesh.h"
+#include "vulkan/VulkanApplication.h"
 
 class Sl3dge : public VulkanApplication {
 private:
@@ -23,14 +25,16 @@ private:
 
 	void load(std::vector<std::unique_ptr<Mesh>> &meshes) override {
 		meshes.emplace_back(std::make_unique<Mesh>("resources/models/viking_room.obj"));
+		meshes.emplace_back(std::make_unique<Mesh>("resources/models/viking_room.obj"));
+		SDL_Log("Loaded %d meshes", meshes.size());
 	}
 
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		camera.start();
-		camera.get_view_matrix(vubo.view);
-		vubo.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
-		vubo.proj[1][1] *= -1;
+		camera.get_view_matrix(scene_info_ubo.view);
+		scene_info_ubo.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
+		scene_info_ubo.proj[1][1] *= -1;
 
 		fubo.ambient_strength = .1f;
 		fubo.diffuse_strength = .5f;
@@ -40,9 +44,12 @@ private:
 
 	void update(float delta_time) override {
 		camera.update(delta_time);
-
+		int i = 0;
 		for (auto &mesh : meshes) {
+			ImGui::PushID(i);
 			mesh->update(delta_time);
+			ImGui::PopID();
+			i++;
 		}
 
 		if (ImGui::BeginMainMenuBar()) {
@@ -76,7 +83,7 @@ private:
 		if (show_lighting_options)
 			show_lighting_window(show_lighting_options);
 
-		camera.get_view_matrix(vubo.view);
+		camera.get_view_matrix(scene_info_ubo.view);
 		fubo.view_position = camera.get_position();
 	}
 

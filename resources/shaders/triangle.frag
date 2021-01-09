@@ -13,8 +13,8 @@ struct PointLight {
     float strength;
 };
 
-layout(binding = 2) uniform sampler2D tex_sampler;
-layout(binding = 3) uniform FragUniformBufferObject {
+layout(set = 0, binding = 1) uniform sampler2D tex_sampler;
+layout(set = 0, binding = 2) uniform FragUniformBufferObject {
     vec3 view_position;
 
     SunLight sun_light;
@@ -33,6 +33,7 @@ layout(location = 0) out vec4 out_color;
 
 
 void main() {
+
     SunLight sun = fubo.sun_light;
 
     vec3 ambient = fubo.ambient_strength * sun.light_color;
@@ -46,4 +47,6 @@ void main() {
     vec3 specular = fubo.specular_strength * spec * sun.light_color;
 
     out_color = vec4(ambient + diffuse + specular, 1.0) * texture(tex_sampler, tex_coords);
+
+
 }

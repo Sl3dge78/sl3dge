@@ -18,15 +18,17 @@ struct VulkanFrame {
 	vk::UniqueFramebuffer framebuffer;
 	vk::UniqueCommandBuffer command_buffer;
 	vk::UniqueFence fence;
-	vk::UniqueDescriptorSet descriptor_set;
+	vk::UniqueDescriptorSet scene_descriptor_set;
+	vk::UniqueDescriptorSet mesh_descriptor_set;
 
-	std::unique_ptr<Buffer> uniform_buffer;
+	std::unique_ptr<Buffer> scene_buffer;
+	std::unique_ptr<Buffer> transform_buffer;
 
 	void init_frame(vk::Device device);
 	void create_framebuffer(vk::Extent2D extent, vk::RenderPass &render_pass, vk::ImageView &depth_image_view);
 	void create_command_buffers(vk::CommandPool command_pool);
 	void create_sync_objects();
-	void create_descriptor_set(vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout descriptor_set_layout, vk::Sampler texture_sampler, vk::ImageView texture_image_view);
+	void create_descriptor_set(vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout scene_descriptor_set_layout, vk::DescriptorSetLayout mesh_descriptor_set_layout, vk::Sampler texture_sampler, vk::ImageView texture_image_view);
 	void create_uniform_buffer(vk::PhysicalDevice physical_device);
 
 	void begin_render_pass();

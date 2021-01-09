@@ -5,7 +5,12 @@
 #include "Mesh.h"
 #include "VulkanApplication.h"
 
+#include <string>
+
 Mesh::Mesh(const std::string path) {
+	this->id = get_id();
+
+	// Todo : load this only once, and then point to the data for each mesh as reqs
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
@@ -43,6 +48,7 @@ Mesh::Mesh(const std::string path) {
 			indices.push_back(unique_vtx[vertex]);
 		}
 	}
+	SDL_Log("id %d", id);
 }
 void Mesh::load(VulkanApplication *app) {
 	{
@@ -79,15 +85,16 @@ void Mesh::load(VulkanApplication *app) {
 	range_info.setTransformOffset(0);
 }
 void Mesh::draw(VulkanFrame &frame) {
-	frame.uniform_buffer->write_data(&this->transform, sizeof(this->transform), sizeof(SceneInfoUBO));
 	frame.command_buffer->bindVertexBuffers(0, { vertex_buffer->buffer }, { 0 });
 	frame.command_buffer->bindIndexBuffer(index_buffer->buffer, 0, vk::IndexType::eUint32);
 	frame.command_buffer->drawIndexed(indices.size(), 1, 0, 0, 0);
 }
-void Mesh::update(float delta_time) {
+void Mesh::update(const float delta_time) {
 	if (show_window) {
-		if (!ImGui::Begin("Mesh", &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
+		std::string name = "Mesh" + std::to_string(id);
+		if (!ImGui::Begin(name.c_str(), &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
 			ImGui::End();
+
 			return;
 		}
 		if (ImGui::InputFloat3("Position", &position[0]) ||
@@ -104,4 +111,7 @@ void Mesh::update_matrix() {
 	glm::mat4 size = glm::scale(glm::mat4(1.0f), scale);
 
 	transform = trans * rot * size;
+}
+int Mesh::get_id() {
+	return id_++;
 }

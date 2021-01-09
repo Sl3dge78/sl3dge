@@ -5,7 +5,7 @@
 #define VULKAN_SWAPCHAIN_H
 
 #include <SDL/SDL.h>
-#include <vulkan/vulkancpp.h>
+#include <vulkan/vulkan.hpp>
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_vulkan.h"
@@ -61,7 +61,8 @@ private:
 	vk::UniqueRenderPass render_pass;
 
 	vk::UniqueDescriptorPool descriptor_pool;
-	vk::UniqueDescriptorSetLayout descriptor_set_layout;
+	vk::UniqueDescriptorSetLayout scene_descriptor_set_layout;
+	vk::UniqueDescriptorSetLayout mesh_descriptor_set_layout;
 
 	std::unique_ptr<Image> depth_image;
 

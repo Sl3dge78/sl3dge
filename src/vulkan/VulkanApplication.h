@@ -58,7 +58,7 @@ public:
 	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 
 protected:
-	SceneInfoUBO vubo;
+	SceneInfoUBO scene_info_ubo;
 	FragUniformBufferObject fubo;
 
 	SDL_Window *window = nullptr;
@@ -115,9 +115,12 @@ private:
 
 	// RTX
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
+	std::unique_ptr<Buffer> rtx_instances_buffer;
+	std::unique_ptr<Buffer> rtx_tlas_buffer;
+	vk::UniqueAccelerationStructureKHR rtx_tlas;
 	void init_rtx();
 	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
-	void build_TLAS();
+	void build_TLAS(bool update = false, vk::BuildAccelerationStructureFlagsKHR flags = { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
 };
 
 #endif

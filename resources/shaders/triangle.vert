@@ -1,12 +1,12 @@
 #version 450
 
 
-layout(binding = 0) uniform SceneUBO {
+layout(set = 0, binding = 0) uniform SceneUBO {
     mat4 view;
     mat4 proj;
 } scene;
 
-layout(binding = 1) uniform MeshUBO {
+layout(set = 1, binding = 0) uniform MeshUBO {
     mat4 transform;
 } mesh;
 

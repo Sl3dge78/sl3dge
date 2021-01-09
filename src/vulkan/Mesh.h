@@ -26,22 +26,26 @@ private:
 
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
-	glm::mat4 transform = glm::mat4(1.0f);
-
 	void update_matrix();
 
+	static int get_id();
+	inline static int id_ = 0;
+
 public:
+	int id;
 	bool show_window = false;
+	glm::mat4 transform = glm::mat4(1.0f);
 
 	Mesh(const std::string path);
 	void load(VulkanApplication *app);
 	void draw(VulkanFrame &frame);
-	void update(float delta_time);
+	void update(const float delta_time);
 	~Mesh() = default;
 
 	vk::AccelerationStructureGeometryKHR geometry;
 	vk::AccelerationStructureBuildRangeInfoKHR range_info;
 	vk::UniqueAccelerationStructureKHR acceleration_structure;
+	std::unique_ptr<Buffer> blas_buffer;
 
 	glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);
