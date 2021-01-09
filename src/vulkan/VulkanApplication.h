@@ -8,7 +8,6 @@
 #include <stdexcept>
 #include <vector>
 
-
 #include <vulkan/vulkan.hpp>
 
 #include <SDL/SDL.h>
@@ -45,6 +44,13 @@ const std::vector<const char *> req_device_extensions = {
 	VK_KHR_MAINTENANCE3_EXTENSION_NAME,
 	VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
 	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
+};
+
+struct RTPushConstant {
+	glm::vec4 clear_color;
+	glm::vec3 light_pos;
+	float light_intensity;
+	int light_type;
 };
 
 class VulkanApplication {
@@ -102,6 +108,7 @@ private:
 	virtual void update(float delta_time) = 0;
 	void main_loop();
 	void draw_scene(VulkanFrame &frame);
+	void draw_ui(VulkanFrame &frame);
 	void draw_frame();
 
 	void create_instance();
@@ -114,13 +121,37 @@ private:
 	std::vector<const char *> get_required_extensions(SDL_Window *window);
 
 	// RTX
+protected:
+	bool rtx = true;
+
+private:
+	struct RTPushConstant {
+		glm::vec4 clear_color;
+		glm::vec3 light_pos;
+		float light_intensity;
+		int light_type;
+	} rtx_push_constants;
+
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
+
 	std::unique_ptr<Buffer> rtx_instances_buffer;
 	std::unique_ptr<Buffer> rtx_tlas_buffer;
 	vk::UniqueAccelerationStructureKHR rtx_tlas;
+
+	vk::UniqueDescriptorPool rtx_pool;
+	vk::UniqueDescriptorSet rtx_set;
+	vk::UniquePipelineLayout rtx_pipeline_layout;
+	vk::UniquePipeline rtx_pipeline;
+
+	std::unique_ptr<Image> rtx_result_image;
+	std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shader_groups;
+	std::unique_ptr<Buffer> shader_binding_table;
 	void init_rtx();
 	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
 	void build_TLAS(bool update = false, vk::BuildAccelerationStructureFlagsKHR flags = { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
+	void build_rtx_pipeline();
+	void create_rtx_SBT();
+	void raytrace(VulkanFrame &frame, int image_id);
 };
 
 #endif

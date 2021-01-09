@@ -49,6 +49,8 @@ public:
 	vk::Pipeline get_pipeline() { return *graphics_pipeline; }
 	vk::PipelineLayout get_pipeline_layout() { return *pipeline_layout; }
 	vk::Extent2D get_extent() { return extent; }
+	vk::Format get_format() { return format; }
+	vk::Image get_image(int id) { return images[id]; }
 
 private:
 	vk::UniqueSwapchainKHR swapchain;

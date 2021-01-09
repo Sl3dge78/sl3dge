@@ -58,7 +58,7 @@ void Swapchain::create_swapchain(vk::Device device, vk::PhysicalDevice physical_
 			surface_fmt.colorSpace,
 			extent,
 			1,
-			{ vk::ImageUsageFlagBits::eColorAttachment },
+			{ vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst },
 			vk::SharingMode::eExclusive,
 			queue_indices,
 			capabilities.currentTransform,

@@ -57,6 +57,7 @@ private:
 				ImGui::MenuItem("Display Lighting Options", "F10", &show_lighting_options);
 				ImGui::MenuItem("Display Metrics", "F11", &show_metrics);
 				ImGui::MenuItem("Cam Info", "", &camera.show_window);
+				ImGui::MenuItem("RTX", "F9", &this->rtx);
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();
@@ -75,6 +76,8 @@ private:
 			show_lighting_options = !show_lighting_options;
 		if (Input::get_key_down(SDL_SCANCODE_F11))
 			show_metrics = !show_metrics;
+		if (Input::get_key_down(SDL_SCANCODE_F9))
+			rtx = !rtx;
 
 		if (show_demo_window)
 			ImGui::ShowDemoWindow(&show_demo_window);

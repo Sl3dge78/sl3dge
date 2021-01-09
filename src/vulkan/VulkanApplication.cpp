@@ -44,6 +44,8 @@ void VulkanApplication::run() {
 
 	build_BLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
 	build_TLAS();
+	build_rtx_pipeline();
+	create_rtx_SBT();
 
 	SDL_Log("Init done, starting main loop...");
 	main_loop();
@@ -185,12 +187,14 @@ void VulkanApplication::draw_scene(VulkanFrame &frame) {
 		frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 1, frame.mesh_descriptor_set.get(), mesh->id * sizeof(MeshUBO));
 		mesh->draw(frame);
 	}
-
+}
+void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	// UI
 	ImGui::Render();
 	auto imgui_data = ImGui::GetDrawData();
 	ImGui_ImplVulkan_RenderDrawData(imgui_data, frame.command_buffer.get());
 }
+
 void VulkanApplication::draw_frame() {
 	// Get the image
 	vk::Semaphore image_acquired_semaphore = swapchain->get_image_acquired_semaphore(semaphore_index);
@@ -222,9 +226,14 @@ void VulkanApplication::draw_frame() {
 		throw std::runtime_error("Waiting for frame timed out!");
 	}
 	device->resetFences(frame->fence.get());
-	frame->begin_render_pass();
-	draw_scene(*frame); // Render 3D objects in the scene
-	frame->end_render_pass();
+	if (rtx) {
+		raytrace(*frame, image_id);
+	} else {
+		frame->begin_render_pass(); // Todo : split this into 2 render passes
+		draw_scene(*frame); // Render 3D objects in the scene
+		draw_ui(*frame);
+		frame->end_render_pass();
+	}
 
 	// Submit Queue
 	{
@@ -619,4 +628,151 @@ void VulkanApplication::build_TLAS(bool update, vk::BuildAccelerationStructureFl
 	cmd_buf->end();
 	graphics_queue.submit(vk::SubmitInfo(nullptr, nullptr, *cmd_buf, nullptr), nullptr);
 	graphics_queue.waitIdle();
+}
+void VulkanApplication::build_rtx_pipeline() {
+	// Allocate render image
+
+	Image *img = new Image(
+			*device, physical_device,
+			swapchain->get_extent().width, swapchain->get_extent().height,
+			vk::Format::eR8G8B8A8Unorm, vk::ImageTiling::eOptimal,
+			{ vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eStorage },
+			vk::MemoryPropertyFlagBits::eDeviceLocal,
+			vk::ImageAspectFlagBits::eColor);
+
+	rtx_result_image = std::unique_ptr<Image>(img);
+
+	// Layout
+	std::vector<vk::DescriptorSetLayoutBinding> bindings{
+		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
+		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, { vk::ShaderStageFlagBits::eRaygenKHR }, nullptr),
+	};
+	auto descriptor_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
+	vk::PushConstantRange push_constant{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR, 0, sizeof(RTPushConstant) };
+	rtx_pipeline_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *descriptor_set_layout, push_constant));
+
+	// Pool & set
+	std::vector<vk::DescriptorPoolSize> pool_sizes{
+		vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
+		vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 1)
+	};
+	rtx_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
+	rtx_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*rtx_pool, *descriptor_set_layout)).front());
+
+	// Write
+	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(*rtx_tlas);
+	vk::WriteDescriptorSet as_descriptor_write{};
+	as_descriptor_write.dstSet = *rtx_set;
+	as_descriptor_write.descriptorType = vk::DescriptorType::eAccelerationStructureKHR;
+	as_descriptor_write.pNext = &as_desc;
+	as_descriptor_write.dstBinding = 0;
+	as_descriptor_write.descriptorCount = 1;
+
+	vk::DescriptorImageInfo image_info({}, rtx_result_image->image_view, vk::ImageLayout::eGeneral);
+	vk::WriteDescriptorSet image_descriptor_write(*rtx_set, 1, 0, vk::DescriptorType::eStorageImage, image_info, nullptr, nullptr);
+
+	std::vector<vk::WriteDescriptorSet> writes{ as_descriptor_write, image_descriptor_write };
+	device->updateDescriptorSets(writes, nullptr);
+
+	// Shaders
+	auto rgen_code = read_file("resources/shaders/raytrace.rgen.spv");
+	auto rmiss_code = read_file("resources/shaders/raytrace.rmiss.spv");
+	auto rchit_code = read_file("resources/shaders/raytrace.rchit.spv");
+
+	auto rgen_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rgen_code.size(), reinterpret_cast<uint32_t *>(rgen_code.data())));
+	auto rmiss_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_code.size(), reinterpret_cast<uint32_t *>(rmiss_code.data())));
+	auto rchit_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rchit_code.size(), reinterpret_cast<uint32_t *>(rchit_code.data())));
+
+	auto shader_stages = {
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eRaygenKHR, *rgen_shader, "main"),
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eMissKHR, *rmiss_shader, "main"),
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eClosestHitKHR, *rchit_shader, "main"),
+	};
+
+	shader_groups = {
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 0, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 1, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup, VK_SHADER_UNUSED_KHR, 2, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+	};
+
+	vk::RayTracingPipelineCreateInfoKHR create_info(
+			{},
+			shader_stages, shader_groups, 1,
+			nullptr, nullptr, nullptr,
+			*rtx_pipeline_layout, nullptr, 0);
+	rtx_pipeline = device->createRayTracingPipelineKHRUnique({}, {}, create_info).value;
+}
+void VulkanApplication::create_rtx_SBT() {
+	const uint32_t group_size_aligned = (rtx_properties.shaderGroupHandleSize + rtx_properties.shaderGroupBaseAlignment - 1) & ~(rtx_properties.shaderGroupBaseAlignment - 1);
+	const uint32_t shader_binding_table_size = group_size_aligned * shader_groups.size();
+
+	auto buf = new Buffer(*device, physical_device, shader_binding_table_size, { vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eShaderBindingTableKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+	shader_binding_table = std::unique_ptr<Buffer>(buf);
+
+	std::vector<uint8_t> shader_handle_storage = device->getRayTracingShaderGroupHandlesKHR<uint8_t>(*rtx_pipeline, 0, shader_groups.size(), shader_binding_table_size);
+
+	void *mapped = device->mapMemory(shader_binding_table->memory, 0, shader_binding_table_size);
+	auto *data = reinterpret_cast<uint8_t *>(mapped);
+	for (uint32_t i = 0; i < shader_groups.size(); i++) {
+		memcpy(data, shader_handle_storage.data() + i * rtx_properties.shaderGroupHandleSize, rtx_properties.shaderGroupHandleSize);
+		data += group_size_aligned;
+	}
+	device->unmapMemory(shader_binding_table->memory);
+}
+void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
+	frame.command_buffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
+
+	vk::ImageMemoryBarrier image_barrier({}, vk::AccessFlagBits::eShaderWrite, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, rtx_result_image->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
+
+	rtx_push_constants.clear_color = glm::vec4(0.1f, 0.1f, 0.1f, 1.f);
+	rtx_push_constants.light_pos = glm::vec3(0.f, 0.f, 1.f);
+	rtx_push_constants.light_intensity = 0.5f;
+	rtx_push_constants.light_type = 0;
+
+	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, *rtx_pipeline);
+	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtx_pipeline_layout, 0, *rtx_set, nullptr);
+	frame.command_buffer->pushConstants(
+			*rtx_pipeline_layout,
+			{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR },
+			0, sizeof(RTPushConstant), &rtx_push_constants);
+
+	const uint32_t group_size = (rtx_properties.shaderGroupHandleSize + rtx_properties.shaderGroupBaseAlignment - 1) & ~(rtx_properties.shaderGroupBaseAlignment - 1);
+	std::array<vk::StridedDeviceAddressRegionKHR, 4> strides{
+		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 0u * group_size, group_size, group_size),
+		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 1u * group_size, group_size, group_size),
+		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 2u * group_size, group_size, group_size),
+		vk::StridedDeviceAddressRegionKHR(0u, 0u, 0u),
+	};
+	frame.command_buffer->traceRaysKHR(strides[0], strides[1], strides[2], strides[3], swapchain->get_extent().width, swapchain->get_extent().height, 1);
+
+	image_barrier.image = swapchain->get_image(image_id);
+	image_barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+	image_barrier.oldLayout = vk::ImageLayout::eUndefined;
+	image_barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
+	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
+
+	image_barrier.image = rtx_result_image->image;
+	image_barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
+	image_barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+	image_barrier.oldLayout = vk::ImageLayout::eGeneral;
+	image_barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
+
+	vk::ImageCopy copy_region{};
+	copy_region.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	copy_region.srcOffset = vk::Offset3D(0, 0, 0);
+	copy_region.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	copy_region.dstOffset = vk::Offset3D(0, 0, 0);
+	copy_region.extent = vk::Extent3D(swapchain->get_extent(), 1);
+	frame.command_buffer->copyImage(rtx_result_image->image, vk::ImageLayout::eTransferSrcOptimal, swapchain->get_image(image_id), vk::ImageLayout::eTransferDstOptimal, copy_region);
+
+	image_barrier.image = swapchain->get_image(image_id);
+	image_barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+	image_barrier.dstAccessMask = vk::AccessFlags();
+	image_barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+	image_barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
+
+	frame.command_buffer->end();
 }

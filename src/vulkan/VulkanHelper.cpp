@@ -96,6 +96,7 @@ vk::Format find_supported_format(vk::PhysicalDevice physical_device, const std::
 		if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features) {
 			return format;
 		} else if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features) {
+			SDL_Log("%d", format);
 			return format;
 		}
 	}
