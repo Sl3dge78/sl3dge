@@ -1,6 +1,8 @@
-#pragma once
+#ifndef DEBUG_H
+#define DEBUG_H
 
 #include <iostream>
+#include <vulkan/vulkan.hpp>
 
 #ifdef NDEBUG
 const bool enable_validation_layers = false;
@@ -14,3 +16,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
 
 	return VK_FALSE;
 }
+
+void debug_set_object_name(vk::Device device, uint64_t object, vk::DebugReportObjectTypeEXT obj_type, const char *name);
+#endif

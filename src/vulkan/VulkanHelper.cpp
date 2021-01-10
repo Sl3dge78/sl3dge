@@ -89,7 +89,6 @@ void Buffer::write_data(void *data, vk::DeviceSize size, const uint32_t offset) 
 }
 
 
-
 vk::Format find_supported_format(vk::PhysicalDevice physical_device, const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
 	for (vk::Format format : candidates) {
 		vk::FormatProperties props = physical_device.getFormatProperties(format);

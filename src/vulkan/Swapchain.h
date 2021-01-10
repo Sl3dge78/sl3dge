@@ -51,6 +51,7 @@ public:
 	vk::Extent2D get_extent() { return extent; }
 	vk::Format get_format() { return format; }
 	vk::Image get_image(int id) { return images[id]; }
+	vk::DescriptorSetLayout get_scene_descriptor_set() { return *scene_descriptor_set_layout; };
 
 private:
 	vk::UniqueSwapchainKHR swapchain;

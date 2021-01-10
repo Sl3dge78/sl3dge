@@ -14,6 +14,8 @@
 #include "Mesh.h"
 #include "vulkan/VulkanApplication.h"
 
+// Todo : Handle multiple instances of the same mesh through a new class
+
 class Sl3dge : public VulkanApplication {
 private:
 	Camera camera;
@@ -25,16 +27,16 @@ private:
 
 	void load(std::vector<std::unique_ptr<Mesh>> &meshes) override {
 		meshes.emplace_back(std::make_unique<Mesh>("resources/models/viking_room.obj"));
-		meshes.emplace_back(std::make_unique<Mesh>("resources/models/viking_room.obj"));
 		SDL_Log("Loaded %d meshes", meshes.size());
 	}
 
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		camera.start();
-		camera.get_view_matrix(scene_info_ubo.view);
-		scene_info_ubo.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
-		scene_info_ubo.proj[1][1] *= -1;
+		camera.get_view_matrix(camera_matrices.view);
+		camera_matrices.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
+		camera_matrices.proj[1][1] *= -1;
+		camera_matrices.proj_inverse = glm::inverse(camera_matrices.proj);
 
 		fubo.ambient_strength = .1f;
 		fubo.diffuse_strength = .5f;
@@ -86,7 +88,8 @@ private:
 		if (show_lighting_options)
 			show_lighting_window(show_lighting_options);
 
-		camera.get_view_matrix(scene_info_ubo.view);
+		camera.get_view_matrix(camera_matrices.view);
+		camera_matrices.view_inverse = glm::inverse(camera_matrices.view);
 		fubo.view_position = camera.get_position();
 	}
 

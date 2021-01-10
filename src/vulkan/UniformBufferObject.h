@@ -3,9 +3,11 @@
 #include <glm/glm.hpp>
 
 // Todo : wrapper class
-struct SceneInfoUBO {
+struct CameraMatrices {
 	alignas(16) glm::mat4 view;
 	alignas(16) glm::mat4 proj;
+	alignas(16) glm::mat4 view_inverse;
+	alignas(16) glm::mat4 proj_inverse;
 };
 
 struct SunLight {

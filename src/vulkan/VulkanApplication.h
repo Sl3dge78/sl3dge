@@ -64,7 +64,7 @@ public:
 	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 
 protected:
-	SceneInfoUBO scene_info_ubo;
+	CameraMatrices camera_matrices;
 	FragUniformBufferObject fubo;
 
 	SDL_Window *window = nullptr;
@@ -137,6 +137,7 @@ private:
 	std::unique_ptr<Buffer> rtx_instances_buffer;
 	std::unique_ptr<Buffer> rtx_tlas_buffer;
 	vk::UniqueAccelerationStructureKHR rtx_tlas;
+	vk::DeviceAddress rtx_tlas_address;
 
 	vk::UniqueDescriptorPool rtx_pool;
 	vk::UniqueDescriptorSet rtx_set;

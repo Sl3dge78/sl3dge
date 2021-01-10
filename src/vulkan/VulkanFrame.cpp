@@ -24,15 +24,15 @@ void VulkanFrame::create_sync_objects() {
 }
 void VulkanFrame::create_descriptor_set(vk::DescriptorPool descriptor_pool, vk::DescriptorSetLayout scene_descriptor_set_layout, vk::DescriptorSetLayout mesh_descriptor_set_layout, vk::Sampler texture_sampler, vk::ImageView texture_image_view) {
 	scene_descriptor_set = std::move(device.allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(descriptor_pool, scene_descriptor_set_layout)).front());
-	auto scene_bi = vk::DescriptorBufferInfo(scene_buffer->buffer, 0, sizeof(SceneInfoUBO));
-	auto f_bi = vk::DescriptorBufferInfo(scene_buffer->buffer, sizeof(SceneInfoUBO), sizeof(FragUniformBufferObject));
+	auto camera_matrices_bi = vk::DescriptorBufferInfo(scene_buffer->buffer, 0, sizeof(CameraMatrices));
+	auto f_bi = vk::DescriptorBufferInfo(scene_buffer->buffer, sizeof(CameraMatrices), sizeof(FragUniformBufferObject));
 	auto image_info = vk::DescriptorImageInfo(texture_sampler, texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
 
 	mesh_descriptor_set = std::move(device.allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(descriptor_pool, mesh_descriptor_set_layout)).front());
 	auto mesh_bi = vk::DescriptorBufferInfo(transform_buffer->buffer, 0, sizeof(MeshUBO));
 
 	auto descriptor_writes = {
-		vk::WriteDescriptorSet(*scene_descriptor_set, 0, 0, vk::DescriptorType::eUniformBuffer, nullptr, scene_bi, nullptr),
+		vk::WriteDescriptorSet(*scene_descriptor_set, 0, 0, vk::DescriptorType::eUniformBuffer, nullptr, camera_matrices_bi, nullptr),
 		vk::WriteDescriptorSet(*scene_descriptor_set, 1, 0, vk::DescriptorType::eCombinedImageSampler, image_info, nullptr, nullptr),
 		vk::WriteDescriptorSet(*scene_descriptor_set, 2, 0, vk::DescriptorType::eUniformBuffer, nullptr, f_bi, nullptr),
 		vk::WriteDescriptorSet(*mesh_descriptor_set, 0, 0, vk::DescriptorType::eUniformBufferDynamic, nullptr, mesh_bi, nullptr),
@@ -41,7 +41,7 @@ void VulkanFrame::create_descriptor_set(vk::DescriptorPool descriptor_pool, vk::
 	device.updateDescriptorSets(descriptor_writes, nullptr);
 }
 void VulkanFrame::create_uniform_buffer(vk::PhysicalDevice physical_device) {
-	vk::DeviceSize size = sizeof(SceneInfoUBO) + sizeof(FragUniformBufferObject);
+	vk::DeviceSize size = sizeof(CameraMatrices) + sizeof(FragUniformBufferObject);
 	scene_buffer = std::unique_ptr<Buffer>(new Buffer(device, physical_device, size, vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent }));
 	size = sizeof(MeshUBO) * 100; // TODO : Allocate transform ubo depending on amount of objects in scene
 	transform_buffer = std::unique_ptr<Buffer>(new Buffer(device, physical_device, size, vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent }));
