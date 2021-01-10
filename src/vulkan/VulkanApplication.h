@@ -22,8 +22,9 @@
 #include "imgui/imgui_impl_vulkan.h"
 
 #include "Debug.h"
-#include "Mesh.h"
 #include "UniformBufferObject.h"
+#include "scene/Mesh.h"
+#include "scene/Scene.h"
 
 #include "Swapchain.h"
 #include "VulkanFrame.h"
@@ -62,6 +63,10 @@ public:
 	vk::Device get_device() { return *device; }
 	vk::PhysicalDevice get_physical_device() { return physical_device; }
 	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
+	vk::CommandBuffer create_commandbuffer(vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool begin = true);
+	std::vector<vk::CommandBuffer> create_commandbuffers(uint32_t count, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool begin = true);
+	void flush_commandbuffer(vk::CommandBuffer cmd, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool wait = true);
+	void flush_commandbuffers(std::vector<vk::CommandBuffer> cmd, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool wait = true);
 
 protected:
 	CameraMatrices camera_matrices;
@@ -69,7 +74,7 @@ protected:
 
 	SDL_Window *window = nullptr;
 
-	std::vector<std::unique_ptr<Mesh>> meshes;
+	std::unique_ptr<Scene> scene;
 
 	float get_aspect_ratio() const;
 
@@ -103,11 +108,11 @@ private:
 	void init_vulkan();
 
 	// Loop
-	virtual void load(std::vector<std::unique_ptr<Mesh>> &meshes) = 0;
+	virtual void load() = 0;
 	virtual void start() = 0;
 	virtual void update(float delta_time) = 0;
 	void main_loop();
-	void draw_scene(VulkanFrame &frame);
+	void rasterize_scene(VulkanFrame &frame);
 	void draw_ui(VulkanFrame &frame);
 	void draw_frame();
 
@@ -134,22 +139,21 @@ private:
 
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
 
-	std::unique_ptr<Buffer> rtx_instances_buffer;
-	std::unique_ptr<Buffer> rtx_tlas_buffer;
-	vk::UniqueAccelerationStructureKHR rtx_tlas;
-	vk::DeviceAddress rtx_tlas_address;
+	//	std::unique_ptr<Buffer> rtx_instances_buffer;
+	//	std::unique_ptr<AccelerationStructure> tlas;
 
 	vk::UniqueDescriptorPool rtx_pool;
 	vk::UniqueDescriptorSet rtx_set;
-	vk::UniquePipelineLayout rtx_pipeline_layout;
+	vk::UniquePipelineLayout rtx_layout;
 	vk::UniquePipeline rtx_pipeline;
 
 	std::unique_ptr<Image> rtx_result_image;
 	std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Buffer> shader_binding_table;
+
 	void init_rtx();
-	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
-	void build_TLAS(bool update = false, vk::BuildAccelerationStructureFlagsKHR flags = { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
+	//	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
+	//	void build_TLAS(bool update = false, vk::BuildAccelerationStructureFlagsKHR flags = { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
 	void build_rtx_pipeline();
 	void create_rtx_SBT();
 	void raytrace(VulkanFrame &frame, int image_id);

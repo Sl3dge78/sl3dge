@@ -11,13 +11,12 @@
 #include <SDL/SDL.h>
 
 #include "Camera.h"
-#include "Mesh.h"
+#include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
 // Todo : Handle multiple instances of the same mesh through a new class
 // Todo : reimplement imgui
 // Todo : clean all this
-
 class Sl3dge : public VulkanApplication {
 private:
 	Camera camera;
@@ -27,11 +26,14 @@ private:
 
 	glm::vec3 light_position = glm::vec3(0.0f, 0.0f, 0.5f);
 
-	void load(std::vector<std::unique_ptr<Mesh>> &meshes) override {
-		meshes.emplace_back(std::make_unique<Mesh>("resources/models/viking_room.obj"));
-		SDL_Log("Loaded %d meshes", meshes.size());
+	void load() override {
+		scene->load_mesh("resources/models/viking_room.obj", this); // 0
+		scene->create_instance(0);
+		auto a = scene->create_instance(0);
+		a->translate(glm::vec3(0.f, 1.f, 0.f));
+		auto b = scene->create_instance(0);
+		b->translate(glm::vec3(1.f, 0.f, 0.f));
 	}
-
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		camera.start();
@@ -45,17 +47,17 @@ private:
 		fubo.specular_strength = .5f;
 		fubo.shininess = 8.0f;
 	}
-
 	void update(float delta_time) override {
 		camera.update(delta_time);
 		int i = 0;
+		/*
 		for (auto &mesh : meshes) {
 			ImGui::PushID(i);
 			mesh->update(delta_time);
 			ImGui::PopID();
 			i++;
 		}
-
+		*/
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Display Lighting Options", "F10", &show_lighting_options);
@@ -65,13 +67,15 @@ private:
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();
+			/*
 			if (ImGui::BeginMenu("Meshes")) {
 				for (auto &mesh : meshes) {
 					ImGui::MenuItem("Info", "", &mesh->show_window);
 				}
 				ImGui::EndMenu();
-			}
+
 			ImGui::Separator();
+			 */
 			ImGui::Text("%.1f FPS", 1.f / delta_time);
 		}
 		ImGui::EndMainMenuBar();
@@ -94,7 +98,6 @@ private:
 		camera_matrices.view_inverse = glm::inverse(camera_matrices.view);
 		fubo.view_position = camera.get_position();
 	}
-
 	void show_metrics_window(bool &opened, float delta_time) {
 		static std::vector<float> frames;
 		frames.push_back(1.f / delta_time);
@@ -112,7 +115,6 @@ private:
 
 		ImGui::End();
 	}
-
 	void show_lighting_window(bool &opened) {
 		if (!ImGui::Begin("Lighting", &show_lighting_options, ImGuiWindowFlags_AlwaysAutoResize)) {
 			ImGui::End();

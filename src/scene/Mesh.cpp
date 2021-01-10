@@ -7,7 +7,7 @@
 
 #include <string>
 
-Mesh::Mesh(const std::string path) {
+Mesh::Mesh(const std::string path, VulkanApplication &app) {
 	this->id = get_id();
 
 	// Todo : load this only once, and then point to the data for each mesh as reqs
@@ -30,7 +30,7 @@ Mesh::Mesh(const std::string path) {
 				attrib.vertices[3 * index.vertex_index + 1],
 				attrib.vertices[3 * index.vertex_index + 2]
 			};
-			/*
+
 			vertex.normal = {
 				attrib.normals[3 * index.normal_index + 0],
 				attrib.normals[3 * index.normal_index + 1],
@@ -40,7 +40,7 @@ Mesh::Mesh(const std::string path) {
 				attrib.texcoords[2 * index.texcoord_index + 0],
 				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 			};
-			*/
+
 			if (unique_vtx.count(vertex) == 0) {
 				unique_vtx[vertex] = uint32_t(vertices.size());
 				vertices.push_back(vertex);
@@ -49,22 +49,20 @@ Mesh::Mesh(const std::string path) {
 			indices.push_back(unique_vtx[vertex]);
 		}
 	}
-	SDL_Log("id %d", id);
-}
-void Mesh::load(VulkanApplication *app) {
+
 	{
 		vk::DeviceSize vertex_size = sizeof(vertices[0]) * uint32_t(vertices.size());
-		Buffer staging_buffer(app->get_device(), app->get_physical_device(), vertex_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+		Buffer staging_buffer(app, vertex_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(vertices.data(), vertex_size);
-		vertex_buffer = std::unique_ptr<Buffer>(new Buffer(app->get_device(), app->get_physical_device(), vertex_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		app->copy_buffer(staging_buffer.buffer, vertex_buffer->buffer, vertex_size);
+		vertex_buffer = std::unique_ptr<Buffer>(new Buffer(app, vertex_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		app.copy_buffer(staging_buffer.buffer, vertex_buffer->buffer, vertex_size);
 	}
 	{
 		vk::DeviceSize index_size = sizeof(indices[0]) * indices.size();
-		Buffer staging_buffer(app->get_device(), app->get_physical_device(), index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+		Buffer staging_buffer(app, index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(indices.data(), index_size);
-		index_buffer = std::unique_ptr<Buffer>(new Buffer(app->get_device(), app->get_physical_device(), index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		app->copy_buffer(staging_buffer.buffer, index_buffer->buffer, index_size);
+		index_buffer = std::unique_ptr<Buffer>(new Buffer(app, index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		app.copy_buffer(staging_buffer.buffer, index_buffer->buffer, index_size);
 	}
 
 	triangles.setVertexFormat(vk::Format::eR32G32B32Sfloat);

@@ -1,4 +1,5 @@
 #include "VulkanHelper.h"
+#include "VulkanApplication.h"
 
 Image::Image(vk::Device device, vk::PhysicalDevice physical_device, const uint32_t w, const uint32_t h, const vk::Format fmt, const vk::ImageTiling tiling, const vk::ImageUsageFlags usage, const vk::MemoryPropertyFlags properties, const vk::ImageAspectFlagBits aspect) {
 	this->device = device;
@@ -78,6 +79,17 @@ Buffer::Buffer(vk::Device device, vk::PhysicalDevice physical_device, vk::Device
 	device.bindBufferMemory(buffer, memory, 0);
 	address = device.getBufferAddress(vk::BufferDeviceAddressInfo(buffer));
 }
+Buffer::Buffer(VulkanApplication &app, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+	this->device = app.get_device();
+	buffer = device.createBuffer(vk::BufferCreateInfo({}, size, { usage | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::SharingMode::eExclusive, nullptr));
+	auto requirements = device.getBufferMemoryRequirements(buffer);
+	vk::MemoryAllocateInfo ai(requirements.size, find_memory_type(app.get_physical_device(), requirements.memoryTypeBits, properties));
+	vk::MemoryAllocateFlagsInfo fi(vk::MemoryAllocateFlagBits::eDeviceAddress);
+	ai.setPNext(&fi);
+	memory = device.allocateMemory(ai);
+	device.bindBufferMemory(buffer, memory, 0);
+	address = device.getBufferAddress(vk::BufferDeviceAddressInfo(buffer));
+}
 Buffer::~Buffer() {
 	device.destroyBuffer(buffer);
 	device.freeMemory(memory);
@@ -95,10 +107,17 @@ AccelerationStructure::AccelerationStructure(vk::Device device, vk::PhysicalDevi
 	acceleration_structure = device.createAccelerationStructureKHRUnique(create_info);
 	address = device.getAccelerationStructureAddressKHR(vk::AccelerationStructureDeviceAddressInfoKHR(*acceleration_structure));
 }
+AccelerationStructure::AccelerationStructure(VulkanApplication &app, vk::AccelerationStructureTypeKHR type, vk::DeviceSize size) {
+	buffer = std::unique_ptr<Buffer>(new Buffer(app, size, { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::MemoryPropertyFlagBits::eDeviceLocal));
+	vk::AccelerationStructureCreateInfoKHR create_info({}, buffer->buffer, 0, size, type, {});
+
+	acceleration_structure = app.get_device().createAccelerationStructureKHRUnique(create_info);
+	address = app.get_device().getAccelerationStructureAddressKHR(vk::AccelerationStructureDeviceAddressInfoKHR(*acceleration_structure));
+}
 vk::DeviceAddress AccelerationStructure::get_address() {
 	return address;
 }
-vk::AccelerationStructureKHR AccelerationStructure::get_acceleration_structure() {
+const vk::AccelerationStructureKHR AccelerationStructure::get_acceleration_structure() {
 	return *acceleration_structure;
 }
 
@@ -108,7 +127,7 @@ vk::Format find_supported_format(vk::PhysicalDevice physical_device, const std::
 		if (tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features) {
 			return format;
 		} else if (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features) {
-			SDL_Log("%d", format);
+			//SDL_Log("Format = %d", format);
 			return format;
 		}
 	}

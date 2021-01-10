@@ -10,9 +10,9 @@
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_vulkan.h"
 
-#include "Vertex.h"
 #include "VulkanFrame.h"
 #include "VulkanHelper.h"
+#include "scene/Vertex.h"
 
 struct FrameSemaphores {
 	vk::UniqueSemaphore image_aquired;

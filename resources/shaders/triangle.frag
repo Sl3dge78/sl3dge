@@ -25,10 +25,9 @@ layout(set = 0, binding = 2) uniform FragUniformBufferObject {
     float shininess;
 } fubo;
 
-/*
+
 layout(location = 0) in vec3 normal;
 layout(location = 1) in vec2 tex_coords;
-*/
 layout(location = 2) in vec3 frag_pos;
 
 layout(location = 0) out vec4 out_color;

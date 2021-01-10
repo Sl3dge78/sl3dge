@@ -43,10 +43,9 @@ public:
 	vk::AccelerationStructureGeometryKHR geometry;
 	vk::AccelerationStructureBuildRangeInfoKHR range_info;
 
-	Mesh(const std::string path);
+	Mesh(const std::string path, VulkanApplication &app);
 	~Mesh() = default;
 
-	void load(VulkanApplication *app);
 	void draw(VulkanFrame &frame);
 	void update(const float delta_time);
 

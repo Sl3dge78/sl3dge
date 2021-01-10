@@ -5,9 +5,9 @@
 
 #include <vulkan/vulkan.hpp>
 
-#include "Mesh.h"
 #include "UniformBufferObject.h"
 #include "VulkanHelper.h"
+#include "scene/Mesh.h"
 
 struct VulkanFrame {
 	vk::Device device;

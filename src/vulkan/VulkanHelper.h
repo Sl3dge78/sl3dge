@@ -13,6 +13,8 @@
 
 #include "Debug.h"
 
+class VulkanApplication;
+
 struct QueueFamilyIndices {
 	std::optional<Uint32> graphics_family;
 	std::optional<Uint32> present_family;
@@ -45,6 +47,7 @@ public:
 	vk::DeviceMemory memory;
 
 	Buffer(vk::Device device, vk::PhysicalDevice physical_device, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
+	Buffer(VulkanApplication &app, vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
 	~Buffer();
 	void write_data(void *data, vk::DeviceSize size, const uint32_t offset = 0);
 };
@@ -56,8 +59,9 @@ private:
 
 public:
 	AccelerationStructure(vk::Device device, vk::PhysicalDevice physical_device, vk::AccelerationStructureTypeKHR type, vk::DeviceSize size);
+	AccelerationStructure(VulkanApplication &app, vk::AccelerationStructureTypeKHR type, vk::DeviceSize size);
 	vk::DeviceAddress get_address();
-	vk::AccelerationStructureKHR get_acceleration_structure();
+	const vk::AccelerationStructureKHR get_acceleration_structure();
 };
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device, const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);

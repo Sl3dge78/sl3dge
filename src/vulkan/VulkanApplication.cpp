@@ -22,9 +22,9 @@ VulkanApplication::~VulkanApplication() {
 	SDL_Log("Cleaning up...");
 	SDL_HideWindow(window);
 
-	meshes.clear();
-
 	Input::cleanup();
+
+	scene.reset();
 
 	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
@@ -36,15 +36,12 @@ VulkanApplication::~VulkanApplication() {
 	SDL_Quit();
 }
 void VulkanApplication::run() {
-	load(meshes);
-	for (auto &mesh : meshes) {
-		mesh->load(this);
-	}
+	scene = std::make_unique<Scene>();
+	load();
 	SDL_Log("Resources loaded");
-
-	build_BLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
+	scene->build_BLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
 	SDL_Log("BLAS created");
-	build_TLAS();
+	scene->build_TLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
 	SDL_Log("TLAS created");
 	build_rtx_pipeline();
 	SDL_Log("RTX Pipeline created");
@@ -177,20 +174,12 @@ void VulkanApplication::main_loop() {
 		device->waitIdle();
 	}
 }
-void VulkanApplication::draw_scene(VulkanFrame &frame) {
-	// SCENE UBO
-	frame.scene_buffer->write_data(&camera_matrices, sizeof(CameraMatrices));
+void VulkanApplication::rasterize_scene(VulkanFrame &frame) {
 	// FRAG UBO
 	frame.scene_buffer->write_data(&fubo, sizeof(fubo), sizeof(CameraMatrices));
-
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline());
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.scene_descriptor_set.get(), nullptr);
-
-	for (auto &mesh : meshes) {
-		frame.transform_buffer->write_data(&mesh->transform, sizeof(mesh->transform), mesh->id * sizeof(MeshUBO));
-		frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 1, frame.mesh_descriptor_set.get(), mesh->id * sizeof(MeshUBO));
-		mesh->draw(frame);
-	}
+	scene->rasterize(frame);
 }
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	// UI
@@ -198,34 +187,29 @@ void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	auto imgui_data = ImGui::GetDrawData();
 	ImGui_ImplVulkan_RenderDrawData(imgui_data, frame.command_buffer.get());
 }
-
 void VulkanApplication::draw_frame() {
-	// Get the image
 	vk::Semaphore image_acquired_semaphore = swapchain->get_image_acquired_semaphore(semaphore_index);
 	vk::Semaphore render_complete_semaphore = swapchain->get_render_complete_semaphore(semaphore_index);
 
+	// Acquire next image
 	uint32_t image_id;
-	{
-		vk::Result result;
-		try {
-			// Get next image and trigger image_available once ready
-			auto ret = device->acquireNextImageKHR(swapchain->get_swapchain(), UINT64_MAX, image_acquired_semaphore, nullptr);
-			image_id = ret.value;
-			result = ret.result;
-		} catch (vk::OutOfDateKHRError &error) {
-		} // Handled below
-
-		if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
-			device->waitIdle();
-			swapchain.reset();
-			swapchain = std::make_unique<Swapchain>();
-			return;
-		}
+	vk::Result result;
+	try {
+		// Get next image and trigger image_acquired_semaphore once ready
+		auto ret = device->acquireNextImageKHR(swapchain->get_swapchain(), UINT64_MAX, image_acquired_semaphore, nullptr);
+		image_id = ret.value;
+		result = ret.result;
+	} catch (vk::OutOfDateKHRError &error) {
+	} // Handled below
+	if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
+		device->waitIdle();
+		swapchain.reset();
+		swapchain = std::make_unique<Swapchain>();
+		return;
 	}
 
-	auto frame = swapchain->get_frame(image_id);
-
 	// Wait for the frame to be finished
+	auto frame = swapchain->get_frame(image_id);
 	if (device->waitForFences(frame->fence.get(), true, UINT64_MAX) != vk::Result::eSuccess) {
 		throw std::runtime_error("Waiting for frame timed out!");
 	}
@@ -237,33 +221,29 @@ void VulkanApplication::draw_frame() {
 		raytrace(*frame, image_id);
 	} else {
 		frame->begin_render_pass(); // Todo : split this into 2 render passes
-		draw_scene(*frame); // Render 3D objects in the scene
+		rasterize_scene(*frame); // Render 3D objects in the scene
 		draw_ui(*frame);
 		frame->end_render_pass();
 	}
 
 	// Submit Queue
-	{
-		vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-		vk::SubmitInfo si(image_acquired_semaphore, flags, frame->command_buffer.get(), render_complete_semaphore);
-		graphics_queue.submit(si, frame->fence.get());
-	}
-	// Present
-	{
-		vk::SwapchainKHR swap = swapchain->get_swapchain();
-		vk::Result result;
-		try {
-			result = present_queue.presentKHR(vk::PresentInfoKHR(render_complete_semaphore, swap, image_id, {}));
-		} catch (vk::OutOfDateKHRError &error) {
-		} // Handled below
+	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	vk::SubmitInfo si(image_acquired_semaphore, flags, frame->command_buffer.get(), render_complete_semaphore);
+	graphics_queue.submit(si, frame->fence.get());
 
-		if (framebuffer_rezised || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
-			framebuffer_rezised = false;
-			device->waitIdle();
-			swapchain.reset();
-			swapchain = std::make_unique<Swapchain>();
-		}
+	// Present
+	vk::SwapchainKHR swap = swapchain->get_swapchain();
+	try {
+		result = present_queue.presentKHR(vk::PresentInfoKHR(render_complete_semaphore, swap, image_id, {}));
+	} catch (vk::OutOfDateKHRError &error) {
+	} // Handled below
+	if (framebuffer_rezised || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
+		framebuffer_rezised = false;
+		device->waitIdle();
+		swapchain.reset();
+		swapchain = std::make_unique<Swapchain>();
 	}
+
 	semaphore_index = (semaphore_index + 1) % swapchain->get_image_count();
 }
 
@@ -458,7 +438,6 @@ std::vector<const char *> VulkanApplication::get_required_extensions(SDL_Window 
 
 	if (enable_validation_layers) {
 		required_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		//required_extension_names.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
 	}
 
 	SDL_Log("Required instance extensions:");
@@ -469,157 +448,114 @@ std::vector<const char *> VulkanApplication::get_required_extensions(SDL_Window 
 	return required_extension_names;
 }
 
+vk::CommandBuffer VulkanApplication::create_commandbuffer(vk::QueueFlagBits type, bool begin) {
+	vk::CommandBufferAllocateInfo alloc_info{};
+	alloc_info.commandBufferCount = 1;
+	alloc_info.level = vk::CommandBufferLevel::ePrimary;
+
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			alloc_info.commandPool = *graphics_command_pool;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			alloc_info.commandPool = *transfer_command_pool;
+			break;
+		default:
+			SDL_LogError(0, "Queue type not supported");
+			throw std::runtime_error("Queue type not supported");
+			break;
+	}
+
+	auto cmd = device->allocateCommandBuffers(alloc_info).front();
+	if (begin) {
+		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
+	}
+	return cmd;
+}
+std::vector<vk::CommandBuffer> VulkanApplication::create_commandbuffers(uint32_t count, vk::QueueFlagBits type, bool begin) {
+	vk::CommandBufferAllocateInfo alloc_info{};
+	alloc_info.commandBufferCount = count;
+	alloc_info.level = vk::CommandBufferLevel::ePrimary;
+
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			alloc_info.commandPool = *graphics_command_pool;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			alloc_info.commandPool = *transfer_command_pool;
+			break;
+		default:
+			SDL_LogError(0, "Queue type not supported");
+			throw std::runtime_error("Queue type not supported");
+			break;
+	}
+
+	auto cmd = device->allocateCommandBuffers(alloc_info);
+	if (begin) {
+		for (auto &c : cmd)
+			c.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
+	}
+	return cmd;
+}
+void VulkanApplication::flush_commandbuffer(vk::CommandBuffer cmd, vk::QueueFlagBits type, bool wait) {
+	cmd.end();
+	vk::CommandPool command_pool;
+	vk::Queue queue;
+
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			command_pool = *graphics_command_pool;
+			queue = graphics_queue;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			command_pool = *transfer_command_pool;
+			queue = transfer_queue;
+			break;
+		default:
+			SDL_LogWarn(0, "Queue type not supported");
+			break;
+	}
+	queue.submit(vk::SubmitInfo(nullptr, nullptr, cmd, nullptr), nullptr);
+
+	if (wait) {
+		queue.waitIdle();
+	}
+	device->freeCommandBuffers(command_pool, cmd);
+}
+void VulkanApplication::flush_commandbuffers(std::vector<vk::CommandBuffer> cmd, vk::QueueFlagBits type, bool wait) {
+	for (auto &c : cmd) {
+		c.end();
+	}
+
+	vk::CommandPool command_pool;
+	vk::Queue queue;
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			command_pool = *graphics_command_pool;
+			queue = graphics_queue;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			command_pool = *transfer_command_pool;
+			queue = transfer_queue;
+			break;
+		default:
+			SDL_LogWarn(0, "Queue type not supported");
+			break;
+	}
+	queue.submit(vk::SubmitInfo(nullptr, nullptr, cmd, nullptr), nullptr);
+	if (wait) {
+		queue.waitIdle();
+	}
+	device->freeCommandBuffers(command_pool, cmd);
+}
+
 void VulkanApplication::init_rtx() {
 	auto properties = physical_device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
 	rtx_properties = properties.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
-}
-void VulkanApplication::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
-	std::vector<std::unique_ptr<AccelerationStructure>> orig_blas;
-	bool do_compaction = (flags & vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction) == vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction;
-	auto query_pool = device->createQueryPoolUnique(vk::QueryPoolCreateInfo({}, vk::QueryType::eAccelerationStructureCompactedSizeKHR, meshes.size(), {}));
-
-	{
-		std::vector<vk::AccelerationStructureBuildGeometryInfoKHR> build_infos;
-		vk::DeviceSize max_scratch = 0;
-
-		// Create BLAS
-		for (auto &mesh : meshes) {
-			vk::AccelerationStructureBuildGeometryInfoKHR build_info(
-					vk::AccelerationStructureTypeKHR::eBottomLevel,
-					flags,
-					vk::BuildAccelerationStructureModeKHR::eBuild,
-					nullptr, nullptr,
-					1, &mesh->geometry, nullptr,
-					nullptr);
-			auto size_info = device->getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, mesh->get_primitive_count());
-			max_scratch = std::max(max_scratch, size_info.buildScratchSize);
-			orig_blas.emplace_back(std::make_unique<AccelerationStructure>(*device, physical_device, vk::AccelerationStructureTypeKHR::eBottomLevel, size_info.accelerationStructureSize));
-			build_infos.emplace_back(build_info);
-		}
-
-		// Build BLAS
-		std::vector<vk::CommandBuffer> cmd_buffs = device->allocateCommandBuffers(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, meshes.size()));
-		Buffer scratch_buffer(*device, physical_device, max_scratch, { vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eStorageBuffer }, vk::MemoryPropertyFlagBits::eDeviceLocal);
-		for (int i = 0; i < meshes.size(); i++) {
-			build_infos[i].dstAccelerationStructure = orig_blas[i]->get_acceleration_structure();
-			build_infos[i].scratchData.deviceAddress = scratch_buffer.address;
-
-			cmd_buffs[i].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-			cmd_buffs[i].buildAccelerationStructuresKHR(build_infos[i], &meshes[i]->range_info);
-			cmd_buffs[i].pipelineBarrier(
-					vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR,
-					vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {},
-					vk::MemoryBarrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR, vk::AccessFlagBits::eAccelerationStructureReadKHR),
-					nullptr, nullptr);
-
-			if (do_compaction)
-				cmd_buffs[i].writeAccelerationStructuresPropertiesKHR(orig_blas[i]->get_acceleration_structure(), vk::QueryType::eAccelerationStructureCompactedSizeKHR, *query_pool, i);
-			cmd_buffs[i].end();
-		}
-		graphics_queue.submit(vk::SubmitInfo(nullptr, {}, cmd_buffs, nullptr));
-		graphics_queue.waitIdle();
-		device->freeCommandBuffers(*graphics_command_pool, cmd_buffs);
-	}
-
-	if (do_compaction) {
-		// Copy them in the meshes while compressing them
-		std::vector<vk::DeviceSize> compact_sizes = device->getQueryPoolResults<vk::DeviceSize>(*query_pool, 0, meshes.size(), meshes.size() * sizeof(vk::DeviceSize), sizeof(vk::DeviceSize), vk::QueryResultFlagBits::eWait).value;
-		vk::UniqueCommandBuffer cmd_buf = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
-		cmd_buf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
-		for (int i = 0; i < meshes.size(); i++) {
-			meshes[i]->blas = std::make_unique<AccelerationStructure>(*device, physical_device, vk::AccelerationStructureTypeKHR::eBottomLevel, compact_sizes[i]);
-			cmd_buf->copyAccelerationStructureKHR(vk::CopyAccelerationStructureInfoKHR(orig_blas[i]->get_acceleration_structure(), meshes[i]->blas->get_acceleration_structure(), vk::CopyAccelerationStructureModeKHR::eCompact));
-		}
-		cmd_buf->end();
-		graphics_queue.submit(vk::SubmitInfo(nullptr, {}, *cmd_buf, nullptr));
-		graphics_queue.waitIdle();
-		/*
-		SDL_Log("RTX Blas: reducing from %u to %u = %u (%2.2f%s smaller) ",
-				stat_total_ori_size,
-				stat_totat_compact_size,
-				stat_total_ori_size - stat_totat_compact_size,
-				(stat_total_ori_size - stat_totat_compact_size) / float(stat_total_ori_size) * 100.f, "%");
-				*/
-	} else {
-		// Just move the BLASes into the meshes for future
-		for (int i = 0; i < meshes.size(); i++) {
-			meshes[i]->blas = std::move(orig_blas[i]);
-		}
-	}
-}
-void VulkanApplication::build_TLAS(bool update, vk::BuildAccelerationStructureFlagsKHR flags) {
-	int hit_goup_id = 0;
-
-	// Todo : multiple instances
-	vk::AccelerationStructureInstanceKHR as_instance{};
-	auto transform = meshes[0]->transform;
-	transform = glm::transpose(transform);
-	memcpy(&as_instance.transform, &transform, sizeof(transform));
-	as_instance.flags = (unsigned int)(vk::GeometryInstanceFlagBitsKHR::eTriangleCullDisable);
-	as_instance.instanceShaderBindingTableRecordOffset = hit_goup_id;
-	as_instance.instanceCustomIndex = 0;
-	as_instance.accelerationStructureReference = meshes[0]->blas->get_address();
-	as_instance.mask = 0xFF;
-
-	if (update) {
-		rtx_instances_buffer.reset();
-	}
-	Buffer *temp = new Buffer(*device, physical_device, sizeof(vk::AccelerationStructureInstanceKHR), { vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR }, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
-	rtx_instances_buffer = std::unique_ptr<Buffer>(temp);
-	rtx_instances_buffer->write_data(&as_instance, sizeof(vk::AccelerationStructureInstanceKHR));
-	debug_set_object_name(*device, (uint64_t)(VkBuffer)rtx_instances_buffer.get(), vk::DebugReportObjectTypeEXT::eBuffer, "RTX INSTANCES BUFFER");
-
-	vk::AccelerationStructureGeometryKHR tlasGeo{};
-	tlasGeo.geometryType = vk::GeometryTypeKHR::eInstances;
-	tlasGeo.flags = vk::GeometryFlagBitsKHR::eOpaque;
-
-	vk::DeviceOrHostAddressConstKHR addr(rtx_instances_buffer->address);
-	vk::AccelerationStructureGeometryInstancesDataKHR geometry_instances_data(false, addr);
-	tlasGeo.geometry.instances = geometry_instances_data;
-
-	vk::AccelerationStructureBuildGeometryInfoKHR build_info{};
-	build_info.flags = flags;
-	build_info.geometryCount = 1;
-	build_info.pGeometries = &tlasGeo;
-	build_info.mode = update ? vk::BuildAccelerationStructureModeKHR::eUpdate : vk::BuildAccelerationStructureModeKHR::eBuild;
-	build_info.type = vk::AccelerationStructureTypeKHR::eTopLevel;
-	build_info.srcAccelerationStructure = nullptr;
-
-	// Find sizes
-	vk::AccelerationStructureBuildSizesInfoKHR size_info{};
-	uint32_t count = 1;
-	size_info = device->getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, count);
-
-	if (!update) {
-		Buffer *temp2 = new Buffer(*device, physical_device, size_info.accelerationStructureSize, { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, { vk::MemoryPropertyFlagBits::eDeviceLocal });
-		rtx_tlas_buffer = std::unique_ptr<Buffer>(temp2);
-		debug_set_object_name(*device, (uint64_t)(VkBuffer)rtx_tlas_buffer.get(), vk::DebugReportObjectTypeEXT::eBuffer, "RTX TLAS BUFFER");
-
-		vk::AccelerationStructureCreateInfoKHR create_info{};
-		create_info.type = vk::AccelerationStructureTypeKHR::eTopLevel;
-		create_info.size = size_info.accelerationStructureSize;
-		create_info.buffer = rtx_tlas_buffer->buffer;
-		rtx_tlas = device->createAccelerationStructureKHRUnique(create_info);
-		debug_set_object_name(*device, (uint64_t)(VkAccelerationStructureKHR)rtx_tlas.get(), vk::DebugReportObjectTypeEXT::eAccelerationStructureKHR, "RTX TLAS");
-	}
-
-	Buffer scratch(*device, physical_device, size_info.buildScratchSize, { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, { vk::MemoryPropertyFlagBits::eDeviceLocal });
-	build_info.srcAccelerationStructure = update ? *rtx_tlas : nullptr;
-	build_info.dstAccelerationStructure = *rtx_tlas;
-	build_info.scratchData.deviceAddress = scratch.address;
-
-	vk::AccelerationStructureBuildRangeInfoKHR build_range(1, 0, 0, 0);
-
-	vk::UniqueCommandBuffer cmd_buf = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
-	cmd_buf->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-	vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eAccelerationStructureWriteKHR);
-	cmd_buf->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, barrier, nullptr, nullptr);
-	cmd_buf->buildAccelerationStructuresKHR(build_info, &build_range);
-	cmd_buf->end();
-	graphics_queue.submit(vk::SubmitInfo(nullptr, nullptr, *cmd_buf, nullptr), nullptr);
-	graphics_queue.waitIdle();
-
-	rtx_tlas_address = device->getAccelerationStructureAddressKHR(vk::AccelerationStructureDeviceAddressInfoKHR(*rtx_tlas));
 }
 void VulkanApplication::build_rtx_pipeline() {
 	// Allocate render image
@@ -650,7 +586,11 @@ void VulkanApplication::build_rtx_pipeline() {
 	rtx_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*rtx_pool, *rtx_set_layout)).front());
 
 	// Write
-	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(*rtx_tlas);
+	std::vector<vk::AccelerationStructureKHR> as{
+		scene->get_tlas(),
+	};
+	vk::WriteDescriptorSetAccelerationStructureKHR as_desc{};
+	as_desc.setAccelerationStructures(as);
 	vk::WriteDescriptorSet as_descriptor_write{};
 	as_descriptor_write.dstSet = *rtx_set;
 	as_descriptor_write.descriptorType = vk::DescriptorType::eAccelerationStructureKHR;
@@ -689,12 +629,12 @@ void VulkanApplication::build_rtx_pipeline() {
 		*rtx_set_layout,
 		swapchain->get_scene_descriptor_set(),
 	};
-	rtx_pipeline_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts, push_constant));
+	rtx_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts, push_constant));
 	vk::RayTracingPipelineCreateInfoKHR create_info(
 			{},
 			shader_stages, shader_groups, 1,
 			nullptr, nullptr, nullptr,
-			*rtx_pipeline_layout, nullptr, 0);
+			*rtx_layout, nullptr, 0);
 	rtx_pipeline = device->createRayTracingPipelineKHRUnique({}, {}, create_info).value;
 }
 void VulkanApplication::create_rtx_SBT() {
@@ -726,9 +666,9 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	rtx_push_constants.light_type = 0;
 
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, *rtx_pipeline);
-	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtx_pipeline_layout, 0, { *rtx_set, frame.scene_descriptor_set.get() }, nullptr);
+	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtx_layout, 0, { *rtx_set, frame.scene_descriptor_set.get() }, nullptr);
 	frame.command_buffer->pushConstants(
-			*rtx_pipeline_layout,
+			*rtx_layout,
 			{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR },
 			0, sizeof(RTPushConstant), &rtx_push_constants);
 

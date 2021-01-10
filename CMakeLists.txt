@@ -38,6 +38,6 @@ include_directories(INCLUDE_DIRS)
 #       src/vulkan/VulkanFrame.cpp
 #       src/vulkan/VulkanHelper.cpp
 #       )
-add_executable(Vulkan ${SOURCES} ${HEADERS} src/vulkan/Mesh.cpp src/vulkan/Mesh.h src/Debug.cpp)
+add_executable(Vulkan ${SOURCES} ${HEADERS})
 target_include_directories(Vulkan PRIVATE ${INCLUDE_DIRS})
 target_link_libraries(Vulkan mingw32 SDL2main SDL2 SDL2_image vulkan-1)
