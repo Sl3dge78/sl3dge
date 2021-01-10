@@ -15,6 +15,8 @@
 #include "vulkan/VulkanApplication.h"
 
 // Todo : Handle multiple instances of the same mesh through a new class
+// Todo : reimplement imgui
+// Todo : clean all this
 
 class Sl3dge : public VulkanApplication {
 private:

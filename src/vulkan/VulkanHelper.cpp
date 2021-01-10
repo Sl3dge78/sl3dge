@@ -88,6 +88,19 @@ void Buffer::write_data(void *data, vk::DeviceSize size, const uint32_t offset) 
 	device.unmapMemory(this->memory);
 }
 
+AccelerationStructure::AccelerationStructure(vk::Device device, vk::PhysicalDevice physical_device, vk::AccelerationStructureTypeKHR type, vk::DeviceSize size) {
+	buffer = std::unique_ptr<Buffer>(new Buffer(device, physical_device, size, { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::MemoryPropertyFlagBits::eDeviceLocal));
+	vk::AccelerationStructureCreateInfoKHR create_info({}, buffer->buffer, 0, size, type, {});
+
+	acceleration_structure = device.createAccelerationStructureKHRUnique(create_info);
+	address = device.getAccelerationStructureAddressKHR(vk::AccelerationStructureDeviceAddressInfoKHR(*acceleration_structure));
+}
+vk::DeviceAddress AccelerationStructure::get_address() {
+	return address;
+}
+vk::AccelerationStructureKHR AccelerationStructure::get_acceleration_structure() {
+	return *acceleration_structure;
+}
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device, const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
 	for (vk::Format format : candidates) {

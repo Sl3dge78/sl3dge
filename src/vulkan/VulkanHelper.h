@@ -48,6 +48,17 @@ public:
 	~Buffer();
 	void write_data(void *data, vk::DeviceSize size, const uint32_t offset = 0);
 };
+class AccelerationStructure {
+private:
+	std::unique_ptr<Buffer> buffer;
+	vk::UniqueAccelerationStructureKHR acceleration_structure;
+	vk::DeviceAddress address = 0;
+
+public:
+	AccelerationStructure(vk::Device device, vk::PhysicalDevice physical_device, vk::AccelerationStructureTypeKHR type, vk::DeviceSize size);
+	vk::DeviceAddress get_address();
+	vk::AccelerationStructureKHR get_acceleration_structure();
+};
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device, const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 QueueFamilyIndices find_queue_families(vk::PhysicalDevice device, vk::SurfaceKHR surface);

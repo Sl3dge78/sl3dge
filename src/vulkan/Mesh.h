@@ -32,19 +32,16 @@ private:
 	static int get_id();
 	inline static int id_ = 0;
 
-	vk::UniqueAccelerationStructureKHR blas;
-	std::unique_ptr<Buffer> blas_buffer;
-	vk::DeviceAddress blas_address;
-
-	vk::AccelerationStructureGeometryKHR geometry;
-	vk::AccelerationStructureBuildRangeInfoKHR range_info;
-	vk::AccelerationStructureBuildGeometryInfoKHR build_info;
 	vk::AccelerationStructureGeometryTrianglesDataKHR triangles;
 
 public:
 	int id;
 	bool show_window = false;
 	glm::mat4 transform = glm::mat4(1.0f);
+
+	std::unique_ptr<AccelerationStructure> blas;
+	vk::AccelerationStructureGeometryKHR geometry;
+	vk::AccelerationStructureBuildRangeInfoKHR range_info;
 
 	Mesh(const std::string path);
 	~Mesh() = default;
@@ -53,9 +50,7 @@ public:
 	void draw(VulkanFrame &frame);
 	void update(const float delta_time);
 
-	vk::DeviceSize create_as(vk::Device device, vk::PhysicalDevice physical_device);
-	void build_as(vk::Device device, vk::DeviceAddress scratch_address, vk::CommandBuffer cmd_buf);
-	vk::DeviceAddress get_AS_reference() { return blas_address; }
+	uint32_t get_primitive_count() { return indices.size() / 3; }
 
 	glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);

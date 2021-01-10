@@ -115,36 +115,3 @@ void Mesh::update_matrix() {
 int Mesh::get_id() {
 	return id_++;
 }
-vk::DeviceSize Mesh::create_as(vk::Device device, vk::PhysicalDevice physical_device) {
-	build_info = vk::AccelerationStructureBuildGeometryInfoKHR(
-			vk::AccelerationStructureTypeKHR::eBottomLevel,
-			{ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace },
-			vk::BuildAccelerationStructureModeKHR::eBuild,
-			nullptr, nullptr,
-			1, &geometry, nullptr,
-			nullptr);
-
-	vk::AccelerationStructureBuildSizesInfoKHR size = device.getAccelerationStructureBuildSizesKHR(vk::AccelerationStructureBuildTypeKHR::eDevice, build_info, range_info.primitiveCount);
-	blas_buffer = std::unique_ptr<Buffer>(new Buffer(device, physical_device, size.accelerationStructureSize, { vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, vk::MemoryPropertyFlagBits::eDeviceLocal));
-	debug_set_object_name(device, (uint64_t)(VkBuffer)(blas_buffer->buffer), vk::DebugReportObjectTypeEXT::eBuffer, "Bottom Level AS Buffer");
-
-	vk::AccelerationStructureCreateInfoKHR create_info({}, blas_buffer->buffer, 0, size.accelerationStructureSize, vk::AccelerationStructureTypeKHR::eBottomLevel, {});
-	this->blas = device.createAccelerationStructureKHRUnique(create_info);
-	debug_set_object_name(device, (uint64_t)(VkAccelerationStructureKHR)(this->blas.get()), vk::DebugReportObjectTypeEXT::eAccelerationStructureKHR, "Bottom Level AS");
-	build_info.setDstAccelerationStructure(this->blas.get());
-	return size.accelerationStructureSize;
-}
-void Mesh::build_as(vk::Device device, vk::DeviceAddress scratch_address, vk::CommandBuffer cmd_buf) {
-	build_info.scratchData.deviceAddress = scratch_address;
-	cmd_buf.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-	cmd_buf.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT("Build BLAS", { 0.5f, .5f, .5f, 1.0f }));
-
-	cmd_buf.buildAccelerationStructuresKHR(build_info, &range_info);
-	vk::MemoryBarrier barrier(vk::AccessFlagBits::eAccelerationStructureWriteKHR, vk::AccessFlagBits::eAccelerationStructureReadKHR);
-	cmd_buf.pipelineBarrier(vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, barrier, nullptr, nullptr);
-
-	cmd_buf.endDebugUtilsLabelEXT();
-	cmd_buf.end();
-
-	blas_address = device.getAccelerationStructureAddressKHR(vk::AccelerationStructureDeviceAddressInfoKHR(*blas));
-}
