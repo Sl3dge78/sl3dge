@@ -37,27 +37,14 @@ private:
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		camera.start();
-		camera.get_view_matrix(camera_matrices.view);
-		camera_matrices.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
-		camera_matrices.proj[1][1] *= -1;
-		camera_matrices.proj_inverse = glm::inverse(camera_matrices.proj);
-
-		fubo.ambient_strength = .1f;
-		fubo.diffuse_strength = .5f;
-		fubo.specular_strength = .5f;
-		fubo.shininess = 8.0f;
+		camera.get_view_matrix(scene->camera_matrices.view);
+		scene->camera_matrices.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
+		scene->camera_matrices.proj[1][1] *= -1;
+		scene->camera_matrices.proj_inverse = glm::inverse(scene->camera_matrices.proj);
 	}
 	void update(float delta_time) override {
 		camera.update(delta_time);
-		int i = 0;
-		/*
-		for (auto &mesh : meshes) {
-			ImGui::PushID(i);
-			mesh->update(delta_time);
-			ImGui::PopID();
-			i++;
-		}
-		*/
+
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Display Lighting Options", "F10", &show_lighting_options);
@@ -67,15 +54,6 @@ private:
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();
-			/*
-			if (ImGui::BeginMenu("Meshes")) {
-				for (auto &mesh : meshes) {
-					ImGui::MenuItem("Info", "", &mesh->show_window);
-				}
-				ImGui::EndMenu();
-
-			ImGui::Separator();
-			 */
 			ImGui::Text("%.1f FPS", 1.f / delta_time);
 		}
 		ImGui::EndMainMenuBar();
@@ -91,12 +69,9 @@ private:
 			ImGui::ShowDemoWindow(&show_demo_window);
 		if (show_metrics)
 			show_metrics_window(show_metrics, delta_time);
-		if (show_lighting_options)
-			show_lighting_window(show_lighting_options);
 
-		camera.get_view_matrix(camera_matrices.view);
-		camera_matrices.view_inverse = glm::inverse(camera_matrices.view);
-		fubo.view_position = camera.get_position();
+		camera.get_view_matrix(scene->camera_matrices.view);
+		scene->camera_matrices.view_inverse = glm::inverse(scene->camera_matrices.view);
 	}
 	void show_metrics_window(bool &opened, float delta_time) {
 		static std::vector<float> frames;
@@ -115,23 +90,7 @@ private:
 
 		ImGui::End();
 	}
-	void show_lighting_window(bool &opened) {
-		if (!ImGui::Begin("Lighting", &show_lighting_options, ImGuiWindowFlags_AlwaysAutoResize)) {
-			ImGui::End();
-			return;
-		}
 
-		ImGui::InputFloat3("Sun Direction", &fubo.sun_light.light_direction[0]);
-		fubo.sun_light.light_direction = glm::normalize(fubo.sun_light.light_direction);
-		ImGui::ColorEdit3("Sun Color", &fubo.sun_light.light_color[0]);
-		ImGui::SliderFloat("Sun Intensity", &fubo.sun_light.strength, 0.f, 1.f);
-		ImGui::Separator();
-		ImGui::SliderFloat("Ambient Strength", &fubo.ambient_strength, 0.f, 1.f);
-		ImGui::SliderFloat("Diffuse Strength", &fubo.diffuse_strength, 0.f, 1.f);
-		ImGui::SliderFloat("Specular Strength", &fubo.specular_strength, 0.f, 1.f);
-		ImGui::InputFloat("Shininess", &fubo.shininess);
-		ImGui::End();
-	}
 };
 
 int main(int argc, char *argv[]) {

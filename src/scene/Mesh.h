@@ -22,8 +22,6 @@ struct MeshUBO {
 
 class Mesh {
 private:
-	std::unique_ptr<Buffer> vertex_buffer;
-	std::unique_ptr<Buffer> index_buffer;
 
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
@@ -37,6 +35,12 @@ private:
 public:
 	int id;
 	bool show_window = false;
+
+	std::unique_ptr<Buffer> vertex_buffer;
+	vk::DeviceSize vertex_size;
+	std::unique_ptr<Buffer> index_buffer;
+	vk::DeviceSize index_size;
+
 	glm::mat4 transform = glm::mat4(1.0f);
 
 	std::unique_ptr<AccelerationStructure> blas;

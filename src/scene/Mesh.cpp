@@ -51,17 +51,17 @@ Mesh::Mesh(const std::string path, VulkanApplication &app) {
 	}
 
 	{
-		vk::DeviceSize vertex_size = sizeof(vertices[0]) * uint32_t(vertices.size());
+		vertex_size = sizeof(vertices[0]) * uint32_t(vertices.size());
 		Buffer staging_buffer(app, vertex_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(vertices.data(), vertex_size);
-		vertex_buffer = std::unique_ptr<Buffer>(new Buffer(app, vertex_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		vertex_buffer = std::unique_ptr<Buffer>(new Buffer(app, vertex_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
 		app.copy_buffer(staging_buffer.buffer, vertex_buffer->buffer, vertex_size);
 	}
 	{
-		vk::DeviceSize index_size = sizeof(indices[0]) * indices.size();
+		index_size = sizeof(indices[0]) * indices.size();
 		Buffer staging_buffer(app, index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(indices.data(), index_size);
-		index_buffer = std::unique_ptr<Buffer>(new Buffer(app, index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		index_buffer = std::unique_ptr<Buffer>(new Buffer(app, index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
 		app.copy_buffer(staging_buffer.buffer, index_buffer->buffer, index_size);
 	}
 

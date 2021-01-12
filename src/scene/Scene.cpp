@@ -5,11 +5,15 @@
 #include "Scene.h"
 #include "vulkan/VulkanApplication.h"
 
+void Scene::allocate_uniform_buffer(VulkanApplication &app) {
+	camera_buffer = std::unique_ptr<Buffer>(new Buffer(app, sizeof(CameraMatrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
+}
+
 void Scene::load_mesh(const std::string path, VulkanApplication *app) {
 	meshes.emplace_back(std::make_unique<Mesh>(path, *app));
 }
 MeshInstance *Scene::create_instance(const uint32_t mesh_id, glm::mat4 transform) {
-	instances.emplace_back(std::make_unique<MeshInstance>(meshes[mesh_id].get()));
+	instances.emplace_back(std::make_unique<MeshInstance>(mesh_id));
 	return instances.back().get();
 }
 void Scene::build_BLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags) {
@@ -80,7 +84,7 @@ void Scene::build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFla
 		as_instance.flags = (unsigned int)(vk::GeometryInstanceFlagBitsKHR::eTriangleCullDisable);
 		as_instance.instanceShaderBindingTableRecordOffset = hit_goup_id;
 		as_instance.instanceCustomIndex = i;
-		as_instance.accelerationStructureReference = instances[i]->mesh->blas->get_address();
+		as_instance.accelerationStructureReference = meshes[instances[i]->mesh_id]->blas->get_address();
 		as_instance.mask = 0xFF;
 		auto tsfm = instances[i]->transform;
 		auto transposed = glm::transpose(instances[i]->transform);

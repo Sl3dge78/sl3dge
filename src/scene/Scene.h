@@ -13,24 +13,38 @@
 class VulkanApplication;
 
 struct MeshInstance {
-	Mesh *mesh;
+	//Mesh *mesh;
+
+	uint32_t mesh_id;
 	glm::mat4 transform = glm::mat4(1.0f);
 
-	MeshInstance(Mesh *mesh) :
-			mesh(mesh){};
+	MeshInstance(const uint32_t mesh_id) :
+			mesh_id(mesh_id){};
 	void translate(glm::vec3 translation) {
 		transform = glm::translate(transform, translation);
 	}
 };
 
+struct CameraMatrices {
+	alignas(16) glm::mat4 view;
+	alignas(16) glm::mat4 proj;
+	alignas(16) glm::mat4 view_inverse;
+	alignas(16) glm::mat4 proj_inverse;
+};
+
 class Scene {
 private:
-	std::vector<std::unique_ptr<Mesh>> meshes;
 	std::unique_ptr<Buffer> rtx_instances_buffer;
 	std::unique_ptr<AccelerationStructure> tlas;
 
 public:
+	std::vector<std::unique_ptr<Mesh>> meshes;
 	std::vector<std::unique_ptr<MeshInstance>> instances;
+
+	std::unique_ptr<Buffer> camera_buffer;
+	CameraMatrices camera_matrices;
+
+	void allocate_uniform_buffer(VulkanApplication &app);
 
 	void load_mesh(const std::string path, VulkanApplication *app);
 	MeshInstance *create_instance(const uint32_t mesh_id, glm::mat4 transform = glm::mat4(1.0f));

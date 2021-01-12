@@ -7,6 +7,16 @@ struct HitPayload
   vec3 hit_value;
 };
 
+struct Vertex {
+  vec3 pos;
+	vec3 normal;
+	vec2 tex_coord;
+};
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT top_level_AS;
+layout(binding = 3, set = 0) buffer Vertices {Vertex v[];} vertices[];
+layout(binding = 4, set = 0) buffer Indices {uint i[];} indices[];
+
 layout(location = 0) rayPayloadInEXT HitPayload prd;
 hitAttributeEXT vec3 attribs;
 

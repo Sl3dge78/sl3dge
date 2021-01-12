@@ -39,6 +39,7 @@ void VulkanApplication::run() {
 	scene = std::make_unique<Scene>();
 	load();
 	SDL_Log("Resources loaded");
+	scene->allocate_uniform_buffer(*this);
 	scene->build_BLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
 	SDL_Log("BLAS created");
 	scene->build_TLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
@@ -176,10 +177,12 @@ void VulkanApplication::main_loop() {
 }
 void VulkanApplication::rasterize_scene(VulkanFrame &frame) {
 	// FRAG UBO
+	/*
 	frame.scene_buffer->write_data(&fubo, sizeof(fubo), sizeof(CameraMatrices));
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline());
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.scene_descriptor_set.get(), nullptr);
 	scene->rasterize(frame);
+	 */
 }
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	// UI
@@ -216,7 +219,8 @@ void VulkanApplication::draw_frame() {
 	device->resetFences(frame->fence.get());
 
 	// SCENE UBO
-	frame->scene_buffer->write_data(&camera_matrices, sizeof(CameraMatrices));
+	//frame->scene_buffer->write_data(&camera_matrices, sizeof(CameraMatrices));
+	scene->camera_buffer->write_data(&scene->camera_matrices, sizeof(CameraMatrices));
 	if (rtx) {
 		raytrace(*frame, image_id);
 	} else {
@@ -569,40 +573,88 @@ void VulkanApplication::build_rtx_pipeline() {
 
 	rtx_result_image = std::unique_ptr<Image>(img);
 
-	// RTX_Layout
-	std::vector<vk::DescriptorSetLayoutBinding> bindings{
-		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
-		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, { vk::ShaderStageFlagBits::eRaygenKHR }, nullptr),
-	};
-	auto rtx_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
-	vk::PushConstantRange push_constant{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR, 0, sizeof(RTPushConstant) };
+	uint32_t mesh_count = scene->meshes.size();
 
-	// Pool & set
-	std::vector<vk::DescriptorPoolSize> pool_sizes{
-		vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
-		vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 1)
-	};
-	rtx_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
+	{ // Descriptor Layout
+		std::vector<vk::DescriptorSetLayoutBinding> bindings{
+			vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
+			vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, { vk::ShaderStageFlagBits::eRaygenKHR }, nullptr),
+			// Camera matrices
+			vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eRaygenKHR, nullptr),
+			// vtx buffer
+			vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
+			// idx buffer
+			vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
+		};
+		/*
+		std::vector<vk::DescriptorBindingFlags> flags{
+			{},
+			{},
+			{},
+			vk::DescriptorBindingFlagBits::eVariableDescriptorCount,
+			vk::DescriptorBindingFlagBits::eVariableDescriptorCount,
+		};
+		vk::DescriptorSetLayoutBindingFlagsCreateInfo flags_ci(flags);
+*/
+		vk::DescriptorSetLayoutCreateInfo set_layout_ci({}, bindings);
+		//		set_layout_ci.pNext = &flags_ci;
+		rtx_set_layout = device->createDescriptorSetLayoutUnique(set_layout_ci);
+
+		// Constants
+		vk::PushConstantRange push_constant{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR, 0, sizeof(RTPushConstant) };
+
+		std::vector<vk::DescriptorSetLayout> layouts{
+			*rtx_set_layout,
+			swapchain->get_scene_descriptor_set(),
+		};
+		rtx_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts, push_constant));
+	}
+
+	{ // Create Descriptor pool
+
+		std::vector<vk::DescriptorPoolSize> pool_sizes{
+			vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
+			vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 1),
+			vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1),
+			vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2)
+		};
+		rtx_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
+	}
+
+	// Descriptor set
+
 	rtx_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*rtx_pool, *rtx_set_layout)).front());
 
-	// Write
-	std::vector<vk::AccelerationStructureKHR> as{
-		scene->get_tlas(),
-	};
-	vk::WriteDescriptorSetAccelerationStructureKHR as_desc{};
-	as_desc.setAccelerationStructures(as);
-	vk::WriteDescriptorSet as_descriptor_write{};
-	as_descriptor_write.dstSet = *rtx_set;
-	as_descriptor_write.descriptorType = vk::DescriptorType::eAccelerationStructureKHR;
-	as_descriptor_write.pNext = &as_desc;
-	as_descriptor_write.dstBinding = 0;
-	as_descriptor_write.descriptorCount = 1;
+	{ // Descriptor writes
+		// Acceleration structure = binding 0
+		std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
+		vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
+		vk::WriteDescriptorSet as_descriptor_write(*rtx_set, 0, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
+		as_descriptor_write.pNext = &as_desc;
 
-	vk::DescriptorImageInfo image_info({}, rtx_result_image->image_view, vk::ImageLayout::eGeneral);
-	vk::WriteDescriptorSet image_descriptor_write(*rtx_set, 1, 0, vk::DescriptorType::eStorageImage, image_info, nullptr, nullptr);
+		// Image = binding 1
+		vk::DescriptorImageInfo image_info({}, rtx_result_image->image_view, vk::ImageLayout::eGeneral);
+		vk::WriteDescriptorSet image_descriptor_write(*rtx_set, 1, 0, vk::DescriptorType::eStorageImage, image_info, nullptr, nullptr);
 
-	std::vector<vk::WriteDescriptorSet> writes{ as_descriptor_write, image_descriptor_write };
-	device->updateDescriptorSets(writes, nullptr);
+		// Camera matrices = binding 2
+		vk::DescriptorBufferInfo bi_camera_matrices(scene->camera_buffer->buffer, 0, sizeof(CameraMatrices));
+		vk::WriteDescriptorSet camera_write(*rtx_set, 2, 0, vk::DescriptorType::eUniformBuffer, nullptr, bi_camera_matrices, nullptr);
+
+		// Storage buffers
+		// Vertex buffers = binding 3
+		// index buffers = binding 4
+		std::vector<vk::DescriptorBufferInfo> bi_vtx;
+		std::vector<vk::DescriptorBufferInfo> bi_idx;
+		for (auto &mesh : scene->meshes) {
+			bi_vtx.emplace_back(mesh->vertex_buffer->buffer, 0, mesh->vertex_size);
+			bi_idx.emplace_back(mesh->index_buffer->buffer, 0, mesh->index_size);
+		}
+		vk::WriteDescriptorSet vtx_writes(*rtx_set, 3, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_vtx.data(), nullptr);
+		vk::WriteDescriptorSet idx_writes(*rtx_set, 4, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_idx.data(), nullptr);
+
+		std::vector<vk::WriteDescriptorSet> writes{ as_descriptor_write, image_descriptor_write, camera_write, vtx_writes, idx_writes };
+		device->updateDescriptorSets(writes, nullptr);
+	}
 
 	// Shaders
 	auto rgen_code = read_file("resources/shaders/raytrace.rgen.spv");
@@ -625,11 +677,6 @@ void VulkanApplication::build_rtx_pipeline() {
 		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup, VK_SHADER_UNUSED_KHR, 2, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
 	};
 
-	std::vector<vk::DescriptorSetLayout> layouts{
-		*rtx_set_layout,
-		swapchain->get_scene_descriptor_set(),
-	};
-	rtx_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts, push_constant));
 	vk::RayTracingPipelineCreateInfoKHR create_info(
 			{},
 			shader_stages, shader_groups, 1,

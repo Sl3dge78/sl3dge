@@ -69,8 +69,8 @@ public:
 	void flush_commandbuffers(std::vector<vk::CommandBuffer> cmd, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool wait = true);
 
 protected:
-	CameraMatrices camera_matrices;
-	FragUniformBufferObject fubo;
+	//CameraMatrices camera_matrices;
+	//FragUniformBufferObject fubo;
 
 	SDL_Window *window = nullptr;
 
@@ -143,6 +143,7 @@ private:
 	//	std::unique_ptr<AccelerationStructure> tlas;
 
 	vk::UniqueDescriptorPool rtx_pool;
+	vk::UniqueDescriptorSetLayout rtx_set_layout;
 	vk::UniqueDescriptorSet rtx_set;
 	vk::UniquePipelineLayout rtx_layout;
 	vk::UniquePipeline rtx_pipeline;

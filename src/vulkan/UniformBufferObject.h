@@ -2,13 +2,6 @@
 
 #include <glm/glm.hpp>
 
-struct CameraMatrices {
-	alignas(16) glm::mat4 view;
-	alignas(16) glm::mat4 proj;
-	alignas(16) glm::mat4 view_inverse;
-	alignas(16) glm::mat4 proj_inverse;
-};
-
 struct SunLight {
 	alignas(16) glm::vec3 light_direction = glm::normalize(glm::vec3(-1.f, -1.f, -1.f));
 	alignas(16) glm::vec3 light_color = { 1.f, 1.f, 1.f };
