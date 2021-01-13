@@ -39,11 +39,11 @@ void VulkanApplication::run() {
 	scene = std::make_unique<Scene>();
 	load();
 	SDL_Log("Resources loaded");
-	scene->allocate_uniform_buffer(*this);
 	scene->build_BLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
 	SDL_Log("BLAS created");
 	scene->build_TLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
 	SDL_Log("TLAS created");
+	scene->allocate_uniform_buffer(*this);
 	build_rtx_pipeline();
 	SDL_Log("RTX Pipeline created");
 	create_rtx_SBT();
@@ -219,7 +219,6 @@ void VulkanApplication::draw_frame() {
 	device->resetFences(frame->fence.get());
 
 	// SCENE UBO
-	//frame->scene_buffer->write_data(&camera_matrices, sizeof(CameraMatrices));
 	scene->camera_buffer->write_data(&scene->camera_matrices, sizeof(CameraMatrices));
 	if (rtx) {
 		raytrace(*frame, image_id);
@@ -316,11 +315,13 @@ void VulkanApplication::create_logical_device() {
 		vk::DeviceQueueCreateInfo ci({}, queue_family, 1, &queue_priority);
 		req_queues.emplace_back(ci);
 	}
-
+	// TODO : do this more cleanly
 	auto supported_features = physical_device.getFeatures2<
 			vk::PhysicalDeviceFeatures2,
 			vk::PhysicalDeviceBufferDeviceAddressFeatures,
-			vk::PhysicalDeviceRayTracingPipelineFeaturesKHR, vk::PhysicalDeviceAccelerationStructureFeaturesKHR>();
+			vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
+			vk::PhysicalDeviceAccelerationStructureFeaturesKHR,
+			vk::PhysicalDeviceDescriptorIndexingFeatures>();
 	vk::DeviceCreateInfo ci({}, req_queues, req_validation_layers, req_device_extensions, nullptr);
 	ci.setPNext(&supported_features.get<vk::PhysicalDeviceFeatures2>());
 	device = physical_device.createDeviceUnique(ci);
@@ -573,6 +574,7 @@ void VulkanApplication::build_rtx_pipeline() {
 
 	rtx_result_image = std::unique_ptr<Image>(img);
 
+	// TODO : move this shit in Scene?
 	uint32_t mesh_count = scene->meshes.size();
 
 	{ // Descriptor Layout
@@ -581,23 +583,15 @@ void VulkanApplication::build_rtx_pipeline() {
 			vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, { vk::ShaderStageFlagBits::eRaygenKHR }, nullptr),
 			// Camera matrices
 			vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eRaygenKHR, nullptr),
+			// Scene description
+			vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 			// vtx buffer
-			vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
-			// idx buffer
 			vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
+			// idx buffer
+			vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 		};
-		/*
-		std::vector<vk::DescriptorBindingFlags> flags{
-			{},
-			{},
-			{},
-			vk::DescriptorBindingFlagBits::eVariableDescriptorCount,
-			vk::DescriptorBindingFlagBits::eVariableDescriptorCount,
-		};
-		vk::DescriptorSetLayoutBindingFlagsCreateInfo flags_ci(flags);
-*/
+
 		vk::DescriptorSetLayoutCreateInfo set_layout_ci({}, bindings);
-		//		set_layout_ci.pNext = &flags_ci;
 		rtx_set_layout = device->createDescriptorSetLayoutUnique(set_layout_ci);
 
 		// Constants
@@ -616,7 +610,7 @@ void VulkanApplication::build_rtx_pipeline() {
 			vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
 			vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 1),
 			vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1),
-			vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2)
+			vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 3)
 		};
 		rtx_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
 	}
@@ -626,33 +620,42 @@ void VulkanApplication::build_rtx_pipeline() {
 	rtx_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*rtx_pool, *rtx_set_layout)).front());
 
 	{ // Descriptor writes
+		std::vector<vk::WriteDescriptorSet> writes;
 		// Acceleration structure = binding 0
 		std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
 		vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
 		vk::WriteDescriptorSet as_descriptor_write(*rtx_set, 0, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
 		as_descriptor_write.pNext = &as_desc;
+		writes.push_back(as_descriptor_write);
 
 		// Image = binding 1
 		vk::DescriptorImageInfo image_info({}, rtx_result_image->image_view, vk::ImageLayout::eGeneral);
 		vk::WriteDescriptorSet image_descriptor_write(*rtx_set, 1, 0, vk::DescriptorType::eStorageImage, image_info, nullptr, nullptr);
+		writes.push_back(image_descriptor_write);
 
 		// Camera matrices = binding 2
-		vk::DescriptorBufferInfo bi_camera_matrices(scene->camera_buffer->buffer, 0, sizeof(CameraMatrices));
+		vk::DescriptorBufferInfo bi_camera_matrices(scene->camera_buffer->buffer, 0, VK_WHOLE_SIZE);
 		vk::WriteDescriptorSet camera_write(*rtx_set, 2, 0, vk::DescriptorType::eUniformBuffer, nullptr, bi_camera_matrices, nullptr);
+		writes.push_back(camera_write);
+
+		// Scene = binding 3
+		vk::DescriptorBufferInfo bi_scene(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
+		vk::WriteDescriptorSet scene_write(*rtx_set, 3, 0, vk::DescriptorType::eStorageBuffer, nullptr, bi_scene, nullptr);
+		writes.push_back(scene_write);
 
 		// Storage buffers
-		// Vertex buffers = binding 3
-		// index buffers = binding 4
+		// Vertex buffers = binding 4
+		// index buffers = binding 5
 		std::vector<vk::DescriptorBufferInfo> bi_vtx;
 		std::vector<vk::DescriptorBufferInfo> bi_idx;
 		for (auto &mesh : scene->meshes) {
-			bi_vtx.emplace_back(mesh->vertex_buffer->buffer, 0, mesh->vertex_size);
-			bi_idx.emplace_back(mesh->index_buffer->buffer, 0, mesh->index_size);
+			bi_vtx.emplace_back(mesh->vertex_buffer->buffer, 0, VK_WHOLE_SIZE);
+			bi_idx.emplace_back(mesh->index_buffer->buffer, 0, VK_WHOLE_SIZE);
 		}
-		vk::WriteDescriptorSet vtx_writes(*rtx_set, 3, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_vtx.data(), nullptr);
-		vk::WriteDescriptorSet idx_writes(*rtx_set, 4, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_idx.data(), nullptr);
-
-		std::vector<vk::WriteDescriptorSet> writes{ as_descriptor_write, image_descriptor_write, camera_write, vtx_writes, idx_writes };
+		vk::WriteDescriptorSet vtx_writes(*rtx_set, 4, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_vtx.data(), nullptr);
+		vk::WriteDescriptorSet idx_writes(*rtx_set, 5, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_idx.data(), nullptr);
+		writes.push_back(vtx_writes);
+		writes.push_back(idx_writes);
 		device->updateDescriptorSets(writes, nullptr);
 	}
 
@@ -713,7 +716,7 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	rtx_push_constants.light_type = 0;
 
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, *rtx_pipeline);
-	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtx_layout, 0, { *rtx_set, frame.scene_descriptor_set.get() }, nullptr);
+	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtx_layout, 0, *rtx_set, nullptr);
 	frame.command_buffer->pushConstants(
 			*rtx_layout,
 			{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR },

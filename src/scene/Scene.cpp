@@ -5,16 +5,33 @@
 #include "Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-void Scene::allocate_uniform_buffer(VulkanApplication &app) {
-	camera_buffer = std::unique_ptr<Buffer>(new Buffer(app, sizeof(CameraMatrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
-}
-
 void Scene::load_mesh(const std::string path, VulkanApplication *app) {
 	meshes.emplace_back(std::make_unique<Mesh>(path, *app));
 }
 MeshInstance *Scene::create_instance(const uint32_t mesh_id, glm::mat4 transform) {
-	instances.emplace_back(std::make_unique<MeshInstance>(mesh_id));
-	return instances.back().get();
+	instances.emplace_back(mesh_id);
+	return &instances.back();
+}
+void Scene::allocate_uniform_buffer(VulkanApplication &app) {
+	camera_buffer = std::unique_ptr<Buffer>(new Buffer(app, sizeof(CameraMatrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
+
+	instances_size = sizeof(instances[0]) * instances.size();
+	Buffer staging_buffer(app, instances_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+	staging_buffer.write_data(instances.data(), instances_size);
+	scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(app, instances_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+	app.copy_buffer(staging_buffer.buffer, scene_desc_buffer->buffer, instances_size);
+	for (auto &ins : instances) {
+		SDL_Log("%d", ins.mesh_id);
+		for (int i = 0; i < 4; i++) {
+			SDL_Log("%f, %f, %f, %f", ins.transform[i][0], ins.transform[i][1], ins.transform[i][2], ins.transform[i][3]);
+		}
+		for (int i = 0; i < 4; i++) {
+			SDL_Log("%f, %f, %f, %f", ins.inverted[i][0], ins.inverted[i][1], ins.inverted[i][2], ins.inverted[i][3]);
+		}
+	}
+
+	//	scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(app, instances_size,  {vk::BufferUsageFlagBits::eStorageBuffer}, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
+	//	scene_desc_buffer->write_data(instances.data(), instances_size);
 }
 void Scene::build_BLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags) {
 	std::vector<std::unique_ptr<AccelerationStructure>> orig_blas;
@@ -84,10 +101,10 @@ void Scene::build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFla
 		as_instance.flags = (unsigned int)(vk::GeometryInstanceFlagBitsKHR::eTriangleCullDisable);
 		as_instance.instanceShaderBindingTableRecordOffset = hit_goup_id;
 		as_instance.instanceCustomIndex = i;
-		as_instance.accelerationStructureReference = meshes[instances[i]->mesh_id]->blas->get_address();
+		as_instance.accelerationStructureReference = meshes[instances[i].mesh_id]->blas->get_address();
 		as_instance.mask = 0xFF;
-		auto tsfm = instances[i]->transform;
-		auto transposed = glm::transpose(instances[i]->transform);
+		auto tsfm = instances[i].transform;
+		auto transposed = glm::transpose(instances[i].transform);
 		memcpy(&as_instance, &transposed, sizeof(vk::TransformMatrixKHR));
 		as_instances.push_back(as_instance);
 	}

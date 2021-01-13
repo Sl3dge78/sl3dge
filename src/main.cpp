@@ -14,9 +14,9 @@
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-// Todo : Handle multiple instances of the same mesh through a new class
-// Todo : reimplement imgui
-// Todo : clean all this
+// TODO : reimplement imgui
+// TODO : Remove?/Update the rasterizing pipeline
+// TODO : clean all this
 class Sl3dge : public VulkanApplication {
 private:
 	Camera camera;
@@ -29,10 +29,10 @@ private:
 	void load() override {
 		scene->load_mesh("resources/models/viking_room.obj", this); // 0
 		scene->create_instance(0);
-		auto a = scene->create_instance(0);
-		a->translate(glm::vec3(0.f, 1.f, 0.f));
-		auto b = scene->create_instance(0);
-		b->translate(glm::vec3(1.f, 0.f, 0.f));
+		//auto a = scene->create_instance(0);
+		//a->translate(glm::vec3(0.f, 1.f, 0.f));
+		//auto b = scene->create_instance(0);
+		//b->translate(glm::vec3(1.f, 0.f, 0.f));
 	}
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump

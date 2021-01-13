@@ -15,13 +15,18 @@ class VulkanApplication;
 struct MeshInstance {
 	//Mesh *mesh;
 
-	uint32_t mesh_id;
-	glm::mat4 transform = glm::mat4(1.0f);
+	alignas(4) uint32_t mesh_id;
+	alignas(16) glm::mat4 transform;
+	alignas(16) glm::mat4 inverted;
 
 	MeshInstance(const uint32_t mesh_id) :
-			mesh_id(mesh_id){};
+			mesh_id(mesh_id) {
+		transform = glm::mat4(1.0f);
+		inverted = glm::inverse(transform);
+	};
 	void translate(glm::vec3 translation) {
 		transform = glm::translate(transform, translation);
+		inverted = glm::inverse(transform);
 	}
 };
 
@@ -39,7 +44,10 @@ private:
 
 public:
 	std::vector<std::unique_ptr<Mesh>> meshes;
-	std::vector<std::unique_ptr<MeshInstance>> instances;
+	std::vector<MeshInstance> instances;
+	vk::DeviceSize instances_size;
+
+	std::unique_ptr<Buffer> scene_desc_buffer;
 
 	std::unique_ptr<Buffer> camera_buffer;
 	CameraMatrices camera_matrices;
