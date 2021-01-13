@@ -1658,5 +1658,21 @@
     <None Include=".gitattributes" />
     <None Include=".gitignore" />
     <None Include="vulkan.ngfx-proj" />
+    <None Include="resources\shaders\raytrace.rchit" />
+    <None Include="resources\shaders\raytrace.rgen" />
+    <None Include="resources\shaders\raytrace.rmiss" />
+    <None Include="resources\shaders\triangle.frag" />
+    <None Include="resources\shaders\triangle.vert" />
+    <None Include="resources\shaders\build_shaders.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="resources\shaders\raytrace.rchit.spv" />
+    <None Include="resources\shaders\raytrace.rgen.spv" />
+    <None Include="resources\shaders\raytrace.rmiss.spv" />
+    <None Include="resources\shaders\triangle.frag.spv" />
+    <None Include="resources\shaders\triangle.vert.spv" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="src\scene\scene.natvis" />
   </ItemGroup>
 </Project>

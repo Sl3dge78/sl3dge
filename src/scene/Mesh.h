@@ -1,7 +1,3 @@
-//
-// Created by Sledge on 2021-01-03.
-//
-
 #ifndef VULKAN_MESH_H
 #define VULKAN_MESH_H
 

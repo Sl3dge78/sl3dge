@@ -1,4 +1,5 @@
-#pragma once
+#ifndef INPUT_H
+#define INPUT_H
 #include <memory>
 
 #include <SDL/SDL.h>
@@ -58,3 +59,5 @@ public:
 		return delta_mouse_y_;
 	}
 };
+
+#endif

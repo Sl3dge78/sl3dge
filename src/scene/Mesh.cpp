@@ -16,7 +16,7 @@ Mesh::Mesh(const std::string path, VulkanApplication &app) {
 	std::vector<tinyobj::material_t> materials;
 	std::string err;
 
-	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "resources/models/viking_room.obj")) {
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str())) {
 		SDL_LogError(0, "Unable to read model %s", err.c_str());
 	}
 

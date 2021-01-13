@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?> 
+  <Type Name="Vertex">
+    <DisplayString>{Vertex}</DisplayString>
+    <Expand>
+      <Item Name="Pos">{pos.x},{pos.y},{pos.z}</Item>
+    </Expand>
+  </Type>

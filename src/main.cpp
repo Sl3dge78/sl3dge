@@ -27,7 +27,7 @@ private:
 	glm::vec3 light_position = glm::vec3(0.0f, 0.0f, 0.5f);
 
 	void load() override {
-		scene->load_mesh("resources/models/viking_room.obj", this); // 0
+		scene->load_mesh("resources/models/cube.obj", this); // 0
 		scene->create_instance(0);
 		//auto a = scene->create_instance(0);
 		//a->translate(glm::vec3(0.f, 1.f, 0.f));
@@ -90,7 +90,6 @@ private:
 
 		ImGui::End();
 	}
-
 };
 
 int main(int argc, char *argv[]) {
