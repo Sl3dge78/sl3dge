@@ -11,7 +11,7 @@
 
 #include "Debug.h"
 #include "Vertex.h"
-#include "VulkanHelper.h"
+#include "vulkan/VulkanHelper.h"
 
 class VulkanApplication;
 class VulkanFrame;
@@ -22,7 +22,6 @@ struct MeshUBO {
 
 class Mesh {
 private:
-
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 	void update_matrix();

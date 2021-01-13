@@ -3,7 +3,7 @@
 //
 
 #include "Mesh.h"
-#include "VulkanApplication.h"
+#include "vulkan/VulkanApplication.h"
 
 #include <string>
 

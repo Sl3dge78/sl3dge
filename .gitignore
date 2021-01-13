@@ -3,3 +3,7 @@
 cmake-build-debug/
 cmake-build-release/
 resources/models/viking_room.obj
+/.vs
+/bin
+/Debug
+/temp

@@ -1,7 +1,7 @@
 #include "VulkanFrame.h"
 
-#include "Scene.h"
-#include "VulkanHelper.h"
+#include "scene/Scene.h"
+#include "vulkan/VulkanHelper.h"
 
 void VulkanFrame::init_frame(vk::Device device) {
 	this->device = device;
