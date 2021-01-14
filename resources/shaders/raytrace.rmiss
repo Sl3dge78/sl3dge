@@ -1,10 +1,8 @@
 #version 460
+#extension  GL_GOOGLE_include_directive  : require
 #extension GL_EXT_ray_tracing : require
 
-struct HitPayload
-{
-  vec3 hit_value;
-};
+#include "shader_utils.h"
 
 layout(location = 0) rayPayloadInEXT HitPayload prd;
 

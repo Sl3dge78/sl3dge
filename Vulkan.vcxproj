@@ -548,6 +548,7 @@
     <ClInclude Include="include\sdl\SDL_video.h" />
     <ClInclude Include="include\sdl\SDL_vulkan.h" />
     <ClInclude Include="include\tiny_obj_loader.h" />
+    <ClInclude Include="resources\shaders\shader_utils.h" />
     <ClInclude Include="src\Camera.h" />
     <ClInclude Include="src\Debug.h" />
     <ClInclude Include="src\imgui\imconfig.h" />
@@ -716,6 +717,7 @@
     <None Include="resources\shaders\raytrace.rgen.spv" />
     <None Include="resources\shaders\raytrace.rmiss" />
     <None Include="resources\shaders\raytrace.rmiss.spv" />
+    <None Include="resources\shaders\shadow.rmiss" />
     <None Include="resources\shaders\triangle.frag" />
     <None Include="resources\shaders\triangle.frag.spv" />
     <None Include="resources\shaders\triangle.vert" />

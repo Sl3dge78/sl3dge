@@ -1244,6 +1244,9 @@
     <ClInclude Include="src\vulkan\VulkanHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="resources\shaders\shader_utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="include\glm\detail\func_common.inl">
@@ -1671,6 +1674,7 @@
     <None Include="resources\shaders\raytrace.rmiss.spv" />
     <None Include="resources\shaders\triangle.frag.spv" />
     <None Include="resources\shaders\triangle.vert.spv" />
+    <None Include="resources\shaders\shadow.rmiss" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="src\scene\scene.natvis" />

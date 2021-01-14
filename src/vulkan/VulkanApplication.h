@@ -47,13 +47,6 @@ const std::vector<const char *> req_device_extensions = {
 	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
 };
 
-struct RTPushConstant {
-	glm::vec4 clear_color;
-	glm::vec3 light_pos;
-	float light_intensity;
-	int light_type;
-};
-
 class VulkanApplication {
 public:
 	VulkanApplication();
@@ -73,7 +66,6 @@ protected:
 	//FragUniformBufferObject fubo;
 
 	SDL_Window *window = nullptr;
-
 	std::unique_ptr<Scene> scene;
 
 	float get_aspect_ratio() const;
@@ -128,8 +120,6 @@ private:
 	// RTX
 protected:
 	bool rtx = true;
-
-private:
 	struct RTPushConstant {
 		glm::vec4 clear_color;
 		glm::vec3 light_pos;
@@ -137,10 +127,8 @@ private:
 		int light_type;
 	} rtx_push_constants;
 
+private:
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
-
-	//	std::unique_ptr<Buffer> rtx_instances_buffer;
-	//	std::unique_ptr<AccelerationStructure> tlas;
 
 	vk::UniqueDescriptorPool rtx_pool;
 	vk::UniqueDescriptorSetLayout rtx_set_layout;
@@ -153,8 +141,6 @@ private:
 	std::unique_ptr<Buffer> shader_binding_table;
 
 	void init_rtx();
-	//	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
-	//	void build_TLAS(bool update = false, vk::BuildAccelerationStructureFlagsKHR flags = { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
 	void build_rtx_pipeline();
 	void create_rtx_SBT();
 	void raytrace(VulkanFrame &frame, int image_id);

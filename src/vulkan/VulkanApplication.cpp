@@ -561,6 +561,10 @@ void VulkanApplication::flush_commandbuffers(std::vector<vk::CommandBuffer> cmd,
 void VulkanApplication::init_rtx() {
 	auto properties = physical_device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
 	rtx_properties = properties.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
+	if (rtx_properties.maxRayRecursionDepth <= 1) {
+		SDL_LogError(0, "Device doesn't support ray recursion!");
+		throw std::runtime_error("Device doesn't support ray recursion!");
+	}
 }
 void VulkanApplication::build_rtx_pipeline() {
 	// Allocate render image
@@ -579,7 +583,9 @@ void VulkanApplication::build_rtx_pipeline() {
 
 	{ // Descriptor Layout
 		std::vector<vk::DescriptorSetLayoutBinding> bindings{
+			// Acceleration structure
 			vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
+			// Final image
 			vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, { vk::ShaderStageFlagBits::eRaygenKHR }, nullptr),
 			// Camera matrices
 			vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eRaygenKHR, nullptr),
@@ -662,22 +668,26 @@ void VulkanApplication::build_rtx_pipeline() {
 	// Shaders
 	auto rgen_code = read_file("resources/shaders/raytrace.rgen.spv");
 	auto rmiss_code = read_file("resources/shaders/raytrace.rmiss.spv");
+	auto rmiss_shadow_code = read_file("resources/shaders/shadow.rmiss.spv");
 	auto rchit_code = read_file("resources/shaders/raytrace.rchit.spv");
 
 	auto rgen_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rgen_code.size(), reinterpret_cast<uint32_t *>(rgen_code.data())));
 	auto rmiss_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_code.size(), reinterpret_cast<uint32_t *>(rmiss_code.data())));
+	auto rmiss_shadow_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_shadow_code.size(), reinterpret_cast<uint32_t *>(rmiss_shadow_code.data())));
 	auto rchit_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rchit_code.size(), reinterpret_cast<uint32_t *>(rchit_code.data())));
 
 	auto shader_stages = {
 		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eRaygenKHR, *rgen_shader, "main"),
 		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eMissKHR, *rmiss_shader, "main"),
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eMissKHR, *rmiss_shadow_shader, "main"),
 		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eClosestHitKHR, *rchit_shader, "main"),
 	};
 
 	shader_groups = {
 		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 0, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
 		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 1, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
-		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup, VK_SHADER_UNUSED_KHR, 2, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 2, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup, VK_SHADER_UNUSED_KHR, 3, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
 	};
 
 	vk::RayTracingPipelineCreateInfoKHR create_info(
@@ -691,8 +701,7 @@ void VulkanApplication::create_rtx_SBT() {
 	const uint32_t group_size_aligned = (rtx_properties.shaderGroupHandleSize + rtx_properties.shaderGroupBaseAlignment - 1) & ~(rtx_properties.shaderGroupBaseAlignment - 1);
 	const uint32_t shader_binding_table_size = group_size_aligned * shader_groups.size();
 
-	auto buf = new Buffer(*device, physical_device, shader_binding_table_size, { vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eShaderBindingTableKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
-	shader_binding_table = std::unique_ptr<Buffer>(buf);
+	shader_binding_table = std::unique_ptr<Buffer>(new Buffer(*device, physical_device, shader_binding_table_size, { vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eShaderBindingTableKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
 
 	std::vector<uint8_t> shader_handle_storage = device->getRayTracingShaderGroupHandlesKHR<uint8_t>(*rtx_pipeline, 0, shader_groups.size(), shader_binding_table_size);
 
@@ -710,11 +719,6 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	vk::ImageMemoryBarrier image_barrier({}, vk::AccessFlagBits::eShaderWrite, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, rtx_result_image->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
 
-	rtx_push_constants.clear_color = glm::vec4(0.1f, 0.1f, 0.1f, 1.f);
-	rtx_push_constants.light_pos = glm::vec3(0.f, 0.f, 1.f);
-	rtx_push_constants.light_intensity = 0.5f;
-	rtx_push_constants.light_type = 0;
-
 	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, *rtx_pipeline);
 	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtx_layout, 0, *rtx_set, nullptr);
 	frame.command_buffer->pushConstants(
@@ -723,10 +727,10 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 			0, sizeof(RTPushConstant), &rtx_push_constants);
 
 	const uint32_t group_size = (rtx_properties.shaderGroupHandleSize + rtx_properties.shaderGroupBaseAlignment - 1) & ~(rtx_properties.shaderGroupBaseAlignment - 1);
-	std::array<vk::StridedDeviceAddressRegionKHR, 4> strides{
-		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 0u * group_size, group_size, group_size),
-		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 1u * group_size, group_size, group_size),
-		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 2u * group_size, group_size, group_size),
+	std::vector<vk::StridedDeviceAddressRegionKHR> strides{
+		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 0u * group_size, group_size, group_size), // Rgen
+		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 1u * group_size, group_size, group_size), // Miss
+		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 3u * group_size, group_size, group_size), // Hit
 		vk::StridedDeviceAddressRegionKHR(0u, 0u, 0u),
 	};
 	frame.command_buffer->traceRaysKHR(strides[0], strides[1], strides[2], strides[3], swapchain->get_extent().width, swapchain->get_extent().height, 1);

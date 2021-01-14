@@ -20,18 +20,6 @@ void Scene::allocate_uniform_buffer(VulkanApplication &app) {
 	staging_buffer.write_data(instances.data(), instances_size);
 	scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(app, instances_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
 	app.copy_buffer(staging_buffer.buffer, scene_desc_buffer->buffer, instances_size);
-	for (auto &ins : instances) {
-		SDL_Log("%d", ins.mesh_id);
-		for (int i = 0; i < 4; i++) {
-			SDL_Log("%f, %f, %f, %f", ins.transform[i][0], ins.transform[i][1], ins.transform[i][2], ins.transform[i][3]);
-		}
-		for (int i = 0; i < 4; i++) {
-			SDL_Log("%f, %f, %f, %f", ins.inverted[i][0], ins.inverted[i][1], ins.inverted[i][2], ins.inverted[i][3]);
-		}
-	}
-
-	//	scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(app, instances_size,  {vk::BufferUsageFlagBits::eStorageBuffer}, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
-	//	scene_desc_buffer->write_data(instances.data(), instances_size);
 }
 void Scene::build_BLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags) {
 	std::vector<std::unique_ptr<AccelerationStructure>> orig_blas;

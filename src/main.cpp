@@ -27,7 +27,7 @@ private:
 	glm::vec3 light_position = glm::vec3(0.0f, 0.0f, 0.5f);
 
 	void load() override {
-		scene->load_mesh("resources/models/cube.obj", this); // 0
+		scene->load_mesh("resources/models/viking_room.obj", this); // 0
 		scene->create_instance(0);
 		//auto a = scene->create_instance(0);
 		//a->translate(glm::vec3(0.f, 1.f, 0.f));
@@ -41,6 +41,11 @@ private:
 		scene->camera_matrices.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
 		scene->camera_matrices.proj[1][1] *= -1;
 		scene->camera_matrices.proj_inverse = glm::inverse(scene->camera_matrices.proj);
+
+		rtx_push_constants.clear_color = glm::vec4(0.1f, 0.1f, 0.1f, 1.f);
+		rtx_push_constants.light_pos = glm::vec3(1.1f, 1.f, 1.f);
+		rtx_push_constants.light_intensity = 0.5f;
+		rtx_push_constants.light_type = 0;
 	}
 	void update(float delta_time) override {
 		camera.update(delta_time);
