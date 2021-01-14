@@ -36,10 +36,10 @@ void main() {
     const vec3 barycentre = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
     vec3 normal = normalize(v0.normal * barycentre.x + v1.normal * barycentre.y + v2.normal * barycentre.z);
-    //normal = normalize(vec3(scene.i[gl_InstanceCustomIndexEXT].inverted * vec4(normal, 0.0)));
+    normal = normalize(vec3(scene.i[gl_InstanceCustomIndexEXT].inverted * vec4(normal, 0.0)));
 
     vec3 world_pos = v0.pos * barycentre.x + v1.pos * barycentre.y + v2.pos * barycentre.z;
-    //world_pos = vec3(scene.i[gl_InstanceCustomIndexEXT].transform * vec4(world_pos, 1.0));
+    world_pos = vec3(scene.i[gl_InstanceCustomIndexEXT].transform * vec4(world_pos, 1.0));
 
     const vec3 light_dir = normalize(constants.light_position - world_pos);
     const float dnl = dot(normal, light_dir);

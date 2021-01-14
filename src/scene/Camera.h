@@ -8,6 +8,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Input.h"
+#include "vulkan/VulkanHelper.h"
+
+class VulkanApplication;
 
 class Camera {
 private:
@@ -20,12 +23,24 @@ private:
 	float yaw = 0.f;
 	float pitch = 0.f;
 
+	float aspect_ratio = 1280.0f / 720.0f;
+	uint32_t height;
+
 public:
+	struct Matrices {
+		alignas(16) glm::mat4 view;
+		alignas(16) glm::mat4 proj;
+		alignas(16) glm::mat4 view_inverse;
+		alignas(16) glm::mat4 proj_inverse;
+	} matrices;
+
+	std::unique_ptr<Buffer> buffer;
+
+	void load(VulkanApplication *app);
 	void start();
 	void update(float delta_time);
 
 	void update_vectors();
-	void get_view_matrix(glm::mat4 &view);
 	glm::vec3 get_position() const { return position; }
 
 	bool show_window = false;

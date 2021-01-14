@@ -13,8 +13,6 @@ MeshInstance *Scene::create_instance(const uint32_t mesh_id, glm::mat4 transform
 	return &instances.back();
 }
 void Scene::allocate_uniform_buffer(VulkanApplication &app) {
-	camera_buffer = std::unique_ptr<Buffer>(new Buffer(app, sizeof(CameraMatrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
-
 	instances_size = sizeof(instances[0]) * instances.size();
 	Buffer staging_buffer(app, instances_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 	staging_buffer.write_data(instances.data(), instances_size);

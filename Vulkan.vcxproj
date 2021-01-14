@@ -158,7 +158,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="include\glm\detail\glm.cpp" />
-    <ClCompile Include="src\Camera.cpp" />
+    <ClCompile Include="src\scene\Camera.cpp" />
     <ClCompile Include="src\Debug.cpp" />
     <ClCompile Include="src\imgui\examples\sdl_vulkan_example.cpp" />
     <ClCompile Include="src\imgui\imgui.cpp" />
@@ -549,7 +549,7 @@
     <ClInclude Include="include\sdl\SDL_vulkan.h" />
     <ClInclude Include="include\tiny_obj_loader.h" />
     <ClInclude Include="resources\shaders\shader_utils.h" />
-    <ClInclude Include="src\Camera.h" />
+    <ClInclude Include="src\scene\Camera.h" />
     <ClInclude Include="src\Debug.h" />
     <ClInclude Include="src\imgui\imconfig.h" />
     <ClInclude Include="src\imgui\imgui.h" />

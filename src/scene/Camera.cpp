@@ -2,15 +2,23 @@
 
 #include "imgui/imgui.h"
 
+#include "vulkan/VulkanApplication.h"
+
+void Camera::load(VulkanApplication *app) {
+	buffer = std::unique_ptr<Buffer>(new Buffer(*app, sizeof(Matrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
+}
 void Camera::start() {
 	position = glm::vec3(1.5f, 1.5f, 1.f);
 
 	yaw = 220.f;
 	pitch = -8.f;
 
+	matrices.proj = glm::perspective(glm::radians(80.f), aspect_ratio, 0.1f, 1000.f);
+	matrices.proj[1][1] *= -1;
+	matrices.proj_inverse = glm::inverse(matrices.proj);
+
 	update_vectors();
 }
-
 void Camera::update(float delta_time) {
 	if (Input::get_mouse(3)) {
 		yaw += Input::delta_mouse_x() * camera_speed * delta_time;
@@ -59,8 +67,9 @@ void Camera::update(float delta_time) {
 		ImGui::InputFloat("pitch", &pitch, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
 		ImGui::End();
 	}
-}
 
+	buffer->write_data(&matrices, sizeof(Matrices));
+}
 void Camera::update_vectors() {
 	glm::vec3 direction;
 
@@ -71,9 +80,6 @@ void Camera::update_vectors() {
 	front = glm::normalize(direction);
 	glm::vec3 right = glm::cross(front, glm::vec3(0.f, 0.f, -1.f));
 	up = glm::cross(front, right);
-}
-
-void Camera::get_view_matrix(glm::mat4 &view) {
-	view = glm::lookAt(position, position + front, up);
-	//view = glm::lookAt(position, front, up);
+	matrices.view = glm::lookAt(position, position + front, up);
+	matrices.view_inverse = glm::inverse(matrices.view);
 }

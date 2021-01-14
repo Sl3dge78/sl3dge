@@ -219,7 +219,6 @@ void VulkanApplication::draw_frame() {
 	device->resetFences(frame->fence.get());
 
 	// SCENE UBO
-	scene->camera_buffer->write_data(&scene->camera_matrices, sizeof(CameraMatrices));
 	if (rtx) {
 		raytrace(*frame, image_id);
 	} else {
@@ -640,7 +639,7 @@ void VulkanApplication::build_rtx_pipeline() {
 		writes.push_back(image_descriptor_write);
 
 		// Camera matrices = binding 2
-		vk::DescriptorBufferInfo bi_camera_matrices(scene->camera_buffer->buffer, 0, VK_WHOLE_SIZE);
+		vk::DescriptorBufferInfo bi_camera_matrices(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
 		vk::WriteDescriptorSet camera_write(*rtx_set, 2, 0, vk::DescriptorType::eUniformBuffer, nullptr, bi_camera_matrices, nullptr);
 		writes.push_back(camera_write);
 

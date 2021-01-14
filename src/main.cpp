@@ -10,16 +10,17 @@
 
 #include <SDL/SDL.h>
 
-#include "Camera.h"
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
 // TODO : reimplement imgui
+// TODO : GLTF
+//		- Materials
+//		- Textures
 // TODO : Remove?/Update the rasterizing pipeline
 // TODO : clean all this
 class Sl3dge : public VulkanApplication {
 private:
-	Camera camera;
 	bool show_demo_window = false;
 	bool show_metrics = false;
 	bool show_lighting_options = false;
@@ -28,19 +29,18 @@ private:
 
 	void load() override {
 		scene->load_mesh("resources/models/viking_room.obj", this); // 0
-		scene->create_instance(0);
-		//auto a = scene->create_instance(0);
-		//a->translate(glm::vec3(0.f, 1.f, 0.f));
-		//auto b = scene->create_instance(0);
-		//b->translate(glm::vec3(1.f, 0.f, 0.f));
+		scene->camera.load(this);
+		//scene->create_instance(0);
+		auto a = scene->create_instance(0);
+		a->translate(glm::vec3(0.f, 1.f, 0.f));
+		auto b = scene->create_instance(0);
+		b->translate(glm::vec3(1.5f, 1.f, 0.f));
+		b->rotate(3.14f, glm::vec3(0.f, 0.f, 1.f));
 	}
+
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
-		camera.start();
-		camera.get_view_matrix(scene->camera_matrices.view);
-		scene->camera_matrices.proj = glm::perspective(glm::radians(80.f), get_aspect_ratio(), 0.1f, 1000.f);
-		scene->camera_matrices.proj[1][1] *= -1;
-		scene->camera_matrices.proj_inverse = glm::inverse(scene->camera_matrices.proj);
+		scene->camera.start();
 
 		rtx_push_constants.clear_color = glm::vec4(0.1f, 0.1f, 0.1f, 1.f);
 		rtx_push_constants.light_pos = glm::vec3(1.1f, 1.f, 1.f);
@@ -48,13 +48,13 @@ private:
 		rtx_push_constants.light_type = 0;
 	}
 	void update(float delta_time) override {
-		camera.update(delta_time);
+		scene->camera.update(delta_time);
 
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Display Lighting Options", "F10", &show_lighting_options);
 				ImGui::MenuItem("Display Metrics", "F11", &show_metrics);
-				ImGui::MenuItem("Cam Info", "", &camera.show_window);
+				//ImGui::MenuItem("Cam Info", "", &camera.show_window);
 				ImGui::MenuItem("RTX", "F9", &this->rtx);
 				ImGui::EndMenu();
 			}
@@ -74,9 +74,6 @@ private:
 			ImGui::ShowDemoWindow(&show_demo_window);
 		if (show_metrics)
 			show_metrics_window(show_metrics, delta_time);
-
-		camera.get_view_matrix(scene->camera_matrices.view);
-		scene->camera_matrices.view_inverse = glm::inverse(scene->camera_matrices.view);
 	}
 	void show_metrics_window(bool &opened, float delta_time) {
 		static std::vector<float> frames;

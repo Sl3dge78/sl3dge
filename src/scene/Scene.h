@@ -7,7 +7,8 @@
 
 #include <vector>
 
-#include "Mesh.h"
+#include "scene/Camera.h"
+#include "scene/Mesh.h"
 #include "vulkan/VulkanHelper.h"
 
 class VulkanApplication;
@@ -28,13 +29,11 @@ struct MeshInstance {
 		transform = glm::translate(transform, translation);
 		inverted = glm::inverse(transform);
 	}
-};
 
-struct CameraMatrices {
-	alignas(16) glm::mat4 view;
-	alignas(16) glm::mat4 proj;
-	alignas(16) glm::mat4 view_inverse;
-	alignas(16) glm::mat4 proj_inverse;
+	void rotate(const float angle, const glm::vec3 dir) {
+		transform = glm::rotate(transform, angle, dir);
+		inverted = glm::inverse(transform);
+	}
 };
 
 class Scene {
@@ -43,14 +42,12 @@ private:
 	std::unique_ptr<AccelerationStructure> tlas;
 
 public:
+	Camera camera;
 	std::vector<std::unique_ptr<Mesh>> meshes;
 	std::vector<MeshInstance> instances;
 	vk::DeviceSize instances_size;
 
 	std::unique_ptr<Buffer> scene_desc_buffer;
-
-	std::unique_ptr<Buffer> camera_buffer;
-	CameraMatrices camera_matrices;
 
 	void allocate_uniform_buffer(VulkanApplication &app);
 
