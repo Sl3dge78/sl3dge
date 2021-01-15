@@ -22,8 +22,6 @@
 #include "imgui/imgui_impl_vulkan.h"
 
 #include "Debug.h"
-#include "UniformBufferObject.h"
-#include "scene/Mesh.h"
 #include "scene/Scene.h"
 
 #include "Swapchain.h"
@@ -62,9 +60,6 @@ public:
 	void flush_commandbuffers(std::vector<vk::CommandBuffer> cmd, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool wait = true);
 
 protected:
-	//CameraMatrices camera_matrices;
-	//FragUniformBufferObject fubo;
-
 	SDL_Window *window = nullptr;
 	std::unique_ptr<Scene> scene;
 
@@ -119,7 +114,6 @@ private:
 
 	// RTX
 protected:
-	bool rtx = true;
 	struct RTPushConstant {
 		glm::vec4 clear_color;
 		glm::vec3 light_pos;

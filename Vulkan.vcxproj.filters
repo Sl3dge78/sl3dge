@@ -1229,9 +1229,6 @@
     <ClInclude Include="src\vulkan\Swapchain.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\vulkan\UniformBufferObject.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\vulkan\VulkanApplication.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -166,7 +166,6 @@ void VulkanApplication::main_loop() {
 		ImGui::NewFrame();
 
 		update(delta_time);
-		ImGui::Render();
 
 		// Don't draw if the app is minimized
 		if (!(SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)) {
@@ -188,7 +187,9 @@ void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	// UI
 	ImGui::Render();
 	auto imgui_data = ImGui::GetDrawData();
+	frame.begin_render_pass();
 	ImGui_ImplVulkan_RenderDrawData(imgui_data, frame.command_buffer.get());
+	frame.end_render_pass();
 }
 void VulkanApplication::draw_frame() {
 	vk::Semaphore image_acquired_semaphore = swapchain->get_image_acquired_semaphore(semaphore_index);
@@ -218,15 +219,10 @@ void VulkanApplication::draw_frame() {
 	}
 	device->resetFences(frame->fence.get());
 
-	// SCENE UBO
-	if (rtx) {
-		raytrace(*frame, image_id);
-	} else {
-		frame->begin_render_pass(); // Todo : split this into 2 render passes
-		rasterize_scene(*frame); // Render 3D objects in the scene
-		draw_ui(*frame);
-		frame->end_render_pass();
-	}
+	frame->command_buffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
+	raytrace(*frame, image_id);
+	draw_ui(*frame);
+	frame->command_buffer->end();
 
 	// Submit Queue
 	vk::PipelineStageFlags flags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -566,7 +562,7 @@ void VulkanApplication::init_rtx() {
 	}
 }
 void VulkanApplication::build_rtx_pipeline() {
-	// Allocate render image
+	// Allocate render image TODO : recreate on swapchain recreation, link to swapchain??
 	Image *img = new Image(
 			*device, physical_device,
 			swapchain->get_extent().width, swapchain->get_extent().height,
@@ -604,7 +600,7 @@ void VulkanApplication::build_rtx_pipeline() {
 
 		std::vector<vk::DescriptorSetLayout> layouts{
 			*rtx_set_layout,
-			swapchain->get_scene_descriptor_set(),
+			//swapchain->get_scene_descriptor_set(),
 		};
 		rtx_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts, push_constant));
 	}
@@ -713,8 +709,6 @@ void VulkanApplication::create_rtx_SBT() {
 	device->unmapMemory(shader_binding_table->memory);
 }
 void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
-	frame.command_buffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
-
 	vk::ImageMemoryBarrier image_barrier({}, vk::AccessFlagBits::eShaderWrite, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, rtx_result_image->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
 
@@ -735,6 +729,7 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	frame.command_buffer->traceRaysKHR(strides[0], strides[1], strides[2], strides[3], swapchain->get_extent().width, swapchain->get_extent().height, 1);
 
 	image_barrier.image = swapchain->get_image(image_id);
+	image_barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
 	image_barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 	image_barrier.oldLayout = vk::ImageLayout::eUndefined;
 	image_barrier.newLayout = vk::ImageLayout::eTransferDstOptimal;
@@ -757,10 +752,8 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 
 	image_barrier.image = swapchain->get_image(image_id);
 	image_barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
-	image_barrier.dstAccessMask = vk::AccessFlags();
+	image_barrier.dstAccessMask = vk::AccessFlagBits::eIndexRead;
 	image_barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-	image_barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
-	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
-
-	frame.command_buffer->end();
+	image_barrier.newLayout = vk::ImageLayout::eGeneral;
+	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eVertexInput, {}, nullptr, nullptr, image_barrier);
 }

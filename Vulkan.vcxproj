@@ -565,7 +565,6 @@
     <ClInclude Include="src\scene\Scene.h" />
     <ClInclude Include="src\scene\Vertex.h" />
     <ClInclude Include="src\vulkan\Swapchain.h" />
-    <ClInclude Include="src\vulkan\UniformBufferObject.h" />
     <ClInclude Include="src\vulkan\VulkanApplication.h" />
     <ClInclude Include="src\vulkan\VulkanFrame.h" />
     <ClInclude Include="src\vulkan\VulkanHelper.h" />

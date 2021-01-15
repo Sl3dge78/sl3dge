@@ -8,22 +8,12 @@ SwapchainCreateInfo Swapchain::info;
 
 Swapchain::Swapchain() {
 	info.device.waitIdle();
-
 	create_swapchain(info.device, info.physical_device, info.surface, info.window);
 	if (log)
 		SDL_Log("Swapchain created");
-	create_render_pass(info.device, info.physical_device);
+	create_ui_render_pass(info.device, info.physical_device);
 	if (log)
 		SDL_Log("Render pass created");
-	create_descriptors(info.device);
-	if (log)
-		SDL_Log("Descriptors created");
-	create_depth_resources(info.device, info.physical_device);
-	if (log)
-		SDL_Log("Depth resources created");
-	create_graphics_pipeline(info.device);
-	if (log)
-		SDL_Log("Pipeline created");
 	create_frames(info.device, info.physical_device, info.command_pool, info.texture_sampler, info.texture_image_view);
 	if (log)
 		SDL_Log("Frames created");
@@ -70,39 +60,25 @@ void Swapchain::create_swapchain(vk::Device device, vk::PhysicalDevice physical_
 	images = device.getSwapchainImagesKHR(*swapchain);
 	image_count = images.size();
 }
-void Swapchain::create_render_pass(vk::Device device, vk::PhysicalDevice physical_device) {
+void Swapchain::create_ui_render_pass(vk::Device device, vk::PhysicalDevice physical_device) {
 	std::vector<vk::AttachmentDescription> attachments;
 	vk::AttachmentDescription color_attachment(
 			{},
 			format,
 			vk::SampleCountFlagBits::e1,
-			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentLoadOp::eLoad,
 			vk::AttachmentStoreOp::eStore,
 			vk::AttachmentLoadOp::eDontCare,
 			vk::AttachmentStoreOp::eDontCare,
-			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eGeneral,
 			vk::ImageLayout::ePresentSrcKHR);
 	vk::AttachmentReference color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
 	attachments.push_back(color_attachment);
-
-	vk::AttachmentDescription depth_attachment(
-			{},
-			find_depth_format(physical_device),
-			vk::SampleCountFlagBits::e1,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eDontCare,
-			vk::AttachmentLoadOp::eDontCare,
-			vk::AttachmentStoreOp::eDontCare,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
-	vk::AttachmentReference depth_ref(1U, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-	attachments.push_back(depth_attachment);
-
 	vk::SubpassDescription subpass(
 			{},
 			vk::PipelineBindPoint::eGraphics,
 			nullptr, color_ref,
-			nullptr, &depth_ref,
+			nullptr, nullptr,
 			nullptr);
 
 	vk::SubpassDependency dependency(
@@ -114,94 +90,25 @@ void Swapchain::create_render_pass(vk::Device device, vk::PhysicalDevice physica
 			{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
 			{});
 
-	render_pass = device.createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
+	ui_render_pass = device.createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
 }
+/*
 void Swapchain::create_descriptors(vk::Device device) {
-	vk::DescriptorSetLayoutBinding camera_matrices(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eRaygenKHR, nullptr);
+	
 	vk::DescriptorSetLayoutBinding sampler(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
-	vk::DescriptorSetLayoutBinding frag(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
-	std::array<vk::DescriptorSetLayoutBinding, 3> bindings = { camera_matrices, sampler, frag };
-	scene_descriptor_set_layout = device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
-
-	vk::DescriptorSetLayoutBinding mesh_ubo(0, vk::DescriptorType::eUniformBufferDynamic, 1, vk::ShaderStageFlagBits::eVertex, nullptr);
-	mesh_descriptor_set_layout = device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, mesh_ubo));
-
-	vk::DescriptorPoolSize a(vk::DescriptorType::eUniformBuffer, image_count);
-	vk::DescriptorPoolSize c(vk::DescriptorType::eUniformBufferDynamic, 1000);
-	vk::DescriptorPoolSize b(vk::DescriptorType::eCombinedImageSampler, image_count);
-	std::array<vk::DescriptorPoolSize, 3> pool_sizes = { a, b, c };
-	descriptor_pool = device.createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, image_count * 2, pool_sizes));
+	vk::DescriptorPoolSize b(vk::DescriptorType::eCombinedImageSampler, image_count);	
+	
 }
-void Swapchain::create_depth_resources(vk::Device device, vk::PhysicalDevice physical_device) {
-	vk::Format depth_format = find_depth_format(physical_device);
-	depth_image = std::unique_ptr<Image>(new Image(device, physical_device, extent.width, extent.height, depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
-}
-void Swapchain::create_graphics_pipeline(vk::Device device) {
-	auto vertex_shader_code = read_file("resources/shaders/triangle.vert.spv");
-	auto fragment_shader_code = read_file("resources/shaders/triangle.frag.spv");
-
-	auto vtx_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, vertex_shader_code.size(), reinterpret_cast<uint32_t *>(vertex_shader_code.data())));
-	auto frag_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, fragment_shader_code.size(), reinterpret_cast<uint32_t *>(fragment_shader_code.data())));
-
-	auto stages = {
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vtx_shader, "main", nullptr),
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *frag_shader, "main", nullptr)
-	};
-	auto a = Vertex::get_binding_description();
-	auto b = Vertex::get_attribute_descriptions();
-	vk::PipelineVertexInputStateCreateInfo vertex_input({}, a, b);
-
-	vk::PipelineInputAssemblyStateCreateInfo input_ci({}, vk::PrimitiveTopology::eTriangleList, false);
-
-	vk::Viewport viewport(0, 0, extent.width, extent.height, 0, 1);
-	vk::Rect2D scissor({ 0, 0 }, extent);
-	vk::PipelineViewportStateCreateInfo viewport_state_ci({}, viewport, scissor);
-
-	vk::PipelineRasterizationStateCreateInfo rasterizer({}, false, false, vk::PolygonMode::eFill, vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, false, 0, 0, 0, 1);
-	vk::PipelineMultisampleStateCreateInfo multisampling({}, vk::SampleCountFlagBits::e1, false, 1, nullptr, false, false);
-	vk::PipelineDepthStencilStateCreateInfo depth_stencil({}, true, true, vk::CompareOp::eLess, false, false, {}, {}, 0, 1);
-
-	vk::PipelineColorBlendAttachmentState color_blend_attachment(
-			false,
-			vk::BlendFactor::eZero, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
-			vk::BlendFactor::eZero, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
-			{ vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA });
-
-	vk::PipelineColorBlendStateCreateInfo color_blending({}, false, vk::LogicOp::eCopy, color_blend_attachment, {});
-
-	auto layouts = { scene_descriptor_set_layout.get(), mesh_descriptor_set_layout.get() };
-	pipeline_layout = device.createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts));
-
-	vk::GraphicsPipelineCreateInfo pipeline_ci(
-			{},
-			stages,
-			&vertex_input,
-			&input_ci,
-			nullptr,
-			&viewport_state_ci,
-			&rasterizer,
-			&multisampling,
-			&depth_stencil,
-			&color_blending,
-			nullptr,
-			*pipeline_layout,
-			*render_pass,
-			0,
-			nullptr,
-			-1);
-
-	graphics_pipeline = device.createGraphicsPipelineUnique(nullptr, pipeline_ci).value;
-}
+*/
 void Swapchain::create_frames(vk::Device device, vk::PhysicalDevice physical_device, vk::CommandPool command_pool, vk::Sampler texture_sampler, vk::ImageView texture_image_view) {
 	frames.resize(image_count);
 	for (uint32_t i = 0; i < images.size(); i++) {
 		frames[i].init_frame(device);
 		frames[i].image_view = create_image_view(device, images[i], format, vk::ImageAspectFlagBits::eColor);
-		frames[i].create_framebuffer(extent, *render_pass, depth_image->image_view);
+		frames[i].create_framebuffer(extent, *ui_render_pass);
 		frames[i].create_command_buffers(command_pool);
 		frames[i].create_sync_objects();
-		frames[i].create_uniform_buffer(physical_device);
-		frames[i].create_descriptor_set(*descriptor_pool, *scene_descriptor_set_layout, *mesh_descriptor_set_layout, texture_sampler, texture_image_view);
+		//frames[i].create_descriptor_set(*descriptor_pool, *scene_descriptor_set_layout, *mesh_descriptor_set_layout, texture_sampler, texture_image_view);
 	}
 }
 void Swapchain::create_semaphores(vk::Device device) {
@@ -255,7 +162,7 @@ void Swapchain::create_imgui_context(SwapchainCreateInfo info) {
 	imgui_init_info.ImageCount = uint32_t(frames.size());
 	imgui_init_info.CheckVkResultFn = nullptr;
 	imgui_init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	ImGui_ImplVulkan_Init(&imgui_init_info, *render_pass);
+	ImGui_ImplVulkan_Init(&imgui_init_info, *ui_render_pass);
 
 	frames[0].command_buffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
 	ImGui_ImplVulkan_CreateFontsTexture(frames[0].command_buffer.get());
@@ -266,6 +173,7 @@ void Swapchain::create_imgui_context(SwapchainCreateInfo info) {
 	info.queue.waitIdle();
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
+
 vk::SurfaceFormatKHR Swapchain::choose_surface_format(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface) {
 	for (const auto &fmt : physical_device.getSurfaceFormatsKHR(surface)) {
 		if (fmt.format == vk::Format::eB8G8R8A8Srgb && fmt.colorSpace == vk::ColorSpaceKHR::eVkColorspaceSrgbNonlinear) {
