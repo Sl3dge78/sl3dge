@@ -117,8 +117,6 @@ void VulkanApplication::init_vulkan() {
 		.queue_family = queue_family_indices.graphics_family.value(),
 		.queue = graphics_queue,
 		.command_pool = *graphics_command_pool,
-		.texture_sampler = *texture_sampler,
-		.texture_image_view = texture->image_view,
 	};
 	swapchain = std::make_unique<Swapchain>();
 	SDL_ShowWindow(window);
@@ -328,6 +326,7 @@ void VulkanApplication::create_logical_device() {
 	transfer_queue = device->getQueue(queue_family_indices.transfer_family.value(), 0);
 }
 void VulkanApplication::create_texture_image() {
+	/*
 	// Load image
 	SDL_Surface *surf = IMG_Load("resources/textures/viking_room.png");
 	surf = SDL_ConvertSurfaceFormat(surf, SDL_PIXELFORMAT_ABGR8888, 0);
@@ -371,6 +370,7 @@ void VulkanApplication::create_texture_image() {
 	graphics_queue.waitIdle();
 
 	SDL_FreeSurface(surf);
+	*/
 }
 void VulkanApplication::create_texture_sampler() {
 	texture_sampler = device->createSamplerUnique(vk::SamplerCreateInfo(
@@ -553,6 +553,13 @@ void VulkanApplication::flush_commandbuffers(std::vector<vk::CommandBuffer> cmd,
 	device->freeCommandBuffers(command_pool, cmd);
 }
 
+int VulkanApplication::get_graphics_family_index() const {
+	return queue_family_indices.graphics_family.value();
+}
+int VulkanApplication::get_transfer_family_index() const {
+	return queue_family_indices.transfer_family.value();
+}
+
 void VulkanApplication::init_rtx() {
 	auto properties = physical_device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
 	rtx_properties = properties.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
@@ -563,10 +570,20 @@ void VulkanApplication::init_rtx() {
 }
 void VulkanApplication::build_rtx_pipeline() {
 	// Allocate render image TODO : recreate on swapchain recreation, link to swapchain??
+	/*
+	VkFormatProperties properties;
+	vkGetPhysicalDeviceFormatProperties(physical_device, VK_FORMAT_B8G8R8A8_SRGB, &properties);
+	if (properties.linearTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) {
+		SDL_Log("Ok storage");
+	}
+	if (properties.linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) {
+		SDL_Log("Ok transfer");
+	}
+	*/
 	Image *img = new Image(
 			*device, physical_device,
 			swapchain->get_extent().width, swapchain->get_extent().height,
-			vk::Format::eB8G8R8A8Unorm, vk::ImageTiling::eOptimal,
+			swapchain->get_format(), vk::ImageTiling::eOptimal,
 			{ vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eStorage },
 			vk::MemoryPropertyFlagBits::eDeviceLocal,
 			vk::ImageAspectFlagBits::eColor);
@@ -575,6 +592,7 @@ void VulkanApplication::build_rtx_pipeline() {
 
 	// TODO : move this shit in Scene?
 	uint32_t mesh_count = scene->meshes.size();
+	uint32_t material_count = scene->materials.size();
 
 	{ // Descriptor Layout
 		std::vector<vk::DescriptorSetLayoutBinding> bindings{
@@ -590,6 +608,8 @@ void VulkanApplication::build_rtx_pipeline() {
 			vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 			// idx buffer
 			vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
+			// Texture buffer
+			vk::DescriptorSetLayoutBinding(6, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 		};
 
 		vk::DescriptorSetLayoutCreateInfo set_layout_ci({}, bindings);
@@ -600,7 +620,6 @@ void VulkanApplication::build_rtx_pipeline() {
 
 		std::vector<vk::DescriptorSetLayout> layouts{
 			*rtx_set_layout,
-			//swapchain->get_scene_descriptor_set(),
 		};
 		rtx_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts, push_constant));
 	}
@@ -611,13 +630,13 @@ void VulkanApplication::build_rtx_pipeline() {
 			vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
 			vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 1),
 			vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1),
-			vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 3)
+			vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 3),
+			vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
 		};
 		rtx_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
 	}
 
 	// Descriptor set
-
 	rtx_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*rtx_pool, *rtx_set_layout)).front());
 
 	{ // Descriptor writes
@@ -657,6 +676,15 @@ void VulkanApplication::build_rtx_pipeline() {
 		vk::WriteDescriptorSet idx_writes(*rtx_set, 5, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_idx.data(), nullptr);
 		writes.push_back(vtx_writes);
 		writes.push_back(idx_writes);
+
+		// Texture sampler = binding 6
+		std::vector<vk::DescriptorImageInfo> images_info;
+		for (auto &mat : scene->materials) {
+			images_info.emplace_back(*texture_sampler, mat->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+		}
+		vk::WriteDescriptorSet texture_write(*rtx_set, 6, 0, material_count, vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
+		writes.push_back(texture_write);
+
 		device->updateDescriptorSets(writes, nullptr);
 	}
 

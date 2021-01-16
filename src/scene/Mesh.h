@@ -42,7 +42,7 @@ public:
 	vk::AccelerationStructureGeometryKHR geometry;
 	vk::AccelerationStructureBuildRangeInfoKHR range_info;
 
-	Mesh(const std::string path, VulkanApplication &app);
+	Mesh(VulkanApplication &app, const std::string path);
 	~Mesh() = default;
 
 	void draw(VulkanFrame &frame);

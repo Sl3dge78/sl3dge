@@ -34,6 +34,7 @@ public:
 	vk::ImageView image_view;
 
 	Image(vk::Device device, vk::PhysicalDevice physical_device, const uint32_t w, const uint32_t h, const vk::Format fmt, const vk::ImageTiling tiling, const vk::ImageUsageFlags usage, const vk::MemoryPropertyFlags properties, const vk::ImageAspectFlagBits aspect);
+	Image(VulkanApplication &app, const uint32_t w, const uint32_t h, const vk::Format fmt, const vk::ImageTiling tiling, const vk::ImageUsageFlags usage, const vk::MemoryPropertyFlags properties, const vk::ImageAspectFlagBits aspect);
 	~Image();
 	void transition_layout(vk::CommandBuffer c_buffer, vk::ImageLayout from, vk::ImageLayout to, const uint32_t transfer_family, const uint32_t graphics_family);
 };

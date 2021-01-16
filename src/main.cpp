@@ -10,24 +10,30 @@
 
 #include <SDL/SDL.h>
 
+#include "scene/Material.h"
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-// TODO : Textures
 // TODO : Faire marcher les label debug sur GPU
-// TODO : Virer vulkan frame et le gérer dans la swapchain directement, c'est de la complexité inutile en trop
+// TODO : Virer VulkanFrame et le gérer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexité inutile en trop
 // TODO : GLTF
 //		- Materials
 //		- Textures
 // TODO : Clean all this
+// TODO : Materials v2 :
+//		- Store a handle to a sampler
+//		- Store a handle to a texture
+//		- Multiple parameters (diffuse, etc)
 
 class Sl3dge : public VulkanApplication {
 private:
 	void load() override {
-		scene->load_mesh("resources/models/viking_room.obj", this); // 0
-		auto a = scene->create_instance(0);
+		auto viking_mesh = scene->load_mesh(this, "resources/models/viking_room.obj"); // 0
+		auto viking_texture = scene->load_material(this, "resources/textures/viking_room.png"); // 0
+
+		auto a = scene->create_instance(viking_mesh, viking_texture);
 		a->translate(glm::vec3(0.f, 1.f, 0.f));
-		auto b = scene->create_instance(0);
+		auto b = scene->create_instance(viking_mesh, viking_texture);
 		b->translate(glm::vec3(1.5f, 1.f, 0.f));
 		b->rotate(3.14f, glm::vec3(0.f, 0.f, 1.f));
 		scene->camera.load(this);

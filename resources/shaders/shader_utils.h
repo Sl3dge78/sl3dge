@@ -11,6 +11,7 @@ struct Vertex {
 
 struct Instance {
 	uint mesh_id;
+	uint mat_id;
 	mat4 transform;
 	mat4 inverted;
 };

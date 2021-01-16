@@ -7,7 +7,7 @@
 
 #include <string>
 
-Mesh::Mesh(const std::string path, VulkanApplication &app) {
+Mesh::Mesh(VulkanApplication &app, const std::string path) {
 	this->id = get_id();
 
 	// Todo : load this only once, and then point to the data for each mesh as reqs

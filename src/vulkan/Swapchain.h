@@ -25,8 +25,6 @@ struct SwapchainCreateInfo {
 	uint32_t queue_family;
 	vk::Queue queue;
 	vk::CommandPool command_pool;
-	vk::Sampler texture_sampler;
-	vk::ImageView texture_image_view;
 };
 
 class Swapchain {
@@ -63,8 +61,8 @@ private:
 	vk::UniqueDescriptorPool imgui_descriptor_pool;
 
 	void create_swapchain(vk::Device device, vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, SDL_Window *window);
-	void create_ui_render_pass(vk::Device device, vk::PhysicalDevice physical_device);
-	void create_frames(vk::Device device, vk::PhysicalDevice physical_device, vk::CommandPool command_pool, vk::Sampler texture_sampler, vk::ImageView texture_image_view);
+	void create_ui_render_pass(vk::Device device);
+	void create_frames(vk::Device device, vk::PhysicalDevice physical_device, vk::CommandPool command_pool);
 	void create_semaphores(vk::Device device);
 	void create_imgui_context(SwapchainCreateInfo info);
 

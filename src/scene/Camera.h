@@ -1,5 +1,5 @@
-#ifndef CAMERA_OBJ_H
-#define CAMERA_OBJ_H
+#ifndef CAMERA_H
+#define CAMERA_H
 
 #include <SDL/SDL.h>
 

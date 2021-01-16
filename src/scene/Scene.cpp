@@ -5,11 +5,16 @@
 #include "Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-void Scene::load_mesh(const std::string path, VulkanApplication *app) {
-	meshes.emplace_back(std::make_unique<Mesh>(path, *app));
+uint32_t Scene::load_mesh(VulkanApplication *app, const std::string path) {
+	meshes.emplace_back(std::make_unique<Mesh>(*app, path));
+	return meshes.size() - 1;
 }
-MeshInstance *Scene::create_instance(const uint32_t mesh_id, glm::mat4 transform) {
-	instances.emplace_back(mesh_id);
+uint32_t Scene::load_material(VulkanApplication *app, const std::string path) {
+	materials.emplace_back(std::make_unique<Material>(*app, path));
+	return materials.size() - 1;
+}
+MeshInstance *Scene::create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform) {
+	instances.emplace_back(mesh_id, mat_id);
 	return &instances.back();
 }
 void Scene::allocate_uniform_buffer(VulkanApplication &app) {
@@ -87,10 +92,10 @@ void Scene::build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFla
 		as_instance.flags = (unsigned int)(vk::GeometryInstanceFlagBitsKHR::eTriangleCullDisable);
 		as_instance.instanceShaderBindingTableRecordOffset = hit_goup_id;
 		as_instance.instanceCustomIndex = i;
-		as_instance.accelerationStructureReference = meshes[instances[i].mesh_id]->blas->get_address();
+		as_instance.accelerationStructureReference = meshes[instances[i].get_mesh_id()]->blas->get_address();
 		as_instance.mask = 0xFF;
-		auto tsfm = instances[i].transform;
-		auto transposed = glm::transpose(instances[i].transform);
+		auto tsfm = instances[i].get_transform();
+		auto transposed = glm::transpose(instances[i].get_transform());
 		memcpy(&as_instance, &transposed, sizeof(vk::TransformMatrixKHR));
 		as_instances.push_back(as_instance);
 	}

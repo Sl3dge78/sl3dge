@@ -23,10 +23,9 @@
 
 #include "Debug.h"
 #include "scene/Scene.h"
-
-#include "Swapchain.h"
-#include "VulkanFrame.h"
-#include "VulkanHelper.h"
+#include "vulkan/Swapchain.h"
+#include "vulkan/VulkanFrame.h"
+#include "vulkan/VulkanHelper.h"
 
 #include "Input.h"
 
@@ -51,13 +50,17 @@ public:
 	~VulkanApplication();
 
 	void run();
-	vk::Device get_device() { return *device; }
-	vk::PhysicalDevice get_physical_device() { return physical_device; }
+
 	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 	vk::CommandBuffer create_commandbuffer(vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool begin = true);
 	std::vector<vk::CommandBuffer> create_commandbuffers(uint32_t count, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool begin = true);
 	void flush_commandbuffer(vk::CommandBuffer cmd, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool wait = true);
 	void flush_commandbuffers(std::vector<vk::CommandBuffer> cmd, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool wait = true);
+
+	vk::Device get_device() { return *device; }
+	vk::PhysicalDevice get_physical_device() { return physical_device; }
+	int get_graphics_family_index() const;
+	int get_transfer_family_index() const;
 
 protected:
 	SDL_Window *window = nullptr;
@@ -82,7 +85,6 @@ private:
 	vk::Queue present_queue;
 	vk::Queue transfer_queue;
 
-	std::unique_ptr<Image> texture;
 	vk::UniqueSampler texture_sampler;
 
 	UniqueSwapchain swapchain;

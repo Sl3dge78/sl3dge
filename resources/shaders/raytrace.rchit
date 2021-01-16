@@ -9,6 +9,7 @@ layout(binding = 0, set = 0) uniform accelerationStructureEXT top_level_AS;
 layout(binding = 3, set = 0) buffer Scene {Instance i[];} scene;
 layout(binding = 4, set = 0) buffer Vertices {Vertex v[];} vertices[];
 layout(binding = 5, set = 0) buffer Indices {uint i[];} indices[];
+layout(binding = 6, set = 0) uniform sampler2D textures[];
 
 layout(push_constant) uniform Constants
 {
@@ -25,6 +26,7 @@ hitAttributeEXT vec3 attribs;
 void main() {
 
     uint mesh_id = scene.i[gl_InstanceCustomIndexEXT].mesh_id;
+    uint mat_id = scene.i[gl_InstanceCustomIndexEXT].mat_id;
     ivec3 idx = ivec3(indices[nonuniformEXT(mesh_id)].i[3 * gl_PrimitiveID + 0], 
                     indices[nonuniformEXT(mesh_id)].i[3 * gl_PrimitiveID + 1], 
                     indices[nonuniformEXT(mesh_id)].i[3 * gl_PrimitiveID + 2]);
@@ -40,6 +42,8 @@ void main() {
 
     vec3 world_pos = v0.pos * barycentre.x + v1.pos * barycentre.y + v2.pos * barycentre.z;
     world_pos = vec3(scene.i[gl_InstanceCustomIndexEXT].transform * vec4(world_pos, 1.0));
+
+    vec2 tex_coord = v0.tex_coord * barycentre.x + v1.tex_coord * barycentre.y + v2.tex_coord * barycentre.z;
 
     const vec3 light_dir = normalize(constants.light_position - world_pos);
     const float dnl = dot(normal, light_dir);
@@ -81,7 +85,8 @@ void main() {
         }
     }
   
-    vec3 color = vec3(1.0,1.0,1.0);
+    vec3 color = texture(textures[mat_id], tex_coord).xyz;
     float lighting = max(diffuse, ambient);
+    //prd.hit_value = color;
     prd.hit_value = color * (diffuse + ambient) * attenuation;
 }

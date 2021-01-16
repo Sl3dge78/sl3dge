@@ -22,6 +22,27 @@ Image::Image(vk::Device device, vk::PhysicalDevice physical_device, const uint32
 
 	image_view = device.createImageView(vk::ImageViewCreateInfo({}, image, vk::ImageViewType::e2D, fmt, vk::ComponentMapping(), vk::ImageSubresourceRange(aspect, 0, 1, 0, 1)));
 }
+Image::Image(VulkanApplication &app, const uint32_t w, const uint32_t h, const vk::Format fmt, const vk::ImageTiling tiling, const vk::ImageUsageFlags usage, const vk::MemoryPropertyFlags properties, const vk::ImageAspectFlagBits aspect) {
+	this->device = app.get_device();
+	image = device.createImage(vk::ImageCreateInfo(
+			{}, vk::ImageType::e2D,
+			fmt, vk::Extent3D(w, h, 1),
+			1,
+			1,
+			vk::SampleCountFlagBits::e1,
+			vk::ImageTiling(tiling),
+			vk::ImageUsageFlags(usage),
+			vk::SharingMode::eExclusive,
+			nullptr,
+			vk::ImageLayout::eUndefined));
+
+	// Allocate VkImage memory
+	auto mem_reqs = device.getImageMemoryRequirements(image);
+	memory = device.allocateMemory(vk::MemoryAllocateInfo(mem_reqs.size, find_memory_type(app.get_physical_device(), mem_reqs.memoryTypeBits, properties)));
+	device.bindImageMemory(image, memory, 0);
+
+	image_view = device.createImageView(vk::ImageViewCreateInfo({}, image, vk::ImageViewType::e2D, fmt, vk::ComponentMapping(), vk::ImageSubresourceRange(aspect, 0, 1, 0, 1)));
+}
 void Image::transition_layout(vk::CommandBuffer c_buffer, vk::ImageLayout from, vk::ImageLayout to, const uint32_t transfer_family, const uint32_t graphics_family) {
 	//    VkImageMemoryBarrier barrier{
 	//            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -184,10 +205,10 @@ void check_vk_result(VkResult err) {
 vk::Format get_vk_format(SDL_PixelFormat *format) {
 	switch (format->format) {
 		case SDL_PIXELFORMAT_ABGR8888:
-			return vk::Format::eR8G8B8A8Srgb;
+			return vk::Format::eR8G8B8A8Unorm;
 
 		case SDL_PIXELFORMAT_RGBA8888:
-			return vk::Format::eR8G8B8A8Srgb;
+			return vk::Format::eR8G8B8A8Unorm;
 
 		default:
 			SDL_LogError(0, "Texture pixel format unsupported!");

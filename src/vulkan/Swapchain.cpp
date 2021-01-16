@@ -11,10 +11,10 @@ Swapchain::Swapchain() {
 	create_swapchain(info.device, info.physical_device, info.surface, info.window);
 	if (log)
 		SDL_Log("Swapchain created");
-	create_ui_render_pass(info.device, info.physical_device);
+	create_ui_render_pass(info.device);
 	if (log)
 		SDL_Log("Render pass created");
-	create_frames(info.device, info.physical_device, info.command_pool, info.texture_sampler, info.texture_image_view);
+	create_frames(info.device, info.physical_device, info.command_pool);
 	if (log)
 		SDL_Log("Frames created");
 	create_semaphores(info.device);
@@ -60,7 +60,7 @@ void Swapchain::create_swapchain(vk::Device device, vk::PhysicalDevice physical_
 	images = device.getSwapchainImagesKHR(*swapchain);
 	image_count = images.size();
 }
-void Swapchain::create_ui_render_pass(vk::Device device, vk::PhysicalDevice physical_device) {
+void Swapchain::create_ui_render_pass(vk::Device device) {
 	std::vector<vk::AttachmentDescription> attachments;
 	vk::AttachmentDescription color_attachment(
 			{},
@@ -92,15 +92,7 @@ void Swapchain::create_ui_render_pass(vk::Device device, vk::PhysicalDevice phys
 
 	ui_render_pass = device.createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
 }
-/*
-void Swapchain::create_descriptors(vk::Device device) {
-	
-	vk::DescriptorSetLayoutBinding sampler(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, nullptr);
-	vk::DescriptorPoolSize b(vk::DescriptorType::eCombinedImageSampler, image_count);	
-	
-}
-*/
-void Swapchain::create_frames(vk::Device device, vk::PhysicalDevice physical_device, vk::CommandPool command_pool, vk::Sampler texture_sampler, vk::ImageView texture_image_view) {
+void Swapchain::create_frames(vk::Device device, vk::PhysicalDevice physical_device, vk::CommandPool command_pool) {
 	frames.resize(image_count);
 	for (uint32_t i = 0; i < images.size(); i++) {
 		frames[i].init_frame(device);
@@ -108,7 +100,6 @@ void Swapchain::create_frames(vk::Device device, vk::PhysicalDevice physical_dev
 		frames[i].create_framebuffer(extent, *ui_render_pass);
 		frames[i].create_command_buffers(command_pool);
 		frames[i].create_sync_objects();
-		//frames[i].create_descriptor_set(*descriptor_pool, *scene_descriptor_set_layout, *mesh_descriptor_set_layout, texture_sampler, texture_image_view);
 	}
 }
 void Swapchain::create_semaphores(vk::Device device) {
@@ -175,11 +166,13 @@ void Swapchain::create_imgui_context(SwapchainCreateInfo info) {
 }
 
 vk::SurfaceFormatKHR Swapchain::choose_surface_format(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface) {
+	/*
 	for (const auto &fmt : physical_device.getSurfaceFormatsKHR(surface)) {
-		if (fmt.format == vk::Format::eB8G8R8A8Srgb && fmt.colorSpace == vk::ColorSpaceKHR::eVkColorspaceSrgbNonlinear) {
+		if (fmt.format == vk::Format::eB8G8R8A8Unorm && fmt.colorSpace == vk::ColorSpaceKHR::eVkColorspaceSrgbNonlinear) {
 			return fmt;
 		}
 	}
+	*/
 	return physical_device.getSurfaceFormatsKHR(surface).front();
 }
 vk::PresentModeKHR Swapchain::choose_present_mode(const vk::PhysicalDevice physical_device, const vk::SurfaceKHR surface) {
