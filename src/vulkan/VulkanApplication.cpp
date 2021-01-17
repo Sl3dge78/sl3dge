@@ -301,17 +301,30 @@ void VulkanApplication::create_logical_device() {
 		vk::DeviceQueueCreateInfo ci({}, queue_family, 1, &queue_priority);
 		req_queues.emplace_back(ci);
 	}
-	// TODO : do this more cleanly
-	auto supported_features = physical_device.getFeatures2<
-			vk::PhysicalDeviceFeatures2,
-			vk::PhysicalDeviceBufferDeviceAddressFeatures,
-			vk::PhysicalDeviceRayTracingPipelineFeaturesKHR,
-			vk::PhysicalDeviceAccelerationStructureFeaturesKHR,
-			vk::PhysicalDeviceDescriptorIndexingFeatures>();
-	vk::DeviceCreateInfo ci({}, req_queues, req_validation_layers, req_device_extensions, nullptr);
-	ci.setPNext(&supported_features.get<vk::PhysicalDeviceFeatures2>());
-	device = physical_device.createDeviceUnique(ci);
 
+	vk::PhysicalDeviceFeatures2 features2{};
+	features2.features.samplerAnisotropy = true;
+	vk::PhysicalDeviceBufferDeviceAddressFeatures device_address{};
+	device_address.bufferDeviceAddress = true;
+	vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline{};
+	rt_pipeline.rayTracingPipeline = true;
+	vk::PhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structures{};
+	acceleration_structures.accelerationStructure = true;
+	vk::PhysicalDeviceDescriptorIndexingFeatures descriptor_indexing{};
+	descriptor_indexing.runtimeDescriptorArray = true;
+	descriptor_indexing.shaderStorageBufferArrayNonUniformIndexing = true;
+
+	vk::StructureChain requested_features = {
+		features2,
+		device_address,
+		rt_pipeline,
+		acceleration_structures,
+		descriptor_indexing
+	};
+
+	vk::DeviceCreateInfo ci({}, req_queues, req_validation_layers, req_device_extensions, nullptr);
+	ci.setPNext(&requested_features.get<vk::PhysicalDeviceFeatures2>());
+	device = physical_device.createDeviceUnique(ci);
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(*device);
 
 	graphics_queue = device->getQueue(queue_family_indices.graphics_family.value(), 0);

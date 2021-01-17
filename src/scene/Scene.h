@@ -57,8 +57,6 @@ public:
 	void build_BLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags);
 	void build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags, bool update = false);
 	vk::AccelerationStructureKHR get_tlas() { return tlas->get_acceleration_structure(); }
-
-	void rasterize(VulkanFrame &frame);
 };
 
 #endif //SCENE_H

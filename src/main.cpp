@@ -14,15 +14,16 @@
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-// TODO : Virer VulkanFrame et le gérer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexité inutile en trop
+// TODO : UI
 // TODO : GLTF
 //		- Materials
 //		- Textures
-// TODO : Clean all this
 // TODO : Materials v2 :
 //		- Store a handle to a sampler
 //		- Store a handle to a texture
 //		- Multiple parameters (diffuse, etc)
+// TODO : Update TLAS when an object has moved
+// TODO - AMELIO : Virer VulkanFrame et le gérer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexité inutile en trop
 
 class Sl3dge : public VulkanApplication {
 private:

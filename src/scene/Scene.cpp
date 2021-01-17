@@ -147,12 +147,3 @@ void Scene::build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFla
 
 	debug_name_object(app.get_device(), uint64_t(VkAccelerationStructureKHR(tlas->get_acceleration_structure())), vk::ObjectType::eAccelerationStructureKHR, "Scene TLAS");
 }
-void Scene::rasterize(VulkanFrame &frame) {
-	/* TODO
-	for(auto& instance : instances) {
-		frame.transform_buffer->write_data(&instance->transform, sizeof(instance->transform), mesh->id * sizeof(MeshUBO));
-		frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 1, frame.mesh_descriptor_set.get(), mesh->id * sizeof(MeshUBO));
-		mesh->draw(frame);
-	}
-	 */
-}
