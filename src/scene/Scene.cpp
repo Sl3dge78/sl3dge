@@ -144,6 +144,8 @@ void Scene::build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFla
 	cmd_buf.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eAccelerationStructureBuildKHR, {}, vk::MemoryBarrier(vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eAccelerationStructureWriteKHR), nullptr, nullptr);
 	cmd_buf.buildAccelerationStructuresKHR(build_info, &build_range);
 	app.flush_commandbuffer(cmd_buf);
+
+	debug_name_object(app.get_device(), uint64_t(VkAccelerationStructureKHR(tlas->get_acceleration_structure())), vk::ObjectType::eAccelerationStructureKHR, "Scene TLAS");
 }
 void Scene::rasterize(VulkanFrame &frame) {
 	/* TODO

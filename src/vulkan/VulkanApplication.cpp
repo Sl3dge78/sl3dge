@@ -206,8 +206,13 @@ void VulkanApplication::draw_frame() {
 	device->resetFences(frame->fence.get());
 
 	frame->command_buffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
+	debug_begin_label(frame->command_buffer.get(), "RTX");
 	raytrace(*frame, image_id);
+	debug_end_label(*frame->command_buffer);
+
+	debug_begin_label(frame->command_buffer.get(), "UI");
 	draw_ui(*frame);
+	debug_end_label(*frame->command_buffer);
 	frame->command_buffer->end();
 
 	// Submit Queue
@@ -343,7 +348,7 @@ void VulkanApplication::build_rtx_pipeline() {
 			vk::ImageAspectFlagBits::eColor);
 
 	rtx_result_image = std::unique_ptr<Image>(img);
-
+	debug_name_object(*device, uint64_t(VkImage(rtx_result_image->image)), rtx_result_image->image.objectType, "RTX Result Image");
 	// TODO : move this shit in Scene?
 	uint32_t mesh_count = scene->meshes.size();
 	uint32_t material_count = scene->materials.size();
@@ -379,7 +384,6 @@ void VulkanApplication::build_rtx_pipeline() {
 	}
 
 	{ // Create Descriptor pool
-
 		std::vector<vk::DescriptorPoolSize> pool_sizes{
 			vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
 			vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 1),
@@ -452,6 +456,11 @@ void VulkanApplication::build_rtx_pipeline() {
 	auto rmiss_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_code.size(), reinterpret_cast<uint32_t *>(rmiss_code.data())));
 	auto rmiss_shadow_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_shadow_code.size(), reinterpret_cast<uint32_t *>(rmiss_shadow_code.data())));
 	auto rchit_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rchit_code.size(), reinterpret_cast<uint32_t *>(rchit_code.data())));
+
+	debug_name_object(*device, uint64_t(VkShaderModule(rgen_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rgen");
+	debug_name_object(*device, uint64_t(VkShaderModule(rmiss_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rmiss");
+	debug_name_object(*device, uint64_t(VkShaderModule(rmiss_shadow_shader.get())), vk::ObjectType::eShaderModule, "shadow.rmiss");
+	debug_name_object(*device, uint64_t(VkShaderModule(rchit_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rchit");
 
 	auto shader_stages = {
 		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eRaygenKHR, *rgen_shader, "main"),

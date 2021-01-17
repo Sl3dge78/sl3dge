@@ -112,8 +112,9 @@
         "platform/win32/arguments": "",
         "platform/win32/autoconnect": true,
         "platform/win32/environment": "",
-        "platform/win32/executable": "D:/Work/Prog/cpp/Vulkan/bin/Vulkan_x64.exe",
+        "platform/win32/executable": "D:/Work/Prog/cpp/Vulkan/bin/Vulkan_Debug_x64.exe",
         "platform/win32/executable/history": [
+            "D:/Work/Prog/cpp/Vulkan/bin/Vulkan_Debug_x64.exe",
             "D:/Work/Prog/cpp/Vulkan/bin/Vulkan_x64.exe",
             "D:/Work/Prog/cpp/Vulkan/cmake-build-debug/Vulkan.exe"
         ],

@@ -14,7 +14,6 @@
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-// TODO : Faire marcher les label debug sur GPU
 // TODO : Virer VulkanFrame et le gérer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexité inutile en trop
 // TODO : GLTF
 //		- Materials
