@@ -16,7 +16,8 @@ VulkanApplication::VulkanApplication() {
 	ImGui_ImplSDL2_InitForVulkan(window);
 
 	init_vulkan();
-	init_rtx();
+
+	SDL_ShowWindow(window);
 }
 VulkanApplication::~VulkanApplication() {
 	SDL_Log("Cleaning up...");
@@ -44,6 +45,7 @@ void VulkanApplication::run() {
 	scene->build_TLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
 	SDL_Log("TLAS created");
 	scene->allocate_uniform_buffer(*this);
+
 	build_rtx_pipeline();
 	SDL_Log("RTX Pipeline created");
 	create_rtx_SBT();
@@ -52,10 +54,6 @@ void VulkanApplication::run() {
 	SDL_Log("Init done, starting main loop...");
 	main_loop();
 	SDL_Log("Closing...");
-}
-float VulkanApplication::get_aspect_ratio() const {
-	auto a = swapchain->get_extent();
-	return float(a.width) / float(a.height);
 }
 void VulkanApplication::init_vulkan() {
 	// Init dispatcher
@@ -101,8 +99,6 @@ void VulkanApplication::init_vulkan() {
 	SDL_Log("Command Pools created!");
 
 	// Texture
-	create_texture_image();
-	SDL_Log("Image created!");
 	create_texture_sampler();
 	SDL_Log("Texture sampler created!");
 
@@ -119,7 +115,8 @@ void VulkanApplication::init_vulkan() {
 		.command_pool = *graphics_command_pool,
 	};
 	swapchain = std::make_unique<Swapchain>();
-	SDL_ShowWindow(window);
+
+	init_rtx();
 }
 void VulkanApplication::main_loop() {
 	bool run = true;
@@ -171,15 +168,6 @@ void VulkanApplication::main_loop() {
 		}
 		device->waitIdle();
 	}
-}
-void VulkanApplication::rasterize_scene(VulkanFrame &frame) {
-	// FRAG UBO
-	/*
-	frame.scene_buffer->write_data(&fubo, sizeof(fubo), sizeof(CameraMatrices));
-	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline());
-	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, swapchain->get_pipeline_layout(), 0, frame.scene_descriptor_set.get(), nullptr);
-	scene->rasterize(frame);
-	 */
 }
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	// UI
@@ -325,53 +313,6 @@ void VulkanApplication::create_logical_device() {
 	present_queue = device->getQueue(queue_family_indices.present_family.value(), 0);
 	transfer_queue = device->getQueue(queue_family_indices.transfer_family.value(), 0);
 }
-void VulkanApplication::create_texture_image() {
-	/*
-	// Load image
-	SDL_Surface *surf = IMG_Load("resources/textures/viking_room.png");
-	surf = SDL_ConvertSurfaceFormat(surf, SDL_PIXELFORMAT_ABGR8888, 0);
-
-	if (surf == nullptr) {
-		SDL_LogError(0, "%s", SDL_GetError());
-		throw std::runtime_error("Unable to create texture");
-	}
-
-	vk::Format format(get_vk_format(surf->format));
-	texture = std::unique_ptr<Image>(new Image(*device, physical_device, surf->w, surf->h, format, vk::ImageTiling::eOptimal, { vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled }, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eColor));
-
-	// Create data transfer buffer
-	vk::DeviceSize img_size = surf->w * surf->h * surf->format->BytesPerPixel;
-	Buffer staging_buffer(*device, physical_device, img_size, { vk::BufferUsageFlagBits::eTransferSrc }, { vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent });
-	staging_buffer.write_data(surf->pixels, img_size);
-
-	// Copy the buffer to the image and send it to graphics queue
-	vk::UniqueCommandBuffer transfer_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*transfer_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
-	transfer_cbuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-	texture->transition_layout(*transfer_cbuffer, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value());
-	copy_buffer_to_image(*transfer_cbuffer, staging_buffer.buffer, texture->image, surf->w, surf->h);
-	texture->transition_layout(*transfer_cbuffer, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value());
-	transfer_cbuffer->end();
-	transfer_queue.submit(vk::SubmitInfo(nullptr, nullptr, *transfer_cbuffer, nullptr));
-
-	// Receive the image on the graphics queue
-	vk::UniqueCommandBuffer graphics_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
-	graphics_cbuffer->begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-	vk::ImageMemoryBarrier barrier(
-			{}, vk::AccessFlagBits::eVertexAttributeRead,
-			vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal,
-			queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value(),
-			texture->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-	graphics_cbuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eVertexInput, {}, nullptr, nullptr, barrier);
-	graphics_cbuffer->end();
-	graphics_queue.submit(vk::SubmitInfo({}, {}, *graphics_cbuffer));
-
-	// Wait for everything to process
-	transfer_queue.waitIdle();
-	graphics_queue.waitIdle();
-
-	SDL_FreeSurface(surf);
-	*/
-}
 void VulkanApplication::create_texture_sampler() {
 	texture_sampler = device->createSamplerUnique(vk::SamplerCreateInfo(
 			{}, vk::Filter::eLinear, vk::Filter::eLinear,
@@ -381,183 +322,6 @@ void VulkanApplication::create_texture_sampler() {
 			true, physical_device.getProperties().limits.maxSamplerAnisotropy,
 			false, vk::CompareOp::eAlways, 0, 0,
 			vk::BorderColor::eIntOpaqueBlack, false));
-}
-
-///Copy a buffer from a staging buffer in the transfer queue to a buffer in the graphics queue transferring ownership.
-void VulkanApplication::copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size) {
-	auto send_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*transfer_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
-	send_cbuffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
-	vk::BufferCopy region(0, 0, size);
-	send_cbuffer->copyBuffer(src, dst, region);
-
-	vk::BufferMemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite, {}, queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value(), dst, 0, size);
-	send_cbuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eBottomOfPipe, {}, nullptr, barrier, nullptr);
-	send_cbuffer->end();
-	transfer_queue.submit(vk::SubmitInfo(nullptr, {}, *send_cbuffer, nullptr), nullptr);
-
-	auto receive_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
-	receive_cbuffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
-
-	// reuse the old barrier create info
-	barrier.setSrcAccessMask({});
-	barrier.setDstAccessMask(vk::AccessFlagBits::eVertexAttributeRead);
-
-	receive_cbuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eVertexInput, {}, nullptr, barrier, nullptr);
-	receive_cbuffer->end();
-	graphics_queue.submit(vk::SubmitInfo(nullptr, {}, *receive_cbuffer, nullptr));
-
-	transfer_queue.waitIdle();
-	graphics_queue.waitIdle();
-}
-bool VulkanApplication::check_validation_layer_support() {
-	auto available_layers = vk::enumerateInstanceLayerProperties();
-
-	for (const char *layer_name : req_validation_layers) {
-		bool layer_found = false;
-		for (const auto &layer_properties : available_layers) {
-			if (strcmp(layer_name, layer_properties.layerName) == 0) {
-				layer_found = true;
-				break;
-			}
-		}
-
-		if (!layer_found) {
-			return false;
-		}
-	}
-
-	return true;
-}
-std::vector<const char *> VulkanApplication::get_required_extensions(SDL_Window *window) {
-	// Get extension count & names
-	uint32_t sdl_extension_count = 0;
-	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, nullptr);
-	std::vector<const char *> required_extension_names = {};
-	required_extension_names.resize(sdl_extension_count);
-	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, required_extension_names.data());
-
-	if (enable_validation_layers) {
-		required_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	}
-
-	SDL_Log("Required instance extensions:");
-	for (const auto &extension : required_extension_names) {
-		SDL_Log("\t %s", extension);
-	}
-
-	return required_extension_names;
-}
-
-vk::CommandBuffer VulkanApplication::create_commandbuffer(vk::QueueFlagBits type, bool begin) {
-	vk::CommandBufferAllocateInfo alloc_info{};
-	alloc_info.commandBufferCount = 1;
-	alloc_info.level = vk::CommandBufferLevel::ePrimary;
-
-	switch (type) {
-		case vk::QueueFlagBits::eGraphics:
-			alloc_info.commandPool = *graphics_command_pool;
-			break;
-
-		case vk::QueueFlagBits::eTransfer:
-			alloc_info.commandPool = *transfer_command_pool;
-			break;
-		default:
-			SDL_LogError(0, "Queue type not supported");
-			throw std::runtime_error("Queue type not supported");
-			break;
-	}
-
-	auto cmd = device->allocateCommandBuffers(alloc_info).front();
-	if (begin) {
-		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
-	}
-	return cmd;
-}
-std::vector<vk::CommandBuffer> VulkanApplication::create_commandbuffers(uint32_t count, vk::QueueFlagBits type, bool begin) {
-	vk::CommandBufferAllocateInfo alloc_info{};
-	alloc_info.commandBufferCount = count;
-	alloc_info.level = vk::CommandBufferLevel::ePrimary;
-
-	switch (type) {
-		case vk::QueueFlagBits::eGraphics:
-			alloc_info.commandPool = *graphics_command_pool;
-			break;
-
-		case vk::QueueFlagBits::eTransfer:
-			alloc_info.commandPool = *transfer_command_pool;
-			break;
-		default:
-			SDL_LogError(0, "Queue type not supported");
-			throw std::runtime_error("Queue type not supported");
-			break;
-	}
-
-	auto cmd = device->allocateCommandBuffers(alloc_info);
-	if (begin) {
-		for (auto &c : cmd)
-			c.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
-	}
-	return cmd;
-}
-void VulkanApplication::flush_commandbuffer(vk::CommandBuffer cmd, vk::QueueFlagBits type, bool wait) {
-	cmd.end();
-	vk::CommandPool command_pool;
-	vk::Queue queue;
-
-	switch (type) {
-		case vk::QueueFlagBits::eGraphics:
-			command_pool = *graphics_command_pool;
-			queue = graphics_queue;
-			break;
-
-		case vk::QueueFlagBits::eTransfer:
-			command_pool = *transfer_command_pool;
-			queue = transfer_queue;
-			break;
-		default:
-			SDL_LogWarn(0, "Queue type not supported");
-			break;
-	}
-	queue.submit(vk::SubmitInfo(nullptr, nullptr, cmd, nullptr), nullptr);
-
-	if (wait) {
-		queue.waitIdle();
-	}
-	device->freeCommandBuffers(command_pool, cmd);
-}
-void VulkanApplication::flush_commandbuffers(std::vector<vk::CommandBuffer> cmd, vk::QueueFlagBits type, bool wait) {
-	for (auto &c : cmd) {
-		c.end();
-	}
-
-	vk::CommandPool command_pool;
-	vk::Queue queue;
-	switch (type) {
-		case vk::QueueFlagBits::eGraphics:
-			command_pool = *graphics_command_pool;
-			queue = graphics_queue;
-			break;
-
-		case vk::QueueFlagBits::eTransfer:
-			command_pool = *transfer_command_pool;
-			queue = transfer_queue;
-			break;
-		default:
-			SDL_LogWarn(0, "Queue type not supported");
-			break;
-	}
-	queue.submit(vk::SubmitInfo(nullptr, nullptr, cmd, nullptr), nullptr);
-	if (wait) {
-		queue.waitIdle();
-	}
-	device->freeCommandBuffers(command_pool, cmd);
-}
-
-int VulkanApplication::get_graphics_family_index() const {
-	return queue_family_indices.graphics_family.value();
-}
-int VulkanApplication::get_transfer_family_index() const {
-	return queue_family_indices.transfer_family.value();
 }
 
 void VulkanApplication::init_rtx() {
@@ -570,16 +334,6 @@ void VulkanApplication::init_rtx() {
 }
 void VulkanApplication::build_rtx_pipeline() {
 	// Allocate render image TODO : recreate on swapchain recreation, link to swapchain??
-	/*
-	VkFormatProperties properties;
-	vkGetPhysicalDeviceFormatProperties(physical_device, VK_FORMAT_B8G8R8A8_SRGB, &properties);
-	if (properties.linearTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) {
-		SDL_Log("Ok storage");
-	}
-	if (properties.linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) {
-		SDL_Log("Ok transfer");
-	}
-	*/
 	Image *img = new Image(
 			*device, physical_device,
 			swapchain->get_extent().width, swapchain->get_extent().height,
@@ -784,4 +538,184 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	image_barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
 	image_barrier.newLayout = vk::ImageLayout::eGeneral;
 	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eVertexInput, {}, nullptr, nullptr, image_barrier);
+}
+
+void VulkanApplication::copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size) {
+	auto send_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*transfer_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
+	send_cbuffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
+	vk::BufferCopy region(0, 0, size);
+	send_cbuffer->copyBuffer(src, dst, region);
+
+	vk::BufferMemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite, {}, queue_family_indices.transfer_family.value(), queue_family_indices.graphics_family.value(), dst, 0, size);
+	send_cbuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eBottomOfPipe, {}, nullptr, barrier, nullptr);
+	send_cbuffer->end();
+	transfer_queue.submit(vk::SubmitInfo(nullptr, {}, *send_cbuffer, nullptr), nullptr);
+
+	auto receive_cbuffer = std::move(device->allocateCommandBuffersUnique(vk::CommandBufferAllocateInfo(*graphics_command_pool, vk::CommandBufferLevel::ePrimary, 1)).front());
+	receive_cbuffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
+
+	// reuse the old barrier create info
+	barrier.setSrcAccessMask({});
+	barrier.setDstAccessMask(vk::AccessFlagBits::eVertexAttributeRead);
+
+	receive_cbuffer->pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eVertexInput, {}, nullptr, barrier, nullptr);
+	receive_cbuffer->end();
+	graphics_queue.submit(vk::SubmitInfo(nullptr, {}, *receive_cbuffer, nullptr));
+
+	transfer_queue.waitIdle();
+	graphics_queue.waitIdle();
+}
+bool VulkanApplication::check_validation_layer_support() {
+	auto available_layers = vk::enumerateInstanceLayerProperties();
+
+	for (const char *layer_name : req_validation_layers) {
+		bool layer_found = false;
+		for (const auto &layer_properties : available_layers) {
+			if (strcmp(layer_name, layer_properties.layerName) == 0) {
+				layer_found = true;
+				break;
+			}
+		}
+
+		if (!layer_found) {
+			return false;
+		}
+	}
+
+	return true;
+}
+std::vector<const char *> VulkanApplication::get_required_extensions(SDL_Window *window) {
+	// Get extension count & names
+	uint32_t sdl_extension_count = 0;
+	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, nullptr);
+	std::vector<const char *> required_extension_names = {};
+	required_extension_names.resize(sdl_extension_count);
+	SDL_Vulkan_GetInstanceExtensions(window, &sdl_extension_count, required_extension_names.data());
+
+	if (enable_validation_layers) {
+		required_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+	}
+
+	SDL_Log("Required instance extensions:");
+	for (const auto &extension : required_extension_names) {
+		SDL_Log("\t %s", extension);
+	}
+
+	return required_extension_names;
+}
+
+vk::CommandBuffer VulkanApplication::create_commandbuffer(vk::QueueFlagBits type, bool begin) {
+	vk::CommandBufferAllocateInfo alloc_info{};
+	alloc_info.commandBufferCount = 1;
+	alloc_info.level = vk::CommandBufferLevel::ePrimary;
+
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			alloc_info.commandPool = *graphics_command_pool;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			alloc_info.commandPool = *transfer_command_pool;
+			break;
+		default:
+			SDL_LogError(0, "Queue type not supported");
+			throw std::runtime_error("Queue type not supported");
+			break;
+	}
+
+	auto cmd = device->allocateCommandBuffers(alloc_info).front();
+	if (begin) {
+		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
+	}
+	return cmd;
+}
+std::vector<vk::CommandBuffer> VulkanApplication::create_commandbuffers(uint32_t count, vk::QueueFlagBits type, bool begin) {
+	vk::CommandBufferAllocateInfo alloc_info{};
+	alloc_info.commandBufferCount = count;
+	alloc_info.level = vk::CommandBufferLevel::ePrimary;
+
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			alloc_info.commandPool = *graphics_command_pool;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			alloc_info.commandPool = *transfer_command_pool;
+			break;
+		default:
+			SDL_LogError(0, "Queue type not supported");
+			throw std::runtime_error("Queue type not supported");
+			break;
+	}
+
+	auto cmd = device->allocateCommandBuffers(alloc_info);
+	if (begin) {
+		for (auto &c : cmd)
+			c.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit, nullptr));
+	}
+	return cmd;
+}
+void VulkanApplication::flush_commandbuffer(vk::CommandBuffer cmd, vk::QueueFlagBits type, bool wait) {
+	cmd.end();
+	vk::CommandPool command_pool;
+	vk::Queue queue;
+
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			command_pool = *graphics_command_pool;
+			queue = graphics_queue;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			command_pool = *transfer_command_pool;
+			queue = transfer_queue;
+			break;
+		default:
+			SDL_LogWarn(0, "Queue type not supported");
+			break;
+	}
+	queue.submit(vk::SubmitInfo(nullptr, nullptr, cmd, nullptr), nullptr);
+
+	if (wait) {
+		queue.waitIdle();
+	}
+	device->freeCommandBuffers(command_pool, cmd);
+}
+void VulkanApplication::flush_commandbuffers(std::vector<vk::CommandBuffer> cmd, vk::QueueFlagBits type, bool wait) {
+	for (auto &c : cmd) {
+		c.end();
+	}
+
+	vk::CommandPool command_pool;
+	vk::Queue queue;
+	switch (type) {
+		case vk::QueueFlagBits::eGraphics:
+			command_pool = *graphics_command_pool;
+			queue = graphics_queue;
+			break;
+
+		case vk::QueueFlagBits::eTransfer:
+			command_pool = *transfer_command_pool;
+			queue = transfer_queue;
+			break;
+		default:
+			SDL_LogWarn(0, "Queue type not supported");
+			break;
+	}
+	queue.submit(vk::SubmitInfo(nullptr, nullptr, cmd, nullptr), nullptr);
+	if (wait) {
+		queue.waitIdle();
+	}
+	device->freeCommandBuffers(command_pool, cmd);
+}
+
+float VulkanApplication::get_aspect_ratio() const {
+	auto a = swapchain->get_extent();
+	return float(a.width) / float(a.height);
+}
+int VulkanApplication::get_graphics_family_index() const {
+	return queue_family_indices.graphics_family.value();
+}
+int VulkanApplication::get_transfer_family_index() const {
+	return queue_family_indices.transfer_family.value();
 }

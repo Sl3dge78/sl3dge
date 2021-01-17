@@ -51,6 +51,7 @@ public:
 
 	void run();
 
+	///Copy a buffer from a staging buffer in the transfer queue to a buffer in the graphics queue transferring ownership.
 	void copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size);
 	vk::CommandBuffer create_commandbuffer(vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool begin = true);
 	std::vector<vk::CommandBuffer> create_commandbuffers(uint32_t count, vk::QueueFlagBits type = vk::QueueFlagBits::eGraphics, bool begin = true);
@@ -61,12 +62,18 @@ public:
 	vk::PhysicalDevice get_physical_device() { return physical_device; }
 	int get_graphics_family_index() const;
 	int get_transfer_family_index() const;
+	float get_aspect_ratio() const;
 
 protected:
 	SDL_Window *window = nullptr;
 	std::unique_ptr<Scene> scene;
 
-	float get_aspect_ratio() const;
+	struct RTPushConstant {
+		glm::vec4 clear_color;
+		glm::vec3 light_pos;
+		float light_intensity;
+		int light_type;
+	} rtx_push_constants;
 
 private:
 	vk::DynamicLoader dynamic_loader;
@@ -90,40 +97,6 @@ private:
 	UniqueSwapchain swapchain;
 	size_t semaphore_index = 0;
 
-	bool framebuffer_rezised = false;
-	bool wait_for_vsync = false;
-
-	// Init & Cleanup
-	void init_vulkan();
-
-	// Loop
-	virtual void load() = 0;
-	virtual void start() = 0;
-	virtual void update(float delta_time) = 0;
-	void main_loop();
-	void rasterize_scene(VulkanFrame &frame);
-	void draw_ui(VulkanFrame &frame);
-	void draw_frame();
-
-	void create_instance();
-	void pick_physical_device();
-	void create_logical_device();
-	void create_texture_image();
-	void create_texture_sampler();
-
-	bool check_validation_layer_support();
-	std::vector<const char *> get_required_extensions(SDL_Window *window);
-
-	// RTX
-protected:
-	struct RTPushConstant {
-		glm::vec4 clear_color;
-		glm::vec3 light_pos;
-		float light_intensity;
-		int light_type;
-	} rtx_push_constants;
-
-private:
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
 
 	vk::UniqueDescriptorPool rtx_pool;
@@ -136,10 +109,31 @@ private:
 	std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Buffer> shader_binding_table;
 
+	bool framebuffer_rezised = false;
+	bool wait_for_vsync = false;
+
+	void init_vulkan();
+
+	virtual void load() = 0;
+	virtual void start() = 0;
+	virtual void update(float delta_time) = 0;
+
+	void main_loop();
+	void draw_ui(VulkanFrame &frame);
+	void draw_frame();
+
+	void create_instance();
+	void pick_physical_device();
+	void create_logical_device();
+	void create_texture_sampler();
+
 	void init_rtx();
 	void build_rtx_pipeline();
 	void create_rtx_SBT();
 	void raytrace(VulkanFrame &frame, int image_id);
+
+	bool check_validation_layer_support();
+	std::vector<const char *> get_required_extensions(SDL_Window *window);
 };
 
 #endif

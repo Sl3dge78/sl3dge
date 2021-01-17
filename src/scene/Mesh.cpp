@@ -10,7 +10,6 @@
 Mesh::Mesh(VulkanApplication &app, const std::string path) {
 	this->id = get_id();
 
-	// Todo : load this only once, and then point to the data for each mesh as reqs
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
