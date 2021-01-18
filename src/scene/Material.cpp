@@ -2,7 +2,7 @@
 
 #include "vulkan/VulkanApplication.h"
 
-Material::Material(VulkanApplication &app, const std::string &texture_path) {
+Texture::Texture(VulkanApplication &app, const std::string &texture_path) {
 	SDL_Surface *surf = IMG_Load(texture_path.c_str());
 	surf = SDL_ConvertSurfaceFormat(surf, SDL_PIXELFORMAT_ABGR8888, 0);
 

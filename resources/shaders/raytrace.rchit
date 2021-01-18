@@ -3,13 +3,14 @@
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
 
-#include "shader_utils.h"
+#include "shader_utils.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT top_level_AS;
 layout(binding = 3, set = 0) buffer Scene {Instance i[];} scene;
 layout(binding = 4, set = 0) buffer Vertices {Vertex v[];} vertices[];
 layout(binding = 5, set = 0) buffer Indices {uint i[];} indices[];
 layout(binding = 6, set = 0) uniform sampler2D textures[];
+layout(binding = 7, set = 0) buffer Materials {Material m[];} materials;
 
 layout(push_constant) uniform Constants
 {
@@ -27,6 +28,8 @@ void main() {
 
     uint mesh_id = scene.i[gl_InstanceCustomIndexEXT].mesh_id;
     uint mat_id = scene.i[gl_InstanceCustomIndexEXT].mat_id;
+    Material mat = materials.m[mat_id];
+
     ivec3 idx = ivec3(indices[nonuniformEXT(mesh_id)].i[3 * gl_PrimitiveID + 0], 
                     indices[nonuniformEXT(mesh_id)].i[3 * gl_PrimitiveID + 1], 
                     indices[nonuniformEXT(mesh_id)].i[3 * gl_PrimitiveID + 2]);
@@ -50,7 +53,7 @@ void main() {
 
     float light_distance = 100000.0; // Compute for point lights
 
-    float ambient = 0.1;
+    float ambient = mat.ambient_intensity;
     float diffuse = max(dnl, 0.0);
     float attenuation = 1;
 
@@ -84,9 +87,10 @@ void main() {
             attenuation = 1;
         }
     }
-  
-    vec3 color = texture(textures[mat_id], tex_coord).xyz;
+    vec3 color = mat.diffuse_color;
+    if(mat.texture_id > 0)
+        color = texture(textures[mat.texture_id-1], tex_coord).xyz;
+
     float lighting = max(diffuse, ambient);
-    //prd.hit_value = color;
     prd.hit_value = color * (diffuse + ambient) * attenuation;
 }

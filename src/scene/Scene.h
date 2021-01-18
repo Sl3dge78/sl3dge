@@ -12,8 +12,8 @@ class VulkanApplication;
 
 class MeshInstance {
 private:
-	uint32_t mesh_id; // Typedef that as mesh handle
-	uint32_t mat_id; // typedef that as mat_handle
+	alignas(4) uint32_t mesh_id; // Typedef that as mesh handle
+	alignas(4) uint32_t mat_id; // typedef that as mat_handle
 	alignas(16) glm::mat4 transform;
 	alignas(16) glm::mat4 inverted;
 
@@ -44,15 +44,19 @@ public:
 	Camera camera;
 	std::vector<std::unique_ptr<Mesh>> meshes;
 	std::vector<MeshInstance> instances;
-	std::vector<std::unique_ptr<Material>> materials;
+	std::vector<Material> materials;
+	std::vector<std::unique_ptr<Texture>> textures;
 	vk::DeviceSize instances_size;
+	vk::DeviceSize materials_size;
 
 	std::unique_ptr<Buffer> scene_desc_buffer;
+	std::unique_ptr<Buffer> materials_buffer;
 
 	void allocate_uniform_buffer(VulkanApplication &app);
 
 	uint32_t load_mesh(VulkanApplication *app, const std::string path);
-	uint32_t load_material(VulkanApplication *app, const std::string path);
+	uint32_t create_material(const float ambient_intensity, const glm::vec3 diffuse_color, const uint32_t texture_id = 0);
+	uint32_t load_texture(VulkanApplication *app, const std::string path);
 	MeshInstance *create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform = glm::mat4(1.0f));
 	void build_BLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags);
 	void build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags, bool update = false);

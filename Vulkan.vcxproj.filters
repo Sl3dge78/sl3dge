@@ -1241,13 +1241,13 @@
     <ClInclude Include="src\vulkan\VulkanHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="resources\shaders\shader_utils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\scene\Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\scene\Material.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resources\shaders\shader_utils.glsl">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

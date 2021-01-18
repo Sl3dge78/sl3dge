@@ -1,7 +1,7 @@
 #version 460 core
 #extension GL_EXT_ray_tracing : require
 
-#include "shader_utils.h"
+#include "shader_utils.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT top_level_AS;
 layout(binding = 1, set = 0, rgba8) uniform image2D image;

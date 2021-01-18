@@ -365,6 +365,7 @@ void VulkanApplication::build_rtx_pipeline() {
 	// TODO : move this shit in Scene?
 	uint32_t mesh_count = scene->meshes.size();
 	uint32_t material_count = scene->materials.size();
+	uint32_t texture_count = scene->textures.size();
 
 	{ // Descriptor Layout
 		std::vector<vk::DescriptorSetLayoutBinding> bindings{
@@ -380,9 +381,13 @@ void VulkanApplication::build_rtx_pipeline() {
 			vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 			// idx buffer
 			vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
-			// Texture buffer
-			vk::DescriptorSetLayoutBinding(6, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 		};
+
+		// Texture buffer
+		bindings.emplace_back(vk::DescriptorSetLayoutBinding(6, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr));
+
+		// Material buffer
+		bindings.emplace_back(vk::DescriptorSetLayoutBinding(7, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr));
 
 		vk::DescriptorSetLayoutCreateInfo set_layout_ci({}, bindings);
 		rtx_set_layout = device->createDescriptorSetLayoutUnique(set_layout_ci);
@@ -449,12 +454,18 @@ void VulkanApplication::build_rtx_pipeline() {
 		writes.push_back(idx_writes);
 
 		// Texture sampler = binding 6
+		// TODO : If we have no texture, this creates a validation error
 		std::vector<vk::DescriptorImageInfo> images_info;
-		for (auto &mat : scene->materials) {
-			images_info.emplace_back(*texture_sampler, mat->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+		for (auto &tex : scene->textures) {
+			images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
 		}
-		vk::WriteDescriptorSet texture_write(*rtx_set, 6, 0, material_count, vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
+		vk::WriteDescriptorSet texture_write(*rtx_set, 6, 0, texture_count, vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
 		writes.push_back(texture_write);
+
+		// Materials = binding 7
+		vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
+		vk::WriteDescriptorSet material_write(*rtx_set, 7, 0, vk::DescriptorType::eStorageBuffer, nullptr, material_info, nullptr);
+		writes.push_back(material_write);
 
 		device->updateDescriptorSets(writes, nullptr);
 	}

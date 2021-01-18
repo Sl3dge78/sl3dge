@@ -15,3 +15,9 @@ struct Instance {
 	mat4 transform;
 	mat4 inverted;
 };
+
+struct Material {
+	float ambient_intensity;
+	vec3 diffuse_color;
+	uint texture_id;
+};

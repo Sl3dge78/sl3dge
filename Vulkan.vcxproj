@@ -550,7 +550,7 @@
     <ClInclude Include="include\sdl\SDL_vulkan.h" />
     <ClInclude Include="include\tiny_obj_loader.h" />
     <ClInclude Include="src\scene\Material.h" />
-    <ClInclude Include="resources\shaders\shader_utils.h" />
+    <ClInclude Include="resources\shaders\shader_utils.glsl" />
     <ClInclude Include="src\scene\Camera.h" />
     <ClInclude Include="src\Debug.h" />
     <ClInclude Include="src\imgui\imconfig.h" />
