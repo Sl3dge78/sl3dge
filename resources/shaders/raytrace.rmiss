@@ -4,14 +4,17 @@
 
 #include "shader_utils.glsl"
 
-layout(location = 0) rayPayloadInEXT HitPayload prd;
+layout(location = 0) rayPayloadInEXT HitPayload payload;
 
-layout(push_constant) uniform Constants
-{
+layout(push_constant) uniform Constants {
     vec4 clear_color;
 };
 
-void main()
-{
-    prd.hit_value = clear_color.xyz * 0.8;
+void main() {
+    if(payload.depth == 0) {
+        payload.direct_color = clear_color.xyz * 0.8;
+    } else {
+        payload.direct_color = vec3(1);
+    }
+    payload.depth = 100;   
 }

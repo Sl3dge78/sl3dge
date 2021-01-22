@@ -55,7 +55,7 @@ public:
 	void allocate_uniform_buffer(VulkanApplication &app);
 
 	uint32_t load_mesh(VulkanApplication *app, const std::string path);
-	uint32_t create_material(const float ambient_intensity, const glm::vec3 diffuse_color, const uint32_t texture_id = 0);
+	uint32_t create_material(const float ambient_intensity, const glm::vec3 diffuse_color, const int32_t texture_id = -1);
 	uint32_t load_texture(VulkanApplication *app, const std::string path);
 	MeshInstance *create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform = glm::mat4(1.0f));
 	void build_BLAS(VulkanApplication &app, vk::BuildAccelerationStructureFlagsKHR flags);

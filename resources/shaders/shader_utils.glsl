@@ -1,6 +1,11 @@
-
 struct HitPayload {
-	vec3 hit_value;
+    uint null;
+    vec3 direct_color;
+    uint seed;
+	uint depth;
+	vec3 ray_origin;
+	vec3 ray_direction;
+	vec3 weight;
 };
 
 struct Vertex {
@@ -19,5 +24,7 @@ struct Instance {
 struct Material {
 	float ambient_intensity;
 	vec3 diffuse_color;
-	uint texture_id;
+	int texture_id;
 };
+
+#define M_PI 3.1415926535897932384626433832795

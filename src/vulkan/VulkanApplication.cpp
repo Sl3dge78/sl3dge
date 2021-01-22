@@ -364,7 +364,6 @@ void VulkanApplication::build_rtx_pipeline() {
 	debug_name_object(*device, uint64_t(VkImage(rtx_result_image->image)), rtx_result_image->image.objectType, "RTX Result Image");
 	// TODO : move this shit in Scene?
 	uint32_t mesh_count = scene->meshes.size();
-	uint32_t material_count = scene->materials.size();
 	uint32_t texture_count = scene->textures.size();
 
 	{ // Descriptor Layout
@@ -374,7 +373,7 @@ void VulkanApplication::build_rtx_pipeline() {
 			// Final image
 			vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, { vk::ShaderStageFlagBits::eRaygenKHR }, nullptr),
 			// Camera matrices
-			vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eRaygenKHR, nullptr),
+			vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eUniformBuffer, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 			// Scene description
 			vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
 			// vtx buffer

@@ -1678,6 +1678,8 @@
     <None Include="resources\shaders\triangle.frag.spv" />
     <None Include="resources\shaders\triangle.vert.spv" />
     <None Include="resources\shaders\shadow.rmiss" />
+    <None Include="resources\shaders\random.glsl" />
+    <None Include="resources\shaders\shadow.rmiss.spv" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="src\scene\scene.natvis" />

@@ -2,25 +2,33 @@
 #extension  GL_GOOGLE_include_directive  : require
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_ARB_shader_clock : enable
 
 #include "shader_utils.glsl"
+#include "random.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT top_level_AS;
+layout(binding = 2, set = 0) uniform CameraMatrices {
+    mat4 view;
+    mat4 proj;
+    mat4 view_inverse;
+    mat4 proj_inverse;
+    int frame;
+} cam;
 layout(binding = 3, set = 0) buffer Scene {Instance i[];} scene;
 layout(binding = 4, set = 0) buffer Vertices {Vertex v[];} vertices[];
 layout(binding = 5, set = 0) buffer Indices {uint i[];} indices[];
 layout(binding = 6, set = 0) uniform sampler2D textures[];
 layout(binding = 7, set = 0) buffer Materials {Material m[];} materials;
 
-layout(push_constant) uniform Constants
-{
+layout(push_constant) uniform Constants {
     vec4 clear_color;
     vec3 light_position;
     float light_instensity;
     int light_type;
 } constants;
 
-layout(location = 0) rayPayloadInEXT HitPayload prd;
+layout(location = 0) rayPayloadInEXT HitPayload payload;
 layout(location = 1) rayPayloadInEXT bool is_shadow;
 hitAttributeEXT vec3 attribs;
 
@@ -47,50 +55,23 @@ void main() {
     world_pos = vec3(scene.i[gl_InstanceCustomIndexEXT].transform * vec4(world_pos, 1.0));
 
     vec2 tex_coord = v0.tex_coord * barycentre.x + v1.tex_coord * barycentre.y + v2.tex_coord * barycentre.z;
+    
+    vec3 tangent, bitangent;
+    create_coordinate_system(normal, tangent, bitangent);
+    vec3 dir = sampling_hemi(payload.seed, tangent, bitangent, normal);
+    
+    vec3 emittance = vec3(0.2);
 
-    const vec3 light_dir = normalize(constants.light_position - world_pos);
-    const float dnl = dot(normal, light_dir);
+    vec3 albedo = mat.diffuse_color;
+    if(mat.texture_id > -1)
+        albedo = texture(textures[mat.texture_id], tex_coord).xyz;
 
-    float light_distance = 100000.0; // Compute for point lights
+    const float p = 1 / M_PI;
+    float cos_theta = dot(dir, normal);
+    vec3 BRDF = albedo / M_PI;
 
-    float ambient = mat.ambient_intensity;
-    float diffuse = max(dnl, 0.0);
-    float attenuation = 1;
-
-    if(dnl>=0) {
-        // Throw a ray in the light's direction. If we hit nothing (miss shader) we're not in shadow.
-        float t_min = 0.0;
-        float t_max = light_distance;
-        vec3 origin = world_pos + normal * 0.003f;
-        vec3 dir = light_dir;
-        uint flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-
-        is_shadow = true;
-        traceRayEXT(top_level_AS,   // Structure
-                flags,          // Flags
-                0xff,           // Mask
-                0,              // sbt record offset
-                0,              // sbt record stride
-                1,              // miss shader index
-                origin,         
-                t_min,
-                dir,
-                t_max, 
-                1               // Payload location
-            );
-  
-
- 
-        if(is_shadow) {
-            attenuation = 0.3;
-        } else {
-            attenuation = 1;
-        }
-    }
-    vec3 color = mat.diffuse_color;
-    if(mat.texture_id > 0)
-        color = texture(textures[mat.texture_id-1], tex_coord).xyz;
-
-    float lighting = max(diffuse, ambient);
-    prd.hit_value = color * (diffuse + ambient) * attenuation;
+    payload.direct_color = emittance;
+    payload.ray_origin = world_pos;
+    payload.ray_direction = dir;
+    payload.weight = BRDF * cos_theta / p;
 }

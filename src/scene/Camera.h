@@ -25,6 +25,7 @@ private:
 
 	float aspect_ratio = 1280.0f / 720.0f;
 	uint32_t height;
+	bool is_dirty;
 
 public:
 	struct Matrices {
@@ -32,6 +33,7 @@ public:
 		alignas(16) glm::mat4 proj;
 		alignas(16) glm::mat4 view_inverse;
 		alignas(16) glm::mat4 proj_inverse;
+		alignas(4) int frame;
 	} matrices;
 
 	std::unique_ptr<Buffer> buffer;
@@ -42,6 +44,8 @@ public:
 
 	void update_vectors();
 	glm::vec3 get_position() const { return position; }
+
+	void display_window();
 
 	bool show_window = false;
 };

@@ -712,6 +712,7 @@
     <None Include="include\glm\gtx\vector_query.inl" />
     <None Include="include\glm\gtx\wrap.inl" />
     <None Include="resources\shaders\build_shaders.bat" />
+    <None Include="resources\shaders\random.glsl" />
     <None Include="resources\shaders\raytrace.rchit" />
     <None Include="resources\shaders\raytrace.rchit.spv" />
     <None Include="resources\shaders\raytrace.rgen" />
@@ -719,6 +720,7 @@
     <None Include="resources\shaders\raytrace.rmiss" />
     <None Include="resources\shaders\raytrace.rmiss.spv" />
     <None Include="resources\shaders\shadow.rmiss" />
+    <None Include="resources\shaders\shadow.rmiss.spv" />
     <None Include="resources\shaders\triangle.frag" />
     <None Include="resources\shaders\triangle.frag.spv" />
     <None Include="resources\shaders\triangle.vert" />

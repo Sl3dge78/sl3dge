@@ -18,9 +18,13 @@ void Camera::start() {
 	matrices.proj_inverse = glm::inverse(matrices.proj);
 
 	update_vectors();
+	buffer->write_data(&matrices, sizeof(Matrices));
 }
 void Camera::update(float delta_time) {
 	if (Input::get_mouse(3)) {
+		if (Input::delta_mouse_x() != 0 || Input::delta_mouse_y() != 0) {
+			is_dirty = true;
+		}
 		yaw += Input::delta_mouse_x() * camera_speed * delta_time;
 		pitch -= Input::delta_mouse_y() * camera_speed * delta_time;
 
@@ -33,8 +37,6 @@ void Camera::update(float delta_time) {
 			pitch = 89.0f;
 		if (pitch < -89.0f)
 			pitch = -89.0f;
-
-		update_vectors();
 	}
 
 	float delta_speed = delta_time * move_speed;
@@ -42,33 +44,43 @@ void Camera::update(float delta_time) {
 	if (Input::get_key(SDL_SCANCODE_LSHIFT))
 		delta_speed *= 2.0f;
 
-	if (Input::get_key(SDL_SCANCODE_W))
+	if (Input::get_key(SDL_SCANCODE_W)) {
 		position += delta_speed * front;
-	if (Input::get_key(SDL_SCANCODE_S))
+		is_dirty = true;
+	}
+	if (Input::get_key(SDL_SCANCODE_S)) {
 		position -= delta_speed * front;
-	if (Input::get_key(SDL_SCANCODE_A))
+		is_dirty = true;
+	}
+	if (Input::get_key(SDL_SCANCODE_A)) {
 		position -= delta_speed * glm::normalize(glm::cross(front, up));
-	if (Input::get_key(SDL_SCANCODE_D))
+		is_dirty = true;
+	}
+	if (Input::get_key(SDL_SCANCODE_D)) {
 		position += delta_speed * glm::normalize(glm::cross(front, up));
-	if (Input::get_key(SDL_SCANCODE_Q))
+		is_dirty = true;
+	}
+	if (Input::get_key(SDL_SCANCODE_Q)) {
 		position -= delta_speed * up;
-	if (Input::get_key(SDL_SCANCODE_E))
+		is_dirty = true;
+	}
+	if (Input::get_key(SDL_SCANCODE_E)) {
 		position += delta_speed * up;
-
-	if (show_window) {
-		if (!ImGui::Begin("Camera", &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
-			ImGui::End();
-			return;
-		}
-
-		ImGui::InputFloat3("Position", &position[0]);
-		ImGui::Separator();
-		ImGui::InputFloat("yaw", &yaw, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
-		ImGui::InputFloat("pitch", &pitch, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
-		ImGui::End();
+		is_dirty = true;
 	}
 
+	if (matrices.frame <= 100)
+		matrices.frame++;
+	if (is_dirty) {
+		matrices.frame = 0;
+		update_vectors();
+		is_dirty = false;
+	}
 	buffer->write_data(&matrices, sizeof(Matrices));
+
+	if (show_window) {
+		display_window();
+	}
 }
 void Camera::update_vectors() {
 	glm::vec3 direction;
@@ -82,4 +94,18 @@ void Camera::update_vectors() {
 	up = glm::cross(front, right);
 	matrices.view = glm::lookAt(position, position + front, up);
 	matrices.view_inverse = glm::inverse(matrices.view);
+}
+
+void Camera::display_window() {
+	if (!ImGui::Begin("Camera", &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::End();
+		return;
+	}
+
+	ImGui::InputFloat3("Position", &position[0]);
+	ImGui::Separator();
+	ImGui::InputFloat("yaw", &yaw, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
+	ImGui::InputFloat("pitch", &pitch, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
+	ImGui::InputInt("frame", &matrices.frame);
+	ImGui::End();
 }

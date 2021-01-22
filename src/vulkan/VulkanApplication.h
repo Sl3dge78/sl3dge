@@ -73,6 +73,7 @@ protected:
 		glm::vec3 light_pos;
 		float light_intensity;
 		int light_type;
+		int frame;
 	} rtx_push_constants;
 
 private:

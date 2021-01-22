@@ -9,13 +9,13 @@ uint32_t Scene::load_mesh(VulkanApplication *app, const std::string path) {
 	meshes.emplace_back(std::make_unique<Mesh>(*app, path));
 	return meshes.size() - 1;
 }
-uint32_t Scene::create_material(const float ambient_intensity, const glm::vec3 diffuse_color, const uint32_t texture_id) {
+uint32_t Scene::create_material(const float ambient_intensity, const glm::vec3 diffuse_color, const int32_t texture_id) {
 	materials.emplace_back(ambient_intensity, diffuse_color, texture_id);
 	return materials.size() - 1;
 }
 uint32_t Scene::load_texture(VulkanApplication *app, const std::string path) {
 	textures.emplace_back(std::make_unique<Texture>(*app, path));
-	return textures.size();
+	return textures.size() - 1;
 }
 MeshInstance *Scene::create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform) {
 	instances.emplace_back(mesh_id, mat_id);
