@@ -19,13 +19,13 @@ public:
 };
 class Material {
 public:
-	alignas(4) float ambient_intensity;
+	alignas(4) float ambient_strength;
+	alignas(4) float shininess;
+	alignas(4) float specular_strength;
 	alignas(16) glm::vec3 diffuse_color;
-	alignas(4) uint32_t texture_id;
-	Material(const float ambient_intensity, const glm::vec3 &diffuse_color, const uint32_t texture_id) :
-			ambient_intensity(ambient_intensity),
-			diffuse_color(diffuse_color),
-			texture_id(texture_id){};
+	alignas(4) int32_t texture_id;
+	Material(const float ambient_intensity, const glm::vec3 &diffuse_color, const float shininess, const float specular_strength, const uint32_t texture_id) :
+			ambient_strength(ambient_intensity), shininess(shininess), specular_strength(specular_strength), diffuse_color(diffuse_color), texture_id(texture_id){};
 };
 
 #endif // !MATERIAL_H

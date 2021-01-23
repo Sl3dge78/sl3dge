@@ -17,8 +17,11 @@ struct Vertex {
 		return pos == other.pos && normal == other.normal && tex_coord == other.tex_coord;
 	}
 
-	static const vk::VertexInputBindingDescription get_binding_description() {
-		return vk::VertexInputBindingDescription(0, sizeof(Vertex), vk::VertexInputRate::eVertex);
+	static const std::vector<vk::VertexInputBindingDescription> get_binding_description() {
+		std::vector<vk::VertexInputBindingDescription> ret = {
+			vk::VertexInputBindingDescription(0, sizeof(Vertex), vk::VertexInputRate::eVertex)
+		};
+		return ret;
 	}
 
 	static const std::vector<vk::VertexInputAttributeDescription> get_attribute_descriptions() {

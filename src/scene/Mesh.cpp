@@ -81,10 +81,10 @@ Mesh::Mesh(VulkanApplication &app, const std::string path) {
 	range_info.setPrimitiveOffset(0);
 	range_info.setTransformOffset(0);
 }
-void Mesh::draw(VulkanFrame &frame) {
-	frame.command_buffer->bindVertexBuffers(0, { vertex_buffer->buffer }, { 0 });
-	frame.command_buffer->bindIndexBuffer(index_buffer->buffer, 0, vk::IndexType::eUint32);
-	frame.command_buffer->drawIndexed(indices.size(), 1, 0, 0, 0);
+void Mesh::draw(vk::CommandBuffer cmd, const uint32_t id) {
+	cmd.bindVertexBuffers(0, { vertex_buffer->buffer }, { 0 });
+	cmd.bindIndexBuffer(index_buffer->buffer, 0, vk::IndexType::eUint32);
+	cmd.drawIndexed(indices.size(), 1, 0, 0, id);
 }
 void Mesh::update(const float delta_time) {
 	if (show_window) {

@@ -45,7 +45,7 @@ public:
 	Mesh(VulkanApplication &app, const std::string path);
 	~Mesh() = default;
 
-	void draw(VulkanFrame &frame);
+	void draw(vk::CommandBuffer cmd, const uint32_t id);
 	void update(const float delta_time);
 
 	uint32_t get_primitive_count() { return indices.size() / 3; }

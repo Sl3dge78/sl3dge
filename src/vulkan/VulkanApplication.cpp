@@ -27,6 +27,7 @@ VulkanApplication::~VulkanApplication() {
 
 	scene.reset();
 
+	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
 
@@ -40,17 +41,15 @@ void VulkanApplication::run() {
 	scene = std::make_unique<Scene>();
 	load();
 	SDL_Log("Resources loaded");
-	scene->build_BLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
-	SDL_Log("BLAS created");
-	scene->build_TLAS(*this, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
-	SDL_Log("TLAS created");
-	scene->allocate_uniform_buffer(*this);
+	scene->init(*this);
+	post_swapchain_init();
 
-	build_rtx_pipeline();
-	SDL_Log("RTX Pipeline created");
-	create_rtx_SBT();
-	SDL_Log("SBT Created");
-
+	if (rtx) {
+		build_rtx_pipeline();
+		SDL_Log("RTX Pipeline created");
+		create_rtx_SBT();
+		SDL_Log("SBT Created");
+	}
 	SDL_Log("Init done, starting main loop...");
 	main_loop();
 	SDL_Log("Closing...");
@@ -103,20 +102,19 @@ void VulkanApplication::init_vulkan() {
 	SDL_Log("Texture sampler created!");
 
 	SDL_Log("Image view created!");
+}
+void VulkanApplication::post_swapchain_init() {
+	device->waitIdle();
+	swapchain.reset();
+	create_swapchain();
+	build_raster_pipeline();
+	create_ui_context();
+	create_frames();
+	create_semaphores();
 
-	Swapchain::info = {
-		.instance = *instance,
-		.surface = *surface,
-		.window = window,
-		.physical_device = physical_device,
-		.device = *device,
-		.queue_family = queue_family_indices.graphics_family.value(),
-		.queue = graphics_queue,
-		.command_pool = *graphics_command_pool,
-	};
-	swapchain = std::make_unique<Swapchain>();
-
-	init_rtx();
+	if (rtx) {
+		init_rtx();
+	}
 }
 void VulkanApplication::main_loop() {
 	bool run = true;
@@ -155,11 +153,11 @@ void VulkanApplication::main_loop() {
 				}
 			}
 		}
-
+		/*
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
-
+		*/
 		update(delta_time);
 
 		// Don't draw if the app is minimized
@@ -169,50 +167,61 @@ void VulkanApplication::main_loop() {
 		device->waitIdle();
 	}
 }
+void VulkanApplication::raster_scene(VulkanFrame &frame) {
+	scene->draw(*frame.command_buffer);
+}
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
 	// UI
 	ImGui::Render();
 	auto imgui_data = ImGui::GetDrawData();
-	frame.begin_render_pass();
 	ImGui_ImplVulkan_RenderDrawData(imgui_data, frame.command_buffer.get());
-	frame.end_render_pass();
 }
 void VulkanApplication::draw_frame() {
-	vk::Semaphore image_acquired_semaphore = swapchain->get_image_acquired_semaphore(semaphore_index);
-	vk::Semaphore render_complete_semaphore = swapchain->get_render_complete_semaphore(semaphore_index);
+	vk::Semaphore image_acquired_semaphore = *frame_semaphores[semaphore_index].image_aquired;
+	vk::Semaphore render_complete_semaphore = *frame_semaphores[semaphore_index].render_complete;
 
 	// Acquire next image
 	uint32_t image_id;
 	vk::Result result;
 	try {
 		// Get next image and trigger image_acquired_semaphore once ready
-		auto ret = device->acquireNextImageKHR(swapchain->get_swapchain(), UINT64_MAX, image_acquired_semaphore, nullptr);
+		auto ret = device->acquireNextImageKHR(*swapchain, UINT64_MAX, image_acquired_semaphore, nullptr);
 		image_id = ret.value;
 		result = ret.result;
 	} catch (vk::OutOfDateKHRError &error) {
 	} // Handled below
 	if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
 		device->waitIdle();
-		swapchain.reset();
-		swapchain = std::make_unique<Swapchain>();
+		post_swapchain_init();
 		return;
 	}
 
 	// Wait for the frame to be finished
-	auto frame = swapchain->get_frame(image_id);
+	auto frame = &frames[image_id];
 	if (device->waitForFences(frame->fence.get(), true, UINT64_MAX) != vk::Result::eSuccess) {
 		throw std::runtime_error("Waiting for frame timed out!");
 	}
 	device->resetFences(frame->fence.get());
 
 	frame->command_buffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
-	debug_begin_label(frame->command_buffer.get(), "RTX");
-	raytrace(*frame, image_id);
-	debug_end_label(*frame->command_buffer);
+	if (rtx) {
+		debug_begin_label(frame->command_buffer.get(), "RTX");
+		raytrace(*frame, image_id);
+		debug_end_label(*frame->command_buffer);
+	} else {
+		frame->begin_render_pass();
+		frame->command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *raster_layout, 0, *raster_desc_set, nullptr);
+		frame->command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *raster_pipeline);
 
-	debug_begin_label(frame->command_buffer.get(), "UI");
-	draw_ui(*frame);
-	debug_end_label(*frame->command_buffer);
+		debug_begin_label(frame->command_buffer.get(), "Scene");
+		raster_scene(*frame);
+		debug_end_label(*frame->command_buffer);
+
+		debug_begin_label(frame->command_buffer.get(), "UI");
+		//draw_ui(*frame);
+		debug_end_label(*frame->command_buffer);
+		frame->end_render_pass();
+	}
 	frame->command_buffer->end();
 
 	// Submit Queue
@@ -221,19 +230,17 @@ void VulkanApplication::draw_frame() {
 	graphics_queue.submit(si, frame->fence.get());
 
 	// Present
-	vk::SwapchainKHR swap = swapchain->get_swapchain();
 	try {
-		result = present_queue.presentKHR(vk::PresentInfoKHR(render_complete_semaphore, swap, image_id, {}));
+		result = present_queue.presentKHR(vk::PresentInfoKHR(render_complete_semaphore, *swapchain, image_id, {}));
 	} catch (vk::OutOfDateKHRError &error) {
 	} // Handled below
 	if (framebuffer_rezised || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
 		framebuffer_rezised = false;
 		device->waitIdle();
-		swapchain.reset();
-		swapchain = std::make_unique<Swapchain>();
+		post_swapchain_init();
 	}
 
-	semaphore_index = (semaphore_index + 1) % swapchain->get_image_count();
+	semaphore_index = (semaphore_index + 1) % swapchain_image_count;
 }
 
 void VulkanApplication::create_instance() {
@@ -313,13 +320,16 @@ void VulkanApplication::create_logical_device() {
 	vk::PhysicalDeviceDescriptorIndexingFeatures descriptor_indexing{};
 	descriptor_indexing.runtimeDescriptorArray = true;
 	descriptor_indexing.shaderStorageBufferArrayNonUniformIndexing = true;
+	vk::PhysicalDeviceRayQueryFeaturesKHR ray_query{};
+	ray_query.rayQuery = true;
 
 	vk::StructureChain requested_features = {
 		features2,
 		device_address,
 		rt_pipeline,
 		acceleration_structures,
-		descriptor_indexing
+		descriptor_indexing,
+		ray_query
 	};
 
 	vk::DeviceCreateInfo ci({}, req_queues, req_validation_layers, req_device_extensions, nullptr);
@@ -342,6 +352,297 @@ void VulkanApplication::create_texture_sampler() {
 			vk::BorderColor::eIntOpaqueBlack, false));
 }
 
+void VulkanApplication::create_swapchain() {
+	auto capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
+	auto surface_fmt = choose_surface_format(physical_device, *surface);
+	auto present_mode = choose_present_mode(physical_device, *surface);
+	swapchain_extent = choose_extent(capabilities, window);
+	uint32_t req_image_count = capabilities.minImageCount + 1;
+	if (capabilities.maxImageCount > 0 && req_image_count > capabilities.maxImageCount) {
+		req_image_count = capabilities.maxImageCount;
+	}
+	auto family_indices = find_queue_families(physical_device, *surface);
+	std::array<const uint32_t, 2> queue_indices({ family_indices.graphics_family.value(), family_indices.present_family.value() });
+
+	vk::SwapchainCreateInfoKHR ci({},
+			*surface,
+			req_image_count,
+			surface_fmt.format,
+			surface_fmt.colorSpace,
+			swapchain_extent,
+			1,
+			{ vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst },
+			vk::SharingMode::eExclusive,
+			queue_indices,
+			capabilities.currentTransform,
+			vk::CompositeAlphaFlagBitsKHR::eOpaque,
+			present_mode,
+			VK_TRUE);
+
+	swapchain = device->createSwapchainKHRUnique(ci);
+	swapchain_format = surface_fmt.format;
+	swapchain_images = device->getSwapchainImagesKHR(*swapchain);
+	swapchain_image_count = swapchain_images.size();
+}
+void VulkanApplication::build_raster_pipeline() {
+	// Shaders
+	auto vertex_code = read_file("resources/shaders/general.vert.spv");
+	auto fragment_code = read_file("resources/shaders/general.frag.spv");
+
+	auto vertex_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, vertex_code.size(), reinterpret_cast<uint32_t *>(vertex_code.data())));
+	auto fragment_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, fragment_code.size(), reinterpret_cast<uint32_t *>(fragment_code.data())));
+
+	auto stages = {
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertex_shader, "main"),
+		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragment_shader, "main"),
+	};
+
+	depth_image = std::unique_ptr<Image>(new Image(*this, swapchain_extent.width, swapchain_extent.height, find_depth_format(), vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
+
+	// Render pass
+	{
+		// Raster color
+		std::vector<vk::AttachmentDescription> attachments;
+		vk::AttachmentDescription raster_attachment(
+				{},
+				swapchain_format,
+				vk::SampleCountFlagBits::e1,
+				vk::AttachmentLoadOp::eClear,
+				vk::AttachmentStoreOp::eStore,
+				vk::AttachmentLoadOp::eDontCare,
+				vk::AttachmentStoreOp::eDontCare,
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::ePresentSrcKHR);
+		attachments.push_back(raster_attachment);
+
+		vk::AttachmentDescription depth_attachment{};
+		depth_attachment.format = find_depth_format();
+		depth_attachment.samples = vk::SampleCountFlagBits::e1;
+		depth_attachment.loadOp = vk::AttachmentLoadOp::eClear;
+		depth_attachment.storeOp = vk::AttachmentStoreOp::eDontCare;
+		depth_attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+		depth_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+		depth_attachment.initialLayout = vk::ImageLayout::eUndefined;
+		depth_attachment.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+		attachments.push_back(depth_attachment);
+
+		vk::AttachmentReference raster_color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
+		vk::AttachmentReference depth_ref(1U, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+		vk::SubpassDependency raster_dependency(
+				VK_SUBPASS_EXTERNAL,
+				0,
+				{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+				{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+				{},
+				{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
+				{});
+		vk::SubpassDescription raster_subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, raster_color_ref, nullptr, &depth_ref, nullptr);
+
+		raster_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, raster_subpass, raster_dependency));
+	}
+
+	uint32_t mesh_count = scene->meshes.size();
+	uint32_t texture_count = scene->textures.size();
+
+	// Descriptors
+	std::vector<vk::DescriptorSetLayoutBinding> bindings{
+		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, { vk::ShaderStageFlagBits::eVertex }, nullptr),
+		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
+		vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
+		// Scene Desc
+		vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }, nullptr),
+		// Material Data
+		vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
+	};
+
+	raster_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
+	raster_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *raster_set_layout, nullptr));
+
+	// Create Descriptor pool
+	{
+		std::vector<vk::DescriptorPoolSize> pool_sizes{
+			vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1 * swapchain_image_count),
+			vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1 * swapchain_image_count),
+			vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
+			vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2),
+		};
+		raster_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
+	}
+
+	raster_desc_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*raster_pool, *raster_set_layout)).front());
+
+	std::vector<vk::WriteDescriptorSet> writes;
+	// Binding 0, Camera matrices
+	vk::DescriptorBufferInfo camera_buffer(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
+	vk::WriteDescriptorSet camera_matrices(*raster_desc_set, 0, 0, vk::DescriptorType::eUniformBuffer, nullptr, camera_buffer, nullptr);
+	writes.push_back(camera_matrices);
+
+	// Binding 1, textures
+	std::vector<vk::DescriptorImageInfo> images_info;
+	for (auto &tex : scene->textures) {
+		images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+	}
+	vk::WriteDescriptorSet texture_write(*raster_desc_set, 1, 0, scene->textures.size(), vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
+	writes.push_back(texture_write);
+
+	// Binding 2 Acceleration Structure
+	std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
+	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
+	vk::WriteDescriptorSet as_descriptor_write(*raster_desc_set, 2, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
+	as_descriptor_write.pNext = &as_desc;
+	writes.push_back(as_descriptor_write);
+
+	// binding 3 scene desc
+	vk::DescriptorBufferInfo scene_info(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
+	vk::WriteDescriptorSet scene_write(*raster_desc_set, 3, 0, vk::DescriptorType::eStorageBuffer, nullptr, scene_info, nullptr);
+	writes.push_back(scene_write);
+
+	// binding 4 Materials
+	vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
+	vk::WriteDescriptorSet material_write(*raster_desc_set, 4, 0, vk::DescriptorType::eStorageBuffer, nullptr, material_info, nullptr);
+	writes.push_back(material_write);
+
+	device->updateDescriptorSets(writes, nullptr);
+
+	// Pipeline
+	{
+		vk::PipelineVertexInputStateCreateInfo vertex_input{};
+		auto desc = Vertex::get_attribute_descriptions();
+		vertex_input.vertexAttributeDescriptionCount = desc.size();
+		vertex_input.pVertexAttributeDescriptions = desc.data();
+
+		auto bindings = Vertex::get_binding_description();
+		vertex_input.vertexBindingDescriptionCount = bindings.size();
+		vertex_input.pVertexBindingDescriptions = bindings.data();
+
+		vk::PipelineInputAssemblyStateCreateInfo input_assembly{};
+		input_assembly.setTopology(vk::PrimitiveTopology::eTriangleList);
+		input_assembly.primitiveRestartEnable = false;
+
+		vk::PipelineViewportStateCreateInfo viewport_state{};
+		vk::Rect2D scissor({ 0, 0 }, swapchain_extent);
+		viewport_state.setScissors(scissor);
+		vk::Viewport viewport(0.0f, 0.0f, swapchain_extent.width, swapchain_extent.height, 0.0f, 1.0f);
+		viewport_state.setViewports(viewport);
+
+		vk::PipelineRasterizationStateCreateInfo rasterization{};
+		rasterization.depthClampEnable = false;
+		rasterization.rasterizerDiscardEnable = false;
+		rasterization.polygonMode = vk::PolygonMode::eFill;
+		rasterization.cullMode = vk::CullModeFlagBits::eNone;
+		rasterization.frontFace = vk::FrontFace::eCounterClockwise;
+		rasterization.depthBiasEnable = false;
+		rasterization.lineWidth = 1.0f;
+
+		vk::PipelineMultisampleStateCreateInfo multisampling{};
+		multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+		multisampling.sampleShadingEnable = false;
+		multisampling.minSampleShading = 0.f;
+		multisampling.pSampleMask = nullptr;
+		multisampling.alphaToCoverageEnable = false;
+		multisampling.alphaToOneEnable = false;
+
+		vk::PipelineDepthStencilStateCreateInfo depth{};
+		depth.depthTestEnable = true;
+		depth.depthWriteEnable = true;
+		depth.depthCompareOp = vk::CompareOp::eLess;
+		depth.depthBoundsTestEnable = false;
+		depth.stencilTestEnable = false;
+
+		vk::PipelineColorBlendStateCreateInfo color_blend{};
+		color_blend.logicOpEnable = false;
+		color_blend.logicOp = vk::LogicOp::eCopy;
+		vk::PipelineColorBlendAttachmentState blend_attachement{};
+		blend_attachement.colorWriteMask = { vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA };
+		blend_attachement.blendEnable = false;
+		color_blend.attachmentCount = 1;
+		color_blend.pAttachments = &blend_attachement;
+
+		vk::GraphicsPipelineCreateInfo pipeline_create_info{};
+		pipeline_create_info.setStages(stages);
+		pipeline_create_info.pVertexInputState = &vertex_input;
+		pipeline_create_info.pInputAssemblyState = &input_assembly;
+		pipeline_create_info.pViewportState = &viewport_state;
+		pipeline_create_info.pRasterizationState = &rasterization;
+		pipeline_create_info.pMultisampleState = &multisampling;
+		pipeline_create_info.pDepthStencilState = &depth;
+		pipeline_create_info.pColorBlendState = &color_blend;
+		pipeline_create_info.layout = *raster_layout;
+		pipeline_create_info.renderPass = *raster_pass;
+		raster_pipeline = device->createGraphicsPipelineUnique(nullptr, pipeline_create_info);
+	}
+}
+void VulkanApplication::create_ui_context() {
+	static std::array<vk::DescriptorPoolSize, 11> pool_sizes{};
+	pool_sizes[0].type = vk::DescriptorType::eSampler;
+	pool_sizes[0].descriptorCount = 1000;
+	pool_sizes[1].type = vk::DescriptorType::eCombinedImageSampler;
+	pool_sizes[1].descriptorCount = 1000;
+	pool_sizes[2].type = vk::DescriptorType::eSampledImage;
+	pool_sizes[2].descriptorCount = 1000;
+	pool_sizes[3].type = vk::DescriptorType::eStorageImage;
+	pool_sizes[3].descriptorCount = 1000;
+	pool_sizes[4].type = vk::DescriptorType::eUniformTexelBuffer;
+	pool_sizes[4].descriptorCount = 1000;
+	pool_sizes[5].type = vk::DescriptorType::eStorageTexelBuffer;
+	pool_sizes[5].descriptorCount = 1000;
+	pool_sizes[6].type = vk::DescriptorType::eUniformBuffer;
+	pool_sizes[6].descriptorCount = 1000;
+	pool_sizes[7].type = vk::DescriptorType::eStorageBuffer;
+	pool_sizes[7].descriptorCount = 1000;
+	pool_sizes[8].type = vk::DescriptorType::eUniformBufferDynamic;
+	pool_sizes[8].descriptorCount = 1000;
+	pool_sizes[9].type = vk::DescriptorType::eStorageBufferDynamic;
+	pool_sizes[9].descriptorCount = 1000;
+	pool_sizes[10].type = vk::DescriptorType::eInputAttachment;
+	pool_sizes[10].descriptorCount = 1000;
+
+	imgui_descriptor_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1000 * uint32_t(pool_sizes.size()), pool_sizes));
+
+	ImGui_ImplVulkan_InitInfo imgui_init_info{};
+	imgui_init_info.Instance = *instance;
+	imgui_init_info.PhysicalDevice = physical_device;
+	imgui_init_info.Device = *device;
+	imgui_init_info.QueueFamily = queue_family_indices.graphics_family.value();
+	imgui_init_info.Queue = graphics_queue;
+	imgui_init_info.PipelineCache = VK_NULL_HANDLE;
+	imgui_init_info.DescriptorPool = *imgui_descriptor_pool;
+	imgui_init_info.Allocator = nullptr;
+	imgui_init_info.MinImageCount = 2;
+	imgui_init_info.ImageCount = uint32_t(swapchain_image_count);
+	imgui_init_info.CheckVkResultFn = nullptr;
+	imgui_init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	ImGui_ImplVulkan_Init(&imgui_init_info, *raster_pass);
+
+	auto cmd_buf = create_commandbuffer();
+	ImGui_ImplVulkan_CreateFontsTexture(cmd_buf);
+	flush_commandbuffer(cmd_buf);
+
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
+}
+void VulkanApplication::create_frames() {
+	frames.resize(swapchain_image_count);
+	for (uint32_t i = 0; i < frames.size(); i++) {
+		frames[i].init_frame(*device);
+		frames[i].raster_image_view = create_image_view(*device, swapchain_images[i], swapchain_format, vk::ImageAspectFlagBits::eColor);
+		frames[i].create_framebuffer(swapchain_extent, *raster_pass, depth_image->image_view);
+		frames[i].create_command_buffers(*graphics_command_pool);
+		frames[i].create_sync_objects();
+	}
+}
+void VulkanApplication::create_semaphores() {
+	frame_semaphores.resize(swapchain_image_count);
+
+	for (auto &fs : frame_semaphores) {
+		VkSemaphoreCreateInfo ci{
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+		};
+		fs.image_aquired = device->createSemaphoreUnique(vk::SemaphoreCreateInfo());
+		fs.render_complete = device->createSemaphoreUnique(vk::SemaphoreCreateInfo());
+	}
+}
+
 void VulkanApplication::init_rtx() {
 	auto properties = physical_device.getProperties2<vk::PhysicalDeviceProperties2, vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
 	rtx_properties = properties.get<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>();
@@ -354,8 +655,8 @@ void VulkanApplication::build_rtx_pipeline() {
 	// Allocate render image TODO : recreate on swapchain recreation, link to swapchain??
 	Image *img = new Image(
 			*device, physical_device,
-			swapchain->get_extent().width, swapchain->get_extent().height,
-			swapchain->get_format(), vk::ImageTiling::eOptimal,
+			swapchain_extent.width, swapchain_extent.height,
+			swapchain_format, vk::ImageTiling::eOptimal,
 			{ vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eStorage },
 			vk::MemoryPropertyFlagBits::eDeviceLocal,
 			vk::ImageAspectFlagBits::eColor);
@@ -540,9 +841,9 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 		vk::StridedDeviceAddressRegionKHR(shader_binding_table->address + 3u * group_size, group_size, group_size), // Hit
 		vk::StridedDeviceAddressRegionKHR(0u, 0u, 0u),
 	};
-	frame.command_buffer->traceRaysKHR(strides[0], strides[1], strides[2], strides[3], swapchain->get_extent().width, swapchain->get_extent().height, 1);
+	frame.command_buffer->traceRaysKHR(strides[0], strides[1], strides[2], strides[3], swapchain_extent.width, swapchain_extent.height, 1);
 
-	image_barrier.image = swapchain->get_image(image_id);
+	image_barrier.image = swapchain_images[image_id];
 	image_barrier.srcAccessMask = vk::AccessFlagBits::eShaderWrite;
 	image_barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 	image_barrier.oldLayout = vk::ImageLayout::eUndefined;
@@ -561,10 +862,10 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	copy_region.srcOffset = vk::Offset3D(0, 0, 0);
 	copy_region.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 	copy_region.dstOffset = vk::Offset3D(0, 0, 0);
-	copy_region.extent = vk::Extent3D(swapchain->get_extent(), 1);
-	frame.command_buffer->copyImage(rtx_result_image->image, vk::ImageLayout::eTransferSrcOptimal, swapchain->get_image(image_id), vk::ImageLayout::eTransferDstOptimal, copy_region);
+	copy_region.extent = vk::Extent3D(swapchain_extent, 1);
+	frame.command_buffer->copyImage(rtx_result_image->image, vk::ImageLayout::eTransferSrcOptimal, swapchain_images[image_id], vk::ImageLayout::eTransferDstOptimal, copy_region);
 
-	image_barrier.image = swapchain->get_image(image_id);
+	image_barrier.image = swapchain_images[image_id];
 	image_barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
 	image_barrier.dstAccessMask = vk::AccessFlagBits::eIndexRead;
 	image_barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
@@ -742,7 +1043,7 @@ void VulkanApplication::flush_commandbuffers(std::vector<vk::CommandBuffer> cmd,
 }
 
 float VulkanApplication::get_aspect_ratio() const {
-	auto a = swapchain->get_extent();
+	auto a = swapchain_extent;
 	return float(a.width) / float(a.height);
 }
 int VulkanApplication::get_graphics_family_index() const {
@@ -750,4 +1051,41 @@ int VulkanApplication::get_graphics_family_index() const {
 }
 int VulkanApplication::get_transfer_family_index() const {
 	return queue_family_indices.transfer_family.value();
+}
+vk::Format VulkanApplication::find_depth_format() {
+	return find_supported_format(physical_device,
+			{ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint },
+			vk::ImageTiling::eOptimal,
+			vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+}
+vk::SurfaceFormatKHR VulkanApplication::choose_surface_format(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface) {
+	/*
+	for (const auto &fmt : physical_device.getSurfaceFormatsKHR(surface)) {
+		if (fmt.format == vk::Format::eB8G8R8A8Unorm && fmt.colorSpace == vk::ColorSpaceKHR::eVkColorspaceSrgbNonlinear) {
+			return fmt;
+		}
+	}
+	*/
+	return physical_device.getSurfaceFormatsKHR(surface).front();
+}
+vk::PresentModeKHR VulkanApplication::choose_present_mode(const vk::PhysicalDevice physical_device, const vk::SurfaceKHR surface) {
+	for (const auto &mode : physical_device.getSurfacePresentModesKHR(surface)) {
+		if (mode == vk::PresentModeKHR::eMailbox) {
+			return mode;
+		}
+	}
+	SDL_Log("Present mode: VK_PRESENT_MODE_FIFO_KHR");
+	return vk::PresentModeKHR::eFifo;
+}
+vk::Extent2D VulkanApplication::choose_extent(const vk::SurfaceCapabilitiesKHR &capabilities, SDL_Window *window) {
+	if (capabilities.currentExtent.width != UINT32_MAX) {
+		return capabilities.currentExtent;
+	} else {
+		int w, h;
+		SDL_Vulkan_GetDrawableSize(window, &w, &h);
+		vk::Extent2D ext = { uint32_t(w), uint32_t(h) };
+		ext.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, swapchain_extent.width));
+		ext.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, swapchain_extent.height));
+		return ext;
+	}
 }

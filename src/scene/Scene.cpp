@@ -10,7 +10,7 @@ uint32_t Scene::load_mesh(VulkanApplication *app, const std::string path) {
 	return meshes.size() - 1;
 }
 uint32_t Scene::create_material(const float ambient_intensity, const glm::vec3 diffuse_color, const int32_t texture_id) {
-	materials.emplace_back(ambient_intensity, diffuse_color, texture_id);
+	materials.emplace_back(ambient_intensity, diffuse_color, 0.0f, 16.0f, texture_id);
 	return materials.size() - 1;
 }
 uint32_t Scene::load_texture(VulkanApplication *app, const std::string path) {
@@ -20,6 +20,11 @@ uint32_t Scene::load_texture(VulkanApplication *app, const std::string path) {
 MeshInstance *Scene::create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform) {
 	instances.emplace_back(mesh_id, mat_id);
 	return &instances.back();
+}
+void Scene::init(VulkanApplication &app) {
+	build_BLAS(app, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
+	build_TLAS(app, { vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
+	allocate_uniform_buffer(app);
 }
 void Scene::allocate_uniform_buffer(VulkanApplication &app) {
 	{
@@ -160,4 +165,11 @@ void Scene::build_TLAS(VulkanApplication &app, vk::BuildAccelerationStructureFla
 	app.flush_commandbuffer(cmd_buf);
 
 	debug_name_object(app.get_device(), uint64_t(VkAccelerationStructureKHR(tlas->get_acceleration_structure())), vk::ObjectType::eAccelerationStructureKHR, "Scene TLAS");
+}
+
+void Scene::draw(vk::CommandBuffer cmd) {
+	for (uint32_t i = 0; i < instances.size(); i++) {
+		auto mesh = meshes[instances[i].get_mesh_id()].get();
+		mesh->draw(cmd, i);
+	}
 }

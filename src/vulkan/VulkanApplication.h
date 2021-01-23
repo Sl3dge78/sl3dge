@@ -23,7 +23,7 @@
 
 #include "Debug.h"
 #include "scene/Scene.h"
-#include "vulkan/Swapchain.h"
+#include "scene/Vertex.h"
 #include "vulkan/VulkanFrame.h"
 #include "vulkan/VulkanHelper.h"
 
@@ -41,7 +41,13 @@ const std::vector<const char *> req_device_extensions = {
 	VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
 	VK_KHR_MAINTENANCE3_EXTENSION_NAME,
 	VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME
+	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+	VK_KHR_RAY_QUERY_EXTENSION_NAME,
+};
+
+struct FrameSemaphores {
+	vk::UniqueSemaphore image_aquired;
+	vk::UniqueSemaphore render_complete;
 };
 
 class VulkanApplication {
@@ -95,9 +101,32 @@ private:
 
 	vk::UniqueSampler texture_sampler;
 
-	UniqueSwapchain swapchain;
+	vk::UniqueSwapchainKHR swapchain;
+	uint32_t swapchain_image_count;
+	std::vector<vk::Image> swapchain_images;
+	vk::Format swapchain_format;
+	vk::Extent2D swapchain_extent;
+
+	std::unique_ptr<Image> depth_image;
+
+	std::vector<VulkanFrame> frames;
+	std::vector<FrameSemaphores> frame_semaphores;
 	size_t semaphore_index = 0;
 
+	bool framebuffer_rezised = false;
+	bool wait_for_vsync = false;
+
+	vk::UniqueDescriptorPool imgui_descriptor_pool;
+
+	vk::UniqueDescriptorSetLayout raster_set_layout;
+	vk::UniquePipelineLayout raster_layout;
+	vk::UniqueRenderPass raster_pass;
+	vk::UniqueDescriptorPool raster_pool;
+	vk::UniquePipeline raster_pipeline;
+	vk::UniqueDescriptorSet raster_desc_set;
+
+	// RTX
+	const bool rtx = false;
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
 
 	vk::UniqueDescriptorPool rtx_pool;
@@ -110,16 +139,15 @@ private:
 	std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Buffer> shader_binding_table;
 
-	bool framebuffer_rezised = false;
-	bool wait_for_vsync = false;
-
 	void init_vulkan();
+	void post_swapchain_init();
 
 	virtual void load() = 0;
 	virtual void start() = 0;
 	virtual void update(float delta_time) = 0;
 
 	void main_loop();
+	void raster_scene(VulkanFrame &frame);
 	void draw_ui(VulkanFrame &frame);
 	void draw_frame();
 
@@ -128,6 +156,12 @@ private:
 	void create_logical_device();
 	void create_texture_sampler();
 
+	void create_swapchain();
+	void build_raster_pipeline();
+	void create_ui_context();
+	void create_frames();
+	void create_semaphores();
+
 	void init_rtx();
 	void build_rtx_pipeline();
 	void create_rtx_SBT();
@@ -135,6 +169,10 @@ private:
 
 	bool check_validation_layer_support();
 	std::vector<const char *> get_required_extensions(SDL_Window *window);
+	vk::Format find_depth_format();
+	vk::SurfaceFormatKHR choose_surface_format(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
+	vk::PresentModeKHR choose_present_mode(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface);
+	vk::Extent2D choose_extent(const vk::SurfaceCapabilitiesKHR &capabilities, SDL_Window *window);
 };
 
 #endif

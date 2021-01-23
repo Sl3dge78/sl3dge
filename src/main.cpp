@@ -16,7 +16,7 @@
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-// TODO : Rasterization 2.0 ; PBR
+// TODO : PBR
 // TODO : GLTF
 //		- Materials
 //		- Textures
@@ -31,24 +31,27 @@ private:
 		auto sphere_mesh = scene->load_mesh(this, "resources/models/sphere.obj");
 		auto sphere_material = scene->create_material(0.1f, glm::vec3(1.0f, 1.0f, 0.0f));
 		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
+		/*
 		float x = float(std::rand() % 10);
 		float y = float(std::rand() % 10);
 		sphere_a->translate(glm::vec3(x, y, 1.0f));
+		*/
 	}
 	void load() override {
 		srand(time(NULL));
 		scene->camera.load(this);
 		auto viking_texture = scene->load_texture(this, "resources/textures/viking_room.png"); // 0
-
+		/*
 		auto viking_mesh = scene->load_mesh(this, "resources/models/viking_room.obj"); // 0
 		auto viking_material = scene->create_material(0.1f, glm::vec3(1.0f, 1.0f, 1.0f), viking_texture);
 
 		auto a = scene->create_instance(viking_mesh, viking_material);
 		a->translate(glm::vec3(0.f, 1.f, 0.f));
+		
 		auto b = scene->create_instance(viking_mesh, viking_material);
 		b->translate(glm::vec3(1.5f, 1.f, 0.f));
 		b->rotate(3.14f, glm::vec3(0.f, 0.f, 1.f));
-
+		*/
 		make_sphere();
 
 		auto plane_mesh = scene->load_mesh(this, "resources/models/plane.obj");
@@ -66,7 +69,7 @@ private:
 	}
 	void update(float delta_time) override {
 		scene->camera.update(delta_time);
-
+		/*
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Camera params", "", &scene->camera.show_window);
@@ -76,6 +79,7 @@ private:
 			ImGui::Text("%.1f FPS", 1.f / delta_time);
 		}
 		ImGui::EndMainMenuBar();
+		*/
 	}
 };
 

@@ -159,6 +159,7 @@
   <ItemGroup>
     <ClCompile Include="include\glm\detail\glm.cpp" />
     <ClCompile Include="src\Debug.cpp" />
+    <ClCompile Include="src\scene\gltfModel.cpp" />
     <ClCompile Include="src\scene\Material.cpp" />
     <ClCompile Include="src\scene\Camera.cpp" />
     <ClCompile Include="src\imgui\examples\sdl_vulkan_example.cpp" />
@@ -174,7 +175,6 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\scene\Mesh.cpp" />
     <ClCompile Include="src\scene\Scene.cpp" />
-    <ClCompile Include="src\vulkan\Swapchain.cpp" />
     <ClCompile Include="src\vulkan\VulkanApplication.cpp" />
     <ClCompile Include="src\vulkan\VulkanFrame.cpp" />
     <ClCompile Include="src\vulkan\VulkanHelper.cpp" />
@@ -549,6 +549,7 @@
     <ClInclude Include="include\sdl\SDL_video.h" />
     <ClInclude Include="include\sdl\SDL_vulkan.h" />
     <ClInclude Include="include\tiny_obj_loader.h" />
+    <ClInclude Include="src\scene\gltfModel.h" />
     <ClInclude Include="src\scene\Material.h" />
     <ClInclude Include="resources\shaders\shader_utils.glsl" />
     <ClInclude Include="src\scene\Camera.h" />
@@ -566,7 +567,6 @@
     <ClInclude Include="src\scene\Mesh.h" />
     <ClInclude Include="src\scene\Scene.h" />
     <ClInclude Include="src\scene\Vertex.h" />
-    <ClInclude Include="src\vulkan\Swapchain.h" />
     <ClInclude Include="src\vulkan\VulkanApplication.h" />
     <ClInclude Include="src\vulkan\VulkanFrame.h" />
     <ClInclude Include="src\vulkan\VulkanHelper.h" />
@@ -721,10 +721,8 @@
     <None Include="resources\shaders\raytrace.rmiss.spv" />
     <None Include="resources\shaders\shadow.rmiss" />
     <None Include="resources\shaders\shadow.rmiss.spv" />
-    <None Include="resources\shaders\triangle.frag" />
-    <None Include="resources\shaders\triangle.frag.spv" />
-    <None Include="resources\shaders\triangle.vert" />
-    <None Include="resources\shaders\triangle.vert.spv" />
+    <None Include="resources\shaders\general.frag" />
+    <None Include="resources\shaders\general.vert" />
     <None Include="vulkan.ngfx-proj" />
   </ItemGroup>
   <ItemGroup>

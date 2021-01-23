@@ -13,7 +13,7 @@ void Camera::start() {
 	yaw = 220.f;
 	pitch = -8.f;
 
-	matrices.proj = glm::perspective(glm::radians(80.f), aspect_ratio, 0.1f, 1000.f);
+	matrices.proj = glm::perspective(glm::radians(80.f), aspect_ratio, 0.001f, 1000.f);
 	matrices.proj[1][1] *= -1;
 	matrices.proj_inverse = glm::inverse(matrices.proj);
 
