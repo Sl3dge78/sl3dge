@@ -8,6 +8,11 @@ struct HitPayload {
 	vec3 weight;
 };
 
+struct HitPayloadSimple {
+    uint null;
+	vec3 direct_color;
+};
+
 struct Vertex {
 	vec3 pos;
 	vec3 normal;

@@ -69,7 +69,7 @@ void Camera::update(float delta_time) {
 		is_dirty = true;
 	}
 
-	if (matrices.frame <= 100)
+	if (matrices.frame <= max_samples)
 		matrices.frame++;
 	if (is_dirty) {
 		matrices.frame = 0;
@@ -107,5 +107,6 @@ void Camera::display_window() {
 	ImGui::InputFloat("yaw", &yaw, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
 	ImGui::InputFloat("pitch", &pitch, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);
 	ImGui::InputInt("frame", &matrices.frame);
+	ImGui::SliderInt("max samples", &max_samples, 0, 4096);
 	ImGui::End();
 }

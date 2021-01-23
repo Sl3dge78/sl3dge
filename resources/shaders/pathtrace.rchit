@@ -1,5 +1,5 @@
 #version 460
-#extension GL_GOOGLE_include_directive  : require
+#extension  GL_GOOGLE_include_directive  : require
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_ARB_shader_clock : enable
@@ -28,7 +28,7 @@ layout(push_constant) uniform Constants {
     int light_type;
 } constants;
 
-layout(location = 0) rayPayloadInEXT HitPayloadSimple payload;
+layout(location = 0) rayPayloadInEXT HitPayload payload;
 layout(location = 1) rayPayloadInEXT bool is_shadow;
 hitAttributeEXT vec3 attribs;
 
@@ -56,30 +56,16 @@ void main() {
 
     vec2 tex_coord = v0.tex_coord * barycentre.x + v1.tex_coord * barycentre.y + v2.tex_coord * barycentre.z;
     
-    vec3 albedo = mat.diffuse_color;
-    if(mat.texture_id > -1)
-        albedo = texture(textures[mat.texture_id], tex_coord).xyz;
-    payload.direct_color = albedo;
-    
-    uint ray_flags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-
-    vec3 light_dir = normalize(constants.light_position - world_pos);
-    float t_max = length(constants.light_position - world_pos);
-    is_shadow = true;
-    traceRayEXT(top_level_AS, ray_flags, 0xFF, 0, 0, 1, world_pos, 0.1, light_dir, t_max, 1);
-
-    if(is_shadow) {
-       payload.direct_color *= 0.1;
-    } else {
-        payload.direct_color *= max(0.1, dot(normal, light_dir));
-    }
-
-    /*
     vec3 tangent, bitangent;
     create_coordinate_system(normal, tangent, bitangent);
     vec3 dir = sampling_hemi(payload.seed, tangent, bitangent, normal);
-
+    
     vec3 emittance = vec3(0.2);
+
+    vec3 albedo = mat.diffuse_color;
+    if(mat.texture_id > -1)
+        albedo = texture(textures[mat.texture_id], tex_coord).xyz;
+
     const float p = 1 / M_PI;
     float cos_theta = dot(dir, normal);
     vec3 BRDF = albedo / M_PI;
@@ -88,5 +74,4 @@ void main() {
     payload.ray_origin = world_pos;
     payload.ray_direction = dir;
     payload.weight = BRDF * cos_theta / p;
-    */
 }

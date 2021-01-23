@@ -26,6 +26,7 @@ private:
 	float aspect_ratio = 1280.0f / 720.0f;
 	uint32_t height;
 	bool is_dirty;
+	int max_samples = 16;
 
 public:
 	struct Matrices {

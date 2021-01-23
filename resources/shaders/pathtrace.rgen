@@ -15,7 +15,7 @@ layout(binding = 2, set = 0) uniform CameraMatrices {
     int frame;
 } cam;
 
-layout(location = 0) rayPayloadEXT HitPayloadSimple payload;
+layout(location = 0) rayPayloadEXT HitPayload payload;
 
 void main() {
 
@@ -28,9 +28,9 @@ void main() {
     const vec2 uv = pixel_center/vec2(gl_LaunchSizeEXT.xy);
     vec2 d = uv * 2.0 - 1.0;
 
-    vec3 ray_origin = (cam.view_inverse * vec4(0,0,0,1)).xyz;
+    payload.ray_origin = (cam.view_inverse * vec4(0,0,0,1)).xyz;
     vec4 target = cam.proj_inverse * vec4(d.x, d.y, 1,1);
-    vec3 ray_direction = (cam.view_inverse * vec4(normalize(target.xyz), 0)).xyz;
+    payload.ray_direction = (cam.view_inverse * vec4(normalize(target.xyz), 0)).xyz;
 
     uint ray_flags = gl_RayFlagsOpaqueEXT;
     uint mask = 0xff;
@@ -38,9 +38,19 @@ void main() {
     float t_max = 10000.0;
 
     payload.direct_color = vec3(0);
-    traceRayEXT(top_level_AS, ray_flags, mask, 0, 0, 0, ray_origin, t_min, ray_direction, t_max, 0);
-    vec3 color = payload.direct_color;
+    payload.depth = 0;
+    payload.seed = seed;
+    payload.weight = vec3(0);
 
+    vec3 weight = vec3(1);
+    vec3 color = vec3(0);
+
+    for (; payload.depth < 16; payload.depth ++) {
+        traceRayEXT(top_level_AS, ray_flags, mask, 0, 0, 0, payload.ray_origin, t_min, payload.ray_direction, t_max, 0);
+        color += payload.direct_color * weight;
+        weight *= payload.weight;
+    }
+    
     if(cam.frame > 0) {
         float a = 1.0 / float(cam.frame + 1);
         vec3 old_color = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
