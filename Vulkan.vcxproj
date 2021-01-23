@@ -174,7 +174,6 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\scene\Mesh.cpp" />
     <ClCompile Include="src\scene\Scene.cpp" />
-    <ClCompile Include="src\vulkan\Swapchain.cpp" />
     <ClCompile Include="src\vulkan\VulkanApplication.cpp" />
     <ClCompile Include="src\vulkan\VulkanFrame.cpp" />
     <ClCompile Include="src\vulkan\VulkanHelper.cpp" />
@@ -566,7 +565,6 @@
     <ClInclude Include="src\scene\Mesh.h" />
     <ClInclude Include="src\scene\Scene.h" />
     <ClInclude Include="src\scene\Vertex.h" />
-    <ClInclude Include="src\vulkan\Swapchain.h" />
     <ClInclude Include="src\vulkan\VulkanApplication.h" />
     <ClInclude Include="src\vulkan\VulkanFrame.h" />
     <ClInclude Include="src\vulkan\VulkanHelper.h" />
@@ -721,10 +719,8 @@
     <None Include="resources\shaders\raytrace.rmiss.spv" />
     <None Include="resources\shaders\shadow.rmiss" />
     <None Include="resources\shaders\shadow.rmiss.spv" />
-    <None Include="resources\shaders\triangle.frag" />
-    <None Include="resources\shaders\triangle.frag.spv" />
-    <None Include="resources\shaders\triangle.vert" />
-    <None Include="resources\shaders\triangle.vert.spv" />
+    <None Include="resources\shaders\general.frag" />
+    <None Include="resources\shaders\general.vert" />
     <None Include="vulkan.ngfx-proj" />
   </ItemGroup>
   <ItemGroup>

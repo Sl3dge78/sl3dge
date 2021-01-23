@@ -44,15 +44,6 @@ Image::Image(VulkanApplication &app, const uint32_t w, const uint32_t h, const v
 	image_view = device.createImageView(vk::ImageViewCreateInfo({}, image, vk::ImageViewType::e2D, fmt, vk::ComponentMapping(), vk::ImageSubresourceRange(aspect, 0, 1, 0, 1)));
 }
 void Image::transition_layout(vk::CommandBuffer c_buffer, vk::ImageLayout from, vk::ImageLayout to, const uint32_t transfer_family, const uint32_t graphics_family) {
-	//    VkImageMemoryBarrier barrier{
-	//            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-	//            .oldLayout = from,
-	//            .newLayout = to,
-	//            .srcQueueFamilyIndex = transfer_family,
-	//            .dstQueueFamilyIndex = transfer_family,
-	//            .image = image,
-	//            .subresourceRange = { .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 },
-	//    };
 	vk::ImageMemoryBarrier barrier({}, {}, from, to, transfer_family, transfer_family, this->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 
 	vk::PipelineStageFlags src_stage;
@@ -81,7 +72,6 @@ void Image::transition_layout(vk::CommandBuffer c_buffer, vk::ImageLayout from, 
 		throw std::runtime_error("Unsupported layout transition");
 	}
 	c_buffer.pipelineBarrier(src_stage, dst_stage, {}, nullptr, nullptr, barrier);
-	//vkCmdPipelineBarrier(c_buffer, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 Image::~Image() {
 	device.destroyImage(image);

@@ -13,13 +13,13 @@ struct VulkanFrame {
 	vk::RenderPass render_pass;
 	vk::Extent2D swapchain_extent;
 
-	vk::UniqueImageView image_view;
+	vk::UniqueImageView raster_image_view;
 	vk::UniqueFramebuffer framebuffer;
 	vk::UniqueCommandBuffer command_buffer;
 	vk::UniqueFence fence;
 
 	void init_frame(vk::Device device);
-	void create_framebuffer(vk::Extent2D extent, vk::RenderPass &render_pass);
+	void create_framebuffer(vk::Extent2D extent, vk::RenderPass &render_pass, vk::ImageView depth_imageview);
 	void create_command_buffers(vk::CommandPool command_pool);
 	void create_sync_objects();
 

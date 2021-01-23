@@ -57,9 +57,6 @@
     <ClCompile Include="src\scene\Scene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\vulkan\Swapchain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\vulkan\VulkanApplication.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1229,9 +1226,6 @@
     <ClInclude Include="src\scene\Vertex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\vulkan\Swapchain.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\vulkan\VulkanApplication.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -1667,19 +1661,17 @@
     <None Include="resources\shaders\raytrace.rchit" />
     <None Include="resources\shaders\raytrace.rgen" />
     <None Include="resources\shaders\raytrace.rmiss" />
-    <None Include="resources\shaders\triangle.frag" />
-    <None Include="resources\shaders\triangle.vert" />
     <None Include="resources\shaders\build_shaders.bat">
       <Filter>Source Files</Filter>
     </None>
     <None Include="resources\shaders\raytrace.rchit.spv" />
     <None Include="resources\shaders\raytrace.rgen.spv" />
     <None Include="resources\shaders\raytrace.rmiss.spv" />
-    <None Include="resources\shaders\triangle.frag.spv" />
-    <None Include="resources\shaders\triangle.vert.spv" />
     <None Include="resources\shaders\shadow.rmiss" />
     <None Include="resources\shaders\random.glsl" />
     <None Include="resources\shaders\shadow.rmiss.spv" />
+    <None Include="resources\shaders\general.frag" />
+    <None Include="resources\shaders\general.vert" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="src\scene\scene.natvis" />
