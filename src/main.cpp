@@ -1,4 +1,4 @@
-#define GLM_FORCE_RADIANS
+ï»¿#define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -24,7 +24,7 @@
 // TODO : GI in RayTracing			// Different pipelines ?
 // TODO : Shadows in RayTracing		// Different pipelines ?
 // TODO : Update TLAS when an object has moved
-// TODO - AMELIO : Virer VulkanFrame et le gérer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexité inutile en trop
+// TODO - AMELIO : Virer VulkanFrame et le gï¿½rer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexitï¿½ inutile en trop
 
 class Sl3dge : public VulkanApplication {
 private:
