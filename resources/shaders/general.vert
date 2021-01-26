@@ -30,7 +30,6 @@ layout(location = 0) out vec3 normal;
 layout(location = 1) out vec2 tex_coords;
 layout(location = 2) out vec3 frag_pos;
 layout(location = 3) out uint mat_id;
-layout(location = 4) out vec3 view_pos;
 
 void main() {
     Instance instance = scene.i[gl_InstanceIndex];
@@ -38,7 +37,7 @@ void main() {
     vec4 pos = instance.transform * vec4(in_position, 1.0);
     gl_Position = cam.proj * cam.view * pos;
     
-    view_pos =  (cam.view * vec4(1.0)).xyz;
+    //view_pos =  (cam.view * vec4(1.0)).xyz;
 
     mat_id = instance.mat_id;
     frag_pos = pos.xyz;

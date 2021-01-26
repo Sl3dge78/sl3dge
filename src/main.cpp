@@ -16,10 +16,11 @@
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-// TODO : PBR
+// TODO : Textures for metallic, roughness, ao & normal
+// TODO : Image based lighting https://learnopengl.com/PBR/IBL/Diffuse-irradiance
+// TODO : Add ui to move instances
+// TODO : Single vertex and index buffer. The instances have an offset in these tables. Then draw indexed instanced.
 // TODO : GLTF
-//		- Materials
-//		- Textures
 // TODO : GI in RayTracing			// Different pipelines ?
 // TODO : Shadows in RayTracing		// Different pipelines ?
 // TODO : Update TLAS when an object has moved
@@ -28,9 +29,6 @@
 class Sl3dge : public VulkanApplication {
 private:
 	void make_sphere() {
-		auto sphere_mesh = scene->load_mesh(this, "resources/models/sphere.obj");
-		auto sphere_material = scene->create_material(0.1f, glm::vec3(1.0f, 1.0f, 0.0f));
-		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
 		/*
 		float x = float(std::rand() % 10);
 		float y = float(std::rand() % 10);
@@ -40,7 +38,7 @@ private:
 	void load() override {
 		srand(time(NULL));
 		scene->camera.load(this);
-		auto viking_texture = scene->load_texture(this, "resources/textures/viking_room.png"); // 0
+		auto viking_texture = scene->load_texture("resources/textures/viking_room.png"); // 0
 		/*
 		auto viking_mesh = scene->load_mesh(this, "resources/models/viking_room.obj"); // 0
 		auto viking_material = scene->create_material(0.1f, glm::vec3(1.0f, 1.0f, 1.0f), viking_texture);
@@ -52,10 +50,13 @@ private:
 		b->translate(glm::vec3(1.5f, 1.f, 0.f));
 		b->rotate(3.14f, glm::vec3(0.f, 0.f, 1.f));
 		*/
-		make_sphere();
+		auto sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
+		auto sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 0.0f), 0.5f);
+		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
+		sphere_a->translate(glm::vec3(0.0f, 0.0f, 1.0f));
 
-		auto plane_mesh = scene->load_mesh(this, "resources/models/plane.obj");
-		auto plane_material = scene->create_material(0.1f, glm::vec3(.5f, .5f, .5f));
+		auto plane_mesh = scene->load_mesh("resources/models/plane.obj");
+		auto plane_material = scene->create_material(glm::vec3(.5f, .5f, .5f), 0.1f);
 		auto plane_a = scene->create_instance(plane_mesh, plane_material);
 	}
 	void start() override {
@@ -69,17 +70,19 @@ private:
 	}
 	void update(float delta_time) override {
 		scene->camera.update(delta_time);
-		/*
+
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Camera params", "", &scene->camera.show_window);
+
 				ImGui::EndMenu();
 			}
+			ImGui::Separator();
+			scene->draw_menu_bar();
 			ImGui::Separator();
 			ImGui::Text("%.1f FPS", 1.f / delta_time);
 		}
 		ImGui::EndMainMenuBar();
-		*/
 	}
 };
 

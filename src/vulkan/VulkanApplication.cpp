@@ -38,10 +38,10 @@ VulkanApplication::~VulkanApplication() {
 	SDL_Quit();
 }
 void VulkanApplication::run() {
-	scene = std::make_unique<Scene>();
+	scene = std::make_unique<Scene>(this);
 	load();
 	SDL_Log("Resources loaded");
-	scene->init(*this);
+	scene->init();
 	post_swapchain_init();
 
 	if (rtx) {
@@ -153,11 +153,11 @@ void VulkanApplication::main_loop() {
 				}
 			}
 		}
-		/*
+
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
-		*/
+
 		update(delta_time);
 
 		// Don't draw if the app is minimized
@@ -168,6 +168,8 @@ void VulkanApplication::main_loop() {
 	}
 }
 void VulkanApplication::raster_scene(VulkanFrame &frame) {
+	glm::vec3 pos = scene->camera.get_position();
+	frame.command_buffer->pushConstants(*raster_layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(glm::vec3), &pos);
 	scene->draw(*frame.command_buffer);
 }
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
@@ -218,7 +220,7 @@ void VulkanApplication::draw_frame() {
 		debug_end_label(*frame->command_buffer);
 
 		debug_begin_label(frame->command_buffer.get(), "UI");
-		//draw_ui(*frame);
+		draw_ui(*frame);
 		debug_end_label(*frame->command_buffer);
 		frame->end_render_pass();
 	}
@@ -455,9 +457,9 @@ void VulkanApplication::build_raster_pipeline() {
 		// Material Data
 		vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
 	};
-
+	vk::PushConstantRange push_constants(vk::ShaderStageFlagBits::eFragment, 0, sizeof(glm::vec3));
 	raster_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
-	raster_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *raster_set_layout, nullptr));
+	raster_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *raster_set_layout, push_constants));
 
 	// Create Descriptor pool
 	{
