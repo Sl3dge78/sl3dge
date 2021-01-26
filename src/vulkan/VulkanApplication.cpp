@@ -153,11 +153,11 @@ void VulkanApplication::main_loop() {
 				}
 			}
 		}
-
+		/*
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
-
+		*/
 		update(delta_time);
 
 		// Don't draw if the app is minimized

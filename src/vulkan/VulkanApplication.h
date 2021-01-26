@@ -50,6 +50,11 @@ struct FrameSemaphores {
 	vk::UniqueSemaphore render_complete;
 };
 
+struct FrameSemaphores {
+	vk::UniqueSemaphore image_aquired;
+	vk::UniqueSemaphore render_complete;
+};
+
 class VulkanApplication {
 public:
 	VulkanApplication();

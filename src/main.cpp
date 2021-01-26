@@ -1,4 +1,4 @@
-#define GLM_FORCE_RADIANS
+ï»¿#define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -24,7 +24,7 @@
 // TODO : GI in RayTracing			// Different pipelines ?
 // TODO : Shadows in RayTracing		// Different pipelines ?
 // TODO : Update TLAS when an object has moved
-// TODO - AMELIO : Virer VulkanFrame et le gérer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexité inutile en trop
+// TODO - AMELIO : Virer VulkanFrame et le gï¿½rer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexitï¿½ inutile en trop
 
 class Sl3dge : public VulkanApplication {
 private:
@@ -58,6 +58,7 @@ private:
 		auto plane_mesh = scene->load_mesh("resources/models/plane.obj");
 		auto plane_material = scene->create_material(glm::vec3(.5f, .5f, .5f), 0.1f);
 		auto plane_a = scene->create_instance(plane_mesh, plane_material);
+		*/
 	}
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
@@ -70,7 +71,7 @@ private:
 	}
 	void update(float delta_time) override {
 		scene->camera.update(delta_time);
-
+		/*
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Camera params", "", &scene->camera.show_window);
@@ -83,6 +84,7 @@ private:
 			ImGui::Text("%.1f FPS", 1.f / delta_time);
 		}
 		ImGui::EndMainMenuBar();
+		*/
 	}
 };
 
