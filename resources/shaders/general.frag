@@ -88,9 +88,18 @@ vec3 pbr(Material mat) {
     vec3 Lo = vec3(0.0);
     // TODO : for each light
     //for (int i = 0; i < light_amount ; i++) {
-        vec3 L = normalize(light_pos - frag_pos);
-        vec3 H = normalize(V + L);
-
+       
+    //}
+    vec3 L = normalize(light_pos - frag_pos);
+    vec3 H = normalize(V + L);
+    
+    rayQueryEXT rayQuery;
+    vec3 ray_orig = frag_pos + (normal * 0.01);
+	rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, ray_orig, 0.01, L, 1000.0);
+	while (rayQueryProceedEXT(rayQuery)) { }
+	if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
+        Lo += 0.0;
+	} else {
         float dist = length(light_pos - frag_pos);
         float attenuation = 1.0 / (dist * dist);
         vec3 radiance = light_color * attenuation;
@@ -109,19 +118,10 @@ vec3 pbr(Material mat) {
 
         float NdotL = max(dot(normal, L), 0.0);
         Lo += (kD * albedo / M_PI + specular) * radiance * NdotL;
-    //}
+    }
+
     vec3 ambient = vec3(0.03) * albedo * mat.ao;
     vec3 color = ambient + Lo;
-
-    // TODO : Do that for each light too
-    rayQueryEXT rayQuery;
-    vec3 ray_orig = frag_pos + (normal * 0.01);
-	rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, ray_orig, 0.01, L, 1000.0);
-	while (rayQueryProceedEXT(rayQuery)) { }
-	if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        //color *= 0.1;
-	}
-    
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
     

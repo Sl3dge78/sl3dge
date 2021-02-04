@@ -18,7 +18,7 @@ private:
 	glm::vec3 front;
 	glm::vec3 up;
 
-	const float camera_speed = 10.0f;
+	const float camera_speed = 100.0f;
 	const float move_speed = 1.0f;
 	float yaw = 0.f;
 	float pitch = 0.f;

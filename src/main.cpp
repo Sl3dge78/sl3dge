@@ -51,7 +51,7 @@ private:
 		b->rotate(3.14f, glm::vec3(0.f, 0.f, 1.f));
 		*/
 		auto sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
-		auto sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 0.0f), 0.5f);
+		auto sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 0.0f), 1.f);
 		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
 		sphere_a->translate(glm::vec3(0.0f, 0.0f, 1.0f));
 
@@ -82,6 +82,7 @@ private:
 			ImGui::Separator();
 			ImGui::Text("%.1f FPS", 1.f / delta_time);
 		}
+
 		ImGui::EndMainMenuBar();
 	}
 };
