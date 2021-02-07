@@ -21,11 +21,27 @@ MeshInstance *Scene::create_instance(const uint32_t mesh_id, const uint32_t mat_
 	instances.emplace_back(mesh_id, mat_id);
 	return &instances.back();
 }
+uint32_t Scene::create_light(const int32_t type, const glm::vec3 color, const float intensity, const glm::vec3 vec, const bool cast_shadows) {
+	Light light{
+		.type = type, // TODO : use enum
+		.color = color,
+		.intensity = intensity,
+		.vec = vec,
+		.cast_shadows = cast_shadows
+	};
+
+	lights.emplace_back(light);
+	return lights.size() - 1;
+}
 void Scene::init() {
 	this->app = app;
 	build_BLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
 	build_TLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
 	allocate_uniform_buffer();
+}
+void Scene::update(float delta_time) {
+	camera.update(delta_time);
+	push_constants.view_pos = camera.get_position();
 }
 void Scene::allocate_uniform_buffer() {
 	{
@@ -38,12 +54,25 @@ void Scene::allocate_uniform_buffer() {
 		materials_buffer = std::unique_ptr<Buffer>(new Buffer(*app, materials_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
 		refresh_materials();
 	}
+	{
+		lights_size = lights.size() * sizeof(lights[0]);
+		lights_buffer = std::unique_ptr<Buffer>(new Buffer(*app, lights_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		refresh_lights();
+	}
 }
 void Scene::refresh_materials() {
 	materials_size = materials.size() * sizeof(materials[0]);
 	Buffer staging_buffer(*app, materials_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 	staging_buffer.write_data(materials.data(), materials_size);
 	app->copy_buffer(staging_buffer.buffer, materials_buffer->buffer, materials_size);
+}
+void Scene::refresh_lights() {
+	lights_size = lights.size() * sizeof(lights[0]);
+	Buffer staging_buffer(*app, lights_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+	staging_buffer.write_data(lights.data(), lights_size);
+	app->copy_buffer(staging_buffer.buffer, lights_buffer->buffer, lights_size);
+
+	push_constants.light_count = lights.size();
 }
 void Scene::refresh_scene_desc() {
 	instances_size = sizeof(instances[0]) * instances.size();
@@ -182,21 +211,53 @@ void Scene::draw(vk::CommandBuffer cmd) {
 	}
 }
 void Scene::draw_menu_bar() {
-	if (ImGui::BeginMenu("Materials")) {
-		for (auto &material : materials) {
-			ImGui::MenuItem("Object", "", &material.draw_ui);
+	// TODO : clean that up
+	{
+		if (ImGui::BeginMenu("Materials")) {
+			for (auto &material : materials) {
+				ImGui::MenuItem("Object", "", &material.draw_ui);
+			}
+			ImGui::EndMenu();
 		}
-		ImGui::EndMenu();
+		bool changed = false;
+		int id = 0;
+		for (auto &material : materials) {
+			ImGui::PushID(id);
+			changed |= material.on_gui();
+			ImGui::PopID();
+			id++;
+		}
+		if (changed) {
+			refresh_materials();
+		}
 	}
-	bool changed = false;
-	int id = 0;
-	for (auto &material : materials) {
-		ImGui::PushID(id);
-		changed |= material.on_gui();
-		ImGui::PopID();
-		id++;
-	}
-	if (changed) {
-		refresh_materials();
+	{
+		bool changed = false;
+
+		if (ImGui::BeginMenu("Lights")) {
+			ImGui::MenuItem("Lights", "", &draw_lights_ui);
+
+			ImGui::EndMenu();
+		}
+		if (draw_lights_ui) {
+			ImGui::Begin("Light");
+			int id = 0;
+			for (auto &light : lights) {
+				ImGui::PushID(id);
+				changed |= ImGui::InputInt("Type", &light.type);
+				changed |= ImGui::ColorEdit3("Color", &light.color.r);
+				changed |= ImGui::DragFloat("Intensity", &light.intensity, 1.0f, 0.0f, 100000.0f);
+				changed |= ImGui::InputFloat3("Vector", &light.vec.x, 0.01f);
+				changed |= ImGui::InputInt("Cast shadows", &light.cast_shadows);
+				ImGui::Spacing();
+				ImGui::PopID();
+				id++;
+			}
+			ImGui::End();
+		}
+
+		if (changed) {
+			refresh_lights();
+		}
 	}
 }

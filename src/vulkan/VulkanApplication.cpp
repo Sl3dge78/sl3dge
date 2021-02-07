@@ -168,8 +168,7 @@ void VulkanApplication::main_loop() {
 	}
 }
 void VulkanApplication::raster_scene(VulkanFrame &frame) {
-	glm::vec3 pos = scene->camera.get_position();
-	frame.command_buffer->pushConstants(*raster_layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(glm::vec3), &pos);
+	frame.command_buffer->pushConstants(*raster_layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants), &scene->push_constants);
 	scene->draw(*frame.command_buffer);
 }
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
@@ -456,8 +455,10 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 			vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }, nullptr),
 			// Material Data
 			vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
+			// Light Data
+			vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
 		};
-		vk::PushConstantRange push_constants(vk::ShaderStageFlagBits::eFragment, 0, sizeof(glm::vec3));
+		vk::PushConstantRange push_constants(vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants));
 		raster_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
 		raster_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *raster_set_layout, push_constants));
 
@@ -467,7 +468,7 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 				vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1 * swapchain_image_count),
 				vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1 * swapchain_image_count),
 				vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
-				vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2),
+				vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 3),
 			};
 			raster_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
 		}
@@ -504,6 +505,11 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 		vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
 		vk::WriteDescriptorSet material_write(*raster_desc_set, 4, 0, vk::DescriptorType::eStorageBuffer, nullptr, material_info, nullptr);
 		writes.push_back(material_write);
+
+		// binding 5 lights
+		vk::DescriptorBufferInfo lights_info(scene->lights_buffer->buffer, 0, VK_WHOLE_SIZE);
+		vk::WriteDescriptorSet lights_write(*raster_desc_set, 5, 0, vk::DescriptorType::eStorageBuffer, nullptr, lights_info, nullptr);
+		writes.push_back(lights_write);
 
 		device->updateDescriptorSets(writes, nullptr);
 	}

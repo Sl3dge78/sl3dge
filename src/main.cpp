@@ -64,6 +64,9 @@ private:
 		auto dune_mesh = scene->load_mesh("resources/models/dune.obj");
 		auto dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f);
 		auto dune_instance = scene->create_instance(dune_mesh, dune_material);
+
+		scene->create_light(0, glm::vec3(1.0), 1.0, glm::normalize(glm::vec3(1.0, 1.0, 0.25)), true);
+		//scene->create_light(1, glm::vec3(1.0), 1.0, glm::vec3(0.0, 0.0, 3.0));
 	}
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
@@ -75,7 +78,7 @@ private:
 		rtx_push_constants.light_type = 0;
 	}
 	void update(float delta_time) override {
-		scene->camera.update(delta_time);
+		scene->update(delta_time);
 
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {

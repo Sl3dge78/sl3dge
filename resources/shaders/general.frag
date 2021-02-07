@@ -21,18 +21,29 @@ struct Instance {
 	mat4 transform;
 	mat4 inverted;
 };
+struct Light {
+    int type;
+    vec3 color;
+    float intensity;
+    vec3 vec;
+    int cast_shadows;
+};
 
 layout(set = 0, binding = 1) uniform sampler2D textures[];
 layout (set = 0, binding = 2) uniform accelerationStructureEXT topLevelAS;
 layout (set = 0, binding = 3) buffer Scene {Instance i[];} scene;
 layout (set = 0, binding = 4) buffer Materials {Material m[];} materials;
+layout (set = 0, binding = 5) buffer Lights {Light l[];} lights;
 
 layout(location = 0) in vec3 normal;
 layout(location = 1) in vec2 tex_coords;
 layout(location = 2) in vec3 frag_pos;
 layout(location = 3) flat in uint mat_id;
 
-layout(push_constant) uniform Constants {vec3 view_pos; } constants;
+layout(push_constant) uniform Constants {
+    vec3 view_pos;
+    uint light_count;
+} constants;
 
 layout(location = 0) out vec4 out_color;
 
@@ -87,54 +98,58 @@ float rim(vec3 N, vec3 V, float power, float strength) {
 vec3 pbr(Material mat) {
 
     vec3 albedo = get_albedo(mat);
-    vec3 light_pos = vec3(0.0, 0.0, 4.0);
-    vec3 light_color = vec3(23.47, 21.31, 20.79);
     
     vec3 V = normalize(constants.view_pos - frag_pos);
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, mat.albedo, mat.metallic);
 
     vec3 Lo = vec3(0.0);
-    // TODO : for each light
-    //for (int i = 0; i < light_amount ; i++) {
 
-    vec3 L = normalize(light_pos - frag_pos);
-    vec3 H = normalize(V + L);
-    
-    float dist = length(light_pos - frag_pos);
-    float attenuation = 1.0 / (dist * dist);
-    vec3 radiance = light_color * attenuation;
-    
-    vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
-    float NDF = distribution_ggx(normal, H, mat.roughness);
-    float G = geometry_smith(normal, V, L, mat.roughness);
+     for (int i = 0; i < 1 ; i++) {
+        Light light = lights.l[0];
+        vec3 L;
+        vec3 radiance;
+        if (light.type == 1) {
+            L = normalize(light.vec - frag_pos);  
+            float dist = length(light.vec - frag_pos);
+            float attenuation = 1.0 / (dist * dist);
+            radiance = light.color * light.intensity * attenuation;
+        } else if (light.type == 0) {
+            L = normalize(light.vec);
+            radiance = light.color * light.intensity;
+        }
+        vec3 H = normalize(V + L);
+        vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+        float NDF = distribution_ggx(normal, H, mat.roughness);
+        float G = geometry_smith(normal, V, L, mat.roughness);
 
-    vec3 numer = NDF * G * F;
-    float denom = 4.0 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0);
-    vec3 specular = numer / max(denom, 0.001);
+        vec3 numer = NDF * G * F;
+        float denom = 4.0 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0);
+        vec3 specular = numer / max(denom, 0.001);
 
-    vec3 kS = F;
-    vec3 kD = vec3(1.0) - kS;
-    kD *= 1.0 - mat.metallic;
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - mat.metallic;
 
-    float NdotL = max(dot(normal, L), 0.0);
+        float NdotL = max(dot(normal, L), 0.0);
 
-    vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
+        vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
 
-    // Main color
-    vec3 val = (kD * albedo / M_PI + specular + rim_light) * radiance * NdotL;
+        // Main color
+        vec3 val = (kD * albedo / M_PI + specular + rim_light) * radiance * NdotL;
 
-    // Shadow
-    rayQueryEXT rayQuery;
-    vec3 ray_orig = frag_pos + (normal * 0.01);
-	rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, ray_orig, 0.01, L, 1000.0);
-	while (rayQueryProceedEXT(rayQuery)) { }
-	if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        val *= mat.ao;
-	} 
-
-    Lo += val;
-    //}
+        // Shadow
+        if(light.cast_shadows == 1) { 
+            rayQueryEXT rayQuery;
+            vec3 ray_orig = frag_pos + (normal * 0.01);
+            rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, ray_orig, 0.01, L, 1000.0);
+            while (rayQueryProceedEXT(rayQuery)) { }
+            if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
+                val *= mat.ao;
+            } 
+        }
+        Lo += val;
+     }
     
     vec3 color = Lo;
     color = color / (color + vec3(1.0));
