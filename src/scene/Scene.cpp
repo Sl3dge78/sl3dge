@@ -182,23 +182,21 @@ void Scene::draw(vk::CommandBuffer cmd) {
 	}
 }
 void Scene::draw_menu_bar() {
-	bool changed = false;
 	if (ImGui::BeginMenu("Materials")) {
 		for (auto &material : materials) {
 			ImGui::MenuItem("Object", "", &material.draw_ui);
 		}
 		ImGui::EndMenu();
 	}
+	bool changed = false;
+	int id = 0;
 	for (auto &material : materials) {
-		if (material.draw_ui) {
-			ImGui::Begin("Material");
-			changed |= ImGui::ColorPicker3("Albedo", &material.albedo.r);
-			changed |= ImGui::DragFloat("Roughness", &material.roughness, 0.01f, 0.0f, 1.0f);
-			changed |= ImGui::DragFloat("Metallic", &material.metallic, 0.01f, 0.0f, 1.0f);
-			changed |= ImGui::DragFloat("AO", &material.ao, 0.01f, 0.0f, 1.0f);
-			ImGui::End();
-		}
+		ImGui::PushID(id);
+		changed |= material.on_gui();
+		ImGui::PopID();
+		id++;
 	}
-	if (changed)
+	if (changed) {
 		refresh_materials();
+	}
 }

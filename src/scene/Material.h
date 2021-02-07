@@ -23,6 +23,8 @@ struct Material {
 	alignas(4) float roughness;
 	alignas(4) float metallic;
 	alignas(4) float ao;
+	alignas(4) float rim_pow;
+	alignas(4) float rim_strength;
 
 	bool draw_ui = false;
 
@@ -32,7 +34,10 @@ struct Material {
 		this->metallic = metallic;
 		this->roughness = roughness;
 		this->ao = ao;
+		this->rim_pow = 16;
+		this->rim_strength = 2;
 	};
+	bool on_gui();
 };
 
 #endif // !MATERIAL_H

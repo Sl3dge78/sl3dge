@@ -50,6 +50,7 @@ private:
 		b->translate(glm::vec3(1.5f, 1.f, 0.f));
 		b->rotate(3.14f, glm::vec3(0.f, 0.f, 1.f));
 		*/
+		/*
 		auto sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
 		auto sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 0.0f), 1.f);
 		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
@@ -58,6 +59,10 @@ private:
 		auto plane_mesh = scene->load_mesh("resources/models/plane.obj");
 		auto plane_material = scene->create_material(glm::vec3(.5f, .5f, .5f), 0.1f);
 		auto plane_a = scene->create_instance(plane_mesh, plane_material);
+		*/
+		auto dune_mesh = scene->load_mesh("resources/models/dune.obj");
+		auto dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f);
+		auto dune_instance = scene->create_instance(dune_mesh, dune_material);
 	}
 	void start() override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump

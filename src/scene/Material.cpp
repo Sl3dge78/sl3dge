@@ -40,3 +40,19 @@ Texture::Texture(VulkanApplication &app, const std::string &texture_path) {
 
 	SDL_FreeSurface(surf);
 }
+
+bool Material::on_gui() {
+	if (!draw_ui)
+		return false;
+
+	bool changed = false;
+	ImGui::Begin("Material", &draw_ui);
+	changed |= ImGui::ColorPicker3("Albedo", &albedo.r);
+	changed |= ImGui::DragFloat("Roughness", &roughness, 0.01f, 0.0f, 1.0f);
+	changed |= ImGui::DragFloat("Metallic", &metallic, 0.01f, 0.0f, 1.0f);
+	changed |= ImGui::DragFloat("AO", &ao, 0.01f, 0.0f, 1.0f);
+	changed |= ImGui::DragFloat("Rim Pow", &rim_pow, 1.00f, 0.0f, 64.0f);
+	changed |= ImGui::DragFloat("Rim Strength", &rim_strength, 0.01f, 0.0f, 10.0f);
+	ImGui::End();
+	return changed;
+}

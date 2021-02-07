@@ -12,6 +12,8 @@ struct Material {
     float metallic;
     float roughness;
     float ao;
+    float rim_pow;
+    float rim_strength;
 };
 struct Instance {
 	uint mesh_id;
@@ -75,6 +77,13 @@ float distribution_ggx(vec3 N, vec3 H, float roughness) {
 vec3 fresnel_schlick(float cos_theta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(max(1.0 - cos_theta, 0.0), 5.0);
 }
+float rim(vec3 N, vec3 V, float power, float strength) {
+
+    float rim = 1.0 - clamp(dot(N, V), 0.0, 1.0);
+    rim = clamp(pow(rim, power) * strength, 0.0, 1.0);
+    return rim;
+
+}
 vec3 pbr(Material mat) {
 
     vec3 albedo = get_albedo(mat);
@@ -88,49 +97,55 @@ vec3 pbr(Material mat) {
     vec3 Lo = vec3(0.0);
     // TODO : for each light
     //for (int i = 0; i < light_amount ; i++) {
-       
-    //}
+
     vec3 L = normalize(light_pos - frag_pos);
     vec3 H = normalize(V + L);
     
+    float dist = length(light_pos - frag_pos);
+    float attenuation = 1.0 / (dist * dist);
+    vec3 radiance = light_color * attenuation;
+    
+    vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+    float NDF = distribution_ggx(normal, H, mat.roughness);
+    float G = geometry_smith(normal, V, L, mat.roughness);
+
+    vec3 numer = NDF * G * F;
+    float denom = 4.0 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0);
+    vec3 specular = numer / max(denom, 0.001);
+
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - mat.metallic;
+
+    float NdotL = max(dot(normal, L), 0.0);
+
+    vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
+
+    // Main color
+    vec3 val = (kD * albedo / M_PI + specular + rim_light) * radiance * NdotL;
+
+    // Shadow
     rayQueryEXT rayQuery;
     vec3 ray_orig = frag_pos + (normal * 0.01);
 	rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, ray_orig, 0.01, L, 1000.0);
 	while (rayQueryProceedEXT(rayQuery)) { }
 	if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-        Lo += 0.0;
-	} else {
-        float dist = length(light_pos - frag_pos);
-        float attenuation = 1.0 / (dist * dist);
-        vec3 radiance = light_color * attenuation;
-        
-        vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
-        float NDF = distribution_ggx(normal, H, mat.roughness);
-        float G = geometry_smith(normal, V, L, mat.roughness);
+        val *= mat.ao;
+	} 
 
-        vec3 numer = NDF * G * F;
-        float denom = 4.0 * max(dot(normal, V), 0.0) * max(dot(normal, L), 0.0);
-        vec3 specular = numer / max(denom, 0.001);
-
-        vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - mat.metallic;
-
-        float NdotL = max(dot(normal, L), 0.0);
-        Lo += (kD * albedo / M_PI + specular) * radiance * NdotL;
-    }
-
-    vec3 ambient = vec3(0.03) * albedo * mat.ao;
-    vec3 color = ambient + Lo;
+    Lo += val;
+    //}
+    
+    vec3 color = Lo;
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
-    
+
     return color;
 }
-/*
+
 vec4 blinn_phong() {
     
-    vec3 light_pos = vec3(0.0, 0.0, 2.0);
+    vec3 light_pos = vec3(0.0, 0.0, 4.0);
     vec3 L = normalize(light_pos - frag_pos);
 
     Material mat = materials.m[mat_id];
@@ -140,21 +155,29 @@ vec4 blinn_phong() {
     float diff = max(dot(normal, L), 0.0);
     vec3 diffuse = mat.albedo * diff;
     
-    vec3 view_dir = normalize(view_pos - frag_pos);
+    vec3 V = normalize(constants.view_pos - frag_pos);
     vec3 reflect_dir = reflect(-L, normal);
 
-    float spec = pow(max(dot(view_dir, reflect_dir), 0.0), mat.shininess);
-    vec3 specular = mat.specular_strength * spec * vec3(1.0);
+    const float shininess = 0;
+    const float specular_strength = 0;
+
+    float spec = pow(max(dot(V, reflect_dir), 0.0), shininess);
+    vec3 specular = specular_strength * spec * vec3(1.0);
+    vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
+    specular += rim_light;
     vec4 ret = vec4(ambient + diffuse + specular, 1.0);
     
-    if(mat.texture_id >= 0) {
-         ret *= texture(textures[mat.texture_id], tex_coords);
+    if(mat.albedo_texture_id >= 0) {
+         ret *= texture(textures[mat.albedo_texture_id], tex_coords);
     }
+
+    return ret;
 }
-*/
+
 
 void main() {
 
     //out_color = blinn_phong();
     out_color = vec4(pbr(materials.m[mat_id]), 1.0);
 }
+
