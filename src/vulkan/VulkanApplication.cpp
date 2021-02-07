@@ -103,11 +103,11 @@ void VulkanApplication::init_vulkan() {
 
 	SDL_Log("Image view created!");
 }
-void VulkanApplication::post_swapchain_init() {
+void VulkanApplication::post_swapchain_init(bool update) {
 	device->waitIdle();
 	swapchain.reset();
 	create_swapchain();
-	build_raster_pipeline();
+	build_raster_pipeline(update);
 	create_ui_context();
 	create_frames();
 	create_semaphores();
@@ -386,7 +386,7 @@ void VulkanApplication::create_swapchain() {
 	swapchain_images = device->getSwapchainImagesKHR(*swapchain);
 	swapchain_image_count = swapchain_images.size();
 }
-void VulkanApplication::build_raster_pipeline() {
+void VulkanApplication::build_raster_pipeline(bool update) {
 	// Shaders
 	auto vertex_code = read_file("resources/shaders/general.vert.spv");
 	auto fragment_code = read_file("resources/shaders/general.frag.spv");
@@ -398,114 +398,118 @@ void VulkanApplication::build_raster_pipeline() {
 		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertex_shader, "main"),
 		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragment_shader, "main"),
 	};
+	if (!update) {
+		depth_image = std::unique_ptr<Image>(new Image(*this, swapchain_extent.width, swapchain_extent.height, find_depth_format(), vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
 
-	depth_image = std::unique_ptr<Image>(new Image(*this, swapchain_extent.width, swapchain_extent.height, find_depth_format(), vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
+		// Render pass
+		{
+			// Raster color
+			std::vector<vk::AttachmentDescription> attachments;
+			vk::AttachmentDescription raster_attachment(
+					{},
+					swapchain_format,
+					vk::SampleCountFlagBits::e1,
+					vk::AttachmentLoadOp::eClear,
+					vk::AttachmentStoreOp::eStore,
+					vk::AttachmentLoadOp::eDontCare,
+					vk::AttachmentStoreOp::eDontCare,
+					vk::ImageLayout::eUndefined,
+					vk::ImageLayout::ePresentSrcKHR);
+			attachments.push_back(raster_attachment);
 
-	// Render pass
-	{
-		// Raster color
-		std::vector<vk::AttachmentDescription> attachments;
-		vk::AttachmentDescription raster_attachment(
-				{},
-				swapchain_format,
-				vk::SampleCountFlagBits::e1,
-				vk::AttachmentLoadOp::eClear,
-				vk::AttachmentStoreOp::eStore,
-				vk::AttachmentLoadOp::eDontCare,
-				vk::AttachmentStoreOp::eDontCare,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::ePresentSrcKHR);
-		attachments.push_back(raster_attachment);
+			vk::AttachmentDescription depth_attachment{};
+			depth_attachment.format = find_depth_format();
+			depth_attachment.samples = vk::SampleCountFlagBits::e1;
+			depth_attachment.loadOp = vk::AttachmentLoadOp::eClear;
+			depth_attachment.storeOp = vk::AttachmentStoreOp::eDontCare;
+			depth_attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+			depth_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+			depth_attachment.initialLayout = vk::ImageLayout::eUndefined;
+			depth_attachment.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+			attachments.push_back(depth_attachment);
 
-		vk::AttachmentDescription depth_attachment{};
-		depth_attachment.format = find_depth_format();
-		depth_attachment.samples = vk::SampleCountFlagBits::e1;
-		depth_attachment.loadOp = vk::AttachmentLoadOp::eClear;
-		depth_attachment.storeOp = vk::AttachmentStoreOp::eDontCare;
-		depth_attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-		depth_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-		depth_attachment.initialLayout = vk::ImageLayout::eUndefined;
-		depth_attachment.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-		attachments.push_back(depth_attachment);
+			vk::AttachmentReference raster_color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
+			vk::AttachmentReference depth_ref(1U, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-		vk::AttachmentReference raster_color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
-		vk::AttachmentReference depth_ref(1U, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+			vk::SubpassDependency raster_dependency(
+					VK_SUBPASS_EXTERNAL,
+					0,
+					{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+					{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+					{},
+					{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
+					{});
+			vk::SubpassDescription raster_subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, raster_color_ref, nullptr, &depth_ref, nullptr);
 
-		vk::SubpassDependency raster_dependency(
-				VK_SUBPASS_EXTERNAL,
-				0,
-				{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-				{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-				{},
-				{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
-				{});
-		vk::SubpassDescription raster_subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, raster_color_ref, nullptr, &depth_ref, nullptr);
+			raster_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, raster_subpass, raster_dependency));
+		}
 
-		raster_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, raster_subpass, raster_dependency));
-	}
+		uint32_t mesh_count = scene->meshes.size();
+		uint32_t texture_count = scene->textures.size();
 
-	uint32_t mesh_count = scene->meshes.size();
-	uint32_t texture_count = scene->textures.size();
-
-	// Descriptors
-	std::vector<vk::DescriptorSetLayoutBinding> bindings{
-		vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, { vk::ShaderStageFlagBits::eVertex }, nullptr),
-		vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
-		vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
-		// Scene Desc
-		vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }, nullptr),
-		// Material Data
-		vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
-	};
-	vk::PushConstantRange push_constants(vk::ShaderStageFlagBits::eFragment, 0, sizeof(glm::vec3));
-	raster_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
-	raster_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *raster_set_layout, push_constants));
-
-	// Create Descriptor pool
-	{
-		std::vector<vk::DescriptorPoolSize> pool_sizes{
-			vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1 * swapchain_image_count),
-			vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1 * swapchain_image_count),
-			vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
-			vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2),
+		// Descriptors
+		std::vector<vk::DescriptorSetLayoutBinding> bindings{
+			vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, { vk::ShaderStageFlagBits::eVertex }, nullptr),
+			vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
+			vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
+			// Scene Desc
+			vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }, nullptr),
+			// Material Data
+			vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
 		};
-		raster_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
+		vk::PushConstantRange push_constants(vk::ShaderStageFlagBits::eFragment, 0, sizeof(glm::vec3));
+		raster_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
+		raster_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *raster_set_layout, push_constants));
+
+		// Create Descriptor pool
+		{
+			std::vector<vk::DescriptorPoolSize> pool_sizes{
+				vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1 * swapchain_image_count),
+				vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1 * swapchain_image_count),
+				vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
+				vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2),
+			};
+			raster_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
+		}
+
+		raster_desc_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*raster_pool, *raster_set_layout)).front());
+
+		std::vector<vk::WriteDescriptorSet> writes;
+		// Binding 0, Camera matrices
+		vk::DescriptorBufferInfo camera_buffer(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
+		vk::WriteDescriptorSet camera_matrices(*raster_desc_set, 0, 0, vk::DescriptorType::eUniformBuffer, nullptr, camera_buffer, nullptr);
+		writes.push_back(camera_matrices);
+
+		// Binding 1, textures
+		std::vector<vk::DescriptorImageInfo> images_info;
+		for (auto &tex : scene->textures) {
+			images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+		}
+		vk::WriteDescriptorSet texture_write(*raster_desc_set, 1, 0, scene->textures.size(), vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
+		writes.push_back(texture_write);
+
+		// Binding 2 Acceleration Structure
+		std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
+		vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
+		vk::WriteDescriptorSet as_descriptor_write(*raster_desc_set, 2, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
+		as_descriptor_write.pNext = &as_desc;
+		writes.push_back(as_descriptor_write);
+
+		// binding 3 scene desc
+		vk::DescriptorBufferInfo scene_info(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
+		vk::WriteDescriptorSet scene_write(*raster_desc_set, 3, 0, vk::DescriptorType::eStorageBuffer, nullptr, scene_info, nullptr);
+		writes.push_back(scene_write);
+
+		// binding 4 Materials
+		vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
+		vk::WriteDescriptorSet material_write(*raster_desc_set, 4, 0, vk::DescriptorType::eStorageBuffer, nullptr, material_info, nullptr);
+		writes.push_back(material_write);
+
+		device->updateDescriptorSets(writes, nullptr);
 	}
-
-	raster_desc_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*raster_pool, *raster_set_layout)).front());
-
-	std::vector<vk::WriteDescriptorSet> writes;
-	// Binding 0, Camera matrices
-	vk::DescriptorBufferInfo camera_buffer(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
-	vk::WriteDescriptorSet camera_matrices(*raster_desc_set, 0, 0, vk::DescriptorType::eUniformBuffer, nullptr, camera_buffer, nullptr);
-	writes.push_back(camera_matrices);
-
-	// Binding 1, textures
-	std::vector<vk::DescriptorImageInfo> images_info;
-	for (auto &tex : scene->textures) {
-		images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+	if (!pipeline_cache || update) {
+		this->pipeline_cache = device->createPipelineCacheUnique(vk::PipelineCacheCreateInfo());
 	}
-	vk::WriteDescriptorSet texture_write(*raster_desc_set, 1, 0, scene->textures.size(), vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
-	writes.push_back(texture_write);
-
-	// Binding 2 Acceleration Structure
-	std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
-	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
-	vk::WriteDescriptorSet as_descriptor_write(*raster_desc_set, 2, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
-	as_descriptor_write.pNext = &as_desc;
-	writes.push_back(as_descriptor_write);
-
-	// binding 3 scene desc
-	vk::DescriptorBufferInfo scene_info(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
-	vk::WriteDescriptorSet scene_write(*raster_desc_set, 3, 0, vk::DescriptorType::eStorageBuffer, nullptr, scene_info, nullptr);
-	writes.push_back(scene_write);
-
-	// binding 4 Materials
-	vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
-	vk::WriteDescriptorSet material_write(*raster_desc_set, 4, 0, vk::DescriptorType::eStorageBuffer, nullptr, material_info, nullptr);
-	writes.push_back(material_write);
-
-	device->updateDescriptorSets(writes, nullptr);
 
 	// Pipeline
 	{
@@ -572,9 +576,10 @@ void VulkanApplication::build_raster_pipeline() {
 		pipeline_create_info.pColorBlendState = &color_blend;
 		pipeline_create_info.layout = *raster_layout;
 		pipeline_create_info.renderPass = *raster_pass;
-		raster_pipeline = device->createGraphicsPipelineUnique(nullptr, pipeline_create_info);
+		raster_pipeline = device->createGraphicsPipelineUnique(*pipeline_cache, pipeline_create_info);
 	}
 }
+
 void VulkanApplication::create_ui_context() {
 	static std::array<vk::DescriptorPoolSize, 11> pool_sizes{};
 	pool_sizes[0].type = vk::DescriptorType::eSampler;
@@ -1047,6 +1052,9 @@ void VulkanApplication::flush_commandbuffers(std::vector<vk::CommandBuffer> cmd,
 float VulkanApplication::get_aspect_ratio() const {
 	auto a = swapchain_extent;
 	return float(a.width) / float(a.height);
+}
+void VulkanApplication::refresh_shaders() {
+	build_raster_pipeline(true); // TODO : Do this automatically when changes are detected in the shaders?
 }
 int VulkanApplication::get_graphics_family_index() const {
 	return queue_family_indices.graphics_family.value();

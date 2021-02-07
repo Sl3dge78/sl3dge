@@ -12,6 +12,7 @@
 
 #include <SDL/SDL.h>
 
+#include "Input.h"
 #include "scene/Material.h"
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
@@ -79,7 +80,7 @@ private:
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Camera params", "", &scene->camera.show_window);
-
+				ImGui::MenuItem("Refresh Shaders", "F5", nullptr);
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();
@@ -89,6 +90,10 @@ private:
 		}
 
 		ImGui::EndMainMenuBar();
+
+		if (Input::get_key_down(SDL_SCANCODE_F5)) {
+			this->refresh_shaders();
+		}
 	}
 };
 

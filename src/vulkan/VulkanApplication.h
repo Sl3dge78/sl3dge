@@ -81,6 +81,7 @@ protected:
 		int light_type;
 		int frame;
 	} rtx_push_constants;
+	void refresh_shaders();
 
 private:
 	vk::DynamicLoader dynamic_loader;
@@ -124,6 +125,7 @@ private:
 	vk::UniqueDescriptorPool raster_pool;
 	vk::UniquePipeline raster_pipeline;
 	vk::UniqueDescriptorSet raster_desc_set;
+	vk::UniquePipelineCache pipeline_cache;
 
 	// RTX
 	const bool rtx = false;
@@ -140,7 +142,7 @@ private:
 	std::unique_ptr<Buffer> shader_binding_table;
 
 	void init_vulkan();
-	void post_swapchain_init();
+	void post_swapchain_init(bool update = false);
 
 	virtual void load() = 0;
 	virtual void start() = 0;
@@ -157,7 +159,7 @@ private:
 	void create_texture_sampler();
 
 	void create_swapchain();
-	void build_raster_pipeline();
+	void build_raster_pipeline(bool update = false);
 	void create_ui_context();
 	void create_frames();
 	void create_semaphores();
