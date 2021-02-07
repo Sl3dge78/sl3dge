@@ -76,10 +76,9 @@ protected:
 
 	struct RTPushConstant {
 		glm::vec4 clear_color;
-		glm::vec3 light_pos;
+		glm::vec3 light_dir;
 		float light_intensity;
-		int light_type;
-		int frame;
+		glm::vec3 light_color;
 	} rtx_push_constants;
 	void refresh_shaders();
 
@@ -128,7 +127,7 @@ private:
 	vk::UniquePipelineCache pipeline_cache;
 
 	// RTX
-	const bool rtx = false;
+	const bool rtx = true;
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
 
 	vk::UniqueDescriptorPool rtx_pool;
@@ -165,7 +164,7 @@ private:
 	void create_semaphores();
 
 	void init_rtx();
-	void build_rtx_pipeline();
+	void build_rtx_pipeline(bool update = false);
 	void create_rtx_SBT();
 	void raytrace(VulkanFrame &frame, int image_id);
 

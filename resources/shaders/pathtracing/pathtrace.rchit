@@ -62,9 +62,9 @@ void main() {
     
     vec3 emittance = vec3(0.2);
 
-    vec3 albedo = mat.diffuse_color;
-    if(mat.texture_id > -1)
-        albedo = texture(textures[mat.texture_id], tex_coord).xyz;
+    vec3 albedo = mat.albedo;
+    if(mat.albedo_texture_id > -1)
+        albedo = texture(textures[mat.albedo_texture_id], tex_coord).xyz;
 
     const float p = 1 / M_PI;
     float cos_theta = dot(dir, normal);

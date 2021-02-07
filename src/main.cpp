@@ -62,10 +62,10 @@ private:
 		auto plane_a = scene->create_instance(plane_mesh, plane_material);
 		*/
 		auto dune_mesh = scene->load_mesh("resources/models/dune.obj");
-		auto dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f);
+		auto dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
 		auto dune_instance = scene->create_instance(dune_mesh, dune_material);
 
-		scene->create_light(0, glm::vec3(1.0), 1.0, glm::normalize(glm::vec3(1.0, 1.0, 0.25)), true);
+		scene->create_light(0, glm::vec3(1.0), 1.0, glm::normalize(glm::vec3(1.0, 1.0, 0.15)), true);
 		//scene->create_light(1, glm::vec3(1.0), 1.0, glm::vec3(0.0, 0.0, 3.0));
 	}
 	void start() override {
@@ -73,9 +73,9 @@ private:
 		scene->camera.start();
 
 		rtx_push_constants.clear_color = glm::vec4(0.7f, 0.7f, 1.0f, 1.f);
-		rtx_push_constants.light_pos = glm::vec3(1.1f, 2.f, 3.f);
-		rtx_push_constants.light_intensity = 0.5f;
-		rtx_push_constants.light_type = 0;
+		rtx_push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.f, .15f));
+		rtx_push_constants.light_intensity = 5.0f;
+		rtx_push_constants.light_color = glm::vec3(1.0, 1.0, 1.0);
 	}
 	void update(float delta_time) override {
 		scene->update(delta_time);

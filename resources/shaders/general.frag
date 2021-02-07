@@ -1,33 +1,12 @@
 #version 460
+#extension GL_GOOGLE_include_directive  : require
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_ray_query : enable
 #extension GL_ARB_separate_shader_objects : enable
 
+#include "shader_utils.glsl"
 #define M_PI 3.1415926535897932384626433832795
-
-struct Material {
-	vec3 albedo;
-    int albedo_texture_id;
-    float metallic;
-    float roughness;
-    float ao;
-    float rim_pow;
-    float rim_strength;
-};
-struct Instance {
-	uint mesh_id;
-	uint mat_id;
-	mat4 transform;
-	mat4 inverted;
-};
-struct Light {
-    int type;
-    vec3 color;
-    float intensity;
-    vec3 vec;
-    int cast_shadows;
-};
 
 layout(set = 0, binding = 1) uniform sampler2D textures[];
 layout (set = 0, binding = 2) uniform accelerationStructureEXT topLevelAS;

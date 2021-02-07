@@ -2,7 +2,6 @@
 #extension GL_GOOGLE_include_directive  : require
 #extension GL_EXT_ray_tracing : require
 #extension GL_EXT_nonuniform_qualifier : enable
-#extension GL_ARB_shader_clock : enable
 
 #include "shader_utils.glsl"
 #include "random.glsl"
@@ -23,9 +22,9 @@ layout(binding = 7, set = 0) buffer Materials {Material m[];} materials;
 
 layout(push_constant) uniform Constants {
     vec4 clear_color;
-    vec3 light_position;
-    float light_instensity;
-    int light_type;
+    vec3 light_dir;
+    float light_intensity;
+    vec3 light_color;
 } constants;
 
 layout(location = 0) rayPayloadInEXT HitPayloadSimple payload;
@@ -56,23 +55,30 @@ void main() {
 
     vec2 tex_coord = v0.tex_coord * barycentre.x + v1.tex_coord * barycentre.y + v2.tex_coord * barycentre.z;
     
-    vec3 albedo = mat.diffuse_color;
-    if(mat.texture_id > -1)
-        albedo = texture(textures[mat.texture_id], tex_coord).xyz;
+    vec3 albedo = mat.albedo;
+    if(mat.albedo_texture_id > -1)
+        albedo = texture(textures[mat.albedo_texture_id], tex_coord).xyz;
     payload.direct_color = albedo;
     
     uint ray_flags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
 
-    vec3 light_dir = normalize(constants.light_position - world_pos);
-    float t_max = length(constants.light_position - world_pos);
+    float t_max = 1000.0;
     is_shadow = true;
-    traceRayEXT(top_level_AS, ray_flags, 0xFF, 0, 0, 1, world_pos, 0.1, light_dir, t_max, 1);
+    traceRayEXT(top_level_AS, ray_flags, 0xFF, 0, 0, 1, world_pos, 0.1, constants.light_dir, t_max, 1);
+
+     vec3 step_abs = exp(-DENSITY * STEP_DIST);
+    vec3 step_col = (vec3(1.) - step_abs) * henyeyGreenstein(constants.light_dir, payload.ray_dir);
+    payload.vol_abs *= step_abs;
 
     if(is_shadow) {
-       payload.direct_color *= 0.1;
+        payload.direct_color *= mat.ao;
+        payload.vol_col += step_col * payload.vol_abs;
     } else {
-        payload.direct_color *= max(0.1, dot(normal, light_dir));
+        payload.direct_color *= max(0.1, dot(normal, constants.light_dir));
+        payload.vol_col += step_col * payload.vol_abs * constants.light_color * constants.light_intensity;
     }
+
+    payload.depth = 100;
 
     /*
     vec3 tangent, bitangent;
