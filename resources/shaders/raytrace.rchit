@@ -12,6 +12,7 @@ layout(binding = 2, set = 0) uniform CameraMatrices {
     mat4 proj;
     mat4 view_inverse;
     mat4 proj_inverse;
+    vec3 pos;
     int frame;
 } cam;
 layout(binding = 3, set = 0) buffer Scene {Instance i[];} scene;
@@ -30,6 +31,100 @@ layout(push_constant) uniform Constants {
 layout(location = 0) rayPayloadInEXT HitPayloadSimple payload;
 layout(location = 1) rayPayloadInEXT bool is_shadow;
 hitAttributeEXT vec3 attribs;
+
+float geometry_schlick_ggx(float NdotV, float roughness){
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+	
+    return nom / denom;
+} 
+float geometry_smith(vec3 N, vec3 V, vec3 L, float roughness){
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx1 = geometry_schlick_ggx(NdotV, roughness);
+    float ggx2 = geometry_schlick_ggx(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
+float distribution_ggx(vec3 N, vec3 H, float roughness) {
+
+    float a = roughness*roughness;
+    float a2 = a*a;
+    float NdotH = max(dot(N,H),0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = M_PI * denom * denom;
+    
+    return nom / denom;
+}
+vec3 fresnel_schlick(float cos_theta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(max(1.0 - cos_theta, 0.0), 5.0);
+}
+float rim(vec3 N, vec3 V, float power, float strength) {
+
+    float rim = 1.0 - clamp(dot(N, V), 0.0, 1.0);
+    rim = clamp(pow(rim, power) * strength, 0.0, 1.0);
+    return rim;
+
+}
+vec3 pbr(Material mat, vec2 tex_coord, vec3 V, vec3 N) {
+
+    vec3 albedo = mat.albedo;
+     if(mat.albedo_texture_id >= 0) {
+         albedo *= texture(textures[mat.albedo_texture_id], tex_coord).xyz;
+    }
+    
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, mat.albedo, mat.metallic);
+
+    vec3 Lo = vec3(0.0);
+
+    //for (int i = 0; i < 1 ; i++) {
+        //Light light = lights.l[0];
+        /*if (light.type == 1) {
+            L = normalize(light.vec - frag_pos);  
+            float dist = length(light.vec - frag_pos);
+            float attenuation = 1.0 / (dist * dist);
+            radiance = light.color * light.intensity * attenuation;
+        } else if (light.type == 0) {*/
+            vec3 L = constants.light_dir;
+            vec3 radiance = constants.light_color * constants.light_intensity;
+        //}
+        vec3 H = normalize(V + L);
+        vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+        float NDF = distribution_ggx(N, H, mat.roughness);
+        float G = geometry_smith(N, V, L, mat.roughness);
+
+         float NdotL = max(dot(N, L), 0.0);
+
+        vec3 numer = NDF * G * F;
+        float denom = 4.0 * max(dot(N, V), 0.0) * NdotL;
+        vec3 specular = numer / max(denom, 0.001);
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - mat.metallic;
+
+        vec3 rim_light = vec3(1.0) * rim(N, V, mat.rim_pow, mat.rim_strength);
+
+        // Main color
+        Lo += (kD * albedo / M_PI + specular + rim_light) * radiance * NdotL;
+    // }
+    
+    vec3 ambient = vec3(0.03) * albedo * mat.ao;
+    //ambient = vec3(0.0);
+    vec3 color = Lo + ambient;
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0/2.2));
+
+    return color;
+}
+
 
 void main() {
 
@@ -55,44 +150,24 @@ void main() {
 
     vec2 tex_coord = v0.tex_coord * barycentre.x + v1.tex_coord * barycentre.y + v2.tex_coord * barycentre.z;
     
-    vec3 albedo = mat.albedo;
-    if(mat.albedo_texture_id > -1)
-        albedo = texture(textures[mat.albedo_texture_id], tex_coord).xyz;
-    payload.direct_color = albedo;
-    
-    uint ray_flags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+    payload.direct_color = pbr(mat, tex_coord, normalize(cam.pos - world_pos), normal);
 
+    float step_length = length(payload.ray_origin - world_pos);
+    vec3 step_abs = exp(-DENSITY * step_length);
+    vec3 step_col = (vec3(1.) - step_abs) * henyeyGreenstein(constants.light_dir, payload.ray_dir);
+    payload.vol_abs *= step_abs;
+
+    uint ray_flags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
     float t_max = 1000.0;
     is_shadow = true;
     traceRayEXT(top_level_AS, ray_flags, 0xFF, 0, 0, 1, world_pos, 0.1, constants.light_dir, t_max, 1);
 
-     vec3 step_abs = exp(-DENSITY * STEP_DIST);
-    vec3 step_col = (vec3(1.) - step_abs) * henyeyGreenstein(constants.light_dir, payload.ray_dir);
-    payload.vol_abs *= step_abs;
-
     if(is_shadow) {
         payload.direct_color *= mat.ao;
-        payload.vol_col += step_col * payload.vol_abs;
+        payload.vol_col += step_col * payload.vol_abs * mat.ao;
     } else {
-        payload.direct_color *= max(0.1, dot(normal, constants.light_dir));
         payload.vol_col += step_col * payload.vol_abs * constants.light_color * constants.light_intensity;
     }
 
     payload.depth = 100;
-
-    /*
-    vec3 tangent, bitangent;
-    create_coordinate_system(normal, tangent, bitangent);
-    vec3 dir = sampling_hemi(payload.seed, tangent, bitangent, normal);
-
-    vec3 emittance = vec3(0.2);
-    const float p = 1 / M_PI;
-    float cos_theta = dot(dir, normal);
-    vec3 BRDF = albedo / M_PI;
-
-    payload.direct_color = emittance;
-    payload.ray_origin = world_pos;
-    payload.ray_direction = dir;
-    payload.weight = BRDF * cos_theta / p;
-    */
 }

@@ -2,6 +2,7 @@
 #define M_PI 3.1415926535897932384626433832795
 
 #define ANISOTROPY .4
+//#define DENSITY vec3(.01, .01, .007)
 #define DENSITY vec3(.005, .005, .004)
 #define DENSITY2 vec3(.0045, .0045, .006)
 #define STEP_DIST 0.5
@@ -20,6 +21,7 @@ struct HitPayloadSimple {
     uint null;
 	vec3 direct_color;
 	vec3 ray_dir;
+	vec3 ray_origin;
 	uint depth;
 	vec3 pos;
 	vec3 vol_col;

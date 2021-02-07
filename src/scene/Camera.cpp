@@ -94,6 +94,7 @@ void Camera::update_vectors() {
 	up = glm::cross(front, right);
 	matrices.view = glm::lookAt(position, position + front, up);
 	matrices.view_inverse = glm::inverse(matrices.view);
+	matrices.pos = position;
 }
 
 void Camera::display_window() {

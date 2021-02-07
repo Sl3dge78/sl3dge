@@ -29,6 +29,8 @@
 
 class Sl3dge : public VulkanApplication {
 private:
+	float time = 0.0f;
+
 	void make_sphere() {
 		/*
 		float x = float(std::rand() % 10);
@@ -37,7 +39,6 @@ private:
 		*/
 	}
 	void load() override {
-		srand(time(NULL));
 		scene->camera.load(this);
 		auto viking_texture = scene->load_texture("resources/textures/viking_room.png"); // 0
 		/*
@@ -65,6 +66,11 @@ private:
 		auto dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
 		auto dune_instance = scene->create_instance(dune_mesh, dune_material);
 
+		auto sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
+		auto sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
+		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
+		sphere_a->translate(glm::vec3(5.0f, 5.0f, 1.0f));
+
 		scene->create_light(0, glm::vec3(1.0), 1.0, glm::normalize(glm::vec3(1.0, 1.0, 0.15)), true);
 		//scene->create_light(1, glm::vec3(1.0), 1.0, glm::vec3(0.0, 0.0, 3.0));
 	}
@@ -72,13 +78,19 @@ private:
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		scene->camera.start();
 
-		rtx_push_constants.clear_color = glm::vec4(0.7f, 0.7f, 1.0f, 1.f);
+		rtx_push_constants.clear_color = glm::vec4(0.43f, 0.77f, .91f, 1.f);
 		rtx_push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.f, .15f));
 		rtx_push_constants.light_intensity = 5.0f;
-		rtx_push_constants.light_color = glm::vec3(1.0, 1.0, 1.0);
+		rtx_push_constants.light_color = glm::vec3(.99, .72, 0.07);
 	}
 	void update(float delta_time) override {
 		scene->update(delta_time);
+
+		time += delta_time;
+		const float speed = 1.0f / 10.0f;
+
+		//rtx_push_constants.light_dir = glm::normalize(glm::vec3(glm::abs(glm::cos(time * speed)), 1.0f, glm::abs(glm::sin(time * speed))));
+		rtx_push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.0f, 0.0f));
 
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
