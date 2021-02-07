@@ -32,5 +32,5 @@ void main() {
     } else {
         payload.vol_col += step_col * payload.vol_abs;
     }
-    payload.direct_color = constants.clear_color.xyz * .5;
+    payload.direct_color = constants.clear_color.xyz * .25;
 }
