@@ -1,3 +1,3 @@
 # Vulkan
 
-![alt text](images/sample.png?raw=true)
+![alt text](images/sample1.png?raw=true)
