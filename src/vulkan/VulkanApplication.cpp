@@ -206,15 +206,15 @@ void VulkanApplication::draw_frame() {
 
 	frame->command_buffer->begin(vk::CommandBufferBeginInfo({}, nullptr));
 	if (rtx) {
+		debug_begin_label(frame->command_buffer.get(), "RTX");
+		raytrace(*frame, image_id);
+		debug_end_label(*frame->command_buffer);
+
 		frame->begin_render_pass();
 		debug_begin_label(frame->command_buffer.get(), "UI");
 		draw_ui(*frame);
 		debug_end_label(*frame->command_buffer);
 		frame->end_render_pass();
-
-		debug_begin_label(frame->command_buffer.get(), "RTX");
-		raytrace(*frame, image_id);
-		debug_end_label(*frame->command_buffer);
 	} else {
 		frame->begin_render_pass();
 		frame->command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *raster_layout, 0, *raster_desc_set, nullptr);
@@ -392,6 +392,45 @@ void VulkanApplication::create_swapchain() {
 	swapchain_image_count = swapchain_images.size();
 }
 void VulkanApplication::build_raster_pipeline(bool update) {
+	depth_image = std::unique_ptr<Image>(new Image(*this, swapchain_extent.width, swapchain_extent.height, find_depth_format(), vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
+
+	raster_pipe = std::make_unique<RasterPipeline>();
+
+	vk::DescriptorBufferInfo cam_bi(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
+	raster_pipe->add_descriptor(vk::DescriptorType::eUniformBuffer, cam_bi, 0, vk::ShaderStageFlagBits::eVertex, swapchain_image_count, 1);
+
+	std::vector<vk::DescriptorImageInfo> images_info;
+	for (auto &tex : scene->textures) {
+		images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+	}
+	raster_pipe->add_descriptor(vk::DescriptorType::eCombinedImageSampler, images_info, 1, vk::ShaderStageFlagBits::eFragment, swapchain_image_count, 1);
+
+	// Binding 2 Acceleration Structure
+	vk::DescriptorSetLayoutBinding as_binding(2, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr);
+	vk::DescriptorPoolSize as_size(vk::DescriptorType::eAccelerationStructureKHR, 1);
+	std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
+	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
+	vk::WriteDescriptorSet as_write(nullptr, 2, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
+	as_write.pNext = &as_desc;
+	raster_pipe->add_descriptor(as_binding, as_size, as_write);
+
+	// binding 3 scene desc
+	vk::DescriptorBufferInfo scene_bi(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
+	raster_pipe->add_descriptor(vk::DescriptorType::eStorageBuffer, scene_bi, 3, { vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }, 1, 1);
+
+	// binding 4 Materials
+	vk::DescriptorBufferInfo mat_bi(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
+	raster_pipe->add_descriptor(vk::DescriptorType::eStorageBuffer, mat_bi, 4, { vk::ShaderStageFlagBits::eFragment }, 1, 1);
+
+	// binding 5 lights
+	vk::DescriptorBufferInfo light_bi(scene->lights_buffer->buffer, 0, VK_WHOLE_SIZE);
+	raster_pipe->add_descriptor(vk::DescriptorType::eStorageBuffer, light_bi, 5, { vk::ShaderStageFlagBits::eFragment }, 1, 1);
+
+	raster_pipe->add_push_constant(vk::PushConstantRange(vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants)));
+
+	raster_pipe->build_pipeline(*device, swapchain_format, swapchain_extent);
+
+	/*
 	// Shaders
 	auto vertex_code = read_file("resources/shaders/general.vert.spv");
 	auto fragment_code = read_file("resources/shaders/general.frag.spv");
@@ -404,7 +443,7 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragment_shader, "main"),
 	};
 	if (!update) {
-		depth_image = std::unique_ptr<Image>(new Image(*this, swapchain_extent.width, swapchain_extent.height, find_depth_format(), vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
+		
 
 		// Render pass
 		{
@@ -419,7 +458,7 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 					vk::AttachmentLoadOp::eDontCare,
 					vk::AttachmentStoreOp::eDontCare,
 					vk::ImageLayout::eUndefined,
-					vk::ImageLayout::ePresentSrcKHR);
+					vk::ImageLayout::eGeneral);
 			attachments.push_back(raster_attachment);
 
 			vk::AttachmentDescription depth_attachment{};
@@ -590,6 +629,7 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 		pipeline_create_info.renderPass = *raster_pass;
 		raster_pipeline = device->createGraphicsPipelineUnique(*pipeline_cache, pipeline_create_info);
 	}
+	*/
 }
 
 void VulkanApplication::create_ui_context() {
@@ -632,7 +672,31 @@ void VulkanApplication::create_ui_context() {
 	imgui_init_info.ImageCount = uint32_t(swapchain_image_count);
 	imgui_init_info.CheckVkResultFn = nullptr;
 	imgui_init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-	ImGui_ImplVulkan_Init(&imgui_init_info, *raster_pass);
+
+	vk::AttachmentDescription ui_attachment(
+			{},
+			swapchain_format,
+			vk::SampleCountFlagBits::e1,
+			vk::AttachmentLoadOp::eLoad,
+			vk::AttachmentStoreOp::eStore,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eDontCare,
+			vk::ImageLayout::eGeneral,
+			vk::ImageLayout::ePresentSrcKHR);
+
+	vk::AttachmentReference color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
+	vk::SubpassDependency dependency(
+			VK_SUBPASS_EXTERNAL,
+			0,
+			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+			{},
+			{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
+			{});
+	vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, color_ref, nullptr, nullptr, nullptr);
+	ui_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, ui_attachment, subpass, dependency));
+
+	ImGui_ImplVulkan_Init(&imgui_init_info, *ui_pass);
 
 	auto cmd_buf = create_commandbuffer();
 	ImGui_ImplVulkan_CreateFontsTexture(cmd_buf);
@@ -645,7 +709,7 @@ void VulkanApplication::create_frames() {
 	for (uint32_t i = 0; i < frames.size(); i++) {
 		frames[i].init_frame(*device);
 		frames[i].raster_image_view = create_image_view(*device, swapchain_images[i], swapchain_format, vk::ImageAspectFlagBits::eColor);
-		frames[i].create_framebuffer(swapchain_extent, *raster_pass, depth_image->image_view);
+		frames[i].create_framebuffer(swapchain_extent, *ui_pass, depth_image->image_view);
 		frames[i].create_command_buffers(*graphics_command_pool);
 		frames[i].create_sync_objects();
 	}

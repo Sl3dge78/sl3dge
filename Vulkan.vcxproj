@@ -178,6 +178,7 @@
     <ClCompile Include="src\vulkan\VulkanApplication.cpp" />
     <ClCompile Include="src\vulkan\VulkanFrame.cpp" />
     <ClCompile Include="src\vulkan\VulkanHelper.cpp" />
+    <ClCompile Include="src\vulkan\VulkanPipeline.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\glm\common.hpp" />
@@ -570,6 +571,7 @@
     <ClInclude Include="src\vulkan\VulkanApplication.h" />
     <ClInclude Include="src\vulkan\VulkanFrame.h" />
     <ClInclude Include="src\vulkan\VulkanHelper.h" />
+    <ClInclude Include="src\vulkan\VulkanPipeline.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

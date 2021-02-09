@@ -17,6 +17,9 @@
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
+// TODO : Framebuffers are linked to renderpasses. Find a way to use 2 render passes (one for UI the other for raster).
+// TODO : Pipeline object
+// TODO : Fix resizing
 // TODO : Textures for metallic, roughness, ao & normal
 // TODO : Image based lighting https://learnopengl.com/PBR/IBL/Diffuse-irradiance
 // TODO : Add ui to move instances
@@ -25,7 +28,7 @@
 // TODO : GI in RayTracing			// Different pipelines ?
 // TODO : Shadows in RayTracing		// Different pipelines ?
 // TODO : Update TLAS when an object has moved
-// TODO - AMELIO : Virer VulkanFrame et le g�rer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexit� inutile en trop
+// TODO - AMELIO : Virer VulkanFrame et le gérer dans la swapchain directement ? ou virer swapchain et le gerer dans l'app? C'est de la complexité inutile en trop
 
 class Sl3dge : public VulkanApplication {
 private:

@@ -26,6 +26,7 @@
 #include "scene/Vertex.h"
 #include "vulkan/VulkanFrame.h"
 #include "vulkan/VulkanHelper.h"
+#include "vulkan/VulkanPipeline.h"
 
 #include "Input.h"
 
@@ -117,7 +118,9 @@ private:
 	bool wait_for_vsync = false;
 
 	vk::UniqueDescriptorPool imgui_descriptor_pool;
+	vk::UniqueRenderPass ui_pass;
 
+	std::unique_ptr<RasterPipeline> raster_pipe;
 	vk::UniqueDescriptorSetLayout raster_set_layout;
 	vk::UniquePipelineLayout raster_layout;
 	vk::UniqueRenderPass raster_pass;
