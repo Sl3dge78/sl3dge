@@ -44,12 +44,6 @@ void VulkanApplication::run() {
 	scene->init();
 	post_swapchain_init();
 
-	if (rtx) {
-		build_rtx_pipeline();
-		SDL_Log("RTX Pipeline created");
-		create_rtx_SBT();
-		SDL_Log("SBT Created");
-	}
 	SDL_Log("Init done, starting main loop...");
 	main_loop();
 	SDL_Log("Closing...");
@@ -100,21 +94,30 @@ void VulkanApplication::init_vulkan() {
 	// Texture
 	create_texture_sampler();
 	SDL_Log("Texture sampler created!");
-
-	SDL_Log("Image view created!");
 }
 void VulkanApplication::post_swapchain_init(bool update) {
 	device->waitIdle();
 	swapchain.reset();
 	create_swapchain();
-	build_raster_pipeline(update);
+
+	create_ui_renderpass();
+	create_raster_renderpass();
+	if (rtx) {
+		init_rtx();
+		raytracing_pipeline.reset();
+		build_rtx_pipeline();
+		create_rtx_SBT();
+	} else {
+		raster_pipe.reset();
+		build_raster_pipeline(update);
+	}
+	if (update) {
+		ImGui_ImplVulkan_Shutdown();
+	}
+
 	create_ui_context();
 	create_frames();
 	create_semaphores();
-
-	if (rtx) {
-		init_rtx();
-	}
 }
 void VulkanApplication::main_loop() {
 	bool run = true;
@@ -168,7 +171,8 @@ void VulkanApplication::main_loop() {
 	}
 }
 void VulkanApplication::raster_scene(VulkanFrame &frame) {
-	frame.command_buffer->pushConstants(*raster_layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants), &scene->push_constants);
+	raster_pipe->bind_push_constants(*frame.command_buffer, 0, &scene->push_constants);
+	//frame.command_buffer->pushConstants(*raster_layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants), &scene->push_constants);
 	scene->draw(*frame.command_buffer);
 }
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
@@ -192,8 +196,7 @@ void VulkanApplication::draw_frame() {
 	} catch (vk::OutOfDateKHRError &error) {
 	} // Handled below
 	if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
-		device->waitIdle();
-		post_swapchain_init();
+		post_swapchain_init(true);
 		return;
 	}
 
@@ -217,8 +220,12 @@ void VulkanApplication::draw_frame() {
 		frame->end_render_pass();
 	} else {
 		frame->begin_render_pass();
+		raster_pipe->bind_descriptors(*frame->command_buffer);
+		raster_pipe->bind(*frame->command_buffer);
+		/*
 		frame->command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *raster_layout, 0, *raster_desc_set, nullptr);
 		frame->command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *raster_pipeline);
+		*/
 
 		debug_begin_label(frame->command_buffer.get(), "Scene");
 		raster_scene(*frame);
@@ -243,8 +250,7 @@ void VulkanApplication::draw_frame() {
 	} // Handled below
 	if (framebuffer_rezised || result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
 		framebuffer_rezised = false;
-		device->waitIdle();
-		post_swapchain_init();
+		post_swapchain_init(true);
 	}
 
 	semaphore_index = (semaphore_index + 1) % swapchain_image_count;
@@ -318,6 +324,7 @@ void VulkanApplication::create_logical_device() {
 
 	vk::PhysicalDeviceFeatures2 features2{};
 	features2.features.samplerAnisotropy = true;
+	features2.features.shaderInt64 = true;
 	vk::PhysicalDeviceBufferDeviceAddressFeatures device_address{};
 	device_address.bufferDeviceAddress = true;
 	vk::PhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline{};
@@ -394,7 +401,7 @@ void VulkanApplication::create_swapchain() {
 void VulkanApplication::build_raster_pipeline(bool update) {
 	depth_image = std::unique_ptr<Image>(new Image(*this, swapchain_extent.width, swapchain_extent.height, find_depth_format(), vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal, vk::ImageAspectFlagBits::eDepth));
 
-	raster_pipe = std::make_unique<RasterPipeline>();
+	raster_pipe = std::make_unique<GraphicsPipeline>();
 
 	vk::DescriptorBufferInfo cam_bi(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
 	raster_pipe->add_descriptor(vk::DescriptorType::eUniformBuffer, cam_bi, 0, vk::ShaderStageFlagBits::eVertex, swapchain_image_count, 1);
@@ -428,208 +435,77 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 
 	raster_pipe->add_push_constant(vk::PushConstantRange(vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants)));
 
-	raster_pipe->build_pipeline(*device, swapchain_format, swapchain_extent);
+	raster_pipe->build_pipeline(*device, swapchain_extent, *raster_render_pass);
+}
+void VulkanApplication::create_raster_renderpass() {
+	// Render pass
+	std::vector<vk::AttachmentDescription> attachments;
+	vk::AttachmentDescription attachment(
+			{},
+			swapchain_format,
+			vk::SampleCountFlagBits::e1,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eDontCare,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::ePresentSrcKHR);
+	attachments.push_back(attachment);
 
-	/*
-	// Shaders
-	auto vertex_code = read_file("resources/shaders/general.vert.spv");
-	auto fragment_code = read_file("resources/shaders/general.frag.spv");
+	vk::AttachmentDescription depth(
+			{},
+			find_depth_format(),
+			vk::SampleCountFlagBits::e1,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eDontCare,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthStencilAttachmentOptimal);
+	attachments.push_back(depth);
 
-	auto vertex_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, vertex_code.size(), reinterpret_cast<uint32_t *>(vertex_code.data())));
-	auto fragment_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, fragment_code.size(), reinterpret_cast<uint32_t *>(fragment_code.data())));
+	vk::AttachmentReference color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
+	vk::AttachmentReference depth_ref(1U, vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-	auto stages = {
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertex_shader, "main"),
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragment_shader, "main"),
-	};
-	if (!update) {
-		
+	vk::SubpassDependency dependency(
+			VK_SUBPASS_EXTERNAL,
+			0,
+			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+			{},
+			{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
+			{});
+	vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, color_ref, nullptr, &depth_ref, nullptr);
 
-		// Render pass
-		{
-			// Raster color
-			std::vector<vk::AttachmentDescription> attachments;
-			vk::AttachmentDescription raster_attachment(
-					{},
-					swapchain_format,
-					vk::SampleCountFlagBits::e1,
-					vk::AttachmentLoadOp::eClear,
-					vk::AttachmentStoreOp::eStore,
-					vk::AttachmentLoadOp::eDontCare,
-					vk::AttachmentStoreOp::eDontCare,
-					vk::ImageLayout::eUndefined,
-					vk::ImageLayout::eGeneral);
-			attachments.push_back(raster_attachment);
+	raster_render_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
+}
+void VulkanApplication::create_ui_renderpass() {
+	// Render pass
+	std::vector<vk::AttachmentDescription> attachments;
+	vk::AttachmentDescription attachment(
+			{},
+			swapchain_format,
+			vk::SampleCountFlagBits::e1,
+			vk::AttachmentLoadOp::eLoad,
+			vk::AttachmentStoreOp::eStore,
+			vk::AttachmentLoadOp::eDontCare,
+			vk::AttachmentStoreOp::eDontCare,
+			vk::ImageLayout::eGeneral,
+			vk::ImageLayout::ePresentSrcKHR);
+	attachments.push_back(attachment);
 
-			vk::AttachmentDescription depth_attachment{};
-			depth_attachment.format = find_depth_format();
-			depth_attachment.samples = vk::SampleCountFlagBits::e1;
-			depth_attachment.loadOp = vk::AttachmentLoadOp::eClear;
-			depth_attachment.storeOp = vk::AttachmentStoreOp::eDontCare;
-			depth_attachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
-			depth_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-			depth_attachment.initialLayout = vk::ImageLayout::eUndefined;
-			depth_attachment.finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-			attachments.push_back(depth_attachment);
+	vk::AttachmentReference color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
+	vk::SubpassDependency dependency(
+			VK_SUBPASS_EXTERNAL,
+			0,
+			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
+			{},
+			{ vk::AccessFlagBits::eColorAttachmentWrite },
+			{});
+	vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, color_ref, nullptr, nullptr, nullptr);
 
-			vk::AttachmentReference raster_color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
-			vk::AttachmentReference depth_ref(1U, vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-			vk::SubpassDependency raster_dependency(
-					VK_SUBPASS_EXTERNAL,
-					0,
-					{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-					{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-					{},
-					{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
-					{});
-			vk::SubpassDescription raster_subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, raster_color_ref, nullptr, &depth_ref, nullptr);
-
-			raster_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, raster_subpass, raster_dependency));
-		}
-
-		uint32_t mesh_count = scene->meshes.size();
-		uint32_t texture_count = scene->textures.size();
-
-		// Descriptors
-		std::vector<vk::DescriptorSetLayoutBinding> bindings{
-			vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eUniformBuffer, 1, { vk::ShaderStageFlagBits::eVertex }, nullptr),
-			vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
-			vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
-			// Scene Desc
-			vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }, nullptr),
-			// Material Data
-			vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
-			// Light Data
-			vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr),
-		};
-		vk::PushConstantRange push_constants(vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants));
-		raster_set_layout = device->createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
-		raster_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *raster_set_layout, push_constants));
-
-		// Create Descriptor pool
-		{
-			std::vector<vk::DescriptorPoolSize> pool_sizes{
-				vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1 * swapchain_image_count),
-				vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1 * swapchain_image_count),
-				vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
-				vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 3),
-			};
-			raster_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
-		}
-
-		raster_desc_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*raster_pool, *raster_set_layout)).front());
-
-		std::vector<vk::WriteDescriptorSet> writes;
-		// Binding 0, Camera matrices
-		vk::DescriptorBufferInfo camera_buffer(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
-		vk::WriteDescriptorSet camera_matrices(*raster_desc_set, 0, 0, vk::DescriptorType::eUniformBuffer, nullptr, camera_buffer, nullptr);
-		writes.push_back(camera_matrices);
-
-		// Binding 1, textures
-		std::vector<vk::DescriptorImageInfo> images_info;
-		for (auto &tex : scene->textures) {
-			images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-		}
-		vk::WriteDescriptorSet texture_write(*raster_desc_set, 1, 0, scene->textures.size(), vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
-		writes.push_back(texture_write);
-
-		// Binding 2 Acceleration Structure
-		std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
-		vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
-		vk::WriteDescriptorSet as_descriptor_write(*raster_desc_set, 2, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
-		as_descriptor_write.pNext = &as_desc;
-		writes.push_back(as_descriptor_write);
-
-		// binding 3 scene desc
-		vk::DescriptorBufferInfo scene_info(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
-		vk::WriteDescriptorSet scene_write(*raster_desc_set, 3, 0, vk::DescriptorType::eStorageBuffer, nullptr, scene_info, nullptr);
-		writes.push_back(scene_write);
-
-		// binding 4 Materials
-		vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
-		vk::WriteDescriptorSet material_write(*raster_desc_set, 4, 0, vk::DescriptorType::eStorageBuffer, nullptr, material_info, nullptr);
-		writes.push_back(material_write);
-
-		// binding 5 lights
-		vk::DescriptorBufferInfo lights_info(scene->lights_buffer->buffer, 0, VK_WHOLE_SIZE);
-		vk::WriteDescriptorSet lights_write(*raster_desc_set, 5, 0, vk::DescriptorType::eStorageBuffer, nullptr, lights_info, nullptr);
-		writes.push_back(lights_write);
-
-		device->updateDescriptorSets(writes, nullptr);
-	}
-	if (!pipeline_cache || update) {
-		this->pipeline_cache = device->createPipelineCacheUnique(vk::PipelineCacheCreateInfo());
-	}
-
-	// Pipeline
-	{
-		vk::PipelineVertexInputStateCreateInfo vertex_input{};
-		auto desc = Vertex::get_attribute_descriptions();
-		vertex_input.vertexAttributeDescriptionCount = desc.size();
-		vertex_input.pVertexAttributeDescriptions = desc.data();
-
-		auto bindings = Vertex::get_binding_description();
-		vertex_input.vertexBindingDescriptionCount = bindings.size();
-		vertex_input.pVertexBindingDescriptions = bindings.data();
-
-		vk::PipelineInputAssemblyStateCreateInfo input_assembly{};
-		input_assembly.setTopology(vk::PrimitiveTopology::eTriangleList);
-		input_assembly.primitiveRestartEnable = false;
-
-		vk::PipelineViewportStateCreateInfo viewport_state{};
-		vk::Rect2D scissor({ 0, 0 }, swapchain_extent);
-		viewport_state.setScissors(scissor);
-		vk::Viewport viewport(0.0f, 0.0f, swapchain_extent.width, swapchain_extent.height, 0.0f, 1.0f);
-		viewport_state.setViewports(viewport);
-
-		vk::PipelineRasterizationStateCreateInfo rasterization{};
-		rasterization.depthClampEnable = false;
-		rasterization.rasterizerDiscardEnable = false;
-		rasterization.polygonMode = vk::PolygonMode::eFill;
-		rasterization.cullMode = vk::CullModeFlagBits::eNone;
-		rasterization.frontFace = vk::FrontFace::eCounterClockwise;
-		rasterization.depthBiasEnable = false;
-		rasterization.lineWidth = 1.0f;
-
-		vk::PipelineMultisampleStateCreateInfo multisampling{};
-		multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
-		multisampling.sampleShadingEnable = false;
-		multisampling.minSampleShading = 0.f;
-		multisampling.pSampleMask = nullptr;
-		multisampling.alphaToCoverageEnable = false;
-		multisampling.alphaToOneEnable = false;
-
-		vk::PipelineDepthStencilStateCreateInfo depth{};
-		depth.depthTestEnable = true;
-		depth.depthWriteEnable = true;
-		depth.depthCompareOp = vk::CompareOp::eLess;
-		depth.depthBoundsTestEnable = false;
-		depth.stencilTestEnable = false;
-
-		vk::PipelineColorBlendStateCreateInfo color_blend{};
-		color_blend.logicOpEnable = false;
-		color_blend.logicOp = vk::LogicOp::eCopy;
-		vk::PipelineColorBlendAttachmentState blend_attachement{};
-		blend_attachement.colorWriteMask = { vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA };
-		blend_attachement.blendEnable = false;
-		color_blend.attachmentCount = 1;
-		color_blend.pAttachments = &blend_attachement;
-
-		vk::GraphicsPipelineCreateInfo pipeline_create_info{};
-		pipeline_create_info.setStages(stages);
-		pipeline_create_info.pVertexInputState = &vertex_input;
-		pipeline_create_info.pInputAssemblyState = &input_assembly;
-		pipeline_create_info.pViewportState = &viewport_state;
-		pipeline_create_info.pRasterizationState = &rasterization;
-		pipeline_create_info.pMultisampleState = &multisampling;
-		pipeline_create_info.pDepthStencilState = &depth;
-		pipeline_create_info.pColorBlendState = &color_blend;
-		pipeline_create_info.layout = *raster_layout;
-		pipeline_create_info.renderPass = *raster_pass;
-		raster_pipeline = device->createGraphicsPipelineUnique(*pipeline_cache, pipeline_create_info);
-	}
-	*/
+	ui_render_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
 }
 
 void VulkanApplication::create_ui_context() {
@@ -673,30 +549,10 @@ void VulkanApplication::create_ui_context() {
 	imgui_init_info.CheckVkResultFn = nullptr;
 	imgui_init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-	vk::AttachmentDescription ui_attachment(
-			{},
-			swapchain_format,
-			vk::SampleCountFlagBits::e1,
-			vk::AttachmentLoadOp::eLoad,
-			vk::AttachmentStoreOp::eStore,
-			vk::AttachmentLoadOp::eDontCare,
-			vk::AttachmentStoreOp::eDontCare,
-			vk::ImageLayout::eGeneral,
-			vk::ImageLayout::ePresentSrcKHR);
-
-	vk::AttachmentReference color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
-	vk::SubpassDependency dependency(
-			VK_SUBPASS_EXTERNAL,
-			0,
-			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-			{},
-			{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
-			{});
-	vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, color_ref, nullptr, nullptr, nullptr);
-	ui_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, ui_attachment, subpass, dependency));
-
-	ImGui_ImplVulkan_Init(&imgui_init_info, *ui_pass);
+	if (!rtx)
+		ImGui_ImplVulkan_Init(&imgui_init_info, *raster_render_pass);
+	else
+		ImGui_ImplVulkan_Init(&imgui_init_info, *ui_render_pass);
 
 	auto cmd_buf = create_commandbuffer();
 	ImGui_ImplVulkan_CreateFontsTexture(cmd_buf);
@@ -709,7 +565,10 @@ void VulkanApplication::create_frames() {
 	for (uint32_t i = 0; i < frames.size(); i++) {
 		frames[i].init_frame(*device);
 		frames[i].raster_image_view = create_image_view(*device, swapchain_images[i], swapchain_format, vk::ImageAspectFlagBits::eColor);
-		frames[i].create_framebuffer(swapchain_extent, *ui_pass, depth_image->image_view);
+		if (!rtx)
+			frames[i].create_framebuffer(swapchain_extent, *raster_render_pass, depth_image->image_view);
+		else
+			frames[i].create_framebuffer(swapchain_extent, *ui_render_pass);
 		frames[i].create_command_buffers(*graphics_command_pool);
 		frames[i].create_sync_objects();
 	}
@@ -736,173 +595,89 @@ void VulkanApplication::init_rtx() {
 }
 void VulkanApplication::build_rtx_pipeline(bool update) {
 	// Allocate render image TODO : recreate on swapchain recreation, link to swapchain??
-	if (!update) {
-		Image *img = new Image(
-				*device, physical_device,
-				swapchain_extent.width, swapchain_extent.height,
-				swapchain_format, vk::ImageTiling::eOptimal,
-				{ vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eStorage },
-				vk::MemoryPropertyFlagBits::eDeviceLocal,
-				vk::ImageAspectFlagBits::eColor);
+	rtx_result_image = std::unique_ptr<Image>(new Image(
+			*device, physical_device,
+			swapchain_extent.width, swapchain_extent.height,
+			swapchain_format, vk::ImageTiling::eOptimal,
+			{ vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eStorage },
+			vk::MemoryPropertyFlagBits::eDeviceLocal,
+			vk::ImageAspectFlagBits::eColor));
+	debug_name_object(*device, uint64_t(VkImage(rtx_result_image->image)), rtx_result_image->image.objectType, "RTX Result Image");
 
-		rtx_result_image = std::unique_ptr<Image>(img);
-		debug_name_object(*device, uint64_t(VkImage(rtx_result_image->image)), rtx_result_image->image.objectType, "RTX Result Image");
-		// TODO : move this shit in Scene?
-		uint32_t mesh_count = scene->meshes.size();
-		uint32_t texture_count = scene->textures.size();
+	raytracing_pipeline = std::make_unique<RaytracingPipeline>();
 
-		{ // Descriptor Layout
-			std::vector<vk::DescriptorSetLayoutBinding> bindings{
-				// Acceleration structure
-				vk::DescriptorSetLayoutBinding(0, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR }, nullptr),
-				// Final image
-				vk::DescriptorSetLayoutBinding(1, vk::DescriptorType::eStorageImage, 1, { vk::ShaderStageFlagBits::eRaygenKHR }, nullptr),
-				// Camera matrices
-				vk::DescriptorSetLayoutBinding(2, vk::DescriptorType::eUniformBuffer, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
-				// Scene description
-				vk::DescriptorSetLayoutBinding(3, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
-				// vtx buffer
-				vk::DescriptorSetLayoutBinding(4, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
-				// idx buffer
-				vk::DescriptorSetLayoutBinding(5, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr),
-			};
+	uint32_t mesh_count = scene->meshes.size();
+	uint32_t texture_count = scene->textures.size();
 
-			// Texture buffer
-			bindings.emplace_back(vk::DescriptorSetLayoutBinding(6, vk::DescriptorType::eCombinedImageSampler, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr));
+	// Binding 0 ; Acceleration Structure
+	vk::DescriptorSetLayoutBinding binding(0, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR }, nullptr);
+	vk::DescriptorPoolSize pool_size(vk::DescriptorType::eAccelerationStructureKHR, 1);
+	std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
+	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
+	vk::WriteDescriptorSet as_descriptor_write(nullptr, 0, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
+	as_descriptor_write.pNext = &as_desc;
+	raytracing_pipeline->add_descriptor(binding, pool_size, as_descriptor_write);
 
-			// Material buffer
-			bindings.emplace_back(vk::DescriptorSetLayoutBinding(7, vk::DescriptorType::eStorageBuffer, 1, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr));
+	// Binding 1 ; Storage Image
+	vk::DescriptorImageInfo image_info({}, rtx_result_image->image_view, vk::ImageLayout::eGeneral);
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageImage, image_info, 1, vk::ShaderStageFlagBits::eRaygenKHR, 1, 1);
 
-			vk::DescriptorSetLayoutCreateInfo set_layout_ci({}, bindings);
-			rtx_set_layout = device->createDescriptorSetLayoutUnique(set_layout_ci);
+	// Binding 2 ; Camera matrices
+	vk::DescriptorBufferInfo bi_camera_matrices(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eUniformBuffer, bi_camera_matrices, 2, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR });
 
-			// Constants
-			vk::PushConstantRange push_constant{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR, 0, sizeof(RTPushConstant) };
+	// Binding 3 ; Scene desc
+	vk::DescriptorBufferInfo bi_scene(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, bi_scene, 3, { vk::ShaderStageFlagBits::eClosestHitKHR });
 
-			std::vector<vk::DescriptorSetLayout> layouts{
-				*rtx_set_layout,
-			};
-			rtx_layout = device->createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, layouts, push_constant));
-		}
-
-		{ // Create Descriptor pool
-			std::vector<vk::DescriptorPoolSize> pool_sizes{
-				vk::DescriptorPoolSize(vk::DescriptorType::eAccelerationStructureKHR, 1),
-				vk::DescriptorPoolSize(vk::DescriptorType::eStorageImage, 1),
-				vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, 1),
-				vk::DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 3),
-				vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1),
-			};
-			rtx_pool = device->createDescriptorPoolUnique(vk::DescriptorPoolCreateInfo({ vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet }, 1, pool_sizes));
-		}
-
-		// Descriptor set
-		rtx_set = std::move(device->allocateDescriptorSetsUnique(vk::DescriptorSetAllocateInfo(*rtx_pool, *rtx_set_layout)).front());
-
-		{ // Descriptor writes
-			std::vector<vk::WriteDescriptorSet> writes;
-			// Acceleration structure = binding 0
-			std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
-			vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
-			vk::WriteDescriptorSet as_descriptor_write(*rtx_set, 0, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
-			as_descriptor_write.pNext = &as_desc;
-			writes.push_back(as_descriptor_write);
-
-			// Image = binding 1
-			vk::DescriptorImageInfo image_info({}, rtx_result_image->image_view, vk::ImageLayout::eGeneral);
-			vk::WriteDescriptorSet image_descriptor_write(*rtx_set, 1, 0, vk::DescriptorType::eStorageImage, image_info, nullptr, nullptr);
-			writes.push_back(image_descriptor_write);
-
-			// Camera matrices = binding 2
-			vk::DescriptorBufferInfo bi_camera_matrices(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
-			vk::WriteDescriptorSet camera_write(*rtx_set, 2, 0, vk::DescriptorType::eUniformBuffer, nullptr, bi_camera_matrices, nullptr);
-			writes.push_back(camera_write);
-
-			// Scene = binding 3
-			vk::DescriptorBufferInfo bi_scene(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
-			vk::WriteDescriptorSet scene_write(*rtx_set, 3, 0, vk::DescriptorType::eStorageBuffer, nullptr, bi_scene, nullptr);
-			writes.push_back(scene_write);
-
-			// Storage buffers
-			// Vertex buffers = binding 4
-			// index buffers = binding 5
-			std::vector<vk::DescriptorBufferInfo> bi_vtx;
-			std::vector<vk::DescriptorBufferInfo> bi_idx;
-			for (auto &mesh : scene->meshes) {
-				bi_vtx.emplace_back(mesh->vertex_buffer->buffer, 0, VK_WHOLE_SIZE);
-				bi_idx.emplace_back(mesh->index_buffer->buffer, 0, VK_WHOLE_SIZE);
-			}
-			vk::WriteDescriptorSet vtx_writes(*rtx_set, 4, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_vtx.data(), nullptr);
-			vk::WriteDescriptorSet idx_writes(*rtx_set, 5, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_idx.data(), nullptr);
-			writes.push_back(vtx_writes);
-			writes.push_back(idx_writes);
-
-			// Texture sampler = binding 6
-			// TODO : If we have no texture, this creates a validation error
-			std::vector<vk::DescriptorImageInfo> images_info;
-			for (auto &tex : scene->textures) {
-				images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-			}
-			vk::WriteDescriptorSet texture_write(*rtx_set, 6, 0, texture_count, vk::DescriptorType::eCombinedImageSampler, images_info.data(), nullptr, nullptr);
-			writes.push_back(texture_write);
-
-			// Materials = binding 7
-			vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
-			vk::WriteDescriptorSet material_write(*rtx_set, 7, 0, vk::DescriptorType::eStorageBuffer, nullptr, material_info, nullptr);
-			writes.push_back(material_write);
-
-			device->updateDescriptorSets(writes, nullptr);
-		}
+	std::vector<vk::DescriptorBufferInfo> bi_vtx;
+	std::vector<vk::DescriptorBufferInfo> bi_idx;
+	for (auto &mesh : scene->meshes) {
+		bi_vtx.emplace_back(mesh->vertex_buffer->buffer, 0, VK_WHOLE_SIZE);
+		bi_idx.emplace_back(mesh->index_buffer->buffer, 0, VK_WHOLE_SIZE);
 	}
+	/*
+		vk::WriteDescriptorSet vtx_writes(*rtx_set, 4, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_vtx.data(), nullptr);
+		vk::WriteDescriptorSet idx_writes(*rtx_set, 5, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_idx.data(), nullptr);
+		vk::DescriptorSetLayoutBinding vtx_binding(4, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr);
+		vk::DescriptorSetLayoutBinding idx_binding(5, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr);
+		vk::DescriptorPoolSize pool_size(vk::DescriptorType::eStorageBuffer, 1);
+		// Binding 4 ; vtx Buffer
+		raytracing_pipeline->add_descriptor(vtx_binding, pool_size, vtx_writes);
+		// Binding 5 ; idx Buffer
+		raytracing_pipeline->add_descriptor(idx_binding, pool_size, idx_writes);
+		*/
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, bi_vtx, 4, { vk::ShaderStageFlagBits::eClosestHitKHR }, 1, mesh_count);
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, bi_idx, 5, { vk::ShaderStageFlagBits::eClosestHitKHR }, 1, mesh_count);
 
-	// Shaders
-	auto rgen_code = read_file("resources/shaders/raytrace.rgen.spv");
-	auto rmiss_code = read_file("resources/shaders/raytrace.rmiss.spv");
-	auto rmiss_shadow_code = read_file("resources/shaders/shadow.rmiss.spv");
-	auto rchit_code = read_file("resources/shaders/raytrace.rchit.spv");
+	// Binding 6 ; Texture Buffer
+	std::vector<vk::DescriptorImageInfo> images_info;
+	for (auto &tex : scene->textures) {
+		images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+	}
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eCombinedImageSampler, images_info, 6, { vk::ShaderStageFlagBits::eClosestHitKHR }, 1, texture_count);
 
-	auto rgen_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rgen_code.size(), reinterpret_cast<uint32_t *>(rgen_code.data())));
-	auto rmiss_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_code.size(), reinterpret_cast<uint32_t *>(rmiss_code.data())));
-	auto rmiss_shadow_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_shadow_code.size(), reinterpret_cast<uint32_t *>(rmiss_shadow_code.data())));
-	auto rchit_shader = device->createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rchit_code.size(), reinterpret_cast<uint32_t *>(rchit_code.data())));
+	// Binding 7 ; Materials
+	vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, material_info, 7, { vk::ShaderStageFlagBits::eClosestHitKHR });
 
-	debug_name_object(*device, uint64_t(VkShaderModule(rgen_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rgen");
-	debug_name_object(*device, uint64_t(VkShaderModule(rmiss_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rmiss");
-	debug_name_object(*device, uint64_t(VkShaderModule(rmiss_shadow_shader.get())), vk::ObjectType::eShaderModule, "shadow.rmiss");
-	debug_name_object(*device, uint64_t(VkShaderModule(rchit_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rchit");
+	vk::PushConstantRange push_constant{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR, 0, sizeof(RTPushConstant) };
+	raytracing_pipeline->add_push_constant(push_constant);
 
-	auto shader_stages = {
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eRaygenKHR, *rgen_shader, "main"),
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eMissKHR, *rmiss_shader, "main"),
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eMissKHR, *rmiss_shadow_shader, "main"),
-		vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eClosestHitKHR, *rchit_shader, "main"),
-	};
-
-	shader_groups = {
-		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 0, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
-		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 1, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
-		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 2, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
-		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup, VK_SHADER_UNUSED_KHR, 3, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
-	};
-
-	vk::RayTracingPipelineCreateInfoKHR create_info(
-			{},
-			shader_stages, shader_groups, 1,
-			nullptr, nullptr, nullptr,
-			*rtx_layout, nullptr, 0);
-	rtx_pipeline = device->createRayTracingPipelineKHRUnique({}, {}, create_info).value;
+	raytracing_pipeline->build_pipeline(*device);
 }
 void VulkanApplication::create_rtx_SBT() {
+	uint32_t shader_amount = raytracing_pipeline->shader_groups.size();
 	const uint32_t group_size_aligned = (rtx_properties.shaderGroupHandleSize + rtx_properties.shaderGroupBaseAlignment - 1) & ~(rtx_properties.shaderGroupBaseAlignment - 1);
-	const uint32_t shader_binding_table_size = group_size_aligned * shader_groups.size();
+	const uint32_t shader_binding_table_size = group_size_aligned * shader_amount;
 
 	shader_binding_table = std::unique_ptr<Buffer>(new Buffer(*device, physical_device, shader_binding_table_size, { vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eShaderBindingTableKHR | vk::BufferUsageFlagBits::eShaderDeviceAddress }, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
 
-	std::vector<uint8_t> shader_handle_storage = device->getRayTracingShaderGroupHandlesKHR<uint8_t>(*rtx_pipeline, 0, shader_groups.size(), shader_binding_table_size);
+	std::vector<uint8_t> shader_handle_storage = device->getRayTracingShaderGroupHandlesKHR<uint8_t>(raytracing_pipeline->get_pipeline(), 0, shader_amount, shader_binding_table_size);
 
 	void *mapped = device->mapMemory(shader_binding_table->memory, 0, shader_binding_table_size);
 	auto *data = reinterpret_cast<uint8_t *>(mapped);
-	for (uint32_t i = 0; i < shader_groups.size(); i++) {
+	for (uint32_t i = 0; i < shader_amount; i++) {
 		memcpy(data, shader_handle_storage.data() + i * rtx_properties.shaderGroupHandleSize, rtx_properties.shaderGroupHandleSize);
 		data += group_size_aligned;
 	}
@@ -912,12 +687,9 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	vk::ImageMemoryBarrier image_barrier({}, vk::AccessFlagBits::eShaderWrite, vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral, VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, rtx_result_image->image, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eAllCommands, {}, nullptr, nullptr, image_barrier);
 
-	frame.command_buffer->bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, *rtx_pipeline);
-	frame.command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eRayTracingKHR, *rtx_layout, 0, *rtx_set, nullptr);
-	frame.command_buffer->pushConstants(
-			*rtx_layout,
-			{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR },
-			0, sizeof(RTPushConstant), &rtx_push_constants);
+	raytracing_pipeline->bind(*frame.command_buffer);
+	raytracing_pipeline->bind_descriptors(*frame.command_buffer);
+	raytracing_pipeline->bind_push_constants(*frame.command_buffer, 0, &rtx_push_constants);
 
 	const uint32_t group_size = (rtx_properties.shaderGroupHandleSize + rtx_properties.shaderGroupBaseAlignment - 1) & ~(rtx_properties.shaderGroupBaseAlignment - 1);
 	std::vector<vk::StridedDeviceAddressRegionKHR> strides{
@@ -954,8 +726,13 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 	image_barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
 	image_barrier.dstAccessMask = vk::AccessFlagBits::eIndexRead;
 	image_barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-	image_barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+	image_barrier.newLayout = vk::ImageLayout::eGeneral;
 	frame.command_buffer->pipelineBarrier(vk::PipelineStageFlagBits::eAllCommands, vk::PipelineStageFlagBits::eVertexInput, {}, nullptr, nullptr, image_barrier);
+}
+
+void VulkanApplication::toggle_rtx() {
+	rtx = !rtx;
+	post_swapchain_init(true);
 }
 
 void VulkanApplication::copy_buffer(vk::Buffer src, vk::Buffer dst, vk::DeviceSize size) {

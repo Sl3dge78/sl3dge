@@ -10,10 +10,12 @@ void VulkanFrame::create_framebuffer(vk::Extent2D extent, vk::RenderPass &render
 	render_pass = render_pass_;
 	swapchain_extent = extent;
 
-	auto attachments = {
-		*raster_image_view,
-		depth_imageview
-	};
+	std::vector<vk::ImageView> attachments;
+	attachments.push_back(*raster_image_view);
+
+	if (depth_imageview) {
+		attachments.push_back(depth_imageview);
+	}
 
 	framebuffer = device.createFramebufferUnique(vk::FramebufferCreateInfo({}, render_pass, attachments, swapchain_extent.width, swapchain_extent.height, 1));
 }

@@ -44,6 +44,7 @@ const std::vector<const char *> req_device_extensions = {
 	VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
 	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
 	VK_KHR_RAY_QUERY_EXTENSION_NAME,
+	VK_KHR_SHADER_CLOCK_EXTENSION_NAME
 };
 
 struct FrameSemaphores {
@@ -82,6 +83,7 @@ protected:
 		glm::vec3 light_color;
 	} rtx_push_constants;
 	void refresh_shaders();
+	void toggle_rtx();
 
 private:
 	vk::DynamicLoader dynamic_loader;
@@ -118,29 +120,18 @@ private:
 	bool wait_for_vsync = false;
 
 	vk::UniqueDescriptorPool imgui_descriptor_pool;
-	vk::UniqueRenderPass ui_pass;
+	vk::UniqueRenderPass raster_render_pass;
+	vk::UniqueRenderPass ui_render_pass;
 
-	std::unique_ptr<RasterPipeline> raster_pipe;
-	vk::UniqueDescriptorSetLayout raster_set_layout;
-	vk::UniquePipelineLayout raster_layout;
-	vk::UniqueRenderPass raster_pass;
-	vk::UniqueDescriptorPool raster_pool;
-	vk::UniquePipeline raster_pipeline;
-	vk::UniqueDescriptorSet raster_desc_set;
-	vk::UniquePipelineCache pipeline_cache;
+	std::unique_ptr<GraphicsPipeline> raster_pipe;
 
 	// RTX
-	const bool rtx = true;
+	bool rtx = false;
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
 
-	vk::UniqueDescriptorPool rtx_pool;
-	vk::UniqueDescriptorSetLayout rtx_set_layout;
-	vk::UniqueDescriptorSet rtx_set;
-	vk::UniquePipelineLayout rtx_layout;
-	vk::UniquePipeline rtx_pipeline;
+	std::unique_ptr<RaytracingPipeline> raytracing_pipeline;
 
 	std::unique_ptr<Image> rtx_result_image;
-	std::vector<vk::RayTracingShaderGroupCreateInfoKHR> shader_groups;
 	std::unique_ptr<Buffer> shader_binding_table;
 
 	void init_vulkan();
@@ -161,10 +152,14 @@ private:
 	void create_texture_sampler();
 
 	void create_swapchain();
+
 	void build_raster_pipeline(bool update = false);
+	void create_raster_renderpass();
+
 	void create_ui_context();
 	void create_frames();
 	void create_semaphores();
+	void create_ui_renderpass();
 
 	void init_rtx();
 	void build_rtx_pipeline(bool update = false);

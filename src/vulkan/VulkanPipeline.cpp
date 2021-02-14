@@ -17,12 +17,14 @@ void VulkanPipeline::add_to_pool(const vk::DescriptorType type, const uint32_t c
 		pool_sizes.emplace_back(type, count);
 	}
 }
+VulkanPipeline::~VulkanPipeline() {
+	set.reset();
+	pool.reset();
+	pipeline.reset();
+}
 void VulkanPipeline::add_shader(const std::string path, const vk::ShaderStageFlagBits stage) {
 }
-void VulkanPipeline::create_render_pass(std::vector<vk::AttachmentDescription> attachments, vk::SubpassDescription subpass, vk::SubpassDependency dependency) {
-	render_pass = device.createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
-}
-void VulkanPipeline::add_descriptor(const vk::DescriptorType type, vk::DescriptorBufferInfo buffer_info, const uint32_t binding, vk::ShaderStageFlags stages, const uint32_t pool_amount, const uint32_t desc_amount) {
+void VulkanPipeline::add_descriptor(const vk::DescriptorType type, const vk::ArrayProxyNoTemporaries<const vk::DescriptorBufferInfo> &buffer_info, const uint32_t binding, vk::ShaderStageFlags stages, const uint32_t pool_amount, const uint32_t desc_amount) {
 	// TODO : Handle arrays
 	switch (type) {
 		case vk::DescriptorType::eStorageBuffer:
@@ -43,9 +45,10 @@ void VulkanPipeline::add_descriptor(const vk::DescriptorType type, vk::Descripto
 void VulkanPipeline::add_descriptor(const vk::DescriptorType type, const vk::ArrayProxyNoTemporaries<const vk::DescriptorImageInfo> &image_info, const uint32_t binding, vk::ShaderStageFlags stages, const uint32_t pool_amount, const uint32_t desc_amount) {
 	switch (type) {
 		case vk::DescriptorType::eCombinedImageSampler:
+		case vk::DescriptorType::eStorageImage:
 			break;
 		default:
-			throw std::runtime_error("Called add_descriptor with image info, but type specified isn't a combined image sampler");
+			throw std::runtime_error("Called add_descriptor with image info, but type specified isn't supported");
 			break;
 	}
 
@@ -62,7 +65,16 @@ void VulkanPipeline::add_descriptor(const vk::DescriptorSetLayoutBinding binding
 void VulkanPipeline::add_push_constant(const vk::PushConstantRange range) {
 	push_constants.push_back(range);
 }
-void VulkanPipeline::build_descriptors() {
+void VulkanPipeline::bind(vk::CommandBuffer cmd) {
+	cmd.bindPipeline(bind_point, *pipeline);
+}
+void VulkanPipeline::bind_descriptors(vk::CommandBuffer cmd) {
+	cmd.bindDescriptorSets(bind_point, *layout, 0, *set, nullptr);
+}
+void VulkanPipeline::bind_push_constants(vk::CommandBuffer cmd, const uint32_t id, void *value) {
+	cmd.pushConstants(*layout, push_constants[id].stageFlags, push_constants[id].offset, push_constants[id].size, value);
+}
+void VulkanPipeline::build_descriptors(vk::Device device) {
 	set_layout = device.createDescriptorSetLayoutUnique(vk::DescriptorSetLayoutCreateInfo({}, bindings));
 	if (push_constants.size() > 0) {
 		layout = device.createPipelineLayoutUnique(vk::PipelineLayoutCreateInfo({}, *set_layout, push_constants));
@@ -79,19 +91,12 @@ void VulkanPipeline::build_descriptors() {
 	}
 	device.updateDescriptorSets(descriptor_writes, nullptr);
 }
-void VulkanPipeline::create_cache() {
+void VulkanPipeline::create_cache(vk::Device device) {
 	cache = device.createPipelineCacheUnique(vk::PipelineCacheCreateInfo());
 }
-void VulkanPipeline::create_pipeline() {
-	build_descriptors();
-	create_info.setStages(shader_stages);
-	create_info.layout = *layout;
-	create_info.renderPass = *render_pass;
-	pipeline = device.createGraphicsPipelineUnique(*cache, create_info);
-}
-void RasterPipeline::build_pipeline(vk::Device device, vk::Format format, vk::Extent2D extent) {
-	this->device = device;
 
+void GraphicsPipeline::build_pipeline(vk::Device device, vk::Extent2D extent, vk::RenderPass render_pass) {
+	bind_point = vk::PipelineBindPoint::eGraphics; // C'est degueu
 	// Shaders
 	auto v_code = read_file("resources/shaders/general.vert.spv");
 	auto v_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, v_code.size(), reinterpret_cast<uint32_t *>(v_code.data())));
@@ -99,34 +104,9 @@ void RasterPipeline::build_pipeline(vk::Device device, vk::Format format, vk::Ex
 	auto f_code = read_file("resources/shaders/general.frag.spv");
 	auto f_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, f_code.size(), reinterpret_cast<uint32_t *>(f_code.data())));
 	shader_stages.push_back(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *f_shader, "main"));
+	graphics_create_info.setStages(shader_stages);
 
-	// Render pass
-	std::vector<vk::AttachmentDescription> attachments;
-	vk::AttachmentDescription raster_attachment(
-			{},
-			format,
-			vk::SampleCountFlagBits::e1,
-			vk::AttachmentLoadOp::eLoad,
-			vk::AttachmentStoreOp::eStore,
-			vk::AttachmentLoadOp::eDontCare,
-			vk::AttachmentStoreOp::eDontCare,
-			vk::ImageLayout::eGeneral,
-			vk::ImageLayout::ePresentSrcKHR);
-	attachments.push_back(raster_attachment);
-
-	vk::AttachmentReference color_ref(0U, vk::ImageLayout::eColorAttachmentOptimal);
-	vk::SubpassDependency dependency(
-			VK_SUBPASS_EXTERNAL,
-			0,
-			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-			{ vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests },
-			{},
-			{ vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite },
-			{});
-	vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, nullptr, color_ref, nullptr, nullptr, nullptr);
-	create_render_pass(attachments, subpass, dependency);
-
-	create_cache();
+	create_cache(device);
 
 	vk::PipelineVertexInputStateCreateInfo vertex_input{};
 	auto desc = Vertex::get_attribute_descriptions();
@@ -135,19 +115,19 @@ void RasterPipeline::build_pipeline(vk::Device device, vk::Format format, vk::Ex
 	auto bindings = Vertex::get_binding_description();
 	vertex_input.vertexBindingDescriptionCount = bindings.size();
 	vertex_input.pVertexBindingDescriptions = bindings.data();
-	create_info.pVertexInputState = &vertex_input;
+	graphics_create_info.pVertexInputState = &vertex_input;
 
 	vk::PipelineInputAssemblyStateCreateInfo input_assembly{};
 	input_assembly.setTopology(vk::PrimitiveTopology::eTriangleList);
 	input_assembly.primitiveRestartEnable = false;
-	create_info.pInputAssemblyState = &input_assembly;
+	graphics_create_info.pInputAssemblyState = &input_assembly;
 
 	vk::PipelineViewportStateCreateInfo viewport_state{};
 	vk::Rect2D scissor({ 0, 0 }, extent);
 	viewport_state.setScissors(scissor);
 	vk::Viewport viewport(0.0f, 0.0f, extent.width, extent.height, 0.0f, 1.0f);
 	viewport_state.setViewports(viewport);
-	create_info.pViewportState = &viewport_state;
+	graphics_create_info.pViewportState = &viewport_state;
 
 	vk::PipelineRasterizationStateCreateInfo rasterization{};
 	rasterization.depthClampEnable = false;
@@ -157,7 +137,7 @@ void RasterPipeline::build_pipeline(vk::Device device, vk::Format format, vk::Ex
 	rasterization.frontFace = vk::FrontFace::eCounterClockwise;
 	rasterization.depthBiasEnable = false;
 	rasterization.lineWidth = 1.0f;
-	create_info.pRasterizationState = &rasterization;
+	graphics_create_info.pRasterizationState = &rasterization;
 
 	vk::PipelineMultisampleStateCreateInfo multisampling{};
 	multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
@@ -166,7 +146,7 @@ void RasterPipeline::build_pipeline(vk::Device device, vk::Format format, vk::Ex
 	multisampling.pSampleMask = nullptr;
 	multisampling.alphaToCoverageEnable = false;
 	multisampling.alphaToOneEnable = false;
-	create_info.pMultisampleState = &multisampling;
+	graphics_create_info.pMultisampleState = &multisampling;
 
 	vk::PipelineDepthStencilStateCreateInfo depth{};
 	depth.depthTestEnable = true;
@@ -174,7 +154,7 @@ void RasterPipeline::build_pipeline(vk::Device device, vk::Format format, vk::Ex
 	depth.depthCompareOp = vk::CompareOp::eLess;
 	depth.depthBoundsTestEnable = false;
 	depth.stencilTestEnable = false;
-	create_info.pDepthStencilState = &depth;
+	graphics_create_info.pDepthStencilState = &depth;
 
 	vk::PipelineColorBlendStateCreateInfo color_blend{};
 	color_blend.logicOpEnable = false;
@@ -184,7 +164,61 @@ void RasterPipeline::build_pipeline(vk::Device device, vk::Format format, vk::Ex
 	blend_attachement.blendEnable = false;
 	color_blend.attachmentCount = 1;
 	color_blend.pAttachments = &blend_attachement;
-	create_info.pColorBlendState = &color_blend;
+	graphics_create_info.pColorBlendState = &color_blend;
 
-	create_pipeline();
+	build_descriptors(device);
+
+	graphics_create_info.layout = get_layout();
+	graphics_create_info.renderPass = render_pass;
+
+	create_pipeline(device);
+}
+void GraphicsPipeline::create_pipeline(vk::Device device) {
+	pipeline = device.createGraphicsPipelineUnique(get_cache(), graphics_create_info);
+}
+
+void RaytracingPipeline::build_pipeline(vk::Device device) {
+	bind_point = vk::PipelineBindPoint::eRayTracingKHR; // C'est degueu
+	// Shaders
+	auto rgen_code = read_file("resources/shaders/raytrace.rgen.spv");
+	auto rmiss_code = read_file("resources/shaders/raytrace.rmiss.spv");
+	auto rmiss_shadow_code = read_file("resources/shaders/shadow.rmiss.spv");
+	auto rchit_code = read_file("resources/shaders/raytrace.rchit.spv");
+
+	auto rgen_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rgen_code.size(), reinterpret_cast<uint32_t *>(rgen_code.data())));
+	auto rmiss_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_code.size(), reinterpret_cast<uint32_t *>(rmiss_code.data())));
+	auto rmiss_shadow_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rmiss_shadow_code.size(), reinterpret_cast<uint32_t *>(rmiss_shadow_code.data())));
+	auto rchit_shader = device.createShaderModuleUnique(vk::ShaderModuleCreateInfo({}, rchit_code.size(), reinterpret_cast<uint32_t *>(rchit_code.data())));
+
+	debug_name_object(device, uint64_t(VkShaderModule(rgen_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rgen");
+	debug_name_object(device, uint64_t(VkShaderModule(rmiss_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rmiss");
+	debug_name_object(device, uint64_t(VkShaderModule(rmiss_shadow_shader.get())), vk::ObjectType::eShaderModule, "shadow.rmiss");
+	debug_name_object(device, uint64_t(VkShaderModule(rchit_shader.get())), vk::ObjectType::eShaderModule, "raytrace.rchit");
+
+	shader_stages.push_back(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eRaygenKHR, *rgen_shader, "main"));
+	shader_stages.push_back(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eMissKHR, *rmiss_shader, "main"));
+	shader_stages.push_back(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eMissKHR, *rmiss_shadow_shader, "main"));
+	shader_stages.push_back(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eClosestHitKHR, *rchit_shader, "main"));
+
+	create_cache(device);
+
+	build_descriptors(device);
+
+	shader_groups = {
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 0, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 1, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 2, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup, VK_SHADER_UNUSED_KHR, 3, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),
+	};
+
+	create_info = vk::RayTracingPipelineCreateInfoKHR(
+			{},
+			shader_stages, shader_groups, 1,
+			nullptr, nullptr, nullptr,
+			this->get_layout(), nullptr, 0);
+
+	create_pipeline(device);
+}
+void RaytracingPipeline::create_pipeline(vk::Device device) {
+	pipeline = device.createRayTracingPipelineKHRUnique({}, get_cache(), create_info).value;
 }

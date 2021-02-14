@@ -17,9 +17,8 @@
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-// TODO : Framebuffers are linked to renderpasses. Find a way to use 2 render passes (one for UI the other for raster).
-// TODO : Pipeline object
-// TODO : Fix resizing
+// TODO : gros clean
+// TODO : Couper vulkan app en 2 1 pour rtx et un pour raster ?
 // TODO : Textures for metallic, roughness, ao & normal
 // TODO : Image based lighting https://learnopengl.com/PBR/IBL/Diffuse-irradiance
 // TODO : Add ui to move instances
@@ -99,6 +98,7 @@ private:
 			if (ImGui::BeginMenu("Options")) {
 				ImGui::MenuItem("Camera params", "", &scene->camera.show_window);
 				ImGui::MenuItem("Refresh Shaders", "F5", nullptr);
+				ImGui::MenuItem("Toggle rtx", "F6", nullptr);
 				ImGui::EndMenu();
 			}
 			ImGui::Separator();
@@ -111,6 +111,9 @@ private:
 
 		if (Input::get_key_down(SDL_SCANCODE_F5)) {
 			this->refresh_shaders();
+		}
+		if (Input::get_key_down(SDL_SCANCODE_F6)) {
+			this->toggle_rtx();
 		}
 	}
 };

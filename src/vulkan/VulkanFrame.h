@@ -19,7 +19,7 @@ struct VulkanFrame {
 	vk::UniqueFence fence;
 
 	void init_frame(vk::Device device);
-	void create_framebuffer(vk::Extent2D extent, vk::RenderPass &render_pass, vk::ImageView depth_imageview);
+	void create_framebuffer(vk::Extent2D extent, vk::RenderPass &render_pass, vk::ImageView depth_imageview = nullptr);
 	void create_command_buffers(vk::CommandPool command_pool);
 	void create_sync_objects();
 
