@@ -1,6 +1,6 @@
 #include "VulkanPipeline.h"
 
-#include "scene/Vertex.h"
+#include "vulkan/Vertex.h"
 #include "vulkan/VulkanHelper.h"
 
 void VulkanPipeline::add_to_pool(const vk::DescriptorType type, const uint32_t count) {
@@ -59,7 +59,7 @@ void VulkanPipeline::add_descriptor(const vk::DescriptorType type, const vk::Arr
 	descriptor_writes.emplace_back(nullptr, binding, 0, type, image_info, nullptr, nullptr);
 }
 void VulkanPipeline::add_descriptor(const vk::DescriptorSetLayoutBinding binding, const vk::DescriptorPoolSize pool_size, const vk::WriteDescriptorSet write) {
-	bindings.emplace_back(binding);
+	bindings.push_back(binding);
 	descriptor_writes.push_back(write);
 }
 void VulkanPipeline::add_push_constant(const vk::PushConstantRange range) {
@@ -166,8 +166,6 @@ void GraphicsPipeline::build_pipeline(vk::Device device, vk::Extent2D extent, vk
 	color_blend.pAttachments = &blend_attachement;
 	graphics_create_info.pColorBlendState = &color_blend;
 
-	build_descriptors(device);
-
 	graphics_create_info.layout = get_layout();
 	graphics_create_info.renderPass = render_pass;
 
@@ -201,8 +199,6 @@ void RaytracingPipeline::build_pipeline(vk::Device device) {
 	shader_stages.push_back(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eClosestHitKHR, *rchit_shader, "main"));
 
 	create_cache(device);
-
-	build_descriptors(device);
 
 	shader_groups = {
 		vk::RayTracingShaderGroupCreateInfoKHR(vk::RayTracingShaderGroupTypeKHR::eGeneral, 0, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_SHADER_UNUSED_KHR, VK_NULL_HANDLE),

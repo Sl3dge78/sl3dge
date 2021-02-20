@@ -13,7 +13,7 @@ struct Instance {
 	mat4 inverted;
 };
 
-layout(set = 0, binding = 0) uniform CameraMatrices {
+layout(set = 0, binding = 2) uniform CameraMatrices {
     mat4 view;
     mat4 proj;
     mat4 view_inverse;

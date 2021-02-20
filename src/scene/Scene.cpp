@@ -5,22 +5,24 @@
 #include "Scene.h"
 #include "vulkan/VulkanApplication.h"
 
-uint32_t Scene::load_mesh(const std::string path) {
-	meshes.emplace_back(std::make_unique<Mesh>(*app, path));
-	return meshes.size() - 1;
+Mesh *Scene::load_mesh(const std::string path) {
+	return meshes.emplace_back(std::make_unique<Mesh>(*app, path, uint32_t(meshes.size()))).get();
 }
-uint32_t Scene::create_material(const glm::vec3 &albedo, const float roughness, const float metallic, const float ao, const uint32_t albedo_texture) {
-	materials.emplace_back(albedo, roughness, metallic, ao, albedo_texture);
-	return materials.size() - 1;
+
+Material *Scene::create_material(const glm::vec3 &albedo, const float roughness, const float metallic, const float ao, const uint32_t albedo_texture) {
+	return materials.emplace_back(std::make_unique<Material>(uint32_t(materials.size()), albedo, roughness, metallic, ao, albedo_texture)).get();
 }
+
 uint32_t Scene::load_texture(const std::string path) {
 	textures.emplace_back(std::make_unique<Texture>(*app, path));
 	return textures.size() - 1;
 }
-MeshInstance *Scene::create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform) {
+/*
+MeshInstance_ *Scene::create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform) {
 	instances.emplace_back(mesh_id, mat_id);
 	return &instances.back();
 }
+*/
 uint32_t Scene::create_light(const int32_t type, const glm::vec3 color, const float intensity, const glm::vec3 vec, const bool cast_shadows) {
 	Light light{
 		.type = type, // TODO : use enum
@@ -37,48 +39,128 @@ void Scene::init() {
 	this->app = app;
 	build_BLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
 	build_TLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
-	allocate_uniform_buffer();
+	update_buffers();
+
+	texture_sampler = app->get_device().createSamplerUnique(vk::SamplerCreateInfo(
+			{}, vk::Filter::eLinear, vk::Filter::eLinear,
+			vk::SamplerMipmapMode::eNearest,
+			vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
+			0,
+			true, app->get_physical_device().getProperties().limits.maxSamplerAnisotropy,
+			false, vk::CompareOp::eAlways, 0, 0,
+			vk::BorderColor::eIntOpaqueBlack, false));
+}
+void Scene::write_descriptors(VulkanPipeline &pipeline) {
+	uint32_t mesh_count = meshes.size();
+	uint32_t texture_count = textures.size();
+
+	vk::DescriptorSetLayoutBinding binding(1, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR | vk::ShaderStageFlagBits::eFragment }, nullptr);
+	vk::DescriptorPoolSize pool_size(vk::DescriptorType::eAccelerationStructureKHR, 1);
+	std::vector<vk::AccelerationStructureKHR> as{ get_tlas() };
+	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
+	vk::WriteDescriptorSet as_descriptor_write(nullptr, 1, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
+	as_descriptor_write.pNext = &as_desc;
+	pipeline.add_descriptor(binding, pool_size, as_descriptor_write);
+
+	vk::DescriptorBufferInfo bi_camera_matrices(camera.buffer->buffer, 0, VK_WHOLE_SIZE);
+	pipeline.add_descriptor(vk::DescriptorType::eUniformBuffer, bi_camera_matrices, 2, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment });
+
+	vk::DescriptorBufferInfo bi_scene(scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
+	pipeline.add_descriptor(vk::DescriptorType::eStorageBuffer, bi_scene, 3, { vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment });
+
+	std::vector<vk::DescriptorBufferInfo> bi_vtx;
+	std::vector<vk::DescriptorBufferInfo> bi_idx;
+	for (auto &mesh : meshes) {
+		bi_vtx.emplace_back(mesh->get_vtx_buffer(), 0, VK_WHOLE_SIZE);
+		bi_idx.emplace_back(mesh->get_idx_buffer(), 0, VK_WHOLE_SIZE);
+	}
+
+	pipeline.add_descriptor(vk::DescriptorType::eStorageBuffer, bi_vtx, 4, { vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eFragment }, 1, mesh_count);
+	pipeline.add_descriptor(vk::DescriptorType::eStorageBuffer, bi_idx, 5, { vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eFragment }, 1, mesh_count);
+
+	std::vector<vk::DescriptorImageInfo> images_info;
+	for (auto &tex : textures) {
+		images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+	}
+	pipeline.add_descriptor(vk::DescriptorType::eCombinedImageSampler, images_info, 6, { vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eFragment }, 1, texture_count);
+
+	// Binding 7 ; Materials
+	vk::DescriptorBufferInfo material_info(materials_buffer->buffer, 0, VK_WHOLE_SIZE);
+	pipeline.add_descriptor(vk::DescriptorType::eStorageBuffer, material_info, 7, { vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eFragment });
+
+	vk::PushConstantRange push_constant{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR | vk::ShaderStageFlagBits::eFragment, 0, sizeof(PushConstant) };
+	pipeline.add_push_constant(push_constant);
+	pipeline.build_descriptors(app->get_device());
 }
 void Scene::update(float delta_time) {
 	camera.update(delta_time);
-	push_constants.view_pos = camera.get_position();
 }
-void Scene::allocate_uniform_buffer() {
+void Scene::update_buffers() {
 	{
-		instances_size = sizeof(instances[0]) * instances.size();
-		scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(*app, instances_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		refresh_scene_desc();
-	}
-	{
-		materials_size = materials.size() * sizeof(materials[0]);
-		materials_buffer = std::unique_ptr<Buffer>(new Buffer(*app, materials_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		refresh_materials();
-	}
-	{
-		lights_size = lights.size() * sizeof(lights[0]);
-		lights_buffer = std::unique_ptr<Buffer>(new Buffer(*app, lights_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		refresh_lights();
-	}
-}
-void Scene::refresh_materials() {
-	materials_size = materials.size() * sizeof(materials[0]);
-	Buffer staging_buffer(*app, materials_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
-	staging_buffer.write_data(materials.data(), materials_size);
-	app->copy_buffer(staging_buffer.buffer, materials_buffer->buffer, materials_size);
-}
-void Scene::refresh_lights() {
-	lights_size = lights.size() * sizeof(lights[0]);
-	Buffer staging_buffer(*app, lights_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
-	staging_buffer.write_data(lights.data(), lights_size);
-	app->copy_buffer(staging_buffer.buffer, lights_buffer->buffer, lights_size);
+		struct Instance {
+			alignas(4) uint32_t mesh_id;
+			alignas(4) uint32_t mat_id;
+			alignas(16) glm::mat4 transform;
+			alignas(16) glm::mat4 inverted;
+		};
 
-	push_constants.light_count = lights.size();
-}
-void Scene::refresh_scene_desc() {
-	instances_size = sizeof(instances[0]) * instances.size();
-	Buffer staging_buffer(*app, instances_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
-	staging_buffer.write_data(instances.data(), instances_size);
-	app->copy_buffer(staging_buffer.buffer, scene_desc_buffer->buffer, instances_size);
+		std::vector<Instance> instances;
+		for (int i = 0; i < nodes.size(); i++) {
+			MeshInstance *mi = dynamic_cast<MeshInstance *>(nodes[i].get());
+			if (mi == nullptr)
+				continue;
+
+			// TODO : Le contenu de material->id change sans que je comprenne pourquoi
+
+			instances.emplace_back(Instance{
+					.mesh_id = mi->get_mesh_id(),
+					.mat_id = mi->get_material_id(),
+					.transform = mi->get_transform(),
+					.inverted = glm::inverse(mi->get_transform()) });
+		}
+
+		vk::DeviceSize instances_size = sizeof(Instance) * instances.size();
+		scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(*app, instances_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		Buffer staging_buffer(*app, instances_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+		staging_buffer.write_data(instances.data(), instances_size);
+		app->copy_buffer(staging_buffer.buffer, scene_desc_buffer->buffer, instances_size);
+	}
+	{
+		struct Mat {
+			alignas(16) glm::vec3 albedo;
+			alignas(4) int32_t albedo_texture_id;
+			alignas(4) float roughness;
+			alignas(4) float metallic;
+			alignas(4) float ao;
+			alignas(4) float rim_pow;
+			alignas(4) float rim_strength;
+		};
+
+		std::vector<Mat> mats;
+		for (auto &mat : materials) {
+			mats.emplace_back(Mat{
+					.albedo = mat->albedo,
+					.albedo_texture_id = mat->albedo_texture_id,
+					.roughness = mat->roughness,
+					.metallic = mat->metallic,
+					.ao = mat->ao,
+					.rim_pow = mat->rim_pow,
+					.rim_strength = mat->rim_strength });
+		}
+
+		vk::DeviceSize materials_size = mats.size() * sizeof(Mat);
+		materials_buffer = std::unique_ptr<Buffer>(new Buffer(*app, materials_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		Buffer staging_buffer(*app, materials_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+		staging_buffer.write_data(mats.data(), materials_size);
+		app->copy_buffer(staging_buffer.buffer, materials_buffer->buffer, materials_size);
+	}
+	{
+		vk::DeviceSize lights_size = lights.size() * sizeof(lights[0]);
+		lights_buffer = std::unique_ptr<Buffer>(new Buffer(*app, lights_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		Buffer staging_buffer(*app, lights_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+		staging_buffer.write_data(lights.data(), lights_size);
+		app->copy_buffer(staging_buffer.buffer, lights_buffer->buffer, lights_size);
+	}
 }
 void Scene::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
 	std::vector<std::unique_ptr<AccelerationStructure>> orig_blas;
@@ -140,19 +222,13 @@ void Scene::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
 	}
 }
 void Scene::build_TLAS(vk::BuildAccelerationStructureFlagsKHR flags, bool update) {
-	int hit_goup_id = 0;
-
 	std::vector<vk::AccelerationStructureInstanceKHR> as_instances = {};
-	for (int i = 0; i < instances.size(); i++) {
-		vk::AccelerationStructureInstanceKHR as_instance = {};
-		as_instance.flags = (unsigned int)(vk::GeometryInstanceFlagBitsKHR::eTriangleCullDisable);
-		as_instance.instanceShaderBindingTableRecordOffset = hit_goup_id;
-		as_instance.instanceCustomIndex = i;
-		as_instance.accelerationStructureReference = meshes[instances[i].get_mesh_id()]->blas->get_address();
-		as_instance.mask = 0xFF;
-		auto transposed = glm::transpose(instances[i].get_transform());
-		memcpy(&as_instance, &transposed, sizeof(vk::TransformMatrixKHR));
-		as_instances.push_back(as_instance);
+	for (int i = 0; i < nodes.size(); i++) {
+		MeshInstance *mi = dynamic_cast<MeshInstance *>(nodes[i].get());
+		if (mi == nullptr)
+			continue;
+
+		as_instances.push_back(mi->get_ASInstance_data());
 	}
 
 	// Update buffers
@@ -205,11 +281,14 @@ void Scene::build_TLAS(vk::BuildAccelerationStructureFlagsKHR flags, bool update
 	debug_name_object(app->get_device(), uint64_t(VkAccelerationStructureKHR(tlas->get_acceleration_structure())), vk::ObjectType::eAccelerationStructureKHR, "Scene TLAS");
 }
 void Scene::draw(vk::CommandBuffer cmd) {
-	for (uint32_t i = 0; i < instances.size(); i++) {
-		auto mesh = meshes[instances[i].get_mesh_id()].get();
-		mesh->draw(cmd, i);
+	for (int i = 0; i < nodes.size(); i++) {
+		VisualInstance *vi = dynamic_cast<VisualInstance *>(nodes[i].get());
+		if (vi == nullptr)
+			continue;
+		vi->draw(cmd);
 	}
 }
+/*
 void Scene::draw_menu_bar() {
 	// TODO : clean that up
 	{
@@ -261,3 +340,4 @@ void Scene::draw_menu_bar() {
 		}
 	}
 }
+*/

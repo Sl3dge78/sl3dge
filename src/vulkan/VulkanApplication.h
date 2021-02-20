@@ -23,7 +23,6 @@
 
 #include "Debug.h"
 #include "scene/Scene.h"
-#include "scene/Vertex.h"
 #include "vulkan/VulkanFrame.h"
 #include "vulkan/VulkanHelper.h"
 #include "vulkan/VulkanPipeline.h"
@@ -76,12 +75,6 @@ protected:
 	SDL_Window *window = nullptr;
 	std::unique_ptr<Scene> scene;
 
-	struct RTPushConstant {
-		glm::vec4 clear_color;
-		glm::vec3 light_dir;
-		float light_intensity;
-		glm::vec3 light_color;
-	} rtx_push_constants;
 	void refresh_shaders();
 	void toggle_rtx();
 
@@ -101,8 +94,6 @@ private:
 	vk::Queue graphics_queue;
 	vk::Queue present_queue;
 	vk::Queue transfer_queue;
-
-	vk::UniqueSampler texture_sampler;
 
 	vk::UniqueSwapchainKHR swapchain;
 	uint32_t swapchain_image_count;
@@ -126,7 +117,7 @@ private:
 	std::unique_ptr<GraphicsPipeline> raster_pipe;
 
 	// RTX
-	bool rtx = false;
+	bool rtx = true;
 	vk::PhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
 
 	std::unique_ptr<RaytracingPipeline> raytracing_pipeline;

@@ -8,21 +8,32 @@
 #include "shader_utils.glsl"
 #define M_PI 3.1415926535897932384626433832795
 
-layout(set = 0, binding = 1) uniform sampler2D textures[];
-layout (set = 0, binding = 2) uniform accelerationStructureEXT topLevelAS;
-layout (set = 0, binding = 3) buffer Scene {Instance i[];} scene;
-layout (set = 0, binding = 4) buffer Materials {Material m[];} materials;
-layout (set = 0, binding = 5) buffer Lights {Light l[];} lights;
+layout(binding = 1, set = 0) uniform accelerationStructureEXT top_level_AS;
+layout(binding = 2, set = 0) uniform CameraMatrices {
+    mat4 view;
+    mat4 proj;
+    mat4 view_inverse;
+    mat4 proj_inverse;
+    vec3 pos;
+    int frame;
+} cam;
+layout(binding = 3, set = 0) buffer Scene {Instance i[];} scene;
+layout(binding = 4, set = 0) buffer Vertices {Vertex v[];} vertices[];
+layout(binding = 5, set = 0) buffer Indices {uint i[];} indices[];
+layout(binding = 6, set = 0) uniform sampler2D textures[];
+layout(binding = 7, set = 0) buffer Materials {Material m[];} materials;
+
+layout(push_constant) uniform Constants {
+    vec4 clear_color;
+    vec3 light_dir;
+    float light_intensity;
+    vec3 light_color;
+} constants;
 
 layout(location = 0) in vec3 normal;
 layout(location = 1) in vec2 tex_coords;
 layout(location = 2) in vec3 frag_pos;
 layout(location = 3) flat in uint mat_id;
-
-layout(push_constant) uniform Constants {
-    vec3 view_pos;
-    uint light_count;
-} constants;
 
 layout(location = 0) out vec4 out_color;
 
@@ -78,25 +89,25 @@ vec3 pbr(Material mat) {
 
     vec3 albedo = get_albedo(mat);
     
-    vec3 V = normalize(constants.view_pos - frag_pos);
+    vec3 V = normalize(cam.pos - frag_pos);
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, mat.albedo, mat.metallic);
 
     vec3 Lo = vec3(0.0);
 
-     for (int i = 0; i < 1 ; i++) {
-        Light light = lights.l[0];
+    // for (int i = 0; i < 1 ; i++) {
+        //Light light = lights.l[0];
         vec3 L;
         vec3 radiance;
-        if (light.type == 1) {
-            L = normalize(light.vec - frag_pos);  
-            float dist = length(light.vec - frag_pos);
-            float attenuation = 1.0 / (dist * dist);
-            radiance = light.color * light.intensity * attenuation;
-        } else if (light.type == 0) {
-            L = normalize(light.vec);
-            radiance = light.color * light.intensity;
-        }
+       // if (light.type == 1) {
+       //     L = normalize(light.vec - frag_pos);  
+       //     float dist = length(light.vec - frag_pos);
+        //    float attenuation = 1.0 / (dist * dist);
+       //     radiance = light.color * light.intensity * attenuation;
+        //} else if (light.type == 0) {
+            L = normalize(constants.light_dir);
+            radiance = constants.light_color * constants.light_intensity;
+        //}
         vec3 H = normalize(V + L);
         vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
         float NDF = distribution_ggx(normal, H, mat.roughness);
@@ -118,17 +129,17 @@ vec3 pbr(Material mat) {
         vec3 val = (kD * albedo / M_PI + specular + rim_light) * radiance * NdotL;
 
         // Shadow
-        if(light.cast_shadows == 1) { 
+       // if(light.cast_shadows == 1) { 
             rayQueryEXT rayQuery;
             vec3 ray_orig = frag_pos + (normal * 0.01);
-            rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, ray_orig, 0.01, L, 1000.0);
+            rayQueryInitializeEXT(rayQuery, top_level_AS, gl_RayFlagsTerminateOnFirstHitEXT, 0xFF, ray_orig, 0.01, L, 1000.0);
             while (rayQueryProceedEXT(rayQuery)) { }
             if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {
                 val *= mat.ao;
             } 
-        }
+        //}
         Lo += val;
-     }
+    // }
     
     vec3 color = Lo;
     color = color / (color + vec3(1.0));
@@ -149,7 +160,7 @@ vec4 blinn_phong() {
     float diff = max(dot(normal, L), 0.0);
     vec3 diffuse = mat.albedo * diff;
     
-    vec3 V = normalize(constants.view_pos - frag_pos);
+    vec3 V = normalize(cam.pos - frag_pos);
     vec3 reflect_dir = reflect(-L, normal);
 
     const float shininess = 0;

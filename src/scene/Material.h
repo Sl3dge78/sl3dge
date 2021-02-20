@@ -18,17 +18,22 @@ public:
 	std::unique_ptr<Image> texture;
 };
 struct Material {
-	alignas(16) glm::vec3 albedo;
-	alignas(4) int32_t albedo_texture_id;
-	alignas(4) float roughness;
-	alignas(4) float metallic;
-	alignas(4) float ao;
-	alignas(4) float rim_pow;
-	alignas(4) float rim_strength;
+	glm::vec3 albedo;
+	int32_t albedo_texture_id;
+	float roughness;
+	float metallic;
+	float ao;
+	float rim_pow;
+	float rim_strength;
 
 	bool draw_ui = false;
 
-	Material(const glm::vec3 &albedo = glm::vec3(0.5f, 0.5f, 0.5f), const float roughness = 0.5, const float metallic = 0, const float ao = 0, const uint32_t albedo_texture = -1) {
+private:
+	uint32_t id = 0;
+
+public:
+	Material(const uint32_t id_, const glm::vec3 &albedo = glm::vec3(0.5f, 0.5f, 0.5f), const float roughness = 0.5, const float metallic = 0, const float ao = 0, const uint32_t albedo_texture = -1) {
+		this->id = id_;
 		this->albedo = albedo;
 		this->albedo_texture_id = albedo_texture;
 		this->metallic = metallic;
@@ -38,6 +43,9 @@ struct Material {
 		this->rim_strength = 2;
 	};
 	bool on_gui();
+	uint32_t get_id() const {
+		return id;
+	}
 };
 
 #endif // !MATERIAL_H

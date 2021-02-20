@@ -12,47 +12,36 @@
 class VulkanApplication;
 class VulkanFrame;
 
-struct MeshUBO {
-	alignas(16) glm::mat4 transform;
-};
-
 class Mesh {
 private:
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-	void update_matrix();
-
-	static int get_id();
-	inline static int id_ = 0;
-
+	uint32_t id;
 	vk::AccelerationStructureGeometryTrianglesDataKHR triangles;
-
-public:
-	int id;
-	bool show_window = false;
-
 	std::unique_ptr<Buffer> vertex_buffer;
 	vk::DeviceSize vertex_size;
 	std::unique_ptr<Buffer> index_buffer;
 	vk::DeviceSize index_size;
 
-	glm::mat4 transform = glm::mat4(1.0f);
+	uint32_t next_instance_id;
 
+protected:
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+
+public:
 	std::unique_ptr<AccelerationStructure> blas;
 	vk::AccelerationStructureGeometryKHR geometry;
 	vk::AccelerationStructureBuildRangeInfoKHR range_info;
 
-	Mesh(VulkanApplication &app, const std::string path);
+	Mesh(VulkanApplication &app, const std::string path, const uint32_t id);
 	~Mesh() = default;
 
-	void draw(vk::CommandBuffer cmd, const uint32_t id);
-	void update(const float delta_time);
-
-	uint32_t get_primitive_count() { return indices.size() / 3; }
-
-	glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);
-	glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);
-	glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
+	uint32_t get_id() const { return id; };
+	uint32_t get_next_instance_id() { return next_instance_id++; };
+	void bind(vk::CommandBuffer cmd);
+	uint32_t get_primitive_count() const { return indices.size() / 3; };
+	uint32_t get_index_count() const { return indices.size(); };
+	vk::Buffer get_vtx_buffer() const { return vertex_buffer->buffer; };
+	vk::Buffer get_idx_buffer() const { return index_buffer->buffer; };
 };
 
 #endif //VULKAN_MESH_H

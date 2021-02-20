@@ -5,7 +5,6 @@
 
 #include <vulkan/vulkan.hpp>
 
-#include "scene/Mesh.h"
 #include "vulkan/VulkanHelper.h"
 
 struct VulkanFrame {

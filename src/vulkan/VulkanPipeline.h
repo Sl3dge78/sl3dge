@@ -33,7 +33,6 @@ protected:
 	vk::PipelineCache get_cache() { return *cache; }
 
 	void add_shader(const std::string path, const vk::ShaderStageFlagBits stage);
-	void build_descriptors(vk::Device device);
 	void create_cache(vk::Device device);
 	virtual void create_pipeline(vk::Device device) = 0; // Ca c'est degueu
 
@@ -43,6 +42,7 @@ public:
 	void add_descriptor(const vk::DescriptorType type, const vk::ArrayProxyNoTemporaries<const vk::DescriptorBufferInfo> &buffer_info, const uint32_t binding, vk::ShaderStageFlags stages, const uint32_t pool_amount = 1, const uint32_t desc_amount = 1);
 	void add_descriptor(const vk::DescriptorType type, const vk::ArrayProxyNoTemporaries<const vk::DescriptorImageInfo> &image_info, const uint32_t binding, vk::ShaderStageFlags stages, const uint32_t pool_amount = 1, const uint32_t desc_amount = 1);
 	void add_descriptor(const vk::DescriptorSetLayoutBinding binding, const vk::DescriptorPoolSize pool_size, const vk::WriteDescriptorSet write); // Override to add descriptors manually
+	void build_descriptors(vk::Device device);
 	void add_push_constant(const vk::PushConstantRange range);
 
 	void bind(vk::CommandBuffer cmd);

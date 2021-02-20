@@ -172,7 +172,8 @@ void VulkanApplication::main_loop() {
 }
 void VulkanApplication::raster_scene(VulkanFrame &frame) {
 	raster_pipe->bind_push_constants(*frame.command_buffer, 0, &scene->push_constants);
-	//frame.command_buffer->pushConstants(*raster_layout, vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants), &scene->push_constants);
+	raster_pipe->bind_descriptors(*frame.command_buffer);
+	raster_pipe->bind(*frame.command_buffer);
 	scene->draw(*frame.command_buffer);
 }
 void VulkanApplication::draw_ui(VulkanFrame &frame) {
@@ -220,12 +221,6 @@ void VulkanApplication::draw_frame() {
 		frame->end_render_pass();
 	} else {
 		frame->begin_render_pass();
-		raster_pipe->bind_descriptors(*frame->command_buffer);
-		raster_pipe->bind(*frame->command_buffer);
-		/*
-		frame->command_buffer->bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *raster_layout, 0, *raster_desc_set, nullptr);
-		frame->command_buffer->bindPipeline(vk::PipelineBindPoint::eGraphics, *raster_pipeline);
-		*/
 
 		debug_begin_label(frame->command_buffer.get(), "Scene");
 		raster_scene(*frame);
@@ -356,14 +351,6 @@ void VulkanApplication::create_logical_device() {
 	transfer_queue = device->getQueue(queue_family_indices.transfer_family.value(), 0);
 }
 void VulkanApplication::create_texture_sampler() {
-	texture_sampler = device->createSamplerUnique(vk::SamplerCreateInfo(
-			{}, vk::Filter::eLinear, vk::Filter::eLinear,
-			vk::SamplerMipmapMode::eNearest,
-			vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat,
-			0,
-			true, physical_device.getProperties().limits.maxSamplerAnisotropy,
-			false, vk::CompareOp::eAlways, 0, 0,
-			vk::BorderColor::eIntOpaqueBlack, false));
 }
 
 void VulkanApplication::create_swapchain() {
@@ -403,38 +390,7 @@ void VulkanApplication::build_raster_pipeline(bool update) {
 
 	raster_pipe = std::make_unique<GraphicsPipeline>();
 
-	vk::DescriptorBufferInfo cam_bi(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
-	raster_pipe->add_descriptor(vk::DescriptorType::eUniformBuffer, cam_bi, 0, vk::ShaderStageFlagBits::eVertex, swapchain_image_count, 1);
-
-	std::vector<vk::DescriptorImageInfo> images_info;
-	for (auto &tex : scene->textures) {
-		images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-	}
-	raster_pipe->add_descriptor(vk::DescriptorType::eCombinedImageSampler, images_info, 1, vk::ShaderStageFlagBits::eFragment, swapchain_image_count, 1);
-
-	// Binding 2 Acceleration Structure
-	vk::DescriptorSetLayoutBinding as_binding(2, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eFragment }, nullptr);
-	vk::DescriptorPoolSize as_size(vk::DescriptorType::eAccelerationStructureKHR, 1);
-	std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
-	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
-	vk::WriteDescriptorSet as_write(nullptr, 2, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
-	as_write.pNext = &as_desc;
-	raster_pipe->add_descriptor(as_binding, as_size, as_write);
-
-	// binding 3 scene desc
-	vk::DescriptorBufferInfo scene_bi(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
-	raster_pipe->add_descriptor(vk::DescriptorType::eStorageBuffer, scene_bi, 3, { vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment }, 1, 1);
-
-	// binding 4 Materials
-	vk::DescriptorBufferInfo mat_bi(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
-	raster_pipe->add_descriptor(vk::DescriptorType::eStorageBuffer, mat_bi, 4, { vk::ShaderStageFlagBits::eFragment }, 1, 1);
-
-	// binding 5 lights
-	vk::DescriptorBufferInfo light_bi(scene->lights_buffer->buffer, 0, VK_WHOLE_SIZE);
-	raster_pipe->add_descriptor(vk::DescriptorType::eStorageBuffer, light_bi, 5, { vk::ShaderStageFlagBits::eFragment }, 1, 1);
-
-	raster_pipe->add_push_constant(vk::PushConstantRange(vk::ShaderStageFlagBits::eFragment, 0, sizeof(Scene::PushConstants)));
-
+	scene->write_descriptors(*raster_pipe);
 	raster_pipe->build_pipeline(*device, swapchain_extent, *raster_render_pass);
 }
 void VulkanApplication::create_raster_renderpass() {
@@ -480,7 +436,6 @@ void VulkanApplication::create_raster_renderpass() {
 	raster_render_pass = device->createRenderPassUnique(vk::RenderPassCreateInfo({}, attachments, subpass, dependency));
 }
 void VulkanApplication::create_ui_renderpass() {
-	// Render pass
 	std::vector<vk::AttachmentDescription> attachments;
 	vk::AttachmentDescription attachment(
 			{},
@@ -606,63 +561,11 @@ void VulkanApplication::build_rtx_pipeline(bool update) {
 
 	raytracing_pipeline = std::make_unique<RaytracingPipeline>();
 
-	uint32_t mesh_count = scene->meshes.size();
-	uint32_t texture_count = scene->textures.size();
-
-	// Binding 0 ; Acceleration Structure
-	vk::DescriptorSetLayoutBinding binding(0, vk::DescriptorType::eAccelerationStructureKHR, 1, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR }, nullptr);
-	vk::DescriptorPoolSize pool_size(vk::DescriptorType::eAccelerationStructureKHR, 1);
-	std::vector<vk::AccelerationStructureKHR> as{ scene->get_tlas() };
-	vk::WriteDescriptorSetAccelerationStructureKHR as_desc(as);
-	vk::WriteDescriptorSet as_descriptor_write(nullptr, 0, 0, 1, vk::DescriptorType::eAccelerationStructureKHR, nullptr, nullptr, nullptr);
-	as_descriptor_write.pNext = &as_desc;
-	raytracing_pipeline->add_descriptor(binding, pool_size, as_descriptor_write);
-
-	// Binding 1 ; Storage Image
+	// Binding 0 ; Storage Image
 	vk::DescriptorImageInfo image_info({}, rtx_result_image->image_view, vk::ImageLayout::eGeneral);
-	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageImage, image_info, 1, vk::ShaderStageFlagBits::eRaygenKHR, 1, 1);
+	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageImage, image_info, 0, vk::ShaderStageFlagBits::eRaygenKHR, 1, 1);
 
-	// Binding 2 ; Camera matrices
-	vk::DescriptorBufferInfo bi_camera_matrices(scene->camera.buffer->buffer, 0, VK_WHOLE_SIZE);
-	raytracing_pipeline->add_descriptor(vk::DescriptorType::eUniformBuffer, bi_camera_matrices, 2, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR });
-
-	// Binding 3 ; Scene desc
-	vk::DescriptorBufferInfo bi_scene(scene->scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
-	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, bi_scene, 3, { vk::ShaderStageFlagBits::eClosestHitKHR });
-
-	std::vector<vk::DescriptorBufferInfo> bi_vtx;
-	std::vector<vk::DescriptorBufferInfo> bi_idx;
-	for (auto &mesh : scene->meshes) {
-		bi_vtx.emplace_back(mesh->vertex_buffer->buffer, 0, VK_WHOLE_SIZE);
-		bi_idx.emplace_back(mesh->index_buffer->buffer, 0, VK_WHOLE_SIZE);
-	}
-	/*
-		vk::WriteDescriptorSet vtx_writes(*rtx_set, 4, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_vtx.data(), nullptr);
-		vk::WriteDescriptorSet idx_writes(*rtx_set, 5, 0, mesh_count, vk::DescriptorType::eStorageBuffer, nullptr, bi_idx.data(), nullptr);
-		vk::DescriptorSetLayoutBinding vtx_binding(4, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr);
-		vk::DescriptorSetLayoutBinding idx_binding(5, vk::DescriptorType::eStorageBuffer, mesh_count, { vk::ShaderStageFlagBits::eClosestHitKHR }, nullptr);
-		vk::DescriptorPoolSize pool_size(vk::DescriptorType::eStorageBuffer, 1);
-		// Binding 4 ; vtx Buffer
-		raytracing_pipeline->add_descriptor(vtx_binding, pool_size, vtx_writes);
-		// Binding 5 ; idx Buffer
-		raytracing_pipeline->add_descriptor(idx_binding, pool_size, idx_writes);
-		*/
-	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, bi_vtx, 4, { vk::ShaderStageFlagBits::eClosestHitKHR }, 1, mesh_count);
-	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, bi_idx, 5, { vk::ShaderStageFlagBits::eClosestHitKHR }, 1, mesh_count);
-
-	// Binding 6 ; Texture Buffer
-	std::vector<vk::DescriptorImageInfo> images_info;
-	for (auto &tex : scene->textures) {
-		images_info.emplace_back(*texture_sampler, tex->texture->image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-	}
-	raytracing_pipeline->add_descriptor(vk::DescriptorType::eCombinedImageSampler, images_info, 6, { vk::ShaderStageFlagBits::eClosestHitKHR }, 1, texture_count);
-
-	// Binding 7 ; Materials
-	vk::DescriptorBufferInfo material_info(scene->materials_buffer->buffer, 0, VK_WHOLE_SIZE);
-	raytracing_pipeline->add_descriptor(vk::DescriptorType::eStorageBuffer, material_info, 7, { vk::ShaderStageFlagBits::eClosestHitKHR });
-
-	vk::PushConstantRange push_constant{ vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eMissKHR, 0, sizeof(RTPushConstant) };
-	raytracing_pipeline->add_push_constant(push_constant);
+	scene->write_descriptors(*raytracing_pipeline);
 
 	raytracing_pipeline->build_pipeline(*device);
 }
@@ -689,7 +592,7 @@ void VulkanApplication::raytrace(VulkanFrame &frame, int image_id) {
 
 	raytracing_pipeline->bind(*frame.command_buffer);
 	raytracing_pipeline->bind_descriptors(*frame.command_buffer);
-	raytracing_pipeline->bind_push_constants(*frame.command_buffer, 0, &rtx_push_constants);
+	raytracing_pipeline->bind_push_constants(*frame.command_buffer, 0, &scene->push_constants);
 
 	const uint32_t group_size = (rtx_properties.shaderGroupHandleSize + rtx_properties.shaderGroupBaseAlignment - 1) & ~(rtx_properties.shaderGroupBaseAlignment - 1);
 	std::vector<vk::StridedDeviceAddressRegionKHR> strides{

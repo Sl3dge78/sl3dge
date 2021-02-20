@@ -6,7 +6,7 @@
 #include "shader_utils.glsl"
 #include "random.glsl"
 
-layout(binding = 0, set = 0) uniform accelerationStructureEXT top_level_AS;
+layout(binding = 1, set = 0) uniform accelerationStructureEXT top_level_AS;
 layout(binding = 2, set = 0) uniform CameraMatrices {
     mat4 view;
     mat4 proj;

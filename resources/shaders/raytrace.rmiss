@@ -4,7 +4,7 @@
 
 #include "shader_utils.glsl"
 
-layout(binding = 0, set = 0) uniform accelerationStructureEXT top_level_AS;
+layout(binding = 1, set = 0) uniform accelerationStructureEXT top_level_AS;
 layout(location = 0) rayPayloadInEXT HitPayloadSimple payload;
 layout(location = 1) rayPayloadInEXT bool is_shadow;
 

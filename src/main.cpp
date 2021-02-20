@@ -13,10 +13,15 @@
 #include <SDL/SDL.h>
 
 #include "Input.h"
+#include "nodes/MeshInstance.h"
 #include "scene/Material.h"
 #include "scene/Scene.h"
 #include "vulkan/VulkanApplication.h"
 
+// == FEATURES ==
+// TODO : Collision avec le sol + gravité
+
+// == AMELIO ==
 // TODO : gros clean
 // TODO : Couper vulkan app en 2 1 pour rtx et un pour raster ?
 // TODO : Textures for metallic, roughness, ao & normal
@@ -64,14 +69,23 @@ private:
 		auto plane_material = scene->create_material(glm::vec3(.5f, .5f, .5f), 0.1f);
 		auto plane_a = scene->create_instance(plane_mesh, plane_material);
 		*/
+		/*
 		auto dune_mesh = scene->load_mesh("resources/models/dune.obj");
 		auto dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
 		auto dune_instance = scene->create_instance(dune_mesh, dune_material);
+		*/
 
-		auto sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
-		auto sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
-		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
-		sphere_a->translate(glm::vec3(5.0f, 5.0f, 1.0f));
+		Mesh *dune_mesh = scene->load_mesh("resources/models/dune.obj");
+		Mesh *sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
+
+		Material *dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
+		Material *sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
+
+		MeshInstance *dune = scene->create_node<MeshInstance>(&scene->scene_root, dune_mesh, dune_material);
+		MeshInstance *sphere = scene->create_node<MeshInstance>(&scene->scene_root, sphere_mesh, sphere_material);
+		sphere->translate(glm::vec3(5.0f, 5.0f, 1.0f));
+		MeshInstance *sphere2 = scene->create_node<MeshInstance>(&scene->scene_root, sphere_mesh, sphere_material);
+		sphere2->translate(glm::vec3(7.0f, 5.0f, 1.0f));
 
 		scene->create_light(0, glm::vec3(1.0), 1.0, glm::normalize(glm::vec3(1.0, 1.0, 0.15)), true);
 		//scene->create_light(1, glm::vec3(1.0), 1.0, glm::vec3(0.0, 0.0, 3.0));
@@ -80,10 +94,10 @@ private:
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
 		scene->camera.start();
 
-		rtx_push_constants.clear_color = glm::vec4(0.43f, 0.77f, .91f, 1.f);
-		rtx_push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.f, .15f));
-		rtx_push_constants.light_intensity = 5.0f;
-		rtx_push_constants.light_color = glm::vec3(.99, .72, 0.07);
+		scene->push_constants.clear_color = glm::vec4(0.43f, 0.77f, .91f, 1.f);
+		scene->push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.f, .15f));
+		scene->push_constants.light_intensity = 5.0f;
+		scene->push_constants.light_color = glm::vec3(.99, .72, 0.07);
 	}
 	void update(float delta_time) override {
 		scene->update(delta_time);
@@ -92,7 +106,7 @@ private:
 		const float speed = 1.0f / 10.0f;
 
 		//rtx_push_constants.light_dir = glm::normalize(glm::vec3(glm::abs(glm::cos(time * speed)), 1.0f, glm::abs(glm::sin(time * speed))));
-		rtx_push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.0f, 0.0f));
+		scene->push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.0f, 0.0f));
 
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
@@ -101,8 +115,6 @@ private:
 				ImGui::MenuItem("Toggle rtx", "F6", nullptr);
 				ImGui::EndMenu();
 			}
-			ImGui::Separator();
-			scene->draw_menu_bar();
 			ImGui::Separator();
 			ImGui::Text("%.1f FPS", 1.f / delta_time);
 		}

@@ -7,8 +7,8 @@
 
 #include <string>
 
-Mesh::Mesh(VulkanApplication &app, const std::string path) {
-	this->id = get_id();
+Mesh::Mesh(VulkanApplication &app, const std::string path, const uint32_t id) {
+	this->id = id;
 
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -81,34 +81,8 @@ Mesh::Mesh(VulkanApplication &app, const std::string path) {
 	range_info.setPrimitiveOffset(0);
 	range_info.setTransformOffset(0);
 }
-void Mesh::draw(vk::CommandBuffer cmd, const uint32_t id) {
+
+void Mesh::bind(vk::CommandBuffer cmd) {
 	cmd.bindVertexBuffers(0, { vertex_buffer->buffer }, { 0 });
 	cmd.bindIndexBuffer(index_buffer->buffer, 0, vk::IndexType::eUint32);
-	cmd.drawIndexed(indices.size(), 1, 0, 0, id);
-}
-void Mesh::update(const float delta_time) {
-	if (show_window) {
-		std::string name = "Mesh" + std::to_string(id);
-		if (!ImGui::Begin(name.c_str(), &show_window, ImGuiWindowFlags_AlwaysAutoResize)) {
-			ImGui::End();
-
-			return;
-		}
-		if (ImGui::InputFloat3("Position", &position[0]) ||
-				ImGui::InputFloat3("Rotation", &rotation[0]) ||
-				ImGui::InputFloat3("Scale", &scale[0])) {
-			update_matrix();
-		}
-		ImGui::End();
-	}
-}
-void Mesh::update_matrix() {
-	glm::mat4 rot = glm::mat4_cast(glm::quat(rotation));
-	glm::mat4 trans = glm::translate(glm::mat4(1.0f), position);
-	glm::mat4 size = glm::scale(glm::mat4(1.0f), scale);
-
-	transform = trans * rot * size;
-}
-int Mesh::get_id() {
-	return id_++;
 }
