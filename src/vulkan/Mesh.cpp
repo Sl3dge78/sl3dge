@@ -9,6 +9,7 @@
 
 Mesh::Mesh(VulkanApplication &app, const std::string path, const uint32_t id) {
 	this->id = id;
+	this->app = &app;
 
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -48,20 +49,23 @@ Mesh::Mesh(VulkanApplication &app, const std::string path, const uint32_t id) {
 			indices.push_back(unique_vtx[vertex]);
 		}
 	}
+	build();
+}
 
+void Mesh::build() {
 	{
 		vertex_size = sizeof(vertices[0]) * uint32_t(vertices.size());
-		Buffer staging_buffer(app, vertex_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+		Buffer staging_buffer(*app, vertex_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(vertices.data(), vertex_size);
-		vertex_buffer = std::unique_ptr<Buffer>(new Buffer(app, vertex_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		app.copy_buffer(staging_buffer.buffer, vertex_buffer->buffer, vertex_size);
+		vertex_buffer = std::unique_ptr<Buffer>(new Buffer(*app, vertex_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		app->copy_buffer(staging_buffer.buffer, vertex_buffer->buffer, vertex_size);
 	}
 	{
 		index_size = sizeof(indices[0]) * indices.size();
-		Buffer staging_buffer(app, index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+		Buffer staging_buffer(*app, index_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(indices.data(), index_size);
-		index_buffer = std::unique_ptr<Buffer>(new Buffer(app, index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		app.copy_buffer(staging_buffer.buffer, index_buffer->buffer, index_size);
+		index_buffer = std::unique_ptr<Buffer>(new Buffer(*app, index_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		app->copy_buffer(staging_buffer.buffer, index_buffer->buffer, index_size);
 	}
 
 	triangles.setVertexFormat(vk::Format::eR32G32B32Sfloat);

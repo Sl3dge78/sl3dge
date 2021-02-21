@@ -39,8 +39,11 @@ VulkanApplication::~VulkanApplication() {
 }
 void VulkanApplication::run() {
 	scene = std::make_unique<Scene>(this);
-	load();
+	load(*scene);
 	SDL_Log("Resources loaded");
+
+	build_scene_graph(*scene);
+
 	scene->init();
 	post_swapchain_init();
 
@@ -125,7 +128,8 @@ void VulkanApplication::main_loop() {
 	float delta_time;
 
 	Input::start();
-	start();
+	start(*scene);
+	scene->start();
 
 	while (run) {
 		// Wait for V_Sync
@@ -161,7 +165,7 @@ void VulkanApplication::main_loop() {
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
-		update(delta_time);
+		update(*scene, delta_time);
 
 		// Don't draw if the app is minimized
 		if (!(SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)) {

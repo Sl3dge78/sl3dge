@@ -62,7 +62,7 @@ void Scene::write_descriptors(VulkanPipeline &pipeline) {
 	as_descriptor_write.pNext = &as_desc;
 	pipeline.add_descriptor(binding, pool_size, as_descriptor_write);
 
-	vk::DescriptorBufferInfo bi_camera_matrices(camera.buffer->buffer, 0, VK_WHOLE_SIZE);
+	vk::DescriptorBufferInfo bi_camera_matrices(camera_buffer->buffer, 0, VK_WHOLE_SIZE);
 	pipeline.add_descriptor(vk::DescriptorType::eUniformBuffer, bi_camera_matrices, 2, { vk::ShaderStageFlagBits::eRaygenKHR | vk::ShaderStageFlagBits::eClosestHitKHR | vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment });
 
 	vk::DescriptorBufferInfo bi_scene(scene_desc_buffer->buffer, 0, VK_WHOLE_SIZE);
@@ -92,8 +92,16 @@ void Scene::write_descriptors(VulkanPipeline &pipeline) {
 	pipeline.add_push_constant(push_constant);
 	pipeline.build_descriptors(app->get_device());
 }
+void Scene::start() {
+	for (auto &node : nodes) {
+		node->start(*this);
+	}
+}
 void Scene::update(float delta_time) {
-	camera.update(delta_time);
+	for (auto &node : nodes) {
+		node->update(*this, delta_time);
+	}
+	camera_buffer->write_data(&main_camera->matrices, sizeof(Camera::Matrices));
 }
 void Scene::update_buffers() {
 	{
@@ -115,8 +123,8 @@ void Scene::update_buffers() {
 			instances.emplace_back(Instance{
 					.mesh_id = mi->get_mesh_id(),
 					.mat_id = mi->get_material_id(),
-					.transform = mi->get_transform(),
-					.inverted = glm::inverse(mi->get_transform()) });
+					.transform = mi->get_world_transform(),
+					.inverted = glm::inverse(mi->get_world_transform()) });
 		}
 
 		vk::DeviceSize instances_size = sizeof(Instance) * instances.size();
@@ -155,14 +163,20 @@ void Scene::update_buffers() {
 		app->copy_buffer(staging_buffer.buffer, materials_buffer->buffer, materials_size);
 	}
 	{
-		vk::DeviceSize lights_size = lights.size() * sizeof(lights[0]);
-		lights_buffer = std::unique_ptr<Buffer>(new Buffer(*app, lights_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
-		Buffer staging_buffer(*app, lights_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
-		staging_buffer.write_data(lights.data(), lights_size);
-		app->copy_buffer(staging_buffer.buffer, lights_buffer->buffer, lights_size);
+		if (lights.size() > 0) {
+			vk::DeviceSize lights_size = lights.size() * sizeof(lights[0]);
+			lights_buffer = std::unique_ptr<Buffer>(new Buffer(*app, lights_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+			Buffer staging_buffer(*app, lights_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
+			staging_buffer.write_data(lights.data(), lights_size);
+			app->copy_buffer(staging_buffer.buffer, lights_buffer->buffer, lights_size);
+		}
 	}
+
+	camera_buffer = std::unique_ptr<Buffer>(new Buffer(*app, sizeof(Camera::Matrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
+	camera_buffer->write_data(&main_camera->matrices, sizeof(Camera::Matrices));
 }
 void Scene::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
+	// Todo : update BLAS if mesh changed
 	std::vector<std::unique_ptr<AccelerationStructure>> orig_blas;
 	bool do_compaction = (flags & vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction) == vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction;
 	auto query_pool = app->get_device().createQueryPoolUnique(vk::QueryPoolCreateInfo({}, vk::QueryType::eAccelerationStructureCompactedSizeKHR, meshes.size(), {}));

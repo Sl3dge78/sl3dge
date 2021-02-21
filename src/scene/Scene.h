@@ -7,9 +7,9 @@
 
 #include "nodes/MeshInstance.h"
 #include "nodes/Node.h"
+#include "nodes/Node3D.h"
 #include "scene/Camera.h"
 #include "scene/Material.h"
-#include "scene/Terrain.h"
 #include "vulkan/Mesh.h"
 #include "vulkan/VulkanHelper.h"
 #include "vulkan/VulkanPipeline.h"
@@ -59,6 +59,7 @@ private:
 	std::unique_ptr<Buffer> scene_desc_buffer;
 	std::unique_ptr<Buffer> materials_buffer;
 	std::unique_ptr<Buffer> lights_buffer;
+	std::unique_ptr<Buffer> camera_buffer;
 
 	std::vector<std::unique_ptr<Mesh>> meshes;
 	std::vector<std::unique_ptr<Material>> materials;
@@ -72,7 +73,7 @@ private:
 	void update_buffers();
 
 public:
-	Camera camera;
+	Camera *main_camera;
 
 	struct PushConstant {
 		alignas(16) glm::vec4 clear_color;
@@ -81,7 +82,7 @@ public:
 		alignas(16) glm::vec3 light_color;
 	} push_constants;
 
-	Node scene_root = Node(nullptr);
+	Node3D scene_root = Node3D(nullptr);
 	std::vector<std::unique_ptr<Node>> nodes;
 
 	bool draw_lights_ui = false;
@@ -91,6 +92,8 @@ public:
 
 	void init();
 	void write_descriptors(VulkanPipeline &pipeline);
+
+	void start();
 	void update(float delta_time);
 
 	Mesh *load_mesh(const std::string path);

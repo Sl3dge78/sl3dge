@@ -73,12 +73,13 @@ public:
 
 protected:
 	SDL_Window *window = nullptr;
-	std::unique_ptr<Scene> scene;
 
 	void refresh_shaders();
 	void toggle_rtx();
 
 private:
+	std::unique_ptr<Scene> scene;
+
 	vk::DynamicLoader dynamic_loader;
 	vk::UniqueInstance instance;
 	vk::UniqueSurfaceKHR surface;
@@ -128,9 +129,10 @@ private:
 	void init_vulkan();
 	void post_swapchain_init(bool update = false);
 
-	virtual void load() = 0;
-	virtual void start() = 0;
-	virtual void update(float delta_time) = 0;
+	virtual void build_scene_graph(Scene &scene) = 0;
+	virtual void load(Scene &scene) = 0;
+	virtual void start(Scene &scene) = 0;
+	virtual void update(Scene &scene, float delta_time) = 0;
 
 	void main_loop();
 	void raster_scene(VulkanFrame &frame);

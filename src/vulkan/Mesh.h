@@ -14,6 +14,7 @@ class VulkanFrame;
 
 class Mesh {
 private:
+	VulkanApplication *app;
 	uint32_t id;
 	vk::AccelerationStructureGeometryTrianglesDataKHR triangles;
 	std::unique_ptr<Buffer> vertex_buffer;
@@ -23,17 +24,18 @@ private:
 
 	uint32_t next_instance_id;
 
-protected:
+public:
 	std::vector<Vertex> vertices;
 	std::vector<uint32_t> indices;
 
-public:
 	std::unique_ptr<AccelerationStructure> blas;
 	vk::AccelerationStructureGeometryKHR geometry;
 	vk::AccelerationStructureBuildRangeInfoKHR range_info;
 
 	Mesh(VulkanApplication &app, const std::string path, const uint32_t id);
 	~Mesh() = default;
+
+	void build();
 
 	uint32_t get_id() const { return id; };
 	uint32_t get_next_instance_id() { return next_instance_id++; };

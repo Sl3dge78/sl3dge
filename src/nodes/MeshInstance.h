@@ -5,7 +5,7 @@
 #include "vulkan/Mesh.h"
 
 class MeshInstance : public VisualInstance {
-private:
+protected:
 	Mesh *mesh;
 	Material *material;
 
@@ -20,7 +20,7 @@ public:
 		as_instance.instanceCustomIndex = get_instance_id();
 		as_instance.accelerationStructureReference = mesh->blas->get_address();
 		as_instance.mask = 0xFF;
-		auto transposed = glm::transpose(this->get_transform());
+		auto transposed = glm::transpose(this->get_world_transform());
 		memcpy(&as_instance, &transposed, sizeof(vk::TransformMatrixKHR));
 		return as_instance;
 	}

@@ -13,6 +13,8 @@
 #include <SDL/SDL.h>
 
 #include "Input.h"
+#include "game/Player.h"
+#include "game/Terrain.h"
 #include "nodes/MeshInstance.h"
 #include "scene/Material.h"
 #include "scene/Scene.h"
@@ -36,81 +38,52 @@
 
 class Sl3dge : public VulkanApplication {
 private:
-	float time = 0.0f;
+	Mesh *dune_mesh;
+	Mesh *sphere_mesh;
+	Material *dune_material;
+	Material *sphere_material;
 
-	void make_sphere() {
-		/*
-		float x = float(std::rand() % 10);
-		float y = float(std::rand() % 10);
-		sphere_a->translate(glm::vec3(x, y, 1.0f));
-		*/
-	}
-	void load() override {
-		scene->camera.load(this);
-		auto viking_texture = scene->load_texture("resources/textures/viking_room.png"); // 0
-		/*
-		auto viking_mesh = scene->load_mesh(this, "resources/models/viking_room.obj"); // 0
-		auto viking_material = scene->create_material(0.1f, glm::vec3(1.0f, 1.0f, 1.0f), viking_texture);
+	Terrain *terrain;
+	Player *player;
 
-		auto a = scene->create_instance(viking_mesh, viking_material);
-		a->translate(glm::vec3(0.f, 1.f, 0.f));
-		
-		auto b = scene->create_instance(viking_mesh, viking_material);
-		b->translate(glm::vec3(1.5f, 1.f, 0.f));
-		b->rotate(3.14f, glm::vec3(0.f, 0.f, 1.f));
-		*/
-		/*
-		auto sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
-		auto sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 0.0f), 1.f);
-		auto sphere_a = scene->create_instance(sphere_mesh, sphere_material);
-		sphere_a->translate(glm::vec3(0.0f, 0.0f, 1.0f));
+	void load(Scene &scene) override {
+		auto viking_texture = scene.load_texture("resources/textures/viking_room.png"); // 0
 
-		auto plane_mesh = scene->load_mesh("resources/models/plane.obj");
-		auto plane_material = scene->create_material(glm::vec3(.5f, .5f, .5f), 0.1f);
-		auto plane_a = scene->create_instance(plane_mesh, plane_material);
-		*/
-		/*
-		auto dune_mesh = scene->load_mesh("resources/models/dune.obj");
-		auto dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
-		auto dune_instance = scene->create_instance(dune_mesh, dune_material);
-		*/
+		dune_mesh = scene.load_mesh("resources/models/dune.obj");
+		sphere_mesh = scene.load_mesh("resources/models/sphere.obj");
 
-		Mesh *dune_mesh = scene->load_mesh("resources/models/dune.obj");
-		Mesh *sphere_mesh = scene->load_mesh("resources/models/sphere.obj");
+		dune_material = scene.create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
+		sphere_material = scene.create_material(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
 
-		Material *dune_material = scene->create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
-		Material *sphere_material = scene->create_material(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
+		terrain = scene.create_node<Terrain>(&scene.scene_root, dune_mesh, dune_material, 128, 128);
+		player = scene.create_node<Player>(&scene.scene_root);
 
-		MeshInstance *dune = scene->create_node<MeshInstance>(&scene->scene_root, dune_mesh, dune_material);
-		MeshInstance *sphere = scene->create_node<MeshInstance>(&scene->scene_root, sphere_mesh, sphere_material);
+		player->camera = scene.create_node<Camera>(player);
+		scene.main_camera = player->camera;
+
+		MeshInstance *sphere = scene.create_node<MeshInstance>(&scene.scene_root, sphere_mesh, sphere_material);
 		sphere->translate(glm::vec3(5.0f, 5.0f, 1.0f));
-		MeshInstance *sphere2 = scene->create_node<MeshInstance>(&scene->scene_root, sphere_mesh, sphere_material);
+		MeshInstance *sphere2 = scene.create_node<MeshInstance>(&scene.scene_root, sphere_mesh, sphere_material);
 		sphere2->translate(glm::vec3(7.0f, 5.0f, 1.0f));
-
-		scene->create_light(0, glm::vec3(1.0), 1.0, glm::normalize(glm::vec3(1.0, 1.0, 0.15)), true);
-		//scene->create_light(1, glm::vec3(1.0), 1.0, glm::vec3(0.0, 0.0, 3.0));
 	}
-	void start() override {
+	virtual void build_scene_graph(Scene &scene) override {
+	}
+	void start(Scene &scene) override {
 		SDL_GetRelativeMouseState(nullptr, nullptr); // Called here to avoid the weird jump
-		scene->camera.start();
 
-		scene->push_constants.clear_color = glm::vec4(0.43f, 0.77f, .91f, 1.f);
-		scene->push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.f, .15f));
-		scene->push_constants.light_intensity = 5.0f;
-		scene->push_constants.light_color = glm::vec3(.99, .72, 0.07);
+		scene.push_constants.clear_color = glm::vec4(0.43f, 0.77f, .91f, 1.f);
+		scene.push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.f, .15f));
+		scene.push_constants.light_intensity = 5.0f;
+		scene.push_constants.light_color = glm::vec3(.99, .72, 0.07);
 	}
-	void update(float delta_time) override {
-		scene->update(delta_time);
+	void update(Scene &scene, float delta_time) override {
+		scene.update(delta_time);
 
-		time += delta_time;
-		const float speed = 1.0f / 10.0f;
-
-		//rtx_push_constants.light_dir = glm::normalize(glm::vec3(glm::abs(glm::cos(time * speed)), 1.0f, glm::abs(glm::sin(time * speed))));
-		scene->push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.0f, 0.0f));
+		scene.push_constants.light_dir = glm::normalize(glm::vec3(1.0f, 1.0f, 0.0f));
 
 		if (ImGui::BeginMainMenuBar()) {
 			if (ImGui::BeginMenu("Options")) {
-				ImGui::MenuItem("Camera params", "", &scene->camera.show_window);
+				ImGui::MenuItem("Camera params", "", &scene.main_camera->show_window);
 				ImGui::MenuItem("Refresh Shaders", "F5", nullptr);
 				ImGui::MenuItem("Toggle rtx", "F6", nullptr);
 				ImGui::EndMenu();

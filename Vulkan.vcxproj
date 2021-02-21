@@ -159,8 +159,6 @@
   <ItemGroup>
     <ClCompile Include="include\glm\detail\glm.cpp" />
     <ClCompile Include="src\nodes\MeshInstance.cpp" />
-    <ClCompile Include="src\nodes\Node3D.cpp" />
-    <ClCompile Include="src\nodes\Node.cpp" />
     <ClCompile Include="src\Debug.cpp" />
     <ClCompile Include="src\nodes\VisualInstance.cpp" />
     <ClCompile Include="src\scene\gltfModel.cpp" />
@@ -179,7 +177,7 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\vulkan\Mesh.cpp" />
     <ClCompile Include="src\scene\Scene.cpp" />
-    <ClCompile Include="src\scene\Terrain.cpp" />
+    <ClCompile Include="src\game\Terrain.cpp" />
     <ClCompile Include="src\vulkan\VulkanApplication.cpp" />
     <ClCompile Include="src\vulkan\VulkanFrame.cpp" />
     <ClCompile Include="src\vulkan\VulkanHelper.cpp" />
@@ -555,6 +553,7 @@
     <ClInclude Include="include\sdl\SDL_video.h" />
     <ClInclude Include="include\sdl\SDL_vulkan.h" />
     <ClInclude Include="include\tiny_obj_loader.h" />
+    <ClInclude Include="src\game\Player.h" />
     <ClInclude Include="src\nodes\MeshInstance.h" />
     <ClInclude Include="src\nodes\VisualInstance.h" />
     <ClInclude Include="src\vulkan\Mesh.h" />
@@ -577,7 +576,7 @@
     <ClInclude Include="src\Input.h" />
     <ClInclude Include="src\scene\Mesh.h" />
     <ClInclude Include="src\scene\Scene.h" />
-    <ClInclude Include="src\scene\Terrain.h" />
+    <ClInclude Include="src\game\Terrain.h" />
     <ClInclude Include="src\vulkan\Vertex.h" />
     <ClInclude Include="src\vulkan\VulkanApplication.h" />
     <ClInclude Include="src\vulkan\VulkanFrame.h" />
