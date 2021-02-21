@@ -1,8 +1,8 @@
 #pragma once
 
 #include "game/Terrain.h"
+#include "nodes/Camera.h"
 #include "nodes/Node3D.h"
-#include "scene/Camera.h"
 #include "scene/Scene.h"
 
 class Player : public Node3D {
@@ -28,6 +28,12 @@ public:
 	virtual void start(Scene &scene) override {
 		yaw = 220.f;
 		pitch = -8.f;
+
+		glm::vec3 direction;
+		direction.x = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+		direction.y = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+		direction.z = sin(glm::radians(pitch));
+		look_at(pos, direction + pos, glm::vec3(0.0, 0.0, 1.0));
 	}
 
 	virtual void update(Scene &scene, float delta_time) override {

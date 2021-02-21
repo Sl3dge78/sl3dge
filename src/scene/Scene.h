@@ -5,42 +5,16 @@
 
 #include "imgui/imgui.h"
 
+#include "nodes/Camera.h"
 #include "nodes/MeshInstance.h"
 #include "nodes/Node.h"
 #include "nodes/Node3D.h"
-#include "scene/Camera.h"
 #include "scene/Material.h"
 #include "vulkan/Mesh.h"
 #include "vulkan/VulkanHelper.h"
 #include "vulkan/VulkanPipeline.h"
 
 class VulkanApplication;
-/*
-class MeshInstance_ {
-private:
-	alignas(4) uint32_t mesh_id; // Typedef that as mesh handle
-	alignas(4) uint32_t mat_id; // typedef that as mat_handle
-	alignas(16) glm::mat4 transform;
-	alignas(16) glm::mat4 inverted;
-
-public:
-	MeshInstance_(const uint32_t mesh_id, const uint32_t mat_id) :
-			mesh_id(mesh_id), mat_id(mat_id) {
-		transform = glm::mat4(1.0f);
-		inverted = glm::inverse(transform);
-	};
-	void translate(glm::vec3 translation) {
-		transform = glm::translate(transform, translation);
-		inverted = glm::inverse(transform);
-	}
-	void rotate(const float angle, const glm::vec3 dir) {
-		transform = glm::rotate(transform, angle, dir);
-		inverted = glm::inverse(transform);
-	}
-	glm::mat4 get_transform() const { return transform; }
-	uint32_t get_mesh_id() const { return mesh_id; }
-};
-*/
 
 struct Light {
 	alignas(4) int32_t type;
