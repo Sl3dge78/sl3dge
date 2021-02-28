@@ -12,7 +12,6 @@ private:
 	float yaw = 0.f;
 	float pitch = 0.f;
 
-	//glm::vec3 pos = glm::vec3(1.0f);
 	const float rotate_speed = 30.0f;
 	const float move_speed = 1.f;
 
@@ -21,8 +20,6 @@ public:
 	Terrain *terrain;
 
 	virtual void load(Scene &scene) override;
-
 	virtual void start(Scene &scene) override;
-
 	virtual void update(Scene &scene, float delta_time) override;
 };

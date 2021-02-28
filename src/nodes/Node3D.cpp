@@ -15,6 +15,12 @@ void Node3D::rotate(const float angle, const glm::vec3 &dir) {
 	notify_children();
 }
 
+void Node3D::move_to(const glm::vec3 &position) {
+	this->translation = position;
+	update_xform();
+	notify_children();
+}
+
 void Node3D::update_xform() {
 	glm::mat4 t = glm::translate(glm::mat4(1.0), translation);
 	glm::mat4 r = glm::toMat4(rotation);

@@ -25,37 +25,18 @@ protected:
 public:
 	void translate(const glm::vec3 &translation);
 	void rotate(const float angle, const glm::vec3 &dir);
-	glm::mat4 const &get_local_transform() const {
-		return local_transform;
-	};
-	glm::mat4 const &get_world_transform() const {
-		return world_transform;
-	};
-	glm::vec3 const get_world_position() const {
-		return glm::vec3(world_transform[3]);
-	};
-	glm::vec3 const get_local_position() const {
-		return glm::vec3(local_transform[3]);
-	};
+	void move_to(const glm::vec3 &position);
+	glm::mat4 const &get_local_transform() const { return local_transform; };
+	glm::mat4 const &get_world_transform() const { return world_transform; };
+	glm::vec3 const get_world_position() const { return glm::vec3(world_transform[3]); };
+	glm::vec3 const get_local_position() const { return glm::vec3(local_transform[3]); };
 
-	glm::vec3 backward() const {
-		return glm::vec3(glm::transpose(local_transform)[2]);
-	};
-	glm::vec3 down() const {
-		return glm::vec3(glm::transpose(local_transform)[1]);
-	};
-	glm::vec3 left() const {
-		return glm::vec3(glm::transpose(local_transform)[0]);
-	};
-	glm::vec3 up() const {
-		return down() * -1.0f;
-	};
-	glm::vec3 forward() const {
-		return backward() * -1.0f;
-	};
-	glm::vec3 right() const {
-		return left() * -1.0f;
-	};
+	glm::vec3 backward() const { return glm::vec3(glm::transpose(local_transform)[2]); };
+	glm::vec3 up() const { return glm::vec3(glm::transpose(local_transform)[1]); };
+	glm::vec3 left() const { return glm::vec3(glm::transpose(local_transform)[0]); };
+	glm::vec3 down() const { return up() * -1.0f; };
+	glm::vec3 forward() const { return backward() * -1.0f; };
+	glm::vec3 right() const { return left() * -1.0f; };
 
 	void update_xform();
 
@@ -63,7 +44,5 @@ public:
 	virtual void load(Scene &scene) override{};
 	virtual void start(Scene &scene) override{};
 	virtual void update(Scene &scene, float delta_time) override{};
-	virtual void on_parent_changed() override {
-		update_xform();
-	};
+	virtual void on_parent_changed() override { update_xform(); };
 };
