@@ -8,28 +8,28 @@ void Player::start(Scene &scene) {
 
 void Player::update(Scene &scene, float delta_time) {
 	if (Input::get_mouse(3)) {
-		rotate(-Input::delta_mouse_x() * rotate_speed * delta_time, glm::vec3(0.0f, 0.0f, 1.0f));
-		rotate(Input::delta_mouse_y() * rotate_speed * delta_time, left());
+		camera->rotate(-Input::delta_mouse_x() * rotate_speed * delta_time, glm::vec3(0.0f, 0.0f, 1.0f));
+		camera->rotate(Input::delta_mouse_y() * rotate_speed * delta_time, camera->left());
 	}
 
 	glm::vec3 translation(0.0f);
 	if (Input::get_key(SDL_SCANCODE_W)) {
-		translation += forward();
+		translation += camera->forward();
 	}
 	if (Input::get_key(SDL_SCANCODE_S)) {
-		translation -= forward();
+		translation -= camera->forward();
 	}
 	if (Input::get_key(SDL_SCANCODE_A)) {
-		translation += left();
+		translation += camera->left();
 	}
 	if (Input::get_key(SDL_SCANCODE_D)) {
-		translation -= left();
+		translation -= camera->left();
 	}
 	if (Input::get_key(SDL_SCANCODE_Q)) {
-		translation += up();
+		translation += camera->up();
 	}
 	if (Input::get_key(SDL_SCANCODE_E)) {
-		translation -= up();
+		translation -= camera->up();
 	}
 	translation *= move_speed;
 	auto gravity = glm::vec3(0.0, 0.0, -1.0) * 9.81f;
