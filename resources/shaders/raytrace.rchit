@@ -145,8 +145,8 @@ void main() {
     vec3 normal = normalize(v0.normal * barycentre.x + v1.normal * barycentre.y + v2.normal * barycentre.z);
     normal = normalize(vec3(scene.i[gl_InstanceCustomIndexEXT].inverted * vec4(normal, 0.0)));
 
-    vec3 world_pos = v0.pos * barycentre.x + v1.pos * barycentre.y + v2.pos * barycentre.z;
-    world_pos = vec3(scene.i[gl_InstanceCustomIndexEXT].transform * vec4(world_pos, 1.0));
+    vec3 local_pos = v0.pos * barycentre.x + v1.pos * barycentre.y + v2.pos * barycentre.z;
+    vec3 world_pos = vec3(scene.i[gl_InstanceCustomIndexEXT].transform * vec4(local_pos, 1.0));
 
     vec2 tex_coord = v0.tex_coord * barycentre.x + v1.tex_coord * barycentre.y + v2.tex_coord * barycentre.z;
     

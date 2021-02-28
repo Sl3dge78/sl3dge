@@ -63,21 +63,21 @@
 #include <altivec.h>
 #endif
 #if !defined(SDL_DISABLE_ARM_NEON_H)
-#  if defined(__ARM_NEON)
-#    include <arm_neon.h>
-#  elif defined(__WINDOWS__) || defined(__WINRT__)
+#if defined(__ARM_NEON)
+#include <arm_neon.h>
+#elif defined(__WINDOWS__) || defined(__WINRT__)
 /* Visual Studio doesn't define __ARM_ARCH, but _M_ARM (if set, always 7), and _M_ARM64 (if set, always 1). */
-#    if defined(_M_ARM)
-#      include <armintr.h>
-#      include <arm_neon.h>
-#      define __ARM_NEON 1 /* Set __ARM_NEON so that it can be used elsewhere, at compile time */
-#    endif
-#    if defined (_M_ARM64)
-#      include <arm64intr.h>
-#      include <arm64_neon.h>
-#      define __ARM_NEON 1 /* Set __ARM_NEON so that it can be used elsewhere, at compile time */
-#    endif
-#  endif
+#if defined(_M_ARM)
+#include <arm_neon.h>
+#include <armintr.h>
+#define __ARM_NEON 1 /* Set __ARM_NEON so that it can be used elsewhere, at compile time */
+#endif
+#if defined(_M_ARM64)
+#include <arm64_neon.h>
+#include <arm64intr.h>
+#define __ARM_NEON 1 /* Set __ARM_NEON so that it can be used elsewhere, at compile time */
+#endif
+#endif
 #endif
 #if defined(__3dNOW__) && !defined(SDL_DISABLE_MM3DNOW_H)
 #include <mm3dnow.h>
@@ -101,7 +101,7 @@
 #endif /* compiler version */
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -111,7 +111,7 @@ extern "C" {
  * The 64-bit PowerPC processors have a 128 byte cache line.
  * We'll use the larger value to be generally safe.
  */
-#define SDL_CACHELINE_SIZE  128
+#define SDL_CACHELINE_SIZE 128
 
 /**
  *  This function returns the number of CPU cores available.
@@ -248,7 +248,7 @@ extern DECLSPEC size_t SDLCALL SDL_SIMDGetAlignment(void);
  * \sa SDL_SIMDAlignment
  * \sa SDL_SIMDFree
  */
-extern DECLSPEC void * SDLCALL SDL_SIMDAlloc(const size_t len);
+extern DECLSPEC void *SDLCALL SDL_SIMDAlloc(const size_t len);
 
 /**
  * \brief Deallocate memory obtained from SDL_SIMDAlloc

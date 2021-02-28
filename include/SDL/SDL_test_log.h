@@ -37,7 +37,7 @@
 #define SDL_test_log_h_
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -37,28 +37,27 @@
 #define SDL_test_h_arness_h
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
 /* ! Definitions for test case structures */
-#define TEST_ENABLED  1
+#define TEST_ENABLED 1
 #define TEST_DISABLED 0
 
 /* ! Definition of all the possible test return values of the test case method */
-#define TEST_ABORTED        -1
-#define TEST_STARTED         0
-#define TEST_COMPLETED       1
-#define TEST_SKIPPED         2
+#define TEST_ABORTED -1
+#define TEST_STARTED 0
+#define TEST_COMPLETED 1
+#define TEST_SKIPPED 2
 
 /* ! Definition of all the possible test results for the harness */
-#define TEST_RESULT_PASSED              0
-#define TEST_RESULT_FAILED              1
-#define TEST_RESULT_NO_ASSERT           2
-#define TEST_RESULT_SKIPPED             3
-#define TEST_RESULT_SETUP_FAILURE       4
+#define TEST_RESULT_PASSED 0
+#define TEST_RESULT_FAILED 1
+#define TEST_RESULT_NO_ASSERT 2
+#define TEST_RESULT_SKIPPED 3
+#define TEST_RESULT_SETUP_FAILURE 4
 
 /* !< Function pointer to a test case setup function (run before every test) */
 typedef void (*SDLTest_TestCaseSetUpFp)(void *arg);
@@ -67,36 +66,35 @@ typedef void (*SDLTest_TestCaseSetUpFp)(void *arg);
 typedef int (*SDLTest_TestCaseFp)(void *arg);
 
 /* !< Function pointer to a test case teardown function (run after every test) */
-typedef void  (*SDLTest_TestCaseTearDownFp)(void *arg);
+typedef void (*SDLTest_TestCaseTearDownFp)(void *arg);
 
 /**
  * Holds information about a single test case.
  */
 typedef struct SDLTest_TestCaseReference {
-    /* !< Func2Stress */
-    SDLTest_TestCaseFp testCase;
-    /* !< Short name (or function name) "Func2Stress" */
-    char *name;
-    /* !< Long name or full description "This test pushes func2() to the limit." */
-    char *description;
-    /* !< Set to TEST_ENABLED or TEST_DISABLED (test won't be run) */
-    int enabled;
+	/* !< Func2Stress */
+	SDLTest_TestCaseFp testCase;
+	/* !< Short name (or function name) "Func2Stress" */
+	char *name;
+	/* !< Long name or full description "This test pushes func2() to the limit." */
+	char *description;
+	/* !< Set to TEST_ENABLED or TEST_DISABLED (test won't be run) */
+	int enabled;
 } SDLTest_TestCaseReference;
 
 /**
  * Holds information about a test suite (multiple test cases).
  */
 typedef struct SDLTest_TestSuiteReference {
-    /* !< "PlatformSuite" */
-    char *name;
-    /* !< The function that is run before each test. NULL skips. */
-    SDLTest_TestCaseSetUpFp testSetUp;
-    /* !< The test cases that are run as part of the suite. Last item should be NULL. */
-    const SDLTest_TestCaseReference **testCases;
-    /* !< The function that is run after each test. NULL skips. */
-    SDLTest_TestCaseTearDownFp testTearDown;
+	/* !< "PlatformSuite" */
+	char *name;
+	/* !< The function that is run before each test. NULL skips. */
+	SDLTest_TestCaseSetUpFp testSetUp;
+	/* !< The test cases that are run as part of the suite. Last item should be NULL. */
+	const SDLTest_TestCaseReference **testCases;
+	/* !< The function that is run after each test. NULL skips. */
+	SDLTest_TestCaseTearDownFp testTearDown;
 } SDLTest_TestSuiteReference;
-
 
 /**
  * \brief Generates a random run seed string for the harness. The generated seed will contain alphanumeric characters (0-9A-Z).
@@ -121,7 +119,6 @@ char *SDLTest_GenerateRunSeed(const int length);
  * \returns Test run result; 0 when all tests passed, 1 if any tests failed.
  */
 int SDLTest_RunSuites(SDLTest_TestSuiteReference *testSuites[], const char *userRunSeed, Uint64 userExecKey, const char *filter, int testIterations);
-
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

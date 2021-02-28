@@ -45,7 +45,7 @@
 #include "SDL_test_random.h"
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,7 +56,7 @@ extern "C" {
  * Note: Maximum size of SDLTest log message is less than SDL's limit
  * to ensure we can fit additional information such as the timestamp.
  */
-#define SDLTEST_MAX_LOGMESSAGE_LENGTH   3584
+#define SDLTEST_MAX_LOGMESSAGE_LENGTH 3584
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

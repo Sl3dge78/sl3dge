@@ -40,11 +40,10 @@
 #include "SDL_stdinc.h"
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 /**
  *  \brief The maximum size of a log message
@@ -61,31 +60,30 @@ extern "C" {
  *  at the VERBOSE level and all other categories are enabled at the
  *  CRITICAL level.
  */
-typedef enum
-{
-    SDL_LOG_CATEGORY_APPLICATION,
-    SDL_LOG_CATEGORY_ERROR,
-    SDL_LOG_CATEGORY_ASSERT,
-    SDL_LOG_CATEGORY_SYSTEM,
-    SDL_LOG_CATEGORY_AUDIO,
-    SDL_LOG_CATEGORY_VIDEO,
-    SDL_LOG_CATEGORY_RENDER,
-    SDL_LOG_CATEGORY_INPUT,
-    SDL_LOG_CATEGORY_TEST,
+typedef enum {
+	SDL_LOG_CATEGORY_APPLICATION,
+	SDL_LOG_CATEGORY_ERROR,
+	SDL_LOG_CATEGORY_ASSERT,
+	SDL_LOG_CATEGORY_SYSTEM,
+	SDL_LOG_CATEGORY_AUDIO,
+	SDL_LOG_CATEGORY_VIDEO,
+	SDL_LOG_CATEGORY_RENDER,
+	SDL_LOG_CATEGORY_INPUT,
+	SDL_LOG_CATEGORY_TEST,
 
-    /* Reserved for future SDL library use */
-    SDL_LOG_CATEGORY_RESERVED1,
-    SDL_LOG_CATEGORY_RESERVED2,
-    SDL_LOG_CATEGORY_RESERVED3,
-    SDL_LOG_CATEGORY_RESERVED4,
-    SDL_LOG_CATEGORY_RESERVED5,
-    SDL_LOG_CATEGORY_RESERVED6,
-    SDL_LOG_CATEGORY_RESERVED7,
-    SDL_LOG_CATEGORY_RESERVED8,
-    SDL_LOG_CATEGORY_RESERVED9,
-    SDL_LOG_CATEGORY_RESERVED10,
+	/* Reserved for future SDL library use */
+	SDL_LOG_CATEGORY_RESERVED1,
+	SDL_LOG_CATEGORY_RESERVED2,
+	SDL_LOG_CATEGORY_RESERVED3,
+	SDL_LOG_CATEGORY_RESERVED4,
+	SDL_LOG_CATEGORY_RESERVED5,
+	SDL_LOG_CATEGORY_RESERVED6,
+	SDL_LOG_CATEGORY_RESERVED7,
+	SDL_LOG_CATEGORY_RESERVED8,
+	SDL_LOG_CATEGORY_RESERVED9,
+	SDL_LOG_CATEGORY_RESERVED10,
 
-    /* Beyond this point is reserved for application use, e.g.
+	/* Beyond this point is reserved for application use, e.g.
        enum {
            MYAPP_CATEGORY_AWESOME1 = SDL_LOG_CATEGORY_CUSTOM,
            MYAPP_CATEGORY_AWESOME2,
@@ -93,23 +91,21 @@ typedef enum
            ...
        };
      */
-    SDL_LOG_CATEGORY_CUSTOM
+	SDL_LOG_CATEGORY_CUSTOM
 } SDL_LogCategory;
 
 /**
  *  \brief The predefined log priorities
  */
-typedef enum
-{
-    SDL_LOG_PRIORITY_VERBOSE = 1,
-    SDL_LOG_PRIORITY_DEBUG,
-    SDL_LOG_PRIORITY_INFO,
-    SDL_LOG_PRIORITY_WARN,
-    SDL_LOG_PRIORITY_ERROR,
-    SDL_LOG_PRIORITY_CRITICAL,
-    SDL_NUM_LOG_PRIORITIES
+typedef enum {
+	SDL_LOG_PRIORITY_VERBOSE = 1,
+	SDL_LOG_PRIORITY_DEBUG,
+	SDL_LOG_PRIORITY_INFO,
+	SDL_LOG_PRIORITY_WARN,
+	SDL_LOG_PRIORITY_ERROR,
+	SDL_LOG_PRIORITY_CRITICAL,
+	SDL_NUM_LOG_PRIORITIES
 } SDL_LogPriority;
-
 
 /**
  *  \brief Set the priority of all log categories
@@ -120,7 +116,7 @@ extern DECLSPEC void SDLCALL SDL_LogSetAllPriority(SDL_LogPriority priority);
  *  \brief Set the priority of a particular log category
  */
 extern DECLSPEC void SDLCALL SDL_LogSetPriority(int category,
-                                                SDL_LogPriority priority);
+		SDL_LogPriority priority);
 
 /**
  *  \brief Get the priority of a particular log category
@@ -173,20 +169,20 @@ extern DECLSPEC void SDLCALL SDL_LogCritical(int category, SDL_PRINTF_FORMAT_STR
  *  \brief Log a message with the specified category and priority.
  */
 extern DECLSPEC void SDLCALL SDL_LogMessage(int category,
-                                            SDL_LogPriority priority,
-                                            SDL_PRINTF_FORMAT_STRING const char *fmt, ...) SDL_PRINTF_VARARG_FUNC(3);
+		SDL_LogPriority priority,
+		SDL_PRINTF_FORMAT_STRING const char *fmt, ...) SDL_PRINTF_VARARG_FUNC(3);
 
 /**
  *  \brief Log a message with the specified category and priority.
  */
 extern DECLSPEC void SDLCALL SDL_LogMessageV(int category,
-                                             SDL_LogPriority priority,
-                                             const char *fmt, va_list ap);
+		SDL_LogPriority priority,
+		const char *fmt, va_list ap);
 
 /**
  *  \brief The prototype for the log output function
  */
-typedef void (SDLCALL *SDL_LogOutputFunction)(void *userdata, int category, SDL_LogPriority priority, const char *message);
+typedef void(SDLCALL *SDL_LogOutputFunction)(void *userdata, int category, SDL_LogPriority priority, const char *message);
 
 /**
  *  \brief Get the current log output function.
@@ -198,7 +194,6 @@ extern DECLSPEC void SDLCALL SDL_LogGetOutputFunction(SDL_LogOutputFunction *cal
  *         function with one of your own.
  */
 extern DECLSPEC void SDLCALL SDL_LogSetOutputFunction(SDL_LogOutputFunction callback, void *userdata);
-
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

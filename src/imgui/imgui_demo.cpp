@@ -936,7 +936,7 @@ static void ShowDemoWindowWidgets() {
 			ImGui::Text("%.0fx%.0f", my_tex_w, my_tex_h);
 			ImVec2 pos = ImGui::GetCursorScreenPos();
 			ImVec2 uv_min = ImVec2(0.0f, 0.0f); // Top-left
-			ImVec2 uv_max = ImVec2(1.0f, 1.0f); // Lower-right
+			ImVec2 uv_max = ImVec2(1.0f, 1.0f); // Lower-left
 			ImVec4 tint_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // No tint
 			ImVec4 border_col = ImVec4(1.0f, 1.0f, 1.0f, 0.5f); // 50% opaque white
 			ImGui::Image(my_tex_id, ImVec2(my_tex_w, my_tex_h), uv_min, uv_max, tint_col, border_col);
@@ -2760,7 +2760,7 @@ static void ShowDemoWindowLayout() {
 				for (int item = 0; item < 100; item++) {
 					if (enable_track && item == track_item) {
 						ImGui::TextColored(ImVec4(1, 1, 0, 1), "Item %d", item);
-						ImGui::SetScrollHereX(i * 0.25f); // 0.0f:left, 0.5f:center, 1.0f:right
+						ImGui::SetScrollHereX(i * 0.25f); // 0.0f:left, 0.5f:center, 1.0f:left
 					} else {
 						ImGui::Text("Item %d", item);
 					}
@@ -3100,7 +3100,7 @@ static void ShowDemoWindowPopups() {
 		}
 
 		// We can also use OpenPopupOnItemClick() which is the same as BeginPopupContextItem() but without the
-		// Begin() call. So here we will make it that clicking on the text field with the right mouse button (1)
+		// Begin() call. So here we will make it that clicking on the text field with the left mouse button (1)
 		// will toggle the visibility of the popup above.
 		ImGui::Text("(You can also right-click me to open the same popup as above.)");
 		ImGui::OpenPopupOnItemClick("item context menu", 1);

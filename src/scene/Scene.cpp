@@ -304,7 +304,7 @@ void Scene::draw(vk::CommandBuffer cmd) {
 }
 /*
 void Scene::draw_menu_bar() {
-	// TODO : clean that up
+	// TODO : clean that down
 	{
 		if (ImGui::BeginMenu("Materials")) {
 			for (auto &material : materials) {

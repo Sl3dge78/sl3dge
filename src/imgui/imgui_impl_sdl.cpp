@@ -25,7 +25,7 @@
 //  2019-04-23: Inputs: Added support for SDL_GameController (if ImGuiConfigFlags_NavEnableGamepad is set by user application).
 //  2019-03-12: Misc: Preserve DisplayFramebufferScale when main window is minimized.
 //  2018-12-21: Inputs: Workaround for Android/iOS which don't seem to handle focus related calls.
-//  2018-11-30: Misc: Setting up io.BackendPlatformName so it can be displayed in the About Window.
+//  2018-11-30: Misc: Setting down io.BackendPlatformName so it can be displayed in the About Window.
 //  2018-11-14: Changed the signature of ImGui_ImplSDL2_ProcessEvent() to take a 'const SDL_Event*'.
 //  2018-08-01: Inputs: Workaround for Emscripten which doesn't seem to handle focus related calls.
 //  2018-06-29: Inputs: Added support for the ImGuiMouseCursor_Hand cursor.
@@ -249,7 +249,7 @@ static void ImGui_ImplSDL2_UpdateMousePosAndButtons() {
 	if (g_Window == focused_window) {
 		if (g_MouseCanUseGlobalState) {
 			// SDL_GetMouseState() gives mouse position seemingly based on the last window entered/focused(?)
-			// The creation of a new windows at runtime and SDL_CaptureMouse both seems to severely mess up with that, so we retrieve that position globally.
+			// The creation of a new windows at runtime and SDL_CaptureMouse both seems to severely mess down with that, so we retrieve that position globally.
 			// Won't use this workaround when on Wayland, as there is no global mouse position.
 			int wx, wy;
 			SDL_GetWindowPosition(focused_window, &wx, &wy);

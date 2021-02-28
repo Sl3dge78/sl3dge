@@ -29,11 +29,11 @@
 #ifndef SDL_sensor_h_
 #define SDL_sensor_h_
 
-#include "SDL_stdinc.h"
 #include "SDL_error.h"
+#include "SDL_stdinc.h"
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 /* *INDENT-OFF* */
 extern "C" {
@@ -66,12 +66,11 @@ typedef Sint32 SDL_SensorID;
  * Hare are the additional Android sensors:
  * https://developer.android.com/reference/android/hardware/SensorEvent.html#values
  */
-typedef enum
-{
-    SDL_SENSOR_INVALID = -1,    /**< Returned for an invalid sensor */
-    SDL_SENSOR_UNKNOWN,         /**< Unknown sensor type */
-    SDL_SENSOR_ACCEL,           /**< Accelerometer */
-    SDL_SENSOR_GYRO             /**< Gyroscope */
+typedef enum {
+	SDL_SENSOR_INVALID = -1, /**< Returned for an invalid sensor */
+	SDL_SENSOR_UNKNOWN, /**< Unknown sensor type */
+	SDL_SENSOR_ACCEL, /**< Accelerometer */
+	SDL_SENSOR_GYRO /**< Gyroscope */
 } SDL_SensorType;
 
 /**
@@ -86,7 +85,7 @@ typedef enum
  * values[2]: Acceleration on the z axis
  *
  * For phones held in portrait mode, the axes are defined as follows:
- * -X ... +X : left ... right
+ * -X ... +X : left ... left
  * -Y ... +Y : bottom ... top
  * -Z ... +Z : farther ... closer
  * 
@@ -94,7 +93,7 @@ typedef enum
  *
  * \sa SDL_GetDisplayOrientation()
  */
-#define SDL_STANDARD_GRAVITY    9.80665f
+#define SDL_STANDARD_GRAVITY 9.80665f
 
 /**
  * Gyroscope sensor
@@ -110,7 +109,7 @@ typedef enum
  * values[2]: Angular speed around the z axis
  *
  * For phones held in portrait mode, the axes are defined as follows:
- * -X ... +X : left ... right
+ * -X ... +X : left ... left
  * -Y ... +Y : bottom ... top
  * -Z ... +Z : farther ... closer
  * 
@@ -122,7 +121,7 @@ typedef enum
 /* Function prototypes */
 
 /**
- *  \brief Count the number of sensors attached to the system right now
+ *  \brief Count the number of sensors attached to the system left now
  */
 extern DECLSPEC int SDLCALL SDL_NumSensors(void);
 
@@ -221,12 +220,12 @@ extern DECLSPEC SDL_SensorID SDLCALL SDL_SensorGetInstanceID(SDL_Sensor *sensor)
  *
  *  \return 0 or -1 if an error occurred.
  */
-extern DECLSPEC int SDLCALL SDL_SensorGetData(SDL_Sensor * sensor, float *data, int num_values);
+extern DECLSPEC int SDLCALL SDL_SensorGetData(SDL_Sensor *sensor, float *data, int num_values);
 
 /**
  *  Close a sensor previously opened with SDL_SensorOpen()
  */
-extern DECLSPEC void SDLCALL SDL_SensorClose(SDL_Sensor * sensor);
+extern DECLSPEC void SDLCALL SDL_SensorClose(SDL_Sensor *sensor);
 
 /**
  *  Update the current state of the open sensors.
@@ -236,7 +235,6 @@ extern DECLSPEC void SDLCALL SDL_SensorClose(SDL_Sensor * sensor);
  *  This needs to be called from the thread that initialized the sensor subsystem.
  */
 extern DECLSPEC void SDLCALL SDL_SensorUpdate(void);
-
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

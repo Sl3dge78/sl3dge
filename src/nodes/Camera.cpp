@@ -5,8 +5,8 @@
 #include "vulkan/VulkanApplication.h"
 
 void Camera::start(Scene &scene) {
-	matrices.proj = glm::perspective(glm::radians(80.f), aspect_ratio, 0.001f, 1000.f);
-	matrices.proj[1][1] *= -1;
+	matrices.proj = glm::perspectiveRH(glm::radians(80.f), aspect_ratio, 0.001f, 1000.f);
+	//matrices.proj[1][1] *= -1;
 	matrices.proj_inverse = glm::inverse(matrices.proj);
 	on_parent_changed();
 }
@@ -20,10 +20,10 @@ void Camera::update(Scene &scene, float delta_time) {
 }
 
 void Camera::on_parent_changed() {
-	update_world_xform();
+	update_xform();
 	matrices.view = get_world_transform();
 	matrices.view_inverse = glm::inverse(matrices.view);
-	matrices.pos = get_position();
+	matrices.pos = get_world_position();
 	matrices.frame = 0;
 }
 
@@ -33,7 +33,7 @@ void Camera::display_window() {
 		ImGui::End();
 		return;
 	}
-	auto pos = get_position();
+	auto pos = get_world_position();
 	ImGui::InputFloat3("Position", &pos[0]);
 	ImGui::Separator();
 	ImGui::InputFloat("yaw", &yaw, 0, 0, 3, ImGuiInputTextFlags_ReadOnly);

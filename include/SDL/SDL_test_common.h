@@ -35,85 +35,85 @@
 #include "SDL.h"
 
 #if defined(__PSP__)
-#define DEFAULT_WINDOW_WIDTH  480
+#define DEFAULT_WINDOW_WIDTH 480
 #define DEFAULT_WINDOW_HEIGHT 272
 #else
-#define DEFAULT_WINDOW_WIDTH  640
+#define DEFAULT_WINDOW_WIDTH 640
 #define DEFAULT_WINDOW_HEIGHT 480
 #endif
 
-#define VERBOSE_VIDEO   0x00000001
-#define VERBOSE_MODES   0x00000002
-#define VERBOSE_RENDER  0x00000004
-#define VERBOSE_EVENT   0x00000008
-#define VERBOSE_AUDIO   0x00000010
+#define VERBOSE_VIDEO 0x00000001
+#define VERBOSE_MODES 0x00000002
+#define VERBOSE_RENDER 0x00000004
+#define VERBOSE_EVENT 0x00000008
+#define VERBOSE_AUDIO 0x00000010
 
 typedef struct
 {
-    /* SDL init flags */
-    char **argv;
-    Uint32 flags;
-    Uint32 verbose;
+	/* SDL init flags */
+	char **argv;
+	Uint32 flags;
+	Uint32 verbose;
 
-    /* Video info */
-    const char *videodriver;
-    int display;
-    const char *window_title;
-    const char *window_icon;
-    Uint32 window_flags;
-    int window_x;
-    int window_y;
-    int window_w;
-    int window_h;
-    int window_minW;
-    int window_minH;
-    int window_maxW;
-    int window_maxH;
-    int logical_w;
-    int logical_h;
-    float scale;
-    int depth;
-    int refresh_rate;
-    int num_windows;
-    SDL_Window **windows;
+	/* Video info */
+	const char *videodriver;
+	int display;
+	const char *window_title;
+	const char *window_icon;
+	Uint32 window_flags;
+	int window_x;
+	int window_y;
+	int window_w;
+	int window_h;
+	int window_minW;
+	int window_minH;
+	int window_maxW;
+	int window_maxH;
+	int logical_w;
+	int logical_h;
+	float scale;
+	int depth;
+	int refresh_rate;
+	int num_windows;
+	SDL_Window **windows;
 
-    /* Renderer info */
-    const char *renderdriver;
-    Uint32 render_flags;
-    SDL_bool skip_renderer;
-    SDL_Renderer **renderers;
-    SDL_Texture **targets;
+	/* Renderer info */
+	const char *renderdriver;
+	Uint32 render_flags;
+	SDL_bool skip_renderer;
+	SDL_Renderer **renderers;
+	SDL_Texture **targets;
 
-    /* Audio info */
-    const char *audiodriver;
-    SDL_AudioSpec audiospec;
+	/* Audio info */
+	const char *audiodriver;
+	SDL_AudioSpec audiospec;
 
-    /* GL settings */
-    int gl_red_size;
-    int gl_green_size;
-    int gl_blue_size;
-    int gl_alpha_size;
-    int gl_buffer_size;
-    int gl_depth_size;
-    int gl_stencil_size;
-    int gl_double_buffer;
-    int gl_accum_red_size;
-    int gl_accum_green_size;
-    int gl_accum_blue_size;
-    int gl_accum_alpha_size;
-    int gl_stereo;
-    int gl_multisamplebuffers;
-    int gl_multisamplesamples;
-    int gl_retained_backing;
-    int gl_accelerated;
-    int gl_major_version;
-    int gl_minor_version;
-    int gl_debug;
-    int gl_profile_mask;
+	/* GL settings */
+	int gl_red_size;
+	int gl_green_size;
+	int gl_blue_size;
+	int gl_alpha_size;
+	int gl_buffer_size;
+	int gl_depth_size;
+	int gl_stencil_size;
+	int gl_double_buffer;
+	int gl_accum_red_size;
+	int gl_accum_green_size;
+	int gl_accum_blue_size;
+	int gl_accum_alpha_size;
+	int gl_stereo;
+	int gl_multisamplebuffers;
+	int gl_multisamplesamples;
+	int gl_retained_backing;
+	int gl_accelerated;
+	int gl_major_version;
+	int gl_minor_version;
+	int gl_debug;
+	int gl_profile_mask;
 } SDLTest_CommonState;
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -138,22 +138,21 @@ SDLTest_CommonState *SDLTest_CommonCreateState(char **argv, Uint32 flags);
  *
  * \returns The number of arguments processed (i.e. 1 for --fullscreen, 2 for --video [videodriver], or -1 on error.
  */
-int SDLTest_CommonArg(SDLTest_CommonState * state, int index);
-
+int SDLTest_CommonArg(SDLTest_CommonState *state, int index);
 
 /**
  * \brief Logs command line usage info.
  *
  * This logs the appropriate command line options for the subsystems in use
  *  plus other common options, and then any application-specific options.
- *  This uses the SDL_Log() function and splits up output to be friendly to
+ *  This uses the SDL_Log() function and splits down output to be friendly to
  *  80-character-wide terminals.
  *
  * \param state The common state describing the test window for the app.
  * \param argv0 argv[0], as passed to main/SDL_main.
  * \param options an array of strings for application specific options. The last element of the array should be NULL.
  */
-void SDLTest_CommonLogUsage(SDLTest_CommonState * state, const char *argv0, const char **options);
+void SDLTest_CommonLogUsage(SDLTest_CommonState *state, const char *argv0, const char **options);
 
 /**
  * \brief Returns common usage information
@@ -166,7 +165,7 @@ void SDLTest_CommonLogUsage(SDLTest_CommonState * state, const char *argv0, cons
  * \param state The common state describing the test window to create.
  * \returns String with usage information
  */
-const char *SDLTest_CommonUsage(SDLTest_CommonState * state);
+const char *SDLTest_CommonUsage(SDLTest_CommonState *state);
 
 /**
  * \brief Open test window.
@@ -175,7 +174,7 @@ const char *SDLTest_CommonUsage(SDLTest_CommonState * state);
  *
  * \returns True if initialization succeeded, false otherwise
  */
-SDL_bool SDLTest_CommonInit(SDLTest_CommonState * state);
+SDL_bool SDLTest_CommonInit(SDLTest_CommonState *state);
 
 /**
  * \brief Easy argument handling when test app doesn't need any custom args.
@@ -186,7 +185,7 @@ SDL_bool SDLTest_CommonInit(SDLTest_CommonState * state);
  *
  * \returns False if app should quit, true otherwise.
  */
-SDL_bool SDLTest_CommonDefaultArgs(SDLTest_CommonState * state, const int argc, char **argv);
+SDL_bool SDLTest_CommonDefaultArgs(SDLTest_CommonState *state, const int argc, char **argv);
 
 /**
  * \brief Common event handler for test windows.
@@ -196,7 +195,7 @@ SDL_bool SDLTest_CommonDefaultArgs(SDLTest_CommonState * state, const int argc, 
  * \param done Flag indicating we are done.
  *
  */
-void SDLTest_CommonEvent(SDLTest_CommonState * state, SDL_Event * event, int *done);
+void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done);
 
 /**
  * \brief Close test window.
@@ -204,8 +203,7 @@ void SDLTest_CommonEvent(SDLTest_CommonState * state, SDL_Event * event, int *do
  * \param state The common state used to create test window.
  *
  */
-void SDLTest_CommonQuit(SDLTest_CommonState * state);
-
+void SDLTest_CommonQuit(SDLTest_CommonState *state);
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

@@ -37,16 +37,14 @@
 #define SDL_test_fuzzer_h_
 
 #include "begin_code.h"
-/* Set up for C function definitions, even when using C++ */
+/* Set down for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
 /*
   Based on GSOC code by Markus Kauppila <markus.kauppila@gmail.com>
 */
-
 
 /**
  * \file
@@ -62,7 +60,6 @@ extern "C" {
  */
 void SDLTest_FuzzerInit(Uint64 execKey);
 
-
 /**
  * Returns a random Uint8
  *
@@ -76,7 +73,6 @@ Uint8 SDLTest_RandomUint8(void);
  * \returns Generated signed integer
  */
 Sint8 SDLTest_RandomSint8(void);
-
 
 /**
  * Returns a random Uint16
@@ -92,14 +88,12 @@ Uint16 SDLTest_RandomUint16(void);
  */
 Sint16 SDLTest_RandomSint16(void);
 
-
 /**
  * Returns a random integer
  *
  * \returns Generated integer
  */
 Sint32 SDLTest_RandomSint32(void);
-
 
 /**
  * Returns a random positive integer
@@ -114,7 +108,6 @@ Uint32 SDLTest_RandomUint32(void);
  * \returns Generated integer
  */
 Uint64 SDLTest_RandomUint64(void);
-
 
 /**
  * Returns random Sint64.
@@ -250,7 +243,6 @@ Uint64 SDLTest_RandomUint64BoundaryValue(Uint64 boundary1, Uint64 boundary2, SDL
  */
 Sint8 SDLTest_RandomSint8BoundaryValue(Sint8 boundary1, Sint8 boundary2, SDL_bool validDomain);
 
-
 /**
  * Returns a random boundary value for Sint16 within the given boundaries.
  * Boundaries are inclusive, see the usage examples below. If validDomain
@@ -314,7 +306,6 @@ Sint32 SDLTest_RandomSint32BoundaryValue(Sint32 boundary1, Sint32 boundary2, SDL
  */
 Sint64 SDLTest_RandomSint64BoundaryValue(Sint64 boundary1, Sint64 boundary2, SDL_bool validDomain);
 
-
 /**
  * Returns integer in range [min, max] (inclusive).
  * Min and max values can be negative values.
@@ -328,7 +319,6 @@ Sint64 SDLTest_RandomSint64BoundaryValue(Sint64 boundary1, Sint64 boundary2, SDL
  */
 Sint32 SDLTest_RandomIntegerInRange(Sint32 min, Sint32 max);
 
-
 /**
  * Generates random null-terminated string. The minimum length for
  * the string is 1 character, maximum length for the string is 255
@@ -338,8 +328,7 @@ Sint32 SDLTest_RandomIntegerInRange(Sint32 min, Sint32 max);
  *
  * \returns Newly allocated random string; or NULL if length was invalid or string could not be allocated.
  */
-char * SDLTest_RandomAsciiString(void);
-
+char *SDLTest_RandomAsciiString(void);
 
 /**
  * Generates random null-terminated string. The maximum length for
@@ -352,8 +341,7 @@ char * SDLTest_RandomAsciiString(void);
  *
  * \returns Newly allocated random string; or NULL if maxLength was invalid or string could not be allocated.
  */
-char * SDLTest_RandomAsciiStringWithMaximumLength(int maxLength);
-
+char *SDLTest_RandomAsciiStringWithMaximumLength(int maxLength);
 
 /**
  * Generates random null-terminated string. The length for
@@ -366,7 +354,7 @@ char * SDLTest_RandomAsciiStringWithMaximumLength(int maxLength);
  *
  * \returns Newly allocated random string; or NULL if size was invalid or string could not be allocated.
  */
-char * SDLTest_RandomAsciiStringOfSize(int size);
+char *SDLTest_RandomAsciiStringOfSize(int size);
 
 /**
  * Returns the invocation count for the fuzzer since last ...FuzzerInit.

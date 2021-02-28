@@ -42,8 +42,9 @@ void main() {
     const vec2 uv = pixel_center/vec2(gl_LaunchSizeEXT.xy);
     vec2 d = uv * 2.0 - 1.0;
 
-    payload.ray_origin = (cam.view_inverse * vec4(0,0,0,1)).xyz;
-    vec4 target = cam.proj_inverse * vec4(d.x, d.y, 1,1);
+    //payload.ray_origin = (cam.view_inverse * vec4(0,0,0,1)).xyz;
+    payload.ray_origin = cam.pos;
+    vec4 target = cam.proj_inverse * vec4(-d.x, -d.y, 1,1);
     payload.ray_dir = (cam.view_inverse * vec4(normalize(target.xyz), 0)).xyz;
 
     uint ray_flags = gl_RayFlagsOpaqueEXT;

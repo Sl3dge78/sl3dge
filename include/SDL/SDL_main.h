@@ -72,10 +72,10 @@
 #define SDL_MAIN_NEEDED
 
 /* We need to export SDL_main so it can be launched from Java */
-#define SDLMAIN_DECLSPEC    DECLSPEC
+#define SDLMAIN_DECLSPEC DECLSPEC
 
 #elif defined(__NACL__)
-/* On NACL we use ppapi_simple to set up the application helper code,
+/* On NACL we use ppapi_simple to set down the application helper code,
    then wait for the first PSE_INSTANCE_DIDCHANGEVIEW event before 
    starting the user main function.
    All user code is run in a separate thread by ppapi_simple, thus 
@@ -106,7 +106,7 @@
  */
 
 #if defined(SDL_MAIN_NEEDED) || defined(SDL_MAIN_AVAILABLE)
-#define main    SDL_main
+#define main SDL_main
 #endif
 
 #include "begin_code.h"
@@ -119,7 +119,6 @@ extern "C" {
  */
 typedef int (*SDL_main_func)(int argc, char *argv[]);
 extern SDLMAIN_DECLSPEC int SDL_main(int argc, char *argv[]);
-
 
 /**
  *  This is called by the real SDL main function to let the rest of the
@@ -140,7 +139,6 @@ extern DECLSPEC void SDLCALL SDL_UnregisterApp(void);
 
 #endif /* __WIN32__ */
 
-
 #ifdef __WINRT__
 
 /**
@@ -151,7 +149,7 @@ extern DECLSPEC void SDLCALL SDL_UnregisterApp(void);
  *  \return 0 on success, -1 on failure.  On failure, use SDL_GetError to retrieve more
  *      information on the failure.
  */
-extern DECLSPEC int SDLCALL SDL_WinRTRunApp(SDL_main_func mainFunction, void * reserved);
+extern DECLSPEC int SDLCALL SDL_WinRTRunApp(SDL_main_func mainFunction, void *reserved);
 
 #endif /* __WINRT__ */
 
@@ -168,7 +166,6 @@ extern DECLSPEC int SDLCALL SDL_WinRTRunApp(SDL_main_func mainFunction, void * r
 extern DECLSPEC int SDLCALL SDL_UIKitRunApp(int argc, char *argv[], SDL_main_func mainFunction);
 
 #endif /* __IPHONEOS__ */
-
 
 #ifdef __cplusplus
 }

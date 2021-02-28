@@ -13,7 +13,7 @@ float Terrain::get_height(const float x, const float y) {
 	float f_x = std::modf(x, &i_x);
 	float f_y = std::modf(y, &i_y);
 
-	float height = get_position().z; // Pas sur de ca ouech
+	float height = get_world_position().z; // Pas sur de ca ouech
 
 	if (1.0f - f_x - f_y >= 0) { // On est dans ABC
 		glm::vec3 bary = glm::vec3(f_x, f_y, 1.0f - f_x - f_y);
