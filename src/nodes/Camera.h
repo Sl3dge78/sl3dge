@@ -35,8 +35,8 @@ public:
 		alignas(4) int frame = 0;
 	} matrices;
 
-	void start(Scene &scene) override;
-	void update(Scene &scene, float delta_time) override;
+	void start() override;
+	void update(float delta_time) override;
 	virtual void on_parent_changed() override;
 
 	void display_window();

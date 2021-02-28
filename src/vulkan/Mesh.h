@@ -26,6 +26,7 @@ private:
 
 public:
 	std::vector<Vertex> vertices;
+	std::vector<float> heightmap;
 	std::vector<uint32_t> indices;
 
 	std::unique_ptr<AccelerationStructure> blas;

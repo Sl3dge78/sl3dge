@@ -94,12 +94,12 @@ void Scene::write_descriptors(VulkanPipeline &pipeline) {
 }
 void Scene::start() {
 	for (auto &node : nodes) {
-		node->start(*this);
+		node->start();
 	}
 }
 void Scene::update(float delta_time) {
 	for (auto &node : nodes) {
-		node->update(*this, delta_time);
+		node->update(delta_time);
 	}
 	camera_buffer->write_data(&main_camera->matrices, sizeof(Camera::Matrices));
 }

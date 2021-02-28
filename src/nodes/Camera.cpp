@@ -4,13 +4,13 @@
 
 #include "vulkan/VulkanApplication.h"
 
-void Camera::start(Scene &scene) {
+void Camera::start() {
 	matrices.proj = glm::perspectiveRH(glm::radians(80.f), aspect_ratio, 0.001f, 1000.f);
 	//matrices.proj[1][1] *= -1;
 	matrices.proj_inverse = glm::inverse(matrices.proj);
 	on_parent_changed();
 }
-void Camera::update(Scene &scene, float delta_time) {
+void Camera::update(float delta_time) {
 	if (matrices.frame <= max_samples) {
 		matrices.frame++;
 	}

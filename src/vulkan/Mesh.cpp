@@ -22,6 +22,10 @@ Mesh::Mesh(VulkanApplication &app, const std::string path, const uint32_t id) {
 
 	std::unordered_map<Vertex, uint32_t> unique_vtx{};
 
+	for (int i = 0; i < attrib.vertices.size(); i += 3) {
+		heightmap.emplace_back(attrib.vertices[i + 2]);
+	}
+
 	for (const auto &shape : shapes) {
 		for (const auto &index : shape.mesh.indices) {
 			Vertex vertex{};

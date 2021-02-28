@@ -17,9 +17,9 @@ public:
 	};
 	virtual ~Node() = default;
 
-	virtual void load(Scene &scene) = 0;
-	virtual void start(Scene &scene) = 0;
-	virtual void update(Scene &scene, float delta_time) = 0;
+	virtual void load() = 0;
+	virtual void start() = 0;
+	virtual void update(float delta_time) = 0;
 	virtual void on_parent_changed() = 0;
 
 protected:

@@ -555,6 +555,7 @@
     <ClInclude Include="include\sdl\SDL_vulkan.h" />
     <ClInclude Include="include\tiny_obj_loader.h" />
     <ClInclude Include="src\game\Player.h" />
+    <ClInclude Include="src\Mathf.h" />
     <ClInclude Include="src\nodes\MeshInstance.h" />
     <ClInclude Include="src\nodes\VisualInstance.h" />
     <ClInclude Include="src\vulkan\Mesh.h" />

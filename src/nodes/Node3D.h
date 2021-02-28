@@ -41,8 +41,8 @@ public:
 	void update_xform();
 
 	// Inherited via Node
-	virtual void load(Scene &scene) override{};
-	virtual void start(Scene &scene) override{};
-	virtual void update(Scene &scene, float delta_time) override{};
+	virtual void load() override{};
+	virtual void start() override{};
+	virtual void update(float delta_time) override{};
 	virtual void on_parent_changed() override { update_xform(); };
 };

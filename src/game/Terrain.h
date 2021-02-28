@@ -5,6 +5,10 @@
 class Terrain : public MeshInstance {
 private:
 	uint32_t width, height;
+	float x = 0.0f, y = 0.0f;
+	float h = 0.0f;
+	glm::vec3 bary = glm::vec3(0.0);
+	float scale = 5.0f;
 
 public:
 	Terrain(Node *parent, Mesh *mesh, Material *material, const uint32_t width, const uint32_t height) :
@@ -12,4 +16,6 @@ public:
 	~Terrain() = default;
 
 	float get_height(const float x, const float y);
+
+	virtual void update(float delta_time) override;
 };

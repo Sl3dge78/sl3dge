@@ -51,20 +51,22 @@ private:
 	void load(Scene &scene) override {
 		auto viking_texture = scene.load_texture("resources/textures/viking_room.png"); // 0
 
-		dune_mesh = scene.load_mesh("resources/models/plane.obj");
+		dune_mesh = scene.load_mesh("resources/models/test_terrain.obj");
 		dune_material = scene.create_material(glm::vec3(255.f / 255.f, 187.f / 255.f, 79.f / 255.f), 0.1f, 0.0f, 0.1f);
-		terrain = scene.create_node<Terrain>(&scene.scene_root, dune_mesh, dune_material, 128, 128);
-
-		sphere_mesh = scene.load_mesh("resources/models/sphere.obj");
-		sphere_material = scene.create_material(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
-		MeshInstance *sphere = scene.create_node<MeshInstance>(&scene.scene_root, sphere_mesh, sphere_material);
-		sphere->translate(glm::vec3(5.0f, 5.0f, 1.0f));
+		terrain = scene.create_node<Terrain>(&scene.scene_root, dune_mesh, dune_material, 3, 3);
+		terrain->rotate(-90.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+		//sphere_mesh = scene.load_mesh("resources/models/sphere.obj");
+		//sphere_material = scene.create_material(glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
+		//MeshInstance *sphere = scene.create_node<MeshInstance>(&scene.scene_root, sphere_mesh, sphere_material);
+		//sphere->translate(glm::vec3(5.0f, 5.0f, 1.0f));
 
 		player = scene.create_node<Player>(&scene.scene_root);
 		player->camera = scene.create_node<Camera>(player);
 		player->camera->translate(glm::vec3(0.0, 0.0f, 1.8f));
 		player->camera->rotate(-90.0f, player->camera->left());
-		player->translate(glm::vec3(5.0, 0.0, 5.0));
+		player->translate(glm::vec3(0.0, 0.0, 5.0));
+
+		player->terrain = terrain;
 
 		scene.main_camera = player->camera;
 	}

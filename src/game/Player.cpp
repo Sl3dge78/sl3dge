@@ -1,12 +1,12 @@
 #include "Player.h"
 
-void Player::load(Scene &scene) {
+void Player::load() {
 }
 
-void Player::start(Scene &scene) {
+void Player::start() {
 }
 
-void Player::update(Scene &scene, float delta_time) {
+void Player::update(float delta_time) {
 	if (Input::get_mouse(3)) {
 		camera->rotate(-Input::delta_mouse_x() * rotate_speed * delta_time, glm::vec3(0.0f, 0.0f, 1.0f));
 		camera->rotate(Input::delta_mouse_y() * rotate_speed * delta_time, camera->left());
@@ -39,8 +39,10 @@ void Player::update(Scene &scene, float delta_time) {
 
 	auto new_pos = get_world_position() + translation;
 
-	if (new_pos.z <= 0)
-		new_pos.z = 0;
+	float h = terrain->get_height(new_pos.x, new_pos.y);
+
+	if (new_pos.z <= h)
+		new_pos.z = h;
 
 	this->move_to(new_pos);
 }
