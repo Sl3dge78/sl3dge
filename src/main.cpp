@@ -62,6 +62,7 @@ private:
 
 		player = scene.create_node<Player>(&scene.scene_root);
 		player->camera = scene.create_node<Camera>(player);
+		player->rotate(-90.0f, player->camera->left());
 		player->translate(glm::vec3(5.0, 0.0, 5.0));
 		scene.main_camera = player->camera;
 	}

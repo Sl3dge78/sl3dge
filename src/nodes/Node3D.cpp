@@ -10,7 +10,7 @@ void Node3D::translate(const glm::vec3 &t) {
 }
 
 void Node3D::rotate(const float angle, const glm::vec3 &dir) {
-	this->rotation = glm::rotate(this->rotation, angle, dir);
+	this->rotation = glm::rotate(this->rotation, glm::radians(angle), dir);
 	update_xform();
 	notify_children();
 }

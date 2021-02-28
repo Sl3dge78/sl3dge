@@ -13,8 +13,8 @@ private:
 	float pitch = 0.f;
 
 	//glm::vec3 pos = glm::vec3(1.0f);
-	const float rotate_speed = 1.0f;
-	const float move_speed = .5f;
+	const float rotate_speed = 30.0f;
+	const float move_speed = 1.f;
 
 public:
 	Camera *camera;
