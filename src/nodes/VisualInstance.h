@@ -9,9 +9,12 @@ public:
 	VisualInstance(Node *parent) :
 			Node3D(parent) {
 		instance_id = VisualInstance::get_next_instance_id();
+		name = "Visual Instance";
 	};
 
 	virtual void draw(vk::CommandBuffer cmd) = 0;
+	virtual void draw_gui() override;
+	;
 
 protected:
 	static uint32_t get_next_instance_id() { return next_instance_id++; };

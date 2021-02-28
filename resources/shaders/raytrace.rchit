@@ -159,8 +159,11 @@ void main() {
 
     uint ray_flags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
     float t_max = 1000.0;
+    float t_min = 0.0;
+    vec3 shadow_start = world_pos + normal * 0.0001;
     is_shadow = true;
-    traceRayEXT(top_level_AS, ray_flags, 0xFF, 0, 0, 1, world_pos, 0.1, constants.light_dir, t_max, 1);
+    
+    traceRayEXT(top_level_AS, ray_flags, 0xFF, 0, 0, 1, shadow_start, t_min, constants.light_dir, t_max, 1);
 
     if(is_shadow) {
         payload.direct_color *= mat.ao;

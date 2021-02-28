@@ -11,7 +11,7 @@ protected:
 
 public:
 	MeshInstance(Node *node, Mesh *mesh, Material *material) :
-			VisualInstance(node), mesh(mesh), material(material){};
+			VisualInstance(node), mesh(mesh), material(material) { name = "Mesh Instance"; };
 
 	vk::AccelerationStructureInstanceKHR get_ASInstance_data() {
 		vk::AccelerationStructureInstanceKHR as_instance = {};
@@ -25,12 +25,14 @@ public:
 		return as_instance;
 	}
 
-	// Inherited via VisualInstance
-	virtual void draw(vk::CommandBuffer cmd) override;
 	uint32_t get_mesh_id() const {
 		return mesh->get_id();
 	};
 	uint32_t get_material_id() const {
 		return material->get_id();
 	};
+
+	// Inherited via VisualInstance
+	virtual void draw(vk::CommandBuffer cmd) override;
+	virtual void draw_gui() override;
 };

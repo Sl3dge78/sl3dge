@@ -6,14 +6,13 @@
 
 float Terrain::get_height(const float x, const float y) {
 	// Interpolate between a,b,c,d to get the real height
-
-	this->x = x / scale;
-	this->y = y / scale;
+	this->x_ = x * (width / scale);
+	this->y_ = height - (y * (height / scale));
 
 	float i_x;
 	float i_y;
-	float f_x = std::modf(Mathf::clamp(x / scale, 0.0f, width - 1.0001f), &i_x);
-	float f_y = std::modf(Mathf::clamp(y / scale, 0.0f, height - 1.0001f), &i_y);
+	float f_x = std::modf(Mathf::clamp(x_, 0.0f, width - 1.0001f), &i_x);
+	float f_y = std::modf(Mathf::clamp(y_, 0.0f, height - 1.0001f), &i_y);
 
 	h = get_world_position().z;
 
@@ -61,17 +60,19 @@ float Terrain::get_height(const float x, const float y) {
 }
 
 void Terrain::update(float delta_time) {
-	ImGui::Begin("Terrain");
+}
 
+void Terrain::draw_gui() {
+	MeshInstance::draw_gui();
+	ImGui::Separator();
+	ImGui::Text("Terrain");
 	bool changed = false;
 
-	changed |= ImGui::SliderFloat("x", &x, 0.0f, width - 1.0001f);
-	changed |= ImGui::SliderFloat("y", &y, 0.0f, height - 1.0001f);
+	changed |= ImGui::SliderFloat("x", &x_, 0.0f, width - 1.0001f);
+	changed |= ImGui::SliderFloat("y", &y_, 0.0f, height - 1.0001f);
 	if (changed)
-		get_height(x, y);
+		get_height(x_, y_);
 
 	ImGui::LabelText("Height", "%.2f", h);
 	ImGui::LabelText("Barycentre", "%.2f,%.2f,%.2f", bary.x, bary.y, bary.z);
-
-	ImGui::End();
 }

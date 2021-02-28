@@ -42,9 +42,11 @@ private:
 	vk::UniqueSampler texture_sampler;
 	std::vector<std::unique_ptr<Texture>> textures;
 
+	bool is_dirty = false;
+
 	void build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags);
 	void build_TLAS(vk::BuildAccelerationStructureFlagsKHR flags, bool update = false);
-	void update_buffers();
+	void upload_buffers(bool update = false);
 
 public:
 	Camera *main_camera;
@@ -58,8 +60,6 @@ public:
 
 	Node3D scene_root = Node3D(nullptr);
 	std::vector<std::unique_ptr<Node>> nodes;
-
-	bool draw_lights_ui = false;
 
 	Scene(VulkanApplication *app) :
 			app(app){};
@@ -80,13 +80,22 @@ public:
 
 	vk::AccelerationStructureKHR get_tlas() { return tlas->get_acceleration_structure(); }
 	void draw(vk::CommandBuffer cmd);
-	//void draw_menu_bar();
+
+	void set_dirty();
+
+private:
+	/* EDITOR STUFF */
+	Node *selected_node = nullptr;
+	void draw_gui();
+	void draw_scene_browser();
+	void draw_selected_node_info();
 };
 
 template <class N, class... T>
 inline N *Scene::create_node(T... args) {
 	static_assert(std::is_base_of<Node, N>::value, "Trying to create a node that isn't derived from node!");
 	std::unique_ptr<N> n = std::make_unique<N>(args...);
+	n->scene = this;
 	N *ret = n.get();
 	nodes.push_back(std::move(n));
 	return ret;

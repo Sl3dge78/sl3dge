@@ -18,6 +18,7 @@ Mesh::Mesh(VulkanApplication &app, const std::string path, const uint32_t id) {
 
 	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str())) {
 		SDL_LogError(0, "Unable to read model %s", err.c_str());
+		throw;
 	}
 
 	std::unordered_map<Vertex, uint32_t> unique_vtx{};

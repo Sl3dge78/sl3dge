@@ -17,12 +17,6 @@ uint32_t Scene::load_texture(const std::string path) {
 	textures.emplace_back(std::make_unique<Texture>(*app, path));
 	return textures.size() - 1;
 }
-/*
-MeshInstance_ *Scene::create_instance(const uint32_t mesh_id, const uint32_t mat_id, glm::mat4 transform) {
-	instances.emplace_back(mesh_id, mat_id);
-	return &instances.back();
-}
-*/
 uint32_t Scene::create_light(const int32_t type, const glm::vec3 color, const float intensity, const glm::vec3 vec, const bool cast_shadows) {
 	Light light{
 		.type = type, // TODO : use enum
@@ -38,8 +32,8 @@ uint32_t Scene::create_light(const int32_t type, const glm::vec3 color, const fl
 void Scene::init() {
 	this->app = app;
 	build_BLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowCompaction });
-	build_TLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace });
-	update_buffers();
+	build_TLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate });
+	upload_buffers(false);
 
 	texture_sampler = app->get_device().createSamplerUnique(vk::SamplerCreateInfo(
 			{}, vk::Filter::eLinear, vk::Filter::eLinear,
@@ -102,8 +96,19 @@ void Scene::update(float delta_time) {
 		node->update(delta_time);
 	}
 	camera_buffer->write_data(&main_camera->matrices, sizeof(Camera::Matrices));
+
+	draw_gui();
+
+	if (is_dirty) {
+		build_TLAS({ vk::BuildAccelerationStructureFlagBitsKHR::ePreferFastTrace | vk::BuildAccelerationStructureFlagBitsKHR::eAllowUpdate }, true);
+		upload_buffers(true);
+		is_dirty = false;
+		app->get_device().waitIdle();
+	}
 }
-void Scene::update_buffers() {
+
+void Scene::upload_buffers(bool update) {
+	// TODO : Handle the case where we created new items !, we'll need to reassign buffers and rebuild the pipeline
 	{
 		struct Instance {
 			alignas(4) uint32_t mesh_id;
@@ -128,7 +133,9 @@ void Scene::update_buffers() {
 		}
 
 		vk::DeviceSize instances_size = sizeof(Instance) * instances.size();
-		scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(*app, instances_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		if (!update)
+			scene_desc_buffer = std::unique_ptr<Buffer>(new Buffer(*app, instances_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+
 		Buffer staging_buffer(*app, instances_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(instances.data(), instances_size);
 		app->copy_buffer(staging_buffer.buffer, scene_desc_buffer->buffer, instances_size);
@@ -157,7 +164,8 @@ void Scene::update_buffers() {
 		}
 
 		vk::DeviceSize materials_size = mats.size() * sizeof(Mat);
-		materials_buffer = std::unique_ptr<Buffer>(new Buffer(*app, materials_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+		if (!update)
+			materials_buffer = std::unique_ptr<Buffer>(new Buffer(*app, materials_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
 		Buffer staging_buffer(*app, materials_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 		staging_buffer.write_data(mats.data(), materials_size);
 		app->copy_buffer(staging_buffer.buffer, materials_buffer->buffer, materials_size);
@@ -165,14 +173,15 @@ void Scene::update_buffers() {
 	{
 		if (lights.size() > 0) {
 			vk::DeviceSize lights_size = lights.size() * sizeof(lights[0]);
-			lights_buffer = std::unique_ptr<Buffer>(new Buffer(*app, lights_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
+			if (!update)
+				lights_buffer = std::unique_ptr<Buffer>(new Buffer(*app, lights_size, { vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eStorageBuffer }, { vk::MemoryPropertyFlagBits::eDeviceLocal }));
 			Buffer staging_buffer(*app, lights_size, vk::BufferUsageFlagBits::eTransferSrc, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible });
 			staging_buffer.write_data(lights.data(), lights_size);
 			app->copy_buffer(staging_buffer.buffer, lights_buffer->buffer, lights_size);
 		}
 	}
-
-	camera_buffer = std::unique_ptr<Buffer>(new Buffer(*app, sizeof(Camera::Matrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
+	if (!update)
+		camera_buffer = std::unique_ptr<Buffer>(new Buffer(*app, sizeof(Camera::Matrices), vk::BufferUsageFlagBits::eUniformBuffer, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
 	camera_buffer->write_data(&main_camera->matrices, sizeof(Camera::Matrices));
 }
 void Scene::build_BLAS(vk::BuildAccelerationStructureFlagsKHR flags) {
@@ -248,7 +257,6 @@ void Scene::build_TLAS(vk::BuildAccelerationStructureFlagsKHR flags, bool update
 	// Update buffers
 	if (update) {
 		rtx_instances_buffer.reset();
-		materials_buffer.reset();
 	}
 	uint32_t buffer_size = as_instances.size() * sizeof(vk::AccelerationStructureInstanceKHR);
 	rtx_instances_buffer = std::unique_ptr<Buffer>(new Buffer(*app, buffer_size, { vk::BufferUsageFlagBits::eShaderDeviceAddress | vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR }, { vk::MemoryPropertyFlagBits::eHostCoherent | vk::MemoryPropertyFlagBits::eHostVisible }));
@@ -302,56 +310,32 @@ void Scene::draw(vk::CommandBuffer cmd) {
 		vi->draw(cmd);
 	}
 }
-/*
-void Scene::draw_menu_bar() {
-	// TODO : clean that down
-	{
-		if (ImGui::BeginMenu("Materials")) {
-			for (auto &material : materials) {
-				ImGui::MenuItem("Object", "", &material.draw_ui);
-			}
-			ImGui::EndMenu();
-		}
-		bool changed = false;
-		int id = 0;
-		for (auto &material : materials) {
-			ImGui::PushID(id);
-			changed |= material.on_gui();
-			ImGui::PopID();
-			id++;
-		}
-		if (changed) {
-			refresh_materials();
-		}
+
+void Scene::set_dirty() {
+	is_dirty = true;
+}
+
+/* EDITOR STUFF */
+void Scene::draw_gui() {
+	draw_scene_browser();
+	draw_selected_node_info();
+}
+
+void Scene::draw_scene_browser() {
+	ImGui::Begin("Scene Browser");
+
+	for (auto &n : nodes) {
+		if (ImGui::Button(n->name.c_str()))
+			selected_node = n.get();
 	}
-	{
-		bool changed = false;
 
-		if (ImGui::BeginMenu("Lights")) {
-			ImGui::MenuItem("Lights", "", &draw_lights_ui);
+	ImGui::End();
+}
 
-			ImGui::EndMenu();
-		}
-		if (draw_lights_ui) {
-			ImGui::Begin("Light");
-			int id = 0;
-			for (auto &light : lights) {
-				ImGui::PushID(id);
-				changed |= ImGui::InputInt("Type", &light.type);
-				changed |= ImGui::ColorEdit3("Color", &light.color.r);
-				changed |= ImGui::DragFloat("Intensity", &light.intensity, 1.0f, 0.0f, 100000.0f);
-				changed |= ImGui::InputFloat3("Vector", &light.vec.x, 0.01f);
-				changed |= ImGui::InputInt("Cast shadows", &light.cast_shadows);
-				ImGui::Spacing();
-				ImGui::PopID();
-				id++;
-			}
-			ImGui::End();
-		}
-
-		if (changed) {
-			refresh_lights();
-		}
+void Scene::draw_selected_node_info() {
+	if (selected_node != nullptr) {
+		ImGui::Begin("Node Info");
+		selected_node->draw_gui();
+		ImGui::End();
 	}
 }
-*/
