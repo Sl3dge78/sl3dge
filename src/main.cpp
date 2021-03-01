@@ -21,9 +21,9 @@
 #include "vulkan/VulkanApplication.h"
 
 // == FEATURES ==
+// Wind surf goo !!
 
 // == AMELIO ==
-// TODO : Update TLAS when an object has moved
 // TODO : Améliorer les ombres
 // TODO : gros clean
 // TODO : Textures for metallic, roughness, ao & normal
@@ -39,8 +39,6 @@ private:
 	Mesh *sphere_mesh;
 	Material *dune_material;
 	Material *sphere_material;
-	Mesh *gizmo_mesh;
-	Material *gizmo_mat;
 
 	Terrain *terrain;
 	Player *player;

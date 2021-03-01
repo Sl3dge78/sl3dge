@@ -310,32 +310,42 @@ void Scene::draw(vk::CommandBuffer cmd) {
 		vi->draw(cmd);
 	}
 }
-
 void Scene::set_dirty() {
 	is_dirty = true;
 }
 
 /* EDITOR STUFF */
+void Scene::draw_menu_bar() {
+	if (ImGui::BeginMainMenuBar()) {
+		if (ImGui::BeginMenu("Scene")) {
+			ImGui::MenuItem("Scene Browser", "", &show_scene_browser);
+			ImGui::MenuItem("Node Info", "", &show_node_info);
+			ImGui::End();
+		}
+	}
+	ImGui::Separator();
+	ImGui::EndMainMenuBar();
+}
 void Scene::draw_gui() {
+	draw_menu_bar();
 	draw_scene_browser();
 	draw_selected_node_info();
 }
-
 void Scene::draw_scene_browser() {
-	ImGui::Begin("Scene Browser");
+	if (ImGui::Begin("Scene Browser", &show_scene_browser)) {
+		for (auto &n : nodes) {
+			if (ImGui::Button(n->name.c_str()))
+				selected_node = n.get();
+		}
 
-	for (auto &n : nodes) {
-		if (ImGui::Button(n->name.c_str()))
-			selected_node = n.get();
+		ImGui::End();
 	}
-
-	ImGui::End();
 }
-
 void Scene::draw_selected_node_info() {
-	if (selected_node != nullptr) {
-		ImGui::Begin("Node Info");
-		selected_node->draw_gui();
+	if (ImGui::Begin("Node Info", &show_node_info)) {
+		if (selected_node != nullptr) {
+			selected_node->draw_gui();
+		}
 		ImGui::End();
 	}
 }

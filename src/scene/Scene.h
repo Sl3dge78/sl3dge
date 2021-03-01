@@ -83,12 +83,18 @@ public:
 
 	void set_dirty();
 
-private:
 	/* EDITOR STUFF */
+private:
 	Node *selected_node = nullptr;
+	bool show_scene_browser = true;
+	bool show_node_info = true;
+
 	void draw_gui();
 	void draw_scene_browser();
 	void draw_selected_node_info();
+
+public:
+	void draw_menu_bar();
 };
 
 template <class N, class... T>
