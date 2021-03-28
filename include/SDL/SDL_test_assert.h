@@ -37,7 +37,7 @@
 #define SDL_test_assert_h_
 
 #include "begin_code.h"
-/* Set down for C function definitions, even when using C++ */
+/* Set up for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,12 +45,12 @@ extern "C" {
 /**
  * \brief Fails the assert.
  */
-#define ASSERT_FAIL 0
+#define ASSERT_FAIL     0
 
 /**
  * \brief Passes the assert.
  */
-#define ASSERT_PASS 1
+#define ASSERT_PASS     1
 
 /**
  * \brief Assert that logs and break execution flow on failures.
@@ -86,6 +86,7 @@ void SDLTest_ResetAssertSummary(void);
  * \brief Logs summary of all assertions (total, pass, fail) since last reset as INFO or ERROR.
  */
 void SDLTest_LogAssertSummary(void);
+
 
 /**
  * \brief Converts the current assert summary state to a test result.

@@ -31,7 +31,7 @@
 #include "SDL_video.h"
 
 #include "begin_code.h"
-/* Set down for C function definitions, even when using C++ */
+/* Set up for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,7 +53,7 @@ typedef void *SDL_MetalView;
  *        specified window.
  *
  *  On macOS, this does *not* associate a MTLDevice with the CAMetalLayer on its
- *  own. It is down to user code to do that.
+ *  own. It is up to user code to do that.
  *
  *  The returned handle can be casted directly to a NSView or UIView, and the
  *  CAMetalLayer can be accessed from the view's 'layer' property.
@@ -68,7 +68,7 @@ typedef void *SDL_MetalView;
  *
  *  \sa SDL_Metal_DestroyView
  */
-extern DECLSPEC SDL_MetalView SDLCALL SDL_Metal_CreateView(SDL_Window *window);
+extern DECLSPEC SDL_MetalView SDLCALL SDL_Metal_CreateView(SDL_Window * window);
 
 /**
  *  \brief Destroy an existing SDL_MetalView object.
@@ -80,7 +80,7 @@ extern DECLSPEC SDL_MetalView SDLCALL SDL_Metal_CreateView(SDL_Window *window);
  */
 extern DECLSPEC void SDLCALL SDL_Metal_DestroyView(SDL_MetalView view);
 
-/* @} */ /* Metal support functions */
+/* @} *//* Metal support functions */
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

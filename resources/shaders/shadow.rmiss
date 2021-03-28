@@ -1,8 +1,13 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
 
-layout(location = 1) rayPayloadInEXT bool is_shadow;
+struct Payload {
+    vec3 direct_color;
+};
+
+layout(location = 0) rayPayloadInEXT Payload payload;
 
 void main() {
-    is_shadow = false;
+    payload.direct_color = vec3(0.0,1.0,0.0);
+
 }

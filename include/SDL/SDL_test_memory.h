@@ -31,10 +31,11 @@
 #define SDL_test_memory_h_
 
 #include "begin_code.h"
-/* Set down for C function definitions, even when using C++ */
+/* Set up for C function definitions, even when using C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 
 /**
  * \brief Start tracking SDL memory allocations
@@ -49,6 +50,7 @@ int SDLTest_TrackAllocations(void);
  * \note This can be called after SDL_Quit()
  */
 void SDLTest_LogAllocations(void);
+
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus
