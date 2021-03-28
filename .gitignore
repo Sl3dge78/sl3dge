@@ -1,1 +1,6 @@
-
+include/
+*.exp
+*.ilk
+*.lib
+*.pdb
+*.obj
