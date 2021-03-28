@@ -1,6 +1,6 @@
 include/
-*.exp
-*.ilk
-*.lib
-*.pdb
-*.obj
+bin/*.exp
+bin/*.ilk
+bin/*.lib
+bin/*.pdb
+bin/*.obj
