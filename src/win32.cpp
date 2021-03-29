@@ -122,7 +122,6 @@ internal int main(int argc, char *argv[]) {
     SDL_Window* window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
     
-    
     VulkanContext *context = VulkanCreateContext(window);
     
     GameCode game_code = {};

@@ -2,12 +2,10 @@
 
 // TODO LIST
 //
-// Hot reloading of the game
-// > Faire un struct avec le mesh et la camera
-// > Rebuild le tlas a chaque reload de l'app
-// Load Scene
+// Normals
+// Envoyer les buffers au shaders
+// Scene data (qui vient du gltf) 
 // Staging buffers
-// Two descriptor sets one for render image & tlas (managed by context) one for the rest (managed by app)
 // 
 
 #define DECL_FUNC(name) global PFN_##name pfn_##name

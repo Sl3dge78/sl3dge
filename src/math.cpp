@@ -2,9 +2,8 @@
 
 // TODO LIST
 //
-// Create a projection matrix
-// Create a view matrix
-// Matrix operation (translate, rotate, look at, ...)
+// Matrix operations (rotate, look at, ...)
+// TRS to mat4 ce serait chouette aussi
 
 typedef struct vec4 {
     alignas(4) float x;
