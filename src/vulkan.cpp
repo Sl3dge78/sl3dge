@@ -192,6 +192,9 @@ internal void AssertVkResult(VkResult result) {
             case VK_ERROR_OUT_OF_POOL_MEMORY:{
                 SDL_LogError(0,"VK_ERROR_OUT_OF_POOL_MEMORY");
             }break;
+            case VK_ERROR_INITIALIZATION_FAILED :{
+                SDL_LogError(0,"VK_ERROR_INITIALIZATION_FAILED");
+            }break;
             default :
             SDL_LogError(0, "Unhandled error : %d", result);
             break;
@@ -812,11 +815,7 @@ internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet* 
     VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
     VkWriteDescriptorSet game_writes[1];
     game_writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[1], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
-    /*
-            GameGetDescriptorWrites(descriptor_set[1], &game_writes_count, NULL);
-            VkWriteDescriptorSet *game_writes = (VkWriteDescriptorSet *)calloc(game_writes_count, sizeof(VkWriteDescriptorSet));
-            GameGetDescriptorWrites(descriptor_set[1], &game_writes_count, game_writes);
-        */
+    
     vkUpdateDescriptorSets(device, game_writes_count, game_writes, 0, NULL);
 }
 
@@ -824,61 +823,111 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     
     // Set Layout
     
+    // TODO(Guigui): TEMP
+    const u32 mesh_count = 1;
+    const u32 material_count = 1;
+    
     // Our set layout
     pipeline->descriptor_set_count = 2;
-    {
-        const u32 app_descriptors_count = 2;
-        VkDescriptorSetLayoutBinding app_bindings[app_descriptors_count] = {};
-        app_bindings[0] = { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR, NULL };
-        app_bindings[1] = { 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, NULL };
-        
-        VkDescriptorSetLayoutCreateInfo app_set_create_info = {};
-        app_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        app_set_create_info.pNext = NULL;
-        app_set_create_info.flags = 0;
-        app_set_create_info.bindingCount = app_descriptors_count;
-        app_set_create_info.pBindings = app_bindings;
-        VkResult result = vkCreateDescriptorSetLayout(device, &app_set_create_info, NULL, &pipeline->app_set_layout);
-        AssertVkResult(result);
-    }
-    // Get the game set layout
-    {
-        u32 game_descriptor_count = 0;
-        game->GetDescriptorsInfo(&game_descriptor_count, NULL);
-        VkDescriptorSetLayoutBinding *game_bindings = (VkDescriptorSetLayoutBinding *) calloc(game_descriptor_count, sizeof(VkDescriptorSetLayoutBinding));
-        game->GetDescriptorsInfo(&game_descriptor_count, game_bindings);
-        
-        VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
-        game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        game_set_create_info.pNext = NULL;
-        game_set_create_info.flags = 0;
-        game_set_create_info.bindingCount = game_descriptor_count;
-        game_set_create_info.pBindings = game_bindings;
-        VkResult result = vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &pipeline->game_set_layout);
-        AssertVkResult(result);
-        free(game_bindings);
-    }
-    // Descriptor Pool
-    const u32 app_pool_count = 2;
-    u32 pool_sizes_count = 0;
-    game->GetPoolSizes(&pool_sizes_count, NULL);
-    VkDescriptorPoolSize *pool_sizes = (VkDescriptorPoolSize *)calloc(pool_sizes_count + app_pool_count, sizeof(VkDescriptorPoolSize));
-    game->GetPoolSizes(&pool_sizes_count, pool_sizes);
+    const u32 app_descriptor_count = 2;
+    VkDescriptorSetLayoutBinding app_bindings[app_descriptor_count] = {};
+    app_bindings[0] = { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR, NULL };
+    app_bindings[1] = { 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, NULL };
     
-    // Append our own requirements
-    pool_sizes[pool_sizes_count] = { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 };
-    pool_sizes[pool_sizes_count + 1] = { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 };
+    VkDescriptorSetLayoutCreateInfo app_set_create_info = {};
+    app_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    app_set_create_info.pNext = NULL;
+    app_set_create_info.flags = 0;
+    app_set_create_info.bindingCount = app_descriptor_count;
+    app_set_create_info.pBindings = app_bindings;
+    VkResult result = vkCreateDescriptorSetLayout(device, &app_set_create_info, NULL, &pipeline->app_set_layout);
+    AssertVkResult(result);
+    
+    // Get the game set layout
+    const VkDescriptorSetLayoutBinding game_bindings[] = {
+        { // CAMERA MATRICES
+            0,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            1,
+            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            NULL
+        },
+        { // SCENE DESCRIPTION
+            1,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            1,
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            NULL
+        },
+        { // VERTEX BUFFER
+            2,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            mesh_count,
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            NULL
+        },
+        { // INDEX BUFFER
+            3,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            mesh_count,
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            NULL
+        },
+        { // MATERIAL BUFFER
+            4,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            material_count,
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            NULL
+        }
+    };
+    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);;
+    
+    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+    game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    game_set_create_info.pNext = NULL;
+    game_set_create_info.flags = 0;
+    game_set_create_info.bindingCount = game_descriptor_count;
+    game_set_create_info.pBindings = game_bindings;
+    result = vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &pipeline->game_set_layout);
+    AssertVkResult(result);
+    
+    // Descriptor Pool
+    // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
+        {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0}
+    };
+    const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
+    
+    // App
+    for(u32 d = 0; d < app_descriptor_count; d++) {
+        for(u32 i = 0; i < pool_sizes_count ; i ++){
+            if(app_bindings[d].descriptorType == pool_sizes[i].type) {
+                pool_sizes[i].descriptorCount ++;
+            }
+        }
+    }
+    
+    //Game
+    for(u32 d = 0; d < game_descriptor_count; d++) {
+        for(u32 i = 0; i < pool_sizes_count ; i ++){
+            if(game_bindings[d].descriptorType == pool_sizes[i].type) {
+                pool_sizes[i].descriptorCount ++;
+            }
+        }
+    }
     
     VkDescriptorPoolCreateInfo pool_ci = {};
     pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_ci.pNext = NULL;
     pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     pool_ci.maxSets = pipeline->descriptor_set_count;
-    pool_ci.poolSizeCount = pool_sizes_count + app_pool_count;
+    pool_ci.poolSizeCount = pool_sizes_count;
     pool_ci.pPoolSizes = pool_sizes;
     AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &pipeline->descriptor_pool));
-    
-    free(pool_sizes);
     
     // Descriptor Set
     VkDescriptorSetLayout set_layouts[2] = {pipeline->app_set_layout, pipeline->game_set_layout};
@@ -892,9 +941,10 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     
     // Push constants
     // TODO(Guigui): Currently limited to 1 PC
+    
+    VkPushConstantRange push_constant_range = 
+    { VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 0, sizeof(PushConstant) };
     const u32 push_constant_count = 1;
-    VkPushConstantRange push_constant_range = {};
-    game->GetPushConstants(&push_constant_range);
     pipeline->push_constant_size = push_constant_range.size;
     
     VkPipelineLayoutCreateInfo create_info = {};
@@ -906,7 +956,7 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     create_info.pushConstantRangeCount = push_constant_count;
     create_info.pPushConstantRanges = &push_constant_range;
     
-    VkResult result = vkCreatePipelineLayout(device, &create_info, NULL, &pipeline->layout);
+    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &pipeline->layout));
 }
 
 internal void CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module) {
@@ -1018,27 +1068,7 @@ void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
 //
 // =========================
 
-internal void CreateBLAS(VulkanContext *context) {
-    const vec3 vertices[] = {
-        {-0.5f, -0.5f, 0.5f}, {0.5f, -0.5f, 0.5f},
-        {-0.5f, -1.0f, -0.5f}, {0.5f, -1.0f, -0.5f}
-    };
-    
-    const u32 indices[] = { 
-        0, 3, 1, 0, 2, 3 
-    };
-    const u32 vtx_count = 4;
-    const u32 idx_count = 6;
-    const u32 primitive_count = 2;
-    
-    CreateBuffer(context, sizeof(vec3) * vtx_count, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->vertex_buffer);
-    DEBUGNameBuffer(context->device, &context->vertex_buffer, "Vertices");
-    UploadToBuffer(context->device, &context->vertex_buffer, (void*)vertices, sizeof(vec3) * vtx_count);
-    
-    CreateBuffer(context, sizeof(u32) * idx_count, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->index_buffer);
-    DEBUGNameBuffer(context->device, &context->index_buffer, "Indices");
-    UploadToBuffer(context->device, &context->index_buffer, (void*)indices, sizeof(u32) * idx_count);
-    
+internal void CreateBLAS(VulkanContext *context, Buffer *vertex_buffer, const u32 vtx_count, Buffer *index_buffer, const u32 primitive_count) {
     
     VkAccelerationStructureGeometryKHR geometry = {};
     geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -1047,11 +1077,11 @@ internal void CreateBLAS(VulkanContext *context) {
     geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
     geometry.geometry.triangles.pNext = NULL;
     geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-    geometry.geometry.triangles.vertexData.deviceAddress = context->vertex_buffer.address;
+    geometry.geometry.triangles.vertexData.deviceAddress = vertex_buffer->address;
     geometry.geometry.triangles.vertexStride = sizeof(vec3);
     geometry.geometry.triangles.maxVertex = vtx_count;
     geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-    geometry.geometry.triangles.indexData.deviceAddress = context->index_buffer.address;
+    geometry.geometry.triangles.indexData.deviceAddress = index_buffer->address;
     geometry.geometry.triangles.transformData.deviceAddress = VK_NULL_HANDLE;
     geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
     
@@ -1234,25 +1264,6 @@ internal void CreateTLAS(VulkanContext *context) {
     vkFreeCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
     DestroyBuffer(context->device, &scratch);
 }
-
-internal void CreateAccelerationStructures(VulkanContext *context) {
-    CreateBLAS(context);
-    CreateTLAS(context);
-}
-
-internal void DestroyAccelerationStructures(VulkanContext *context) {
-    
-    DestroyBuffer(context->device, &context->TLAS_buffer);
-    pfn_vkDestroyAccelerationStructureKHR(context->device, context->TLAS, NULL);
-    DestroyBuffer(context->device, &context->instance_data);
-    
-    DestroyBuffer(context->device, &context->vertex_buffer);
-    DestroyBuffer(context->device, &context->index_buffer);
-    
-    DestroyBuffer(context->device, &context->BLAS_buffer);
-    pfn_vkDestroyAccelerationStructureKHR(context->device, context->BLAS, NULL);
-}
-
 
 // =========================
 //
@@ -1468,7 +1479,28 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, GameCode *game) {
         free(data);
     }
     
-    CreateAccelerationStructures(context);
+    u32 vtx_count = 0;
+    u32 idx_count = 0;
+    game->GetScene(&vtx_count, NULL, &idx_count, NULL);
+    vec3 *vertices = (vec3 *)calloc(vtx_count, sizeof(vec3));
+    u32 *indices = (u32 *)calloc(idx_count, sizeof(u32));
+    game->GetScene(&vtx_count, vertices, &idx_count, indices);
+    
+    const u32 primitive_count = idx_count / 3;
+    
+    CreateBuffer(context, sizeof(vec3) * vtx_count, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->vertex_buffer);
+    DEBUGNameBuffer(context->device, &context->vertex_buffer, "Vertices");
+    UploadToBuffer(context->device, &context->vertex_buffer, (void*)vertices, sizeof(vec3) * vtx_count);
+    
+    CreateBuffer(context, sizeof(u32) * idx_count, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->index_buffer);
+    DEBUGNameBuffer(context->device, &context->index_buffer, "Indices");
+    UploadToBuffer(context->device, &context->index_buffer, (void*)indices, sizeof(u32) * idx_count);
+    
+    free(vertices);
+    free(indices);
+    
+    CreateBLAS(context, &context->vertex_buffer, vtx_count, &context->index_buffer, primitive_count);
+    CreateTLAS(context);
     
     WriteDescriptorSets(context->device, pipeline->descriptor_sets, pipeline, context);
     
@@ -1478,7 +1510,16 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, GameCode *game) {
 
 void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *pipeline) {
     
-    DestroyAccelerationStructures(context);
+    DestroyBuffer(context->device, &context->TLAS_buffer);
+    pfn_vkDestroyAccelerationStructureKHR(context->device, context->TLAS, NULL);
+    DestroyBuffer(context->device, &context->instance_data);
+    
+    DestroyBuffer(context->device, &context->vertex_buffer);
+    DestroyBuffer(context->device, &context->index_buffer);
+    
+    DestroyBuffer(context->device, &context->BLAS_buffer);
+    pfn_vkDestroyAccelerationStructureKHR(context->device, context->BLAS, NULL);
+    
     DestroyBuffer(context->device, &pipeline->rgen_sbt);
     DestroyBuffer(context->device, &pipeline->rmiss_sbt);
     DestroyBuffer(context->device, &pipeline->rchit_sbt);

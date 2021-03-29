@@ -18,12 +18,8 @@ typedef struct GameCode {
     FILETIME last_write_time;
     HMODULE game_dll;
     
+    game_get_scene* GetScene;
     game_loop* GameLoop;
-    game_get_descriptors_info* GetDescriptorsInfo;
-    game_get_descriptor_writes* GetDescriptorWrites;
-    game_get_pool_sizes* GetPoolSizes;
-    game_get_push_constants* GetPushConstants;
-    
 } GameCode;
 
 #include "vulkan.cpp"
@@ -32,6 +28,8 @@ typedef struct ShaderCode {
     char *spv_path;
     FILETIME last_write_time;
 } ShaderCode;
+
+
 
 inline FILETIME Win32GetLastWriteTime(char *file_name) {
     
@@ -47,33 +45,35 @@ inline FILETIME Win32GetLastWriteTime(char *file_name) {
     return last_write_time;
 }
 
-internal void Win32LoadGameCode(GameCode* game_code) {
+// Returns true if it loaded new gamecode
+internal bool Win32LoadGameCode(GameCode* game_code) {
+    
+    bool result = false;
     
     game_code->dll_path = "bin\\game.dll";
     
+    game_code->GetScene = GameGetSceneStub;
     game_code->GameLoop = GameLoopStub;
-    game_code->GetDescriptorsInfo = GameGetDescriptorsInfoStub;
-    game_code->GetDescriptorWrites = GameGetDescriptorWritesStub;
-    game_code->GetPoolSizes = GameGetPoolSizesStub;
-    game_code->GetPushConstants = GameGetPushConstantsStub;
     
     // Compiler can still be writing to the file
     // Try to copy, if we can do it, compiler is done so we can load it
     // If not, compiler is not done, so copy fails and we're loading the previous one
     if(CopyFile(game_code->dll_path, "bin\\game_temp.dll", FALSE)) {
         game_code->last_write_time = Win32GetLastWriteTime(game_code->dll_path); // Write only if we were able to copy so that we can retry loading later
+        result = true;
+    } else {
+        result = false;
     }
     // If we were able to copy, this'll be the new one, if we weren't able to it'll be the old one
     game_code->game_dll = LoadLibrary("bin\\game_temp.dll");
     
     if(game_code->game_dll) {
         // Load function pointers
+        game_code->GetScene = (game_get_scene*)GetProcAddress(game_code->game_dll, "GameGetScene");
         game_code->GameLoop = (game_loop *) GetProcAddress(game_code->game_dll, "GameLoop");
-        game_code->GetDescriptorsInfo = (game_get_descriptors_info* ) GetProcAddress(game_code->game_dll, "GameGetDescriptorsInfo");
-        game_code->GetDescriptorWrites = (game_get_descriptor_writes*) GetProcAddress(game_code->game_dll, "GameGetPoolSizes");
-        game_code->GetPoolSizes = (game_get_pool_sizes*) GetProcAddress(game_code->game_dll, "GameGetPoolSizes");
-        game_code->GetPushConstants = (game_get_push_constants*)GetProcAddress(game_code->game_dll, "GameGetPushConstants");
     }
+    
+    return result;
 }
 
 internal void Win32UnloadGameCode(GameCode* game_code) {
@@ -81,11 +81,8 @@ internal void Win32UnloadGameCode(GameCode* game_code) {
         FreeLibrary(game_code->game_dll);
     }
     game_code->game_dll = NULL;
+    game_code->GetScene = GameGetSceneStub;
     game_code->GameLoop = GameLoopStub;
-    game_code->GetDescriptorsInfo = GameGetDescriptorsInfoStub;
-    game_code->GetDescriptorWrites = GameGetDescriptorWritesStub;
-    game_code->GetPoolSizes = GameGetPoolSizesStub;
-    game_code->GetPushConstants = GameGetPushConstantsStub;
 }
 
 // TODO(Guigui): Use win32 api. This allocates memory, free it!
@@ -123,6 +120,7 @@ internal int main(int argc, char *argv[]) {
     SDL_Window* window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
     
+    
     VulkanContext *context = VulkanCreateContext(window);
     
     GameCode game_code = {};
@@ -151,10 +149,12 @@ internal int main(int argc, char *argv[]) {
         FILETIME game_code_time = Win32GetLastWriteTime(game_code.dll_path);
         if(CompareFileTime(&game_code.last_write_time, &game_code_time)){
             Win32UnloadGameCode(&game_code);
-            VulkanDestroyRenderer(context, renderer);
             
-            Win32LoadGameCode(&game_code);
-            renderer = VulkanCreateRenderer(context, &game_code);
+            if(Win32LoadGameCode(&game_code)) {
+                VulkanDestroyRenderer(context, renderer);
+                renderer = VulkanCreateRenderer(context, &game_code);
+                SDL_Log("Game code successfully reloaded");
+            }
         }
         
         while (SDL_PollEvent(&event)) {
@@ -170,7 +170,6 @@ internal int main(int argc, char *argv[]) {
                 renderer = VulkanCreateRenderer(context, &game_code);
             }
         }
-        
         VulkanDrawFrame(context, renderer);
     }
     
@@ -181,7 +180,7 @@ internal int main(int argc, char *argv[]) {
     SDL_DestroyWindow(window);
     SDL_Quit();
     
-    if(DEBUGDumpMemoryLeaks()) {
+    if(0 || DEBUGDumpMemoryLeaks()) {
         Win32WaitForConsoleClose();
     }
     return (0);
