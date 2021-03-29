@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan.h>
 #include <SDL/SDL.h>
+#define CGLTF_IMPLEMENTATION
+#include <cgltf/cgltf.h>
 
 #define internal static;
 #define global static;
@@ -24,12 +26,20 @@ typedef struct PushConstant {
     alignas(16) vec3 light_color;
 } PushConstant;
 
+typedef struct GameData {
+    mat4 cam_matrix;
+} GameData ;
+
 #define GAME_GET_SCENE(name) void name(u32 *vtx_count, vec3 *vertices, u32 *idx_count, u32 *indices)
 typedef GAME_GET_SCENE(game_get_scene);
 GAME_GET_SCENE(GameGetSceneStub) {}
 
-#define GAME_LOOP(name) void name(void)
+#define GAME_LOOP(name) void name(GameData *game_data)
 typedef GAME_LOOP(game_loop);
 GAME_LOOP(GameLoopStub) { }
+
+#define GAME_START(name) void name(GameData *game_data)
+typedef GAME_START(game_start);
+GAME_START(GameStartStub) { }
 
 #endif //MAIN_H

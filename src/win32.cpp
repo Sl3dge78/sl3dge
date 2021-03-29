@@ -20,6 +20,7 @@ typedef struct GameCode {
     
     game_get_scene* GetScene;
     game_loop* GameLoop;
+    game_start* GameStart;
 } GameCode;
 
 #include "vulkan.cpp"
@@ -28,8 +29,6 @@ typedef struct ShaderCode {
     char *spv_path;
     FILETIME last_write_time;
 } ShaderCode;
-
-
 
 inline FILETIME Win32GetLastWriteTime(char *file_name) {
     
@@ -54,6 +53,7 @@ internal bool Win32LoadGameCode(GameCode* game_code) {
     
     game_code->GetScene = GameGetSceneStub;
     game_code->GameLoop = GameLoopStub;
+    game_code->GameStart = GameStartStub;
     
     // Compiler can still be writing to the file
     // Try to copy, if we can do it, compiler is done so we can load it
@@ -71,6 +71,7 @@ internal bool Win32LoadGameCode(GameCode* game_code) {
         // Load function pointers
         game_code->GetScene = (game_get_scene*)GetProcAddress(game_code->game_dll, "GameGetScene");
         game_code->GameLoop = (game_loop *) GetProcAddress(game_code->game_dll, "GameLoop");
+        game_code->GameStart = (game_start *) GetProcAddress(game_code->game_dll, "GameStart");
     }
     
     return result;
@@ -83,6 +84,7 @@ internal void Win32UnloadGameCode(GameCode* game_code) {
     game_code->game_dll = NULL;
     game_code->GetScene = GameGetSceneStub;
     game_code->GameLoop = GameLoopStub;
+    game_code->GameStart = GameStartStub;
 }
 
 // TODO(Guigui): Use win32 api. This allocates memory, free it!
@@ -134,6 +136,10 @@ internal int main(int argc, char *argv[]) {
     shader_code.spv_path = "resources\\shaders\\shaders.meta";
     shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
     
+    GameData game_data = {};
+    
+    game_code.GameStart(&game_data);
+    
     bool running = true;
     
     SDL_Event event;
@@ -163,13 +169,9 @@ internal int main(int argc, char *argv[]) {
                 SDL_HideWindow(window);
                 running = false;
             }
-            if(event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_J) {
-                Win32UnloadGameCode(&game_code);
-                Win32LoadGameCode(&game_code);
-                VulkanDestroyRenderer(context, renderer);
-                renderer = VulkanCreateRenderer(context, &game_code);
-            }
         }
+        game_code.GameLoop(&game_data);
+        VulkanUpdateDescriptors(context, &game_data);
         VulkanDrawFrame(context, renderer);
     }
     

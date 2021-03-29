@@ -69,11 +69,6 @@ typedef struct VulkanRenderer {
     
 } VulkanRenderer;
 
-typedef struct CameraInfo {
-    alignas(16) mat4 view;
-    alignas(16) mat4 proj;
-} CameraInfo;
-
 typedef struct VulkanContext {
     VkInstance instance;
     VkPhysicalDevice physical_device;
@@ -95,6 +90,7 @@ typedef struct VulkanContext {
     Swapchain swapchain;
     PushConstant push_constants;
     
+    Buffer gltf_buffer;
     Buffer vertex_buffer;
     Buffer index_buffer;
     
@@ -104,7 +100,6 @@ typedef struct VulkanContext {
     VkAccelerationStructureKHR TLAS;
     Buffer instance_data;
     
-    CameraInfo cam_info;
     Buffer cam_buffer;
     
 } VulkanContext;
@@ -1156,6 +1151,122 @@ internal void CreateBLAS(VulkanContext *context, Buffer *vertex_buffer, const u3
     DestroyBuffer(context->device, &scratch);
 }
 
+internal void CreateBLASGLTF(VulkanContext *context, cgltf_mesh *mesh, Buffer *buffer) {
+    
+    VkAccelerationStructureGeometryKHR geometry = {};
+    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    geometry.pNext = NULL;
+    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+    geometry.geometry.triangles.pNext = NULL;
+    
+    u32 triangle_count = 0;
+    
+    // Vertex
+    for(u32 i = 0; i < mesh->primitives[0].attributes_count; i ++) {
+        if(mesh->primitives[0].attributes[i].type == cgltf_attribute_type_position) {
+            cgltf_accessor *position_data = mesh->primitives[0].attributes[i].data;
+            if(position_data->component_type == cgltf_component_type_r_32f) {
+                geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+            }
+            
+            geometry.geometry.triangles.vertexData.deviceAddress = buffer->address + position_data->buffer_view->offset;
+            geometry.geometry.triangles.vertexStride = position_data->stride;
+            geometry.geometry.triangles.maxVertex = position_data->count;
+            triangle_count = position_data->count / 3;
+        }
+    }
+    
+    
+    
+    // Index
+    switch(mesh->primitives[0].indices->component_type) {
+        case (cgltf_component_type_r_16u):
+        geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT16;
+        break;
+        
+        default :
+        SDL_LogError(0, "Unknown index format %d", mesh->primitives[0].indices->component_type);
+        ASSERT(0);
+        break;
+    };
+    geometry.geometry.triangles.indexData.deviceAddress = buffer->address + mesh->primitives[0].indices->buffer_view->offset;
+    
+    geometry.geometry.triangles.transformData.deviceAddress = VK_NULL_HANDLE;
+    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    
+    VkAccelerationStructureBuildGeometryInfoKHR build_info = {};
+    build_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+    build_info.pNext = NULL;
+    build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+    build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+    build_info.srcAccelerationStructure = VK_NULL_HANDLE;
+    build_info.geometryCount = 1;
+    build_info.pGeometries = &geometry;
+    build_info.ppGeometries = NULL;
+    build_info.scratchData.deviceAddress = NULL;
+    
+    // Query the build size
+    VkAccelerationStructureBuildSizesInfoKHR size_info = {};
+    size_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
+    pfn_vkGetAccelerationStructureBuildSizesKHR(context->device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_info, &triangle_count, &size_info);
+    
+    //Alloc the scratch buffer
+    Buffer scratch;
+    CreateBuffer(context, size_info.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scratch);
+    build_info.scratchData.deviceAddress = scratch.address;
+    
+    //Alloc the blas buffer
+    CreateBuffer(context, size_info.accelerationStructureSize, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->BLAS_buffer);
+    DEBUGNameBuffer(context->device, &context->BLAS_buffer, "BLAS");
+    
+    VkAccelerationStructureCreateInfoKHR blas_ci = {};
+    blas_ci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+    blas_ci.pNext = NULL;
+    blas_ci.createFlags = 0;
+    blas_ci.buffer = context->BLAS_buffer.buffer;
+    blas_ci.offset = 0;
+    blas_ci.size = size_info.accelerationStructureSize; // Will be queried below
+    blas_ci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+    blas_ci.deviceAddress = 0;
+    VkResult result = pfn_vkCreateAccelerationStructureKHR(context->device, &blas_ci, NULL, &context->BLAS);
+    AssertVkResult(result);
+    DEBUGNameObject(context->device, (u64)context->BLAS, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, "BLAS");
+    
+    
+    // Now build it !!
+    build_info.dstAccelerationStructure = context->BLAS;
+    VkAccelerationStructureBuildRangeInfoKHR range_info = { triangle_count, 0, 0, 0 };
+    VkAccelerationStructureBuildRangeInfoKHR* infos[] = { &range_info }; 
+    
+    VkCommandBuffer cmd_buffer;
+    AllocateCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
+    BeginCommandBuffer(context->device, cmd_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    pfn_vkCmdBuildAccelerationStructuresKHR(cmd_buffer, 1, &build_info, infos);
+    VkMemoryBarrier barrier = {
+        VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        NULL, 
+        VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+        VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
+    };
+    
+    vkCmdPipelineBarrier(cmd_buffer,
+                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                         0,
+                         1, &barrier,
+                         0, NULL, 0, NULL);
+    vkEndCommandBuffer(cmd_buffer);
+    VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmd_buffer, 0, NULL};
+    vkQueueSubmit(context->graphics_queue, 1, &si, VK_NULL_HANDLE);
+    vkQueueWaitIdle(context->graphics_queue);
+    
+    vkFreeCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
+    DestroyBuffer(context->device, &scratch);
+    
+}
+
 internal void CreateTLAS(VulkanContext *context) {
     
     const u32 primitive_count = 1;
@@ -1271,7 +1382,11 @@ internal void CreateTLAS(VulkanContext *context) {
 //
 // =========================
 
-void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *pipeline) {
+void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
+    UploadToBuffer(context->device, &context->cam_buffer, &game_data->cam_matrix, sizeof(game_data->cam_matrix));
+}
+
+void VulkanDrawFrame(VulkanContext *context, VulkanRenderer *pipeline) {
     u32 image_id;
     Swapchain* swapchain = &context->swapchain;
     
@@ -1427,12 +1542,10 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     context->swapchain.swapchain = VK_NULL_HANDLE; //Not sure if this is required
     CreateOrUpdateSwapchain(context, window, &context->swapchain);
     
-    context->cam_info.proj = mat4_perspective(90.f, 16.0f/9.0f, 0.1f, 1000.0f);
-    context->cam_info.view = mat4_identity();
-    mat4_translate(&context->cam_info.view, {0.0f,0.0f,-1.0f});
+    mat4 id = mat4_identity();
     
-    CreateBuffer(context, sizeof(CameraInfo), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
-    UploadToBuffer(context->device, &context->cam_buffer, &context->cam_info, sizeof(CameraInfo));
+    CreateBuffer(context, sizeof(mat4), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
+    UploadToBuffer(context->device, &context->cam_buffer, &id, sizeof(mat4));
     DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
     
     return context;
@@ -1478,15 +1591,13 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, GameCode *game) {
         pipeline->strides[3] ={ 0u, 0u, 0u };
         free(data);
     }
-    
+#if 0
     u32 vtx_count = 0;
     u32 idx_count = 0;
     game->GetScene(&vtx_count, NULL, &idx_count, NULL);
     vec3 *vertices = (vec3 *)calloc(vtx_count, sizeof(vec3));
     u32 *indices = (u32 *)calloc(idx_count, sizeof(u32));
     game->GetScene(&vtx_count, vertices, &idx_count, indices);
-    
-    const u32 primitive_count = idx_count / 3;
     
     CreateBuffer(context, sizeof(vec3) * vtx_count, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->vertex_buffer);
     DEBUGNameBuffer(context->device, &context->vertex_buffer, "Vertices");
@@ -1499,10 +1610,33 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, GameCode *game) {
     free(vertices);
     free(indices);
     
+    const u32 primitive_count = idx_count / 3;
     CreateBLAS(context, &context->vertex_buffer, vtx_count, &context->index_buffer, primitive_count);
+#endif
+    // NEW METHOD; from gltf
+#if 1
+    cgltf_options options = {0};
+    cgltf_data *data = NULL;
+    cgltf_result result = cgltf_parse_file(&options, "resources\\triangle.gltf", &data);
+    if(result != cgltf_result_success) {
+        SDL_LogError(0, "Error reading scene");
+    }
+    cgltf_load_buffers(&options, data,  "resources\\triangle.gltf");
+    
+    CreateBuffer(context, data->buffers[0].size, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->gltf_buffer);
+    DEBUGNameBuffer(context->device, &context->gltf_buffer, "GLTF");
+    UploadToBuffer(context->device, &context->gltf_buffer, data->buffers[0].data, data->buffers[0].size);
+    
+    for(u32 i = 0; i < data->meshes_count; i++) {
+        CreateBLASGLTF(context, &data->meshes[i], &context->gltf_buffer);
+    }
+    cgltf_free(data);
+#endif
     CreateTLAS(context);
     
     WriteDescriptorSets(context->device, pipeline->descriptor_sets, pipeline, context);
+    
+    
     
     return pipeline;
     
@@ -1510,13 +1644,15 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, GameCode *game) {
 
 void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *pipeline) {
     
+    DestroyBuffer(context->device, &context->gltf_buffer);
+    
     DestroyBuffer(context->device, &context->TLAS_buffer);
     pfn_vkDestroyAccelerationStructureKHR(context->device, context->TLAS, NULL);
     DestroyBuffer(context->device, &context->instance_data);
-    
+#if 0
     DestroyBuffer(context->device, &context->vertex_buffer);
     DestroyBuffer(context->device, &context->index_buffer);
-    
+#endif
     DestroyBuffer(context->device, &context->BLAS_buffer);
     pfn_vkDestroyAccelerationStructureKHR(context->device, context->BLAS, NULL);
     
