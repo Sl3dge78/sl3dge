@@ -26,16 +26,6 @@ extern "C" __declspec(dllexport) GAME_GET_SCENE(GameGetScene) {
     *vtx_count = sizeof(vtx) / sizeof(vtx[0]);
     *idx_count = sizeof(idx) / sizeof(idx[0]);
     
-    cgltf_options options = {0};
-    cgltf_data *data = NULL;
-    cgltf_result result = cgltf_parse_file(&options, "resources\\triangle.gltf", &data);
-    if(result == cgltf_result_success) {
-        cgltf_load_buffers(&options, data,  "resources\\triangle.gltf");
-        
-        cgltf_free(data);
-    }
-    
-    
     if(vertices) {
         memcpy(vertices, vtx, sizeof(vtx));
     }
@@ -53,7 +43,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     vec3 movement = {};
     
-    const float speed = 0.001f;
+    const float speed = 0.01f;
     
     if(keyboard[SDL_SCANCODE_W]) {
         movement.y -= speed;

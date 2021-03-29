@@ -1153,6 +1153,12 @@ internal void CreateBLAS(VulkanContext *context, Buffer *vertex_buffer, const u3
 
 internal void CreateBLASGLTF(VulkanContext *context, cgltf_mesh *mesh, Buffer *buffer) {
     
+    if(mesh->primitives_count > 1) {
+        SDL_LogError(0, "Multiple primitives, not supported... yet");
+        ASSERT(0);
+    }
+    cgltf_primitive *primitive = &mesh->primitives[0];
+    
     VkAccelerationStructureGeometryKHR geometry = {};
     geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
     geometry.pNext = NULL;
@@ -1163,34 +1169,34 @@ internal void CreateBLASGLTF(VulkanContext *context, cgltf_mesh *mesh, Buffer *b
     u32 triangle_count = 0;
     
     // Vertex
-    for(u32 i = 0; i < mesh->primitives[0].attributes_count; i ++) {
-        if(mesh->primitives[0].attributes[i].type == cgltf_attribute_type_position) {
-            cgltf_accessor *position_data = mesh->primitives[0].attributes[i].data;
+    for(u32 i = 0; i < primitive->attributes_count; i ++) {
+        if(primitive->attributes[i].type == cgltf_attribute_type_position) {
+            cgltf_accessor *position_data = primitive->attributes[i].data;
+            
             if(position_data->component_type == cgltf_component_type_r_32f) {
                 geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
             }
             
-            geometry.geometry.triangles.vertexData.deviceAddress = buffer->address + position_data->buffer_view->offset;
+            geometry.geometry.triangles.vertexData.deviceAddress = buffer->address + position_data->offset + position_data->buffer_view->offset;
             geometry.geometry.triangles.vertexStride = position_data->stride;
             geometry.geometry.triangles.maxVertex = position_data->count;
-            triangle_count = position_data->count / 3;
+            break;
         }
     }
-    
-    
-    
     // Index
-    switch(mesh->primitives[0].indices->component_type) {
-        case (cgltf_component_type_r_16u):
-        geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT16;
-        break;
-        
-        default :
-        SDL_LogError(0, "Unknown index format %d", mesh->primitives[0].indices->component_type);
+    if(primitive->indices){
+        cgltf_accessor *indices = primitive->indices;
+        if(indices->component_type == cgltf_component_type_r_16u) {
+            geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT16;
+        } else {
+            ASSERT(0);
+        }
+        triangle_count = indices->count / 3;
+        geometry.geometry.triangles.indexData.deviceAddress = buffer->address + primitive->indices->buffer_view->offset;
+    } else {
+        SDL_LogError(0, "Unindexed meshed are not supported ??, ... yet");
         ASSERT(0);
-        break;
-    };
-    geometry.geometry.triangles.indexData.deviceAddress = buffer->address + mesh->primitives[0].indices->buffer_view->offset;
+    }
     
     geometry.geometry.triangles.transformData.deviceAddress = VK_NULL_HANDLE;
     geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
@@ -1617,26 +1623,29 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, GameCode *game) {
 #if 1
     cgltf_options options = {0};
     cgltf_data *data = NULL;
-    cgltf_result result = cgltf_parse_file(&options, "resources\\triangle.gltf", &data);
+    const char * file = "resources/models/box/Box.gltf";
+    cgltf_result result = cgltf_parse_file(&options, file, &data);
     if(result != cgltf_result_success) {
         SDL_LogError(0, "Error reading scene");
+        ASSERT(0);
     }
-    cgltf_load_buffers(&options, data,  "resources\\triangle.gltf");
+    cgltf_load_buffers(&options, data, file);
     
     CreateBuffer(context, data->buffers[0].size, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->gltf_buffer);
     DEBUGNameBuffer(context->device, &context->gltf_buffer, "GLTF");
     UploadToBuffer(context->device, &context->gltf_buffer, data->buffers[0].data, data->buffers[0].size);
     
-    for(u32 i = 0; i < data->meshes_count; i++) {
-        CreateBLASGLTF(context, &data->meshes[i], &context->gltf_buffer);
+    if(data->meshes_count > 1) {
+        SDL_LogError(0, "Multiple meshes not supported, yet");
+        ASSERT(0);
     }
+    CreateBLASGLTF(context, &data->meshes[0], &context->gltf_buffer);
+    
     cgltf_free(data);
 #endif
     CreateTLAS(context);
     
     WriteDescriptorSets(context->device, pipeline->descriptor_sets, pipeline, context);
-    
-    
     
     return pipeline;
     

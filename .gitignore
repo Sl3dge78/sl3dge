@@ -1,6 +1,5 @@
 include/
-bin/*.exp
-bin/*.ilk
-bin/*.lib
-bin/*.pdb
-bin/*.obj
+resources/models
+*.pdb
+*.ilk
+*.obj
