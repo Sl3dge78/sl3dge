@@ -25,6 +25,36 @@ typedef union mat4 {
     float m[4][4];
 } mat4;
 
+typedef struct quat {
+    float x;
+    float y;
+    float z;
+    float w;
+} quat;
+
+void vec3_add(vec3 *vec, const vec3 add) {
+    vec->x += add.x;
+    vec->y += add.y;
+    vec->z += add.z;
+}
+
+void vec3_fmul(vec3 *vec, const float mul) {
+    vec->x *= mul;
+    vec->y *= mul;
+    vec->z *= mul;
+}
+
+vec3 vec3_fmul(const vec3 vec, const float mul) {
+    
+    vec3 result = vec;
+    
+    result.x *= mul;
+    result.y *= mul;
+    result.z *= mul;
+    
+    return (result);
+}
+
 void mat4_print(const mat4* mat) {
     
     SDL_Log("\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f",

@@ -50,16 +50,20 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     vec3 right = { (float)sin(-game_data->rotation_z + PI/2.f), (float)cos(-game_data->rotation_z + PI/2.f), 0.f}; 
     
     if(keyboard[SDL_SCANCODE_W]) {
+        vec3_add(&movement, vec3_fmul(forward, -speed));
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_S]) {
+        vec3_add(&movement, vec3_fmul(forward, speed));
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_A]){
         
+        vec3_add(&movement, vec3_fmul(right, -speed));
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_D]){
+        vec3_add(&movement, vec3_fmul(right, speed));
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_Q]){
