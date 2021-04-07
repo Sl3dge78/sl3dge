@@ -121,12 +121,14 @@
         ],
         "platform/win32/executable": "D:/Guigui/Work/Prog/vulkan/bin/vulkan.exe",
         "platform/win32/executable/history": [
+            "D:/Guigui/Work/Prog/vulkan/bin/vulkan.exe",
             "D:/Guigui/Work/Prog/Handmade/bin/vulkan.exe",
             "D:/Guigui/Work/Prog/Handmade/bin/Handmade.exe",
             "W:/bin/Handmade.exe"
         ],
         "platform/win32/workingdir": "D:/Guigui/Work/Prog/vulkan",
         "platform/win32/workingdir/history": [
+            "D:/Guigui/Work/Prog/vulkan",
             "D:/Guigui/Work/Prog/Handmade",
             "W:/"
         ],

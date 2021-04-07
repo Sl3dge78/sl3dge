@@ -28,13 +28,14 @@ typedef struct PushConstant {
 
 typedef struct GameData {
     mat4 cam_matrix;
+    float rotation_z;
 } GameData ;
 
 #define GAME_GET_SCENE(name) void name(u32 *vtx_count, vec3 *vertices, u32 *idx_count, u32 *indices)
 typedef GAME_GET_SCENE(game_get_scene);
 GAME_GET_SCENE(GameGetSceneStub) {}
 
-#define GAME_LOOP(name) void name(GameData *game_data)
+#define GAME_LOOP(name) void name(float delta_time, GameData *game_data)
 typedef GAME_LOOP(game_loop);
 GAME_LOOP(GameLoopStub) { }
 

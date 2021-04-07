@@ -44,21 +44,18 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     vec3 movement = {};
     
     const float speed = 0.01f;
+    const float speed = delta_time;
     
     if(keyboard[SDL_SCANCODE_W]) {
-        movement.y -= speed;
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_S]) {
-        movement.y += speed;
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_A]){
-        movement.x -= speed;
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_D]){
-        movement.x += speed;
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_Q]){

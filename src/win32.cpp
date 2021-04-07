@@ -140,9 +140,17 @@ internal int main(int argc, char *argv[]) {
     game_code.GameStart(&game_data);
     
     bool running = true;
+    float delta_time = 0;
+    int last_time = SDL_GetTicks();
     
     SDL_Event event;
     while (running) {
+        
+        // Synch
+        int time = SDL_GetTicks();
+        delta_time = (float)(time - last_time) / 1000.f;
+        last_time = time;
+        
         // Reload shaders if necessary
         FILETIME shader_time = Win32GetLastWriteTime(shader_code.spv_path);
         if(CompareFileTime(& shader_code.last_write_time, &shader_time)){
@@ -169,7 +177,7 @@ internal int main(int argc, char *argv[]) {
                 running = false;
             }
         }
-        game_code.GameLoop(&game_data);
+        game_code.GameLoop(delta_time, &game_data);
         VulkanUpdateDescriptors(context, &game_data);
         VulkanDrawFrame(context, renderer);
     }
