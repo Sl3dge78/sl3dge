@@ -5,6 +5,8 @@
 // Matrix operations (rotate, look at, ...)
 // TRS to mat4 ce serait chouette aussi
 
+#define PI 3.1415926535897932384626433f
+
 typedef struct vec4 {
     alignas(4) float x;
     alignas(4) float y;
@@ -102,46 +104,66 @@ mat4 mat4_perspective(const float fov, const float aspect_ratio, const float nea
     return result;
 }
 
-void mat4_translate(mat4* mat, const vec3 vec) {
+void mat4_translate(mat4 *mat, const vec3 vec) {
     mat->m[0][3] += vec.x;
     mat->m[1][3] += vec.y;
     mat->m[2][3] += vec.z;
 }
-/*
-// TODO(Guigui):  Coords are inversed (x is y)
-mat4 mat4_rotation_x(const float radians) {
-    
-    mat4 result = {};
-    result.m[0][0] = 1.0f;
-    result.m[1][1] = cos(radians);
-    result.m[2][1] = -sin(radians);
-    result.m[1][2] = sin(radians);
-    result.m[2][2] = cos(radians);
-    result.m[3][3] = 1.0f;
-    return result;
+
+void mat4_rotate_x(mat4 *mat, const float radians) {
+    mat->m[0][0] = 1.0f;
+    mat->m[1][1] = cos(radians);
+    mat->m[1][2] = -sin(radians);
+    mat->m[2][1] = sin(radians);
+    mat->m[2][2] = cos(radians);
+    mat->m[3][3] = 1.0f;
 }
 
-mat4 mat4_rotation_y(const float radians) {
+void mat4_rotate_y(mat4 *mat, const float radians) {
+    mat->m[0][0] = cos(radians);
+    mat->m[0][2] = sin(radians);
+    mat->m[1][1] = 1.0f; 
+    mat->m[2][0] = -sin(radians);
+    mat->m[2][2] = cos(radians);
+    mat->m[3][3] = 1.0f;
     
-    mat4 result = {};
-    result.m[0][0] = cos(radians);
-    result.m[2][0] = sin(radians);
-    result.m[1][1] = 1.0f; 
-    result.m[0][2] = -sin(radians);
-    result.m[2][2] = cos(radians);
-    result.m[3][3] = 1.0f;
-    return result;
 }
 
-mat4 mat4_rotation_z(const float radians) {
-    
-    mat4 result = {};
-    result.m[0][0] = cos(radians);
-    result.m[1][0] = -sin(radians);
-    result.m[0][1] = sin(radians);
-    result.m[1][1] = cos(radians);
-    result.m[2][2] = 1.0f;
-    result.m[3][3] = 1.0f;
-    return result;
+void mat4_rotate_z(mat4 *mat, const float radians) {
+    mat->m[0][0] = cos(radians);
+    mat->m[0][1] = -sin(radians);
+    mat->m[1][0] = sin(radians);
+    mat->m[1][1] = cos(radians);
+    mat->m[2][2] = 1.0f;
+    mat->m[3][3] = 1.0f;
 }
-*/
+
+
+void mat4_rotate_euler(mat4 *mat, const vec3 euler) {
+    
+    const float cx = cos(euler.x);
+    const float sx = sin(euler.x);
+    const float cy = cos(euler.y);
+    const float sy = sin(euler.y);
+    const float cz = cos(euler.z);
+    const float sz = sin(euler.z);
+    
+    const float t01 = -sz*cx;
+    const float t02 = sz*sx;
+    const float t11 = cz*cx;
+    const float t12 = cz*-sx;
+    
+    mat->m[0][0] = cz*cy + t02*-sy;
+    mat->m[0][1] = t01;
+    mat->m[0][2] = cz*sy + t02*cy;
+    
+    mat->m[1][0] = sz*cy + t12*-sy;
+    mat->m[1][1] = t11;
+    mat->m[1][2] = sz*sy + t12*cy;
+    
+    mat->m[2][0] = cx*-sy;
+    mat->m[2][1] = sx;
+    mat->m[2][2] = cx*cy;
+}
+
+
