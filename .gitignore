@@ -3,3 +3,4 @@ resources/models
 *.pdb
 *.ilk
 *.obj
+bin/game.dll
