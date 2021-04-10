@@ -34,6 +34,7 @@ typedef struct Swapchain {
     VkExtent2D extent;
     
     VkImage* images;
+    VkImageView* image_views;
     
     VkCommandBuffer* command_buffers;
     VkFence* fences;
@@ -49,21 +50,17 @@ typedef struct VulkanRenderer {
     VkPipelineLayout layout;
     VkDescriptorPool descriptor_pool;
     
+    VkRenderPass render_pass;
+    
     VkDescriptorSet descriptor_sets[2];
     u32 descriptor_set_count;
+    
+    u32 push_constant_size;
     
     VkDescriptorSetLayout app_set_layout;
     VkDescriptorSetLayout game_set_layout;
     
-    u32 push_constant_size;
-    
-    Image render_image;
-    
-    Buffer rgen_sbt;
-    Buffer rmiss_sbt;
-    Buffer rchit_sbt;
-    
-    VkStridedDeviceAddressRegionKHR strides[4];
+    VkFramebuffer *framebuffers;
     
 } VulkanRenderer;
 
@@ -88,25 +85,9 @@ typedef struct VulkanContext {
     Swapchain swapchain;
     PushConstant push_constants;
     
-    Buffer gltf_buffer;
-    Buffer vertex_buffer;
-    Buffer index_buffer;
-    
-    Buffer BLAS_buffer;
-    VkAccelerationStructureKHR BLAS;
-    Buffer TLAS_buffer;
-    VkAccelerationStructureKHR TLAS;
-    Buffer instance_data;
-    
     Buffer cam_buffer;
     
 } VulkanContext;
-
-u32 aligned_size(const u32 value, const u32 alignment) {
-    
-    return (value + alignment - 1) & ~(alignment - 1);
-    
-}
 
 global VkDebugUtilsMessengerEXT debug_messenger;
 
@@ -132,6 +113,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBits
     } else if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
         SDL_LogError(0,pCallbackData->pMessage);
     }
+    KEEP_CONSOLE_OPEN(true);
     return VK_FALSE;
 }
 
@@ -343,6 +325,23 @@ internal void EndAndExecuteCommandBuffer(const VkDevice device, const VkQueue qu
     vkQueueWaitIdle(queue);
     vkFreeCommandBuffers(device, pool, 1, &cmd);
 }
+
+internal void CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module) {
+    i64 size = 0;
+    u32 *code = Win32AllocateAndLoadBinary(path, &size);
+    
+    VkShaderModuleCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.pNext = NULL;
+    create_info.flags = 0;
+    create_info.codeSize = size;
+    create_info.pCode = code;
+    
+    VkResult result = vkCreateShaderModule(device,&create_info,NULL,shader_module);
+    free(code);
+    AssertVkResult(result);
+}
+
 
 // ========================
 //
@@ -641,7 +640,7 @@ internal void FillSwapchainCreateInfo(VkPhysicalDevice physical_device, VkSurfac
     create_info->oldSwapchain = VK_NULL_HANDLE;
 }
 
-void DestroySwapchainContext(const VulkanContext* context, Swapchain *swapchain) {
+void DestroySwapchain(const VulkanContext* context, Swapchain *swapchain) {
     
     vkFreeCommandBuffers(context->device,context->graphics_command_pool,swapchain->image_count, swapchain->command_buffers);
     free(swapchain->command_buffers);
@@ -652,7 +651,9 @@ void DestroySwapchainContext(const VulkanContext* context, Swapchain *swapchain)
         vkDestroyFence(context->device, swapchain->fences[i], NULL);
         vkDestroySemaphore(context->device, swapchain->image_acquired_semaphore[i], NULL);
         vkDestroySemaphore(context->device, swapchain->render_complete_semaphore[i], NULL);
+        vkDestroyImageView(context->device, swapchain->image_views[i], NULL);
     }
+    free(swapchain->image_views);
     free(swapchain->fences);
     free(swapchain->image_acquired_semaphore);
     free(swapchain->render_complete_semaphore);
@@ -660,7 +661,7 @@ void DestroySwapchainContext(const VulkanContext* context, Swapchain *swapchain)
 
 internal void CreateOrUpdateSwapchain(const VulkanContext* context, SDL_Window* window, Swapchain *swapchain) {
     if(swapchain->swapchain != VK_NULL_HANDLE) {
-        DestroySwapchainContext(context, swapchain);
+        DestroySwapchain(context, swapchain);
     }
     
     VkSwapchainCreateInfoKHR create_info = {};
@@ -677,8 +678,22 @@ internal void CreateOrUpdateSwapchain(const VulkanContext* context, SDL_Window* 
     swapchain->images = (VkImage *)calloc(swapchain->image_count, sizeof(VkImage));
     vkGetSwapchainImagesKHR(context->device, swapchain->swapchain, &swapchain->image_count, swapchain->images);
     
+    swapchain->image_views = (VkImageView*)calloc(swapchain->image_count, sizeof(VkImageView));
+    
     for(u32 i = 0; i < swapchain->image_count; i++) {
         DEBUGNameObject(context->device, (u64)swapchain->images[i], VK_OBJECT_TYPE_IMAGE, "Swapchain image");
+        
+        VkImageViewCreateInfo image_view_ci = {};
+        image_view_ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        image_view_ci.pNext = NULL;
+        image_view_ci.flags = 0;
+        image_view_ci.image = swapchain->images[i];
+        image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D ;
+        image_view_ci.format = swapchain->format;
+        image_view_ci.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+        image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        
+        AssertVkResult(vkCreateImageView(context->device, &image_view_ci, NULL, &swapchain->image_views[i]));
     }
     
     // Command buffer
@@ -719,104 +734,220 @@ internal void CreateOrUpdateSwapchain(const VulkanContext* context, SDL_Window* 
     SDL_Log("Swapchain created with %d images", swapchain->image_count);
 }
 
-//
-//
-// NOTE(Guigui): PIPELINE
-//
-//
-
-internal void CreateRtxRenderImage(const VkDevice device, const Swapchain *swapchain, const VkPhysicalDeviceMemoryProperties *memory_properties, Image *image) {
-    VkImageCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    create_info.pNext = NULL;
-    create_info.flags = 0;
-    create_info.imageType = VK_IMAGE_TYPE_2D;
-    create_info.format = swapchain->format;
-    create_info.extent = {swapchain->extent.width, swapchain->extent.height, 1};
-    create_info.mipLevels = 1;
-    create_info.arrayLayers = 1;
-    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT ;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 0;
-    create_info.pQueueFamilyIndices = NULL;
-    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    
-    VkResult result = vkCreateImage(device, &create_info, NULL, &image->image);
-    AssertVkResult(result);
-    
-    VkMemoryRequirements requirements = {};
-    vkGetImageMemoryRequirements(device, image->image, &requirements);
-    
-    VkMemoryAllocateInfo alloc_info = {};
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.pNext = NULL;
-    alloc_info.allocationSize = requirements.size;
-    alloc_info.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    result = vkAllocateMemory(device, &alloc_info, NULL, &image->memory);
-    AssertVkResult(result);
-    
-    result = vkBindImageMemory(device, image->image, image->memory, 0);
-    AssertVkResult(result);
-    
-    VkImageViewCreateInfo imv_ci = {};
-    imv_ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imv_ci.pNext = NULL;
-    imv_ci.flags = 0;
-    imv_ci.image = image->image;
-    imv_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imv_ci.format = swapchain->format;
-    imv_ci.components = {};
-    imv_ci.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-    result = vkCreateImageView(device, &imv_ci, NULL, &image->image_view);
-    AssertVkResult(result);
-    DEBUGNameImage(device, image, "RTX Render Image");
+void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
+    UploadToBuffer(context->device, &context->cam_buffer, &game_data->cam_matrix, sizeof(game_data->cam_matrix));
 }
 
-internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet* descriptor_set, const VulkanRenderer* pipeline, const VulkanContext *context) {
+internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkPipeline *pipeline, VkRenderPass *render_pass) {
     
-    VkDescriptorImageInfo img_info =  { 
-        VK_NULL_HANDLE, pipeline->render_image.image_view, VK_IMAGE_LAYOUT_GENERAL
-    };
+    VkRenderPassCreateInfo render_pass_ci = {};
+    render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    render_pass_ci.pNext = NULL;
+    render_pass_ci.flags = 0;
     
-    VkWriteDescriptorSetAccelerationStructureKHR as_write = { 
-        VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR, NULL, 1, &context->TLAS 
-    };
+    VkAttachmentDescription color_attachment = {};
+    color_attachment.flags = 0;
+    color_attachment.format = swapchain->format;
+    color_attachment.samples = VK_SAMPLE_COUNT_1_BIT ;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    render_pass_ci.attachmentCount = 1;
+    render_pass_ci.pAttachments = &color_attachment;
     
-    VkWriteDescriptorSet app_writes[2] = {
-        { // Rneder image
-            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            NULL,
-            *descriptor_set,
-            0, 0, 1,
-            VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &img_info, NULL, NULL
-        },
-        { // Acceleration Structure
-            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
-            &as_write,
-            *descriptor_set,
-            1, 0, 1,
-            VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-            NULL, NULL, NULL
-        }
+    VkSubpassDescription subpss_desc = {};
+    subpss_desc.flags = 0;
+    subpss_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpss_desc.inputAttachmentCount = 0;
+    subpss_desc.pInputAttachments = NULL;
+    
+    VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    subpss_desc.colorAttachmentCount = 1;
+    subpss_desc.pColorAttachments = &color_ref;
+    subpss_desc.pResolveAttachments = NULL;
+    subpss_desc.pDepthStencilAttachment = NULL;
+    subpss_desc.preserveAttachmentCount = 0;
+    subpss_desc.pPreserveAttachments = NULL;
+    
+    render_pass_ci.subpassCount = 1;
+    render_pass_ci.pSubpasses = &subpss_desc;
+    render_pass_ci.dependencyCount = 0;
+    render_pass_ci.pDependencies = NULL;
+    
+    AssertVkResult(vkCreateRenderPass(device, &render_pass_ci, NULL, render_pass));
+    
+    VkGraphicsPipelineCreateInfo pipeline_ci = {};
+    pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline_ci.pNext = NULL;
+    pipeline_ci.flags = 0;
+    
+    VkPipelineShaderStageCreateInfo stages_ci[2];
+    stages_ci[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages_ci[0].pNext = NULL;
+    stages_ci[0].flags = 0;
+    stages_ci[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    CreateVkShaderModule("resources/shaders/general.vert.spv", device, &stages_ci[0].module);
+    stages_ci[0].pName = "main";
+    stages_ci[0].pSpecializationInfo = NULL;
+    
+    stages_ci[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages_ci[1].pNext = NULL;
+    stages_ci[1].flags = 0;
+    stages_ci[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    CreateVkShaderModule("resources/shaders/general.frag.spv", device, &stages_ci[1].module);
+    stages_ci[1].pName = "main";
+    stages_ci[1].pSpecializationInfo = NULL;
+    
+    pipeline_ci.stageCount = 2;
+    pipeline_ci.pStages = stages_ci;
+    
+    VkPipelineVertexInputStateCreateInfo vertex_input = {};
+    vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertex_input.pNext = NULL;
+    vertex_input.flags = 0;
+    vertex_input.vertexBindingDescriptionCount = 1;
+    
+    VkVertexInputBindingDescription vtx_input_binding = {};
+    vtx_input_binding.binding = 0;
+    vtx_input_binding.stride = 12; // TODO(Guigui): Needs to be dependent on the gltf
+    vtx_input_binding.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+    vertex_input.pVertexBindingDescriptions = &vtx_input_binding;
+    
+    vertex_input.vertexAttributeDescriptionCount = 2;
+    VkVertexInputAttributeDescription vtx_descriptions[] = {
+        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 288}, // Position
+        {1, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}    // Normal
         
     };
+    vertex_input.pVertexAttributeDescriptions = vtx_descriptions;
+    pipeline_ci.pVertexInputState = &vertex_input;
     
-    vkUpdateDescriptorSets(device, 2, app_writes, 0, NULL);
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {};
+    input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    input_assembly_state.pNext = NULL;
+    input_assembly_state.flags = 0;
+    input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    input_assembly_state.primitiveRestartEnable = VK_FALSE;
+    pipeline_ci.pInputAssemblyState = &input_assembly_state;
+    
+    pipeline_ci.pTessellationState = NULL;
+    
+    VkPipelineViewportStateCreateInfo viewport_state = {};
+    viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewport_state.pNext = NULL;
+    viewport_state.flags = 0;
+    viewport_state.viewportCount = 1;
+    VkViewport viewport = {};
+    viewport.x = 0.f;
+    viewport.y = 0.f;
+    viewport.width = swapchain->extent.width;
+    viewport.height = swapchain->extent.height;
+    viewport.minDepth = 0.f;
+    viewport.maxDepth = 1.f;
+    viewport_state.pViewports = &viewport;
+    viewport_state.scissorCount = 1;
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = swapchain->extent;
+    viewport_state.pScissors = &scissor;
+    pipeline_ci.pViewportState = &viewport_state;
+    
+    VkPipelineRasterizationStateCreateInfo rasterization_state = {};
+    rasterization_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterization_state.pNext = NULL;
+    rasterization_state.flags = 0;
+    rasterization_state.depthClampEnable = VK_FALSE;
+    rasterization_state.rasterizerDiscardEnable = VK_FALSE;
+    rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterization_state.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterization_state.depthBiasEnable = VK_FALSE;
+    rasterization_state.depthBiasConstantFactor = 0.f;
+    rasterization_state.depthBiasClamp = 0.f;
+    rasterization_state.depthBiasSlopeFactor = 0.f;
+    rasterization_state.lineWidth = 1.f;
+    pipeline_ci.pRasterizationState = &rasterization_state;
+    
+    VkPipelineMultisampleStateCreateInfo multisample_state = {};
+    multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisample_state.pNext = NULL;
+    multisample_state.flags = 0;
+    multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisample_state.sampleShadingEnable = VK_FALSE;
+    multisample_state.minSampleShading = 0.f;
+    multisample_state.pSampleMask = 0;
+    multisample_state.alphaToCoverageEnable = VK_FALSE;
+    multisample_state.alphaToOneEnable = VK_FALSE;
+    pipeline_ci.pMultisampleState = &multisample_state;
+    
+    pipeline_ci.pDepthStencilState = NULL;
+    
+    VkPipelineColorBlendStateCreateInfo color_blend_state = {};
+    color_blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    color_blend_state.pNext = NULL;
+    color_blend_state.flags = 0;
+    color_blend_state.logicOpEnable = VK_FALSE;
+    color_blend_state.logicOp = VK_LOGIC_OP_COPY;
+    
+    VkPipelineColorBlendAttachmentState color_blend_attachement = {};
+    color_blend_attachement.blendEnable = VK_FALSE;
+    /*
+    VkBlendFactor            srcColorBlendFactor;
+    VkBlendFactor            dstColorBlendFactor;
+    VkBlendOp                colorBlendOp;
+    VkBlendFactor            srcAlphaBlendFactor;
+    VkBlendFactor            dstAlphaBlendFactor;
+    VkBlendOp                alphaBlendOp;
+    VkColorComponentFlags    colorWriteMask;
+*/
+    color_blend_state.attachmentCount = 1;
+    color_blend_state.pAttachments = &color_blend_attachement;
+    color_blend_state.blendConstants[0] = 0.0f;
+    color_blend_state.blendConstants[1] = 0.0f;
+    color_blend_state.blendConstants[2] = 0.0f;
+    color_blend_state.blendConstants[3] = 0.0f;
+    pipeline_ci.pColorBlendState = &color_blend_state;
+    
+    pipeline_ci.pDynamicState = NULL; // TODO(Guigui): look at this
+    pipeline_ci.layout = layout;
+    
+    pipeline_ci.renderPass = *render_pass;
+    pipeline_ci.subpass = 0;
+    pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
+    pipeline_ci.basePipelineIndex = 0;
+    
+    // TODO: handle pipeline caching
+    AssertVkResult(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, pipeline));
+    
+    vkDeviceWaitIdle(device);
+    vkDestroyShaderModule(device, pipeline_ci.pStages[0].module, NULL);
+    vkDestroyShaderModule(device, pipeline_ci.pStages[1].module, NULL);
+    
+}
+
+void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
+    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, &renderer->pipeline, &renderer->render_pass);
+}
+
+
+internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet *descriptor_set, Buffer *cam_buffer) {
     
     u32 game_writes_count = 1;
-    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
+    VkDescriptorBufferInfo bi_cam = { cam_buffer->buffer, 0, VK_WHOLE_SIZE };
     VkWriteDescriptorSet game_writes[1];
-    game_writes[0] = {
-        { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[1], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL},
-        { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[1], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL}
-    };
+    game_writes[0] = 
+    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[0], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
     
     vkUpdateDescriptorSets(device, game_writes_count, game_writes, 0, NULL);
 }
 
-internal void CreatePipelineLayout(const VkDevice device, const Image* result_image, VulkanRenderer *pipeline, GameCode *game) {
+
+
+internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer) {
     
     // Set Layout
     
@@ -825,8 +956,10 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     const u32 material_count = 1;
     
     // Our set layout
-    pipeline->descriptor_set_count = 2;
-    const u32 app_descriptor_count = 2;
+    renderer->descriptor_set_count = 1;
+    
+    const u32 app_descriptor_count = 0;
+    /*
     VkDescriptorSetLayoutBinding app_bindings[app_descriptor_count] = {};
     app_bindings[0] = { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR, NULL };
     app_bindings[1] = { 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, NULL };
@@ -837,8 +970,9 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     app_set_create_info.flags = 0;
     app_set_create_info.bindingCount = app_descriptor_count;
     app_set_create_info.pBindings = app_bindings;
-    VkResult result = vkCreateDescriptorSetLayout(device, &app_set_create_info, NULL, &pipeline->app_set_layout);
+    VkResult result = vkCreateDescriptorSetLayout(device, &app_set_create_info, NULL, &renderer->app_set_layout);
     AssertVkResult(result);
+    */
     
     // Get the game set layout
     const VkDescriptorSetLayoutBinding game_bindings[] = {
@@ -878,7 +1012,7 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
             NULL
         }
     };
-    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);;
+    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
     
     VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
     game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -886,20 +1020,19 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     game_set_create_info.flags = 0;
     game_set_create_info.bindingCount = game_descriptor_count;
     game_set_create_info.pBindings = game_bindings;
-    result = vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &pipeline->game_set_layout);
-    AssertVkResult(result);
+    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->game_set_layout));
     
     // Descriptor Pool
     // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
     VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0},
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
-        {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0}
     };
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
     
+    
     // App
+    /*
     for(u32 d = 0; d < app_descriptor_count; d++) {
         for(u32 i = 0; i < pool_sizes_count ; i ++){
             if(app_bindings[d].descriptorType == pool_sizes[i].type) {
@@ -907,6 +1040,7 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
             }
         }
     }
+*/
     
     //Game
     for(u32 d = 0; d < game_descriptor_count; d++) {
@@ -921,20 +1055,20 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_ci.pNext = NULL;
     pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_ci.maxSets = pipeline->descriptor_set_count;
+    pool_ci.maxSets = renderer->descriptor_set_count;
     pool_ci.poolSizeCount = pool_sizes_count;
     pool_ci.pPoolSizes = pool_sizes;
-    AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &pipeline->descriptor_pool));
+    AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
     
     // Descriptor Set
-    VkDescriptorSetLayout set_layouts[2] = {pipeline->app_set_layout, pipeline->game_set_layout};
+    VkDescriptorSetLayout set_layouts[1] = {renderer->game_set_layout};
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
-    allocate_info.descriptorPool = pipeline->descriptor_pool;
-    allocate_info.descriptorSetCount = pipeline->descriptor_set_count;
+    allocate_info.descriptorPool = renderer->descriptor_pool;
+    allocate_info.descriptorSetCount = renderer->descriptor_set_count;
     allocate_info.pSetLayouts = set_layouts;
-    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, pipeline->descriptor_sets));
+    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, renderer->descriptor_sets));
     
     // Push constants
     // TODO(Guigui): Currently limited to 1 PC
@@ -942,459 +1076,23 @@ internal void CreatePipelineLayout(const VkDevice device, const Image* result_im
     VkPushConstantRange push_constant_range = 
     { VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 0, sizeof(PushConstant) };
     const u32 push_constant_count = 1;
-    pipeline->push_constant_size = push_constant_range.size;
+    renderer->push_constant_size = push_constant_range.size;
     
     VkPipelineLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.flags = 0;
-    create_info.setLayoutCount = pipeline->descriptor_set_count;
+    create_info.setLayoutCount = renderer->descriptor_set_count;
     create_info.pSetLayouts = set_layouts;
     create_info.pushConstantRangeCount = push_constant_count;
     create_info.pPushConstantRanges = &push_constant_range;
     
-    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &pipeline->layout));
+    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
 }
 
-internal void CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module) {
-    i64 size = 0;
-    u32 *code = Win32AllocateAndLoadBinary(path, &size);
-    
-    VkShaderModuleCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    create_info.pNext = NULL;
-    create_info.flags = 0;
-    create_info.codeSize = size;
-    create_info.pCode = code;
-    
-    VkResult result = vkCreateShaderModule(device,&create_info,NULL,shader_module);
-    free(code);
-    AssertVkResult(result);
-}
 
-internal void CreatePipeline(const VkDevice device, const VkPipelineLayout *layout, const VkPhysicalDeviceRayTracingPipelinePropertiesKHR* rtx_properties, VkPipeline *pipeline) {
+void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     
-    VkRayTracingPipelineCreateInfoKHR create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-    create_info.pNext = NULL;
-    create_info.flags = 0;
-    
-    // SHADERS
-    const u32 shader_count = 4;
-    create_info.stageCount = shader_count;
-    VkPipelineShaderStageCreateInfo temp = {};
-    temp.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    temp.pNext = NULL;
-    temp.flags = 0;
-    temp.pName = "main";
-    temp.pSpecializationInfo = NULL;
-    
-    VkPipelineShaderStageCreateInfo rgen = temp;
-    rgen.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-    CreateVkShaderModule("resources/shaders/raytrace.rgen.spv", device, &rgen.module);
-    
-    VkPipelineShaderStageCreateInfo rmiss = temp;
-    rmiss.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
-    CreateVkShaderModule("resources/shaders/raytrace.rmiss.spv", device, &rmiss.module);
-    
-    VkPipelineShaderStageCreateInfo rmiss_shadow = temp;
-    rmiss_shadow.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
-    CreateVkShaderModule("resources/shaders/shadow.rmiss.spv", device, &rmiss_shadow.module);
-    
-    VkPipelineShaderStageCreateInfo rchit = temp;
-    rchit.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-    CreateVkShaderModule("resources/shaders/raytrace.rchit.spv", device, &rchit.module);
-    
-    VkPipelineShaderStageCreateInfo stages[shader_count] = {
-        rgen, rmiss, rmiss_shadow, rchit
-    };
-    create_info.pStages = stages;
-    
-    // GROUPS
-    create_info.groupCount = shader_count;
-    VkRayTracingShaderGroupCreateInfoKHR group_temp = {}; // Used as template
-    group_temp.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-    group_temp.pNext = NULL;
-    group_temp.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-    group_temp.generalShader = VK_SHADER_UNUSED_KHR;
-    group_temp.closestHitShader = VK_SHADER_UNUSED_KHR;
-    group_temp.anyHitShader = VK_SHADER_UNUSED_KHR;
-    group_temp.intersectionShader = VK_SHADER_UNUSED_KHR;
-    group_temp.pShaderGroupCaptureReplayHandle = NULL;
-    
-    VkRayTracingShaderGroupCreateInfoKHR rgen_group = group_temp;
-    rgen_group.generalShader = 0;
-    VkRayTracingShaderGroupCreateInfoKHR rmiss_group = group_temp;
-    rmiss_group.generalShader = 1;
-    VkRayTracingShaderGroupCreateInfoKHR rmiss_shadow_group = group_temp;
-    rmiss_shadow_group.generalShader = 2;
-    VkRayTracingShaderGroupCreateInfoKHR rchit_group = group_temp;
-    rchit_group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-    rchit_group.closestHitShader = 3;
-    VkRayTracingShaderGroupCreateInfoKHR groups[shader_count] = {
-        rgen_group, rmiss_group, rmiss_shadow_group, rchit_group
-    };
-    create_info.pGroups = groups;
-    
-    create_info.maxPipelineRayRecursionDepth = rtx_properties->maxRayRecursionDepth;
-    create_info.pLibraryInfo = NULL;
-    create_info.pLibraryInterface = NULL;
-    create_info.pDynamicState = NULL;
-    create_info.layout = *layout;
-    create_info.basePipelineHandle = NULL;
-    create_info.basePipelineIndex = 0;
-    
-    VkResult result = pfn_vkCreateRayTracingPipelinesKHR(device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline);
-    AssertVkResult(result);
-    
-    vkDestroyShaderModule(device, rgen.module, NULL);
-    vkDestroyShaderModule(device, rmiss.module, NULL);
-    vkDestroyShaderModule(device, rmiss_shadow.module, NULL);
-    vkDestroyShaderModule(device, rchit.module, NULL);
-}
-
-void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
-    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
-    
-    CreatePipeline(context->device, &renderer->layout, &context->rtx_properties, &renderer->pipeline);
-}
-
-// =========================
-//
-// NOTE(Guigui): ACCELERATION STRUCTURES
-//
-// =========================
-
-internal void CreateBLAS(VulkanContext *context, Buffer *vertex_buffer, const u32 vtx_count, Buffer *index_buffer, const u32 primitive_count) {
-    
-    VkAccelerationStructureGeometryKHR geometry = {};
-    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    geometry.pNext = NULL;
-    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-    geometry.geometry.triangles.pNext = NULL;
-    geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-    geometry.geometry.triangles.vertexData.deviceAddress = vertex_buffer->address;
-    geometry.geometry.triangles.vertexStride = sizeof(vec3);
-    geometry.geometry.triangles.maxVertex = vtx_count;
-    geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-    geometry.geometry.triangles.indexData.deviceAddress = index_buffer->address;
-    geometry.geometry.triangles.transformData.deviceAddress = VK_NULL_HANDLE;
-    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-    
-    VkAccelerationStructureBuildGeometryInfoKHR build_info = {};
-    build_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-    build_info.pNext = NULL;
-    build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-    build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-    build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-    build_info.srcAccelerationStructure = VK_NULL_HANDLE;
-    build_info.geometryCount = 1;
-    build_info.pGeometries = &geometry;
-    build_info.ppGeometries = NULL;
-    build_info.scratchData.deviceAddress = NULL;
-    
-    // Query the build size
-    VkAccelerationStructureBuildSizesInfoKHR size_info = {};
-    size_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-    pfn_vkGetAccelerationStructureBuildSizesKHR(context->device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_info, &primitive_count, &size_info);
-    
-    //Alloc the scratch buffer
-    Buffer scratch;
-    CreateBuffer(context, size_info.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scratch);
-    build_info.scratchData.deviceAddress = scratch.address;
-    
-    //Alloc the blas buffer
-    CreateBuffer(context, size_info.accelerationStructureSize, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->BLAS_buffer);
-    DEBUGNameBuffer(context->device, &context->BLAS_buffer, "BLAS");
-    
-    VkAccelerationStructureCreateInfoKHR blas_ci = {};
-    blas_ci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-    blas_ci.pNext = NULL;
-    blas_ci.createFlags = 0;
-    blas_ci.buffer = context->BLAS_buffer.buffer;
-    blas_ci.offset = 0;
-    blas_ci.size = size_info.accelerationStructureSize; // Will be queried below
-    blas_ci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-    blas_ci.deviceAddress = 0;
-    VkResult result = pfn_vkCreateAccelerationStructureKHR(context->device, &blas_ci, NULL, &context->BLAS);
-    AssertVkResult(result);
-    DEBUGNameObject(context->device, (u64)context->BLAS, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, "BLAS");
-    
-    
-    // Now build it !!
-    build_info.dstAccelerationStructure = context->BLAS;
-    VkAccelerationStructureBuildRangeInfoKHR range_info = { primitive_count, 0, 0, 0 };
-    VkAccelerationStructureBuildRangeInfoKHR* infos[] = { &range_info }; 
-    
-    VkCommandBuffer cmd_buffer;
-    AllocateCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
-    BeginCommandBuffer(context->device, cmd_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    pfn_vkCmdBuildAccelerationStructuresKHR(cmd_buffer, 1, &build_info, infos);
-    VkMemoryBarrier barrier = {
-        VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-        NULL, 
-        VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-        VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
-    };
-    
-    vkCmdPipelineBarrier(cmd_buffer,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         0,
-                         1, &barrier,
-                         0, NULL, 0, NULL);
-    vkEndCommandBuffer(cmd_buffer);
-    VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmd_buffer, 0, NULL};
-    vkQueueSubmit(context->graphics_queue, 1, &si, VK_NULL_HANDLE);
-    vkQueueWaitIdle(context->graphics_queue);
-    
-    vkFreeCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
-    DestroyBuffer(context->device, &scratch);
-}
-
-internal void CreateBLASGLTF(VulkanContext *context, cgltf_mesh *mesh, Buffer *buffer) {
-    
-    if(mesh->primitives_count > 1) {
-        SDL_LogError(0, "Multiple primitives, not supported... yet");
-        ASSERT(0);
-    }
-    cgltf_primitive *primitive = &mesh->primitives[0];
-    
-    VkAccelerationStructureGeometryKHR geometry = {};
-    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    geometry.pNext = NULL;
-    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-    geometry.geometry.triangles.pNext = NULL;
-    
-    u32 triangle_count = 0;
-    
-    // Vertex
-    for(u32 i = 0; i < primitive->attributes_count; i ++) {
-        if(primitive->attributes[i].type == cgltf_attribute_type_position) {
-            cgltf_accessor *position_data = primitive->attributes[i].data;
-            
-            if(position_data->component_type == cgltf_component_type_r_32f) {
-                geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-            }
-            
-            geometry.geometry.triangles.vertexData.deviceAddress = buffer->address + position_data->offset + position_data->buffer_view->offset;
-            geometry.geometry.triangles.vertexStride = position_data->stride;
-            geometry.geometry.triangles.maxVertex = position_data->count;
-            break;
-        }
-    }
-    // Index
-    if(primitive->indices){
-        cgltf_accessor *indices = primitive->indices;
-        if(indices->component_type == cgltf_component_type_r_16u) {
-            geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT16;
-        } else {
-            ASSERT(0);
-        }
-        triangle_count = indices->count / 3;
-        geometry.geometry.triangles.indexData.deviceAddress = buffer->address + primitive->indices->buffer_view->offset;
-    } else {
-        SDL_LogError(0, "Unindexed meshed are not supported ??, ... yet");
-        ASSERT(0);
-    }
-    
-    geometry.geometry.triangles.transformData.deviceAddress = VK_NULL_HANDLE;
-    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-    
-    VkAccelerationStructureBuildGeometryInfoKHR build_info = {};
-    build_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-    build_info.pNext = NULL;
-    build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-    build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-    build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-    build_info.srcAccelerationStructure = VK_NULL_HANDLE;
-    build_info.geometryCount = 1;
-    build_info.pGeometries = &geometry;
-    build_info.ppGeometries = NULL;
-    build_info.scratchData.deviceAddress = NULL;
-    
-    // Query the build size
-    VkAccelerationStructureBuildSizesInfoKHR size_info = {};
-    size_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-    pfn_vkGetAccelerationStructureBuildSizesKHR(context->device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_info, &triangle_count, &size_info);
-    
-    //Alloc the scratch buffer
-    Buffer scratch;
-    CreateBuffer(context, size_info.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scratch);
-    build_info.scratchData.deviceAddress = scratch.address;
-    
-    //Alloc the blas buffer
-    CreateBuffer(context, size_info.accelerationStructureSize, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->BLAS_buffer);
-    DEBUGNameBuffer(context->device, &context->BLAS_buffer, "BLAS");
-    
-    VkAccelerationStructureCreateInfoKHR blas_ci = {};
-    blas_ci.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-    blas_ci.pNext = NULL;
-    blas_ci.createFlags = 0;
-    blas_ci.buffer = context->BLAS_buffer.buffer;
-    blas_ci.offset = 0;
-    blas_ci.size = size_info.accelerationStructureSize; // Will be queried below
-    blas_ci.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-    blas_ci.deviceAddress = 0;
-    VkResult result = pfn_vkCreateAccelerationStructureKHR(context->device, &blas_ci, NULL, &context->BLAS);
-    AssertVkResult(result);
-    DEBUGNameObject(context->device, (u64)context->BLAS, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, "BLAS");
-    
-    
-    // Now build it !!
-    build_info.dstAccelerationStructure = context->BLAS;
-    VkAccelerationStructureBuildRangeInfoKHR range_info = { triangle_count, 0, 0, 0 };
-    VkAccelerationStructureBuildRangeInfoKHR* infos[] = { &range_info }; 
-    
-    VkCommandBuffer cmd_buffer;
-    AllocateCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
-    BeginCommandBuffer(context->device, cmd_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    pfn_vkCmdBuildAccelerationStructuresKHR(cmd_buffer, 1, &build_info, infos);
-    VkMemoryBarrier barrier = {
-        VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-        NULL, 
-        VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-        VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
-    };
-    
-    vkCmdPipelineBarrier(cmd_buffer,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         0,
-                         1, &barrier,
-                         0, NULL, 0, NULL);
-    vkEndCommandBuffer(cmd_buffer);
-    VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmd_buffer, 0, NULL};
-    vkQueueSubmit(context->graphics_queue, 1, &si, VK_NULL_HANDLE);
-    vkQueueWaitIdle(context->graphics_queue);
-    
-    vkFreeCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
-    DestroyBuffer(context->device, &scratch);
-    
-}
-
-internal void CreateTLAS(VulkanContext *context) {
-    
-    const u32 primitive_count = 1;
-    
-    mat4 mat = {};
-    mat = mat4_identity();
-    mat4_transpose(&mat);
-    VkTransformMatrixKHR xform = {};
-    memcpy(&xform, &mat, sizeof(xform));
-    
-    VkAccelerationStructureDeviceAddressInfoKHR info = {};
-    info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-    info.pNext = NULL;
-    info.accelerationStructure = context->BLAS;
-    
-    VkAccelerationStructureInstanceKHR instance = {};
-    instance.transform = xform;
-    instance.instanceCustomIndex = 0;
-    instance.mask = 0xFF;
-    instance.instanceShaderBindingTableRecordOffset = 0;
-    instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR ;
-    instance.accelerationStructureReference = (u64)pfn_vkGetAccelerationStructureDeviceAddressKHR(context->device, &info);
-    
-    CreateBuffer(context, sizeof(VkAccelerationStructureInstanceKHR),  VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->instance_data);
-    DEBUGNameBuffer(context->device, &context->instance_data, "Instance Data");
-    UploadToBuffer(context->device, &context->instance_data, &instance, sizeof(VkAccelerationStructureInstanceKHR));
-    
-    VkAccelerationStructureGeometryKHR geometry = {};
-    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    geometry.pNext = NULL;
-    geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-    geometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-    geometry.geometry.instances.pNext = NULL;
-    geometry.geometry.instances.arrayOfPointers = VK_FALSE;
-    geometry.geometry.instances.data.deviceAddress = context->instance_data.address;
-    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-    
-    VkAccelerationStructureBuildGeometryInfoKHR build_info = {};
-    build_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-    build_info.pNext = NULL;
-    build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR ;
-    build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-    build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-    build_info.srcAccelerationStructure = VK_NULL_HANDLE;
-    build_info.dstAccelerationStructure = VK_NULL_HANDLE; // Set below
-    build_info.geometryCount = 1;
-    build_info.pGeometries = &geometry;
-    build_info.ppGeometries = NULL;
-    build_info.scratchData.deviceAddress = NULL; // Set below
-    
-    //Get size info
-    VkAccelerationStructureBuildSizesInfoKHR size_info = {};
-    size_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-    pfn_vkGetAccelerationStructureBuildSizesKHR(context->device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_info, &primitive_count, &size_info);
-    CreateBuffer(context, size_info.accelerationStructureSize, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->TLAS_buffer);
-    DEBUGNameBuffer(context->device, &context->TLAS_buffer, "TLAS");
-    Buffer scratch;
-    CreateBuffer(context, size_info.buildScratchSize,  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scratch);
-    
-    VkAccelerationStructureCreateInfoKHR create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-    create_info.pNext = NULL;
-    create_info.createFlags = 0;
-    create_info.buffer = context->TLAS_buffer.buffer;
-    create_info.offset = 0;
-    create_info.size = size_info.accelerationStructureSize; 
-    create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-    create_info.deviceAddress = 0;
-    AssertVkResult(pfn_vkCreateAccelerationStructureKHR(context->device, &create_info, NULL, &context->TLAS));
-    DEBUGNameObject(context->device, (u64)context->TLAS, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, "TLAS");
-    
-    // Now build it
-    build_info.dstAccelerationStructure = context->TLAS;
-    build_info.scratchData.deviceAddress = scratch.address;
-    
-    VkAccelerationStructureBuildRangeInfoKHR range_info = { primitive_count, 0, 0, 0 };
-    VkAccelerationStructureBuildRangeInfoKHR* infos[] = { &range_info }; 
-    
-    vkDeviceWaitIdle(context->device);
-    
-    VkCommandBuffer cmd_buffer;
-    AllocateCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
-    BeginCommandBuffer(context->device, cmd_buffer, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    
-    VkMemoryBarrier barrier = {
-        VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-        NULL, 
-        VK_ACCESS_TRANSFER_WRITE_BIT,
-        VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR
-    };
-    
-    vkCmdPipelineBarrier(cmd_buffer,
-                         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-                         0,
-                         1, &barrier,
-                         0, NULL, 0, NULL);
-    
-    pfn_vkCmdBuildAccelerationStructuresKHR(cmd_buffer, 1, &build_info, infos);
-    vkEndCommandBuffer(cmd_buffer);
-    
-    VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmd_buffer, 0, NULL};
-    vkQueueSubmit(context->graphics_queue, 1, &si, VK_NULL_HANDLE);
-    vkQueueWaitIdle(context->graphics_queue);
-    
-    vkFreeCommandBuffers(context->device, context->graphics_command_pool, 1, &cmd_buffer);
-    DestroyBuffer(context->device, &scratch);
-}
-
-// =========================
-//
-// NOTE(Guigui): RENDERING
-//
-// =========================
-
-void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
-    UploadToBuffer(context->device, &context->cam_buffer, &game_data->cam_matrix, sizeof(game_data->cam_matrix));
-}
-
-void VulkanDrawFrame(VulkanContext *context, VulkanRenderer *pipeline) {
     u32 image_id;
     Swapchain* swapchain = &context->swapchain;
     
@@ -1403,77 +1101,31 @@ void VulkanDrawFrame(VulkanContext *context, VulkanRenderer *pipeline) {
     AssertVkResult(result);// TODO(Guigui): Recreate swapchain if Suboptimal or outofdate;
     
     // If the frame hasn't finished rendering wait for it to finish
-    result = vkWaitForFences(context->device, 1, &swapchain->fences[image_id], VK_TRUE, UINT64_MAX);
-    AssertVkResult(result);
+    AssertVkResult(vkWaitForFences(context->device, 1, &swapchain->fences[image_id], VK_TRUE, UINT64_MAX));
+    
     vkResetFences(context->device, 1, &swapchain->fences[image_id]);
     
     VkCommandBuffer cmd = swapchain->command_buffers[image_id];
     
     const VkCommandBufferBeginInfo begin_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL, 0, NULL };
-    result = vkBeginCommandBuffer(cmd, &begin_info);
-    AssertVkResult(result);
+    AssertVkResult(vkBeginCommandBuffer(cmd, &begin_info));
     
-    VkImageMemoryBarrier img_barrier = {};
-    img_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    img_barrier.pNext = NULL;
-    img_barrier.srcAccessMask = 0;
-    img_barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    img_barrier.image = pipeline->render_image.image;
-    img_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,0, 0,NULL, 0, NULL, 1, &img_barrier);
+    VkRenderPassBeginInfo renderpass_begin = {};
+    renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderpass_begin.pNext = 0;
+    renderpass_begin.renderPass = renderer->render_pass;
+    renderpass_begin.framebuffer = renderer->framebuffers[image_id];
+    renderpass_begin.renderArea = {{0,0}, swapchain->extent};
+    renderpass_begin.clearValueCount = 1;
+    VkClearValue clear_value = {};
+    clear_value.color = {0.0f, 0.0f, 0.0f, 0.0f};
+    renderpass_begin.pClearValues = &clear_value;
+    vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE );
     
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->pipeline);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->layout, 0, pipeline->descriptor_set_count, pipeline->descriptor_sets, 0, 0);
-    vkCmdPushConstants(cmd, pipeline->layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR,
-                       0, pipeline->push_constant_size, &context->push_constants);
     
-    pfn_vkCmdTraceRaysKHR(cmd, &pipeline->strides[0], &pipeline->strides[1], &pipeline->strides[2], &pipeline->strides[3], swapchain->extent.width, swapchain->extent.height, 1);
+    vkCmdEndRenderPass(cmd);
+    AssertVkResult(vkEndCommandBuffer(cmd));
     
-    img_barrier.image = pipeline->render_image.image;
-    img_barrier.srcAccessMask = 0;
-    img_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    img_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    img_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,0, 0,NULL, 0, NULL, 1, &img_barrier);
-    
-    img_barrier.image = swapchain->images[image_id];
-    img_barrier.srcAccessMask = 0;
-    img_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    img_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,0, 0,NULL, 0, NULL, 1, &img_barrier);
-    
-    VkImageCopy image_copy = {};
-    image_copy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-    image_copy.srcOffset = {0, 0, 0};
-    image_copy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-    image_copy.dstOffset = {0, 0, 0};
-    image_copy.extent = { swapchain->extent.width, swapchain->extent.height, 1};
-    vkCmdCopyImage(cmd, pipeline->render_image.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, swapchain->images[image_id], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &image_copy);
-    
-    img_barrier.image = pipeline->render_image.image;
-    img_barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    img_barrier.dstAccessMask = 0;
-    img_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,0, 0,NULL, 0, NULL, 1, &img_barrier);
-    
-    img_barrier.image = swapchain->images[image_id];
-    img_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    img_barrier.dstAccessMask = 0;
-    img_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL; 
-    img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, NULL, 0, NULL, 1, &img_barrier);
-    
-    result = vkEndCommandBuffer(cmd);
-    AssertVkResult(result);
-    
-    // Submit the queue
-    // TODO(Guigui): Record buffers beforehand, no need to do it each frame now
     const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1505,14 +1157,9 @@ void VulkanDrawFrame(VulkanContext *context, VulkanRenderer *pipeline) {
     swapchain->semaphore_id = (swapchain->semaphore_id + 1) % swapchain->image_count;
     
     vkDeviceWaitIdle(context->device);
+    
 }
 
-
-// =========================
-//
-// NOTE(Guigui): ENTRY
-//
-// =========================
 
 VulkanContext* VulkanCreateContext(SDL_Window* window){
     VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
@@ -1550,8 +1197,8 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     context->swapchain.swapchain = VK_NULL_HANDLE; //Not sure if this is required
     CreateOrUpdateSwapchain(context, window, &context->swapchain);
     
-    mat4 id = mat4_identity();
     
+    mat4 id = mat4_identity();
     CreateBuffer(context, sizeof(mat4), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
     UploadToBuffer(context->device, &context->cam_buffer, &id, sizeof(mat4));
     DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
@@ -1559,129 +1206,53 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     return context;
 }
 
-VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, GameCode *game) {
-    VulkanRenderer *pipeline = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
+VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
+    VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
+    CreatePipelineLayout(context->device, renderer);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, &renderer->pipeline, &renderer->render_pass);
     
-    CreateRtxRenderImage(context->device, &context->swapchain, &context->memory_properties,  &pipeline->render_image);
-    
-    CreatePipelineLayout(context->device, &pipeline->render_image, pipeline, game);
-    CreatePipeline(context->device, &pipeline->layout, &context->rtx_properties, &pipeline->pipeline);
-    
-    // SHADER BINDING TABLE
-    {
-        const u32 handle_size = context->rtx_properties.shaderGroupHandleSize;
-        const u32 handle_size_aligned = aligned_size(context->rtx_properties.shaderGroupHandleSize, context->rtx_properties.shaderGroupHandleAlignment);
-        const u32 group_count = 4;
-        const u32 sbt_size = group_count * handle_size_aligned;
+    // Framebuffers
+    renderer->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         
-        CreateBuffer(context, handle_size_aligned, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &pipeline->rgen_sbt);
-        DEBUGNameBuffer(context->device,  &pipeline->rgen_sbt, "RGEN SBT");
+        VkFramebufferCreateInfo create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        create_info.pNext = NULL;
+        create_info.flags = 0;
+        create_info.renderPass = renderer->render_pass;
+        create_info.attachmentCount = 1;
+        create_info.pAttachments = &context->swapchain.image_views[i];
+        create_info.width = context->swapchain.extent.width;
+        create_info.height = context->swapchain.extent.height;
+        create_info.layers = 1;
+        AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &renderer->framebuffers[i]));
         
-        CreateBuffer(context, handle_size_aligned, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &pipeline->rmiss_sbt);
-        DEBUGNameBuffer(context->device,  &pipeline->rmiss_sbt, "RMISS SBT");
-        
-        CreateBuffer(context, handle_size_aligned, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &pipeline->rchit_sbt);
-        DEBUGNameBuffer(context->device,  &pipeline->rchit_sbt, "RCHIT SBT");
-        
-        
-        u8* data = (u8*)malloc(sbt_size);
-        
-        VkResult result = pfn_vkGetRayTracingShaderGroupHandlesKHR(context->device, pipeline->pipeline, 0, group_count, sbt_size, data);
-        AssertVkResult(result);
-        
-        UploadToBuffer(context->device, &pipeline->rgen_sbt, data, handle_size_aligned);
-        UploadToBuffer(context->device, &pipeline->rmiss_sbt, data + handle_size_aligned, handle_size_aligned * 2);
-        UploadToBuffer(context->device, &pipeline->rchit_sbt, data + (3 * handle_size_aligned), handle_size_aligned);
-        
-        pipeline->strides[0] ={ pipeline->rgen_sbt.address, handle_size_aligned, handle_size_aligned };
-        pipeline->strides[1] ={ pipeline->rmiss_sbt.address, handle_size_aligned, handle_size_aligned };
-        pipeline->strides[2] ={ pipeline->rchit_sbt.address, handle_size_aligned, handle_size_aligned };
-        pipeline->strides[3] ={ 0u, 0u, 0u };
-        free(data);
     }
-#if 0
-    u32 vtx_count = 0;
-    u32 idx_count = 0;
-    game->GetScene(&vtx_count, NULL, &idx_count, NULL);
-    vec3 *vertices = (vec3 *)calloc(vtx_count, sizeof(vec3));
-    u32 *indices = (u32 *)calloc(idx_count, sizeof(u32));
-    game->GetScene(&vtx_count, vertices, &idx_count, indices);
     
-    CreateBuffer(context, sizeof(vec3) * vtx_count, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->vertex_buffer);
-    DEBUGNameBuffer(context->device, &context->vertex_buffer, "Vertices");
-    UploadToBuffer(context->device, &context->vertex_buffer, (void*)vertices, sizeof(vec3) * vtx_count);
+    WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
     
-    CreateBuffer(context, sizeof(u32) * idx_count, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->index_buffer);
-    DEBUGNameBuffer(context->device, &context->index_buffer, "Indices");
-    UploadToBuffer(context->device, &context->index_buffer, (void*)indices, sizeof(u32) * idx_count);
-    
-    free(vertices);
-    free(indices);
-    
-    const u32 primitive_count = idx_count / 3;
-    CreateBLAS(context, &context->vertex_buffer, vtx_count, &context->index_buffer, primitive_count);
-#endif
-    // NEW METHOD; from gltf
-#if 1
-    cgltf_options options = {0};
-    cgltf_data *data = NULL;
-    const char * file = "resources/models/box/Box.gltf";
-    cgltf_result result = cgltf_parse_file(&options, file, &data);
-    if(result != cgltf_result_success) {
-        SDL_LogError(0, "Error reading scene");
-        ASSERT(0);
-    }
-    cgltf_load_buffers(&options, data, file);
-    
-    CreateBuffer(context, data->buffers[0].size, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR,VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->gltf_buffer);
-    DEBUGNameBuffer(context->device, &context->gltf_buffer, "GLTF");
-    UploadToBuffer(context->device, &context->gltf_buffer, data->buffers[0].data, data->buffers[0].size);
-    
-    if(data->meshes_count > 1) {
-        SDL_LogError(0, "Multiple meshes not supported, yet");
-        ASSERT(0);
-    }
-    CreateBLASGLTF(context, &data->meshes[0], &context->gltf_buffer);
-    
-    cgltf_free(data);
-#endif
-    CreateTLAS(context);
-    
-    WriteDescriptorSets(context->device, pipeline->descriptor_sets, pipeline, context);
-    
-    return pipeline;
-    
+    return renderer;
 }
 
-void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *pipeline) {
+void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     
-    DestroyBuffer(context->device, &context->gltf_buffer);
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+        
+        vkDestroyFramebuffer(context->device, renderer->framebuffers[i], NULL);
+        
+    }
+    free(renderer->framebuffers);
     
-    DestroyBuffer(context->device, &context->TLAS_buffer);
-    pfn_vkDestroyAccelerationStructureKHR(context->device, context->TLAS, NULL);
-    DestroyBuffer(context->device, &context->instance_data);
-#if 0
-    DestroyBuffer(context->device, &context->vertex_buffer);
-    DestroyBuffer(context->device, &context->index_buffer);
-#endif
-    DestroyBuffer(context->device, &context->BLAS_buffer);
-    pfn_vkDestroyAccelerationStructureKHR(context->device, context->BLAS, NULL);
+    vkDestroyRenderPass(context->device, renderer->render_pass, NULL);
     
-    DestroyBuffer(context->device, &pipeline->rgen_sbt);
-    DestroyBuffer(context->device, &pipeline->rmiss_sbt);
-    DestroyBuffer(context->device, &pipeline->rchit_sbt);
-    DestroyImage(context->device, &pipeline->render_image);
+    vkFreeDescriptorSets(context->device, renderer->descriptor_pool, 1, renderer->descriptor_sets);
+    vkDestroyDescriptorPool(context->device, renderer->descriptor_pool, NULL);
     
-    vkFreeDescriptorSets(context->device, pipeline->descriptor_pool, 2, pipeline->descriptor_sets);
-    vkDestroyDescriptorPool(context->device, pipeline->descriptor_pool, NULL);
+    vkDestroyDescriptorSetLayout(context->device, renderer->game_set_layout, NULL);
+    vkDestroyPipelineLayout(context->device, renderer->layout, NULL);
+    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
     
-    vkDestroyDescriptorSetLayout(context->device, pipeline->app_set_layout, NULL);
-    vkDestroyDescriptorSetLayout(context->device, pipeline->game_set_layout, NULL);
-    vkDestroyPipelineLayout(context->device, pipeline->layout, NULL);
-    vkDestroyPipeline(context->device, pipeline->pipeline, NULL);
-    
-    free(pipeline);
-    
+    free(renderer);
 }
 
 void VulkanDestroyContext(VulkanContext *context){
@@ -1690,7 +1261,7 @@ void VulkanDestroyContext(VulkanContext *context){
     
     DestroyBuffer(context->device, &context->cam_buffer);
     
-    DestroySwapchainContext(context, &context->swapchain);
+    DestroySwapchain(context, &context->swapchain);
     vkDestroySwapchainKHR(context->device, context->swapchain.swapchain, NULL);
     vkDestroySurfaceKHR(context->instance, context->surface, NULL);
     

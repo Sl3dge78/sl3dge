@@ -7,6 +7,10 @@
 
 #define PI 3.1415926535897932384626433f
 
+u32 aligned_size(const u32 value, const u32 alignment) {
+    return (value + alignment - 1) & ~(alignment - 1);
+}
+
 typedef struct vec4 {
     alignas(4) float x;
     alignas(4) float y;

@@ -24,6 +24,7 @@ typedef struct GameCode {
 } GameCode;
 
 #include "vulkan.cpp"
+#include "vulkan_rtx.cpp"
 
 typedef struct ShaderCode {
     char *spv_path;
@@ -108,10 +109,6 @@ internal u32* Win32AllocateAndLoadBinary(const char* path, i64 *file_size) {
     return result;
 }
 
-inline void Win32WaitForConsoleClose() {
-    while(true);
-}
-
 internal int main(int argc, char *argv[]) {
     
 #if DEBUG
@@ -126,7 +123,8 @@ internal int main(int argc, char *argv[]) {
     
     GameCode game_code = {};
     Win32LoadGameCode(&game_code);
-    VulkanRenderer *renderer = VulkanCreateRenderer(context, &game_code);
+    
+    VulkanRenderer *renderer = VulkanCreateRenderer(context);
     
     SDL_Log("Vulkan Succesfully Loaded!");
     SDL_ShowWindow(window);
@@ -165,7 +163,7 @@ internal int main(int argc, char *argv[]) {
             
             if(Win32LoadGameCode(&game_code)) {
                 VulkanDestroyRenderer(context, renderer);
-                renderer = VulkanCreateRenderer(context, &game_code);
+                renderer = VulkanCreateRenderer(context);
                 SDL_Log("Game code successfully reloaded");
             }
         }
