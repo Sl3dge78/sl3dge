@@ -3,8 +3,8 @@ resources/models
 *.pdb
 *.ilk
 *.obj
-bin/game.dll
-bin/game.exp
-bin/game.lib
-bin/vulkan.exe
+bin/*.dll
+bin/*.exp
+bin/*.lib
+bin/*.exe
 *.rdbg
