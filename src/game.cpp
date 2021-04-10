@@ -2,11 +2,20 @@
 
 #include <string.h>
 
-// Todo/idea list 
-//
-// Make our own console, in-engine
-// 
-//  
+/*
+=== TODO ===
+
+ CRITICAL
+
+ MAJOR
+
+ BACKLOG
+
+ IMPROVEMENTS
+
+ IDEAS
+ 
+*/
 
 extern "C" __declspec(dllexport) GAME_START(GameStart) {
     game_data->cam_matrix = mat4_identity();

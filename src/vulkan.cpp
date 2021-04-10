@@ -1,12 +1,24 @@
 #include <SDL/SDL_vulkan.h>
 
-// TODO LIST
-//
-// Normals
-// Envoyer les buffers au shaders
-// Scene data (qui vient du gltf) 
-// Staging buffers
-// 
+/*
+ === TODO ===
+ CRITICAL
+ - Draw the cube in raster
+
+ MAJOR
+  - Remove RTX from reqs
+
+ BACKLOG
+ - Normals
+  - Window Resize
+
+ IMPROVEMENTS
+ - Envoyer les buffers au shaders
+ - Scene data (qui vient du gltf) 
+ - Staging buffers
+ - Handle pipeline caches
+ - Pipline dynamic states ?
+*/
 
 #define DECL_FUNC(name) global PFN_##name pfn_##name
 #define LOAD_INSTANCE_FUNC(instance, name) pfn_##name = (PFN_##name)vkGetInstanceProcAddr(instance, #name); \

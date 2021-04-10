@@ -11,6 +11,22 @@
 
 #include <windows.h>
 
+/* 
+=== TODO ===
+
+ CRITICAL
+
+ MAJOR
+
+ BACKLOG
+
+ IMPROVEMENTS
+
+ IDEAS
+ - In game console
+
+*/
+
 u32* Win32AllocateAndLoadBinary(const char* path, i64 *file_size);
 
 typedef struct GameCode {
@@ -60,7 +76,8 @@ internal bool Win32LoadGameCode(GameCode* game_code) {
     // Try to copy, if we can do it, compiler is done so we can load it
     // If not, compiler is not done, so copy fails and we're loading the previous one
     if(CopyFile(game_code->dll_path, "bin\\game_temp.dll", FALSE)) {
-        game_code->last_write_time = Win32GetLastWriteTime(game_code->dll_path); // Write only if we were able to copy so that we can retry loading later
+        // We were able to copy
+        game_code->last_write_time = Win32GetLastWriteTime(game_code->dll_path); 
         result = true;
     } else {
         result = false;
@@ -88,7 +105,7 @@ internal void Win32UnloadGameCode(GameCode* game_code) {
     game_code->GameStart = GameStartStub;
 }
 
-// TODO(Guigui): Use win32 api. This allocates memory, free it!
+// This allocates memory, free it!
 internal u32* Win32AllocateAndLoadBinary(const char* path, i64 *file_size) {
     
     FILE *file = fopen(path,"rb");
@@ -157,10 +174,10 @@ internal int main(int argc, char *argv[]) {
             SDL_Log("Shaders reloaded");
         }
         
+        // Reload gamecode if necessary
         FILETIME game_code_time = Win32GetLastWriteTime(game_code.dll_path);
         if(CompareFileTime(&game_code.last_write_time, &game_code_time)){
             Win32UnloadGameCode(&game_code);
-            
             if(Win32LoadGameCode(&game_code)) {
                 VulkanDestroyRenderer(context, renderer);
                 renderer = VulkanCreateRenderer(context);

@@ -1,9 +1,25 @@
 #include <math.h>
 
-// TODO LIST
-//
-// Matrix operations (rotate, look at, ...)
-// TRS to mat4 ce serait chouette aussi
+/* 
+=== TODO ===
+
+ CRITICAL
+
+ MAJOR
+
+ BACKLOG
+
+ - mat4 lookat
+
+ IMPROVEMENTS
+
+- quaternions
+
+ IDEAS
+ 
+
+*/
+
 
 #define PI 3.1415926535897932384626433f
 
