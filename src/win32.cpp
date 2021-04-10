@@ -187,8 +187,6 @@ internal int main(int argc, char *argv[]) {
     SDL_DestroyWindow(window);
     SDL_Quit();
     
-    if(0 || DEBUGDumpMemoryLeaks()) {
-        Win32WaitForConsoleClose();
-    }
+    DBG_END();
     return (0);
 }

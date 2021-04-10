@@ -4,6 +4,11 @@
 
 #define ASSERT(expression) if(!(expression)) { *(int *)0 = 0;}
 
+global bool DBG_keep_console_open = false;
+#define KEEP_CONSOLE_OPEN(value) DBG_keep_console_open |= value
+
+#define DBG_END() PerformEndChecks()
+
 typedef struct MemoryInfo {
 	void *ptr;
 	size_t size;
@@ -24,7 +29,7 @@ internal void add_memory_info(void *ptr, size_t size, char *filename, u32 line) 
     
 	leak->info.ptr = ptr;
 	leak->info.size = size;
-	leak->info.file = filename;
+	leak->info.file = filename+26;
 	leak->info.line = line;
 	leak->next = NULL;
     
@@ -109,7 +114,7 @@ void DBG_free(void *ptr) {
 	free(ptr);
 }
 
-bool DEBUGDumpMemoryLeaks() {
+bool DBG_DumpMemoryLeaks() {
 	int count = 0;
 	for (MemoryLeak *leak = array_start; leak != NULL; leak = leak->next) {
 		SDL_LogError(0, "Memory leak found - Address: %p | Size: %06d | Last alloc: %s:%d", leak->info.ptr, (u64)leak->info.size, leak->info.file, leak->info.line);
@@ -117,6 +122,15 @@ bool DEBUGDumpMemoryLeaks() {
 	}
     clear_array();
     return count;
+}
+
+void PerformEndChecks() {
+    
+    DBG_keep_console_open |= DBG_DumpMemoryLeaks();
+    
+    if(DBG_keep_console_open) {
+        while(1);
+    }
 }
 
 #define malloc(size) DBG_malloc(size, __FILE__, __LINE__)
@@ -127,5 +141,7 @@ bool DEBUGDumpMemoryLeaks() {
 #else // #if DEBUG
 
 #define ASSERT(expression)
+#define KEEP_CONSOLE_OPEN(value)
+#define DBG_END()
 
 #endif // #if DEBUG
