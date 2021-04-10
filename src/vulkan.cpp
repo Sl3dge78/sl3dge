@@ -785,14 +785,14 @@ internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet* 
     };
     
     VkWriteDescriptorSet app_writes[2] = {
-        { 
+        { // Rneder image
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             NULL,
             *descriptor_set,
             0, 0, 1,
             VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, &img_info, NULL, NULL
         },
-        { 
+        { // Acceleration Structure
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, 
             &as_write,
             *descriptor_set,
@@ -800,6 +800,7 @@ internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet* 
             VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
             NULL, NULL, NULL
         }
+        
     };
     
     vkUpdateDescriptorSets(device, 2, app_writes, 0, NULL);
@@ -807,7 +808,10 @@ internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet* 
     u32 game_writes_count = 1;
     VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
     VkWriteDescriptorSet game_writes[1];
-    game_writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[1], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
+    game_writes[0] = {
+        { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[1], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL},
+        { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[1], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL}
+    };
     
     vkUpdateDescriptorSets(device, game_writes_count, game_writes, 0, NULL);
 }
