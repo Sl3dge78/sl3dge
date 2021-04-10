@@ -4,3 +4,7 @@ resources/models
 *.ilk
 *.obj
 bin/game.dll
+bin/game.exp
+bin/game.lib
+bin/vulkan.exe
+*.rdbg
