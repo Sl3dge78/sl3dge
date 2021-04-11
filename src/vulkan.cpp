@@ -74,6 +74,9 @@ typedef struct VulkanRenderer {
     
     VkFramebuffer *framebuffers;
     
+    Buffer vtx_buffer;
+    Buffer idx_buffer;
+    
 } VulkanRenderer;
 
 typedef struct VulkanContext {
@@ -820,21 +823,22 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input.pNext = NULL;
     vertex_input.flags = 0;
+    vertex_input.vertexBindingDescriptionCount = 0;
+    vertex_input.vertexAttributeDescriptionCount = 0;
+    /*
     vertex_input.vertexBindingDescriptionCount = 1;
-    
     VkVertexInputBindingDescription vtx_input_binding = {};
     vtx_input_binding.binding = 0;
-    vtx_input_binding.stride = 12; // TODO(Guigui): Needs to be dependent on the gltf
-    vtx_input_binding.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+    vtx_input_binding.stride = sizeof(vec3); // TODO(Guigui): Needs to be dependent on the gltf
+    vtx_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     vertex_input.pVertexBindingDescriptions = &vtx_input_binding;
     
-    vertex_input.vertexAttributeDescriptionCount = 2;
+    vertex_input.vertexAttributeDescriptionCount = 1;
     VkVertexInputAttributeDescription vtx_descriptions[] = {
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 288}, // Position
-        {1, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}    // Normal
-        
+        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, // Position
     };
     vertex_input.pVertexAttributeDescriptions = vtx_descriptions;
+*/
     pipeline_ci.pVertexInputState = &vertex_input;
     
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {};
@@ -874,8 +878,8 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     rasterization_state.depthClampEnable = VK_FALSE;
     rasterization_state.rasterizerDiscardEnable = VK_FALSE;
     rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterization_state.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterization_state.cullMode = VK_CULL_MODE_NONE;
+    rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterization_state.depthBiasEnable = VK_FALSE;
     rasterization_state.depthBiasConstantFactor = 0.f;
     rasterization_state.depthBiasClamp = 0.f;
@@ -906,15 +910,16 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     
     VkPipelineColorBlendAttachmentState color_blend_attachement = {};
     color_blend_attachement.blendEnable = VK_FALSE;
+    color_blend_attachement.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT ;
     /*
-    VkBlendFactor            srcColorBlendFactor;
-    VkBlendFactor            dstColorBlendFactor;
-    VkBlendOp                colorBlendOp;
-    VkBlendFactor            srcAlphaBlendFactor;
-    VkBlendFactor            dstAlphaBlendFactor;
-    VkBlendOp                alphaBlendOp;
-    VkColorComponentFlags    colorWriteMask;
-*/
+        VkBlendFactor            srcColorBlendFactor;
+        VkBlendFactor            dstColorBlendFactor;
+        VkBlendOp                colorBlendOp;
+        VkBlendFactor            srcAlphaBlendFactor;
+        VkBlendFactor            dstAlphaBlendFactor;
+        VkBlendOp                alphaBlendOp;
+        
+    */
     color_blend_state.attachmentCount = 1;
     color_blend_state.pAttachments = &color_blend_attachement;
     color_blend_state.blendConstants[0] = 0.0f;
@@ -957,8 +962,6 @@ internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet *
     vkUpdateDescriptorSets(device, game_writes_count, game_writes, 0, NULL);
 }
 
-
-
 internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer) {
     
     // Set Layout
@@ -971,20 +974,6 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     renderer->descriptor_set_count = 1;
     
     const u32 app_descriptor_count = 0;
-    /*
-    VkDescriptorSetLayoutBinding app_bindings[app_descriptor_count] = {};
-    app_bindings[0] = { 0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR, NULL };
-    app_bindings[1] = { 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, NULL };
-    
-    VkDescriptorSetLayoutCreateInfo app_set_create_info = {};
-    app_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    app_set_create_info.pNext = NULL;
-    app_set_create_info.flags = 0;
-    app_set_create_info.bindingCount = app_descriptor_count;
-    app_set_create_info.pBindings = app_bindings;
-    VkResult result = vkCreateDescriptorSetLayout(device, &app_set_create_info, NULL, &renderer->app_set_layout);
-    AssertVkResult(result);
-    */
     
     // Get the game set layout
     const VkDescriptorSetLayoutBinding game_bindings[] = {
@@ -1042,17 +1031,6 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     };
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
     
-    
-    // App
-    /*
-    for(u32 d = 0; d < app_descriptor_count; d++) {
-        for(u32 i = 0; i < pool_sizes_count ; i ++){
-            if(app_bindings[d].descriptorType == pool_sizes[i].type) {
-                pool_sizes[i].descriptorCount ++;
-            }
-        }
-    }
-*/
     
     //Game
     for(u32 d = 0; d < game_descriptor_count; d++) {
@@ -1130,10 +1108,19 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     renderpass_begin.renderArea = {{0,0}, swapchain->extent};
     renderpass_begin.clearValueCount = 1;
     VkClearValue clear_value = {};
-    clear_value.color = {0.0f, 0.0f, 0.0f, 0.0f};
+    clear_value.color = {1.0f, 0.0f, 0.0f, 0.0f};
     renderpass_begin.pClearValues = &clear_value;
     vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE );
     
+    VkDeviceSize offset = 0;
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
+    /*
+    vkCmdBindVertexBuffers(cmd, 0, 1, &renderer->vtx_buffer.buffer, &offset);
+    vkCmdBindIndexBuffer(cmd, renderer->idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+*/
+    //vkCmdBindVertexBuffers(cmd, 0, 1, &renderer->vtx_buffer.buffer, &offset);
+    vkCmdDraw(cmd,3,1,0,0);
     
     vkCmdEndRenderPass(cmd);
     AssertVkResult(vkEndCommandBuffer(cmd));
@@ -1169,7 +1156,6 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     swapchain->semaphore_id = (swapchain->semaphore_id + 1) % swapchain->image_count;
     
     vkDeviceWaitIdle(context->device);
-    
 }
 
 
@@ -1241,12 +1227,53 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
         
     }
     
+    const vec3 vtx[] = {
+        {0.0f, 0.f, 0.0f}, {0.0f, 1.f, 0.0f},
+        {1.0f, 0.0f, 0.f}//, {1.0f, 1.0f, 0.0f}
+    };
+    const u32 idx[] = { 
+        0, 3, 1, 0, 2, 3 
+    };
+    
+    
+    CreateBuffer(context, sizeof(vtx), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->vtx_buffer);
+    CreateBuffer(context, sizeof(idx), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->idx_buffer);
+    
+    UploadToBuffer(context->device, &renderer->vtx_buffer, (void *)vtx, sizeof(vtx));
+    UploadToBuffer(context->device, &renderer->idx_buffer, (void *)idx, sizeof(idx));
+    
+    /*
+    // Load gltf
+    cgltf_options options = {0};
+    cgltf_data *data = NULL;
+    const char *file = "resources/models/box/Box.gltf";
+    cgltf_result result = cgltf_parse_file(&options, file, &data);
+    if(result != cgltf_result_success) {
+        SDL_LogError(0, "Error reading scene");
+        ASSERT(0);
+    }
+    cgltf_load_buffers(&options, data, file);
+    
+    CreateBuffer(context, data->buffers[0].size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf_buffer);
+    DEBUGNameBuffer(context->device, &renderer->gltf_buffer, "GLTF");
+    UploadToBuffer(context->device, &renderer->gltf_buffer, data->buffers[0].data, data->buffers[0].size);
+    
+    if(data->meshes_count > 1) {
+        SDL_LogError(0, "Multiple meshes not supported, yet");
+        ASSERT(0);
+    }
+    
+    cgltf_free(data);
+    */
     WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
     
     return renderer;
 }
 
 void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
+    
+    DestroyBuffer(context->device, &renderer->vtx_buffer);
+    DestroyBuffer(context->device, &renderer->idx_buffer);
     
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         

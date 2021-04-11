@@ -101,7 +101,6 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
         }
         if(mouse_y != 0){
             float new_rot = game_data->rotation_x + speed * mouse_y * -2.5f;
-            SDL_Log("%f", new_rot);
             if(new_rot < PI/2.0f && new_rot > -PI/2.0f) {
                 game_data->rotation_x = new_rot;
             }
