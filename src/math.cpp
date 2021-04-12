@@ -27,19 +27,27 @@ u32 aligned_size(const u32 value, const u32 alignment) {
     return (value + alignment - 1) & ~(alignment - 1);
 }
 
+typedef struct vec2 {
+    alignas(4) float x;
+    alignas(4) float y;
+} vec2;
+
+inline void vec2_print(vec2 *v) {
+    SDL_Log("%f, %f", v->x, v->y);
+}
+
+typedef struct vec3 {
+    alignas(4) float x;
+    alignas(4) float y;
+    alignas(4) float z;
+} vec3;
+
 typedef struct vec4 {
     alignas(4) float x;
     alignas(4) float y;
     alignas(4) float z;
     alignas(4) float w;
 } vec4;
-
-typedef struct vec3 {
-    alignas(4) float x;
-    alignas(4) float y;
-    alignas(4) float z;
-    
-} vec3;
 
 vec3 operator+(vec3 l, const vec3 r) {
     l.x += r.x;
@@ -55,26 +63,19 @@ vec3 operator-(vec3 l, const vec3 r) {
     return l;
 };
 
-typedef union mat4 {
-    float v[16];
-    float m[4][4];
-} mat4;
-
-typedef struct quat {
-    float x;
-    float y;
-    float z;
-    float w;
-} quat;
-
-void vec3_add(vec3 *vec, const vec3 add) {
+/// Y up
+inline vec3 spherical_to_carthesian(const vec2 v) {
+    vec3 result;
     
+    result.x = cos(v.x) * sin(v.y);
+    result.y = cos(v.y);
+    result.z = sin(v.x) * sin(v.y);
+    
+    return result;
 }
 
-void vec3_sub(vec3 *vec, const vec3 sub) {
-    vec->x -= sub.x;
-    vec->y -= sub.y;
-    vec->z -= sub.z;
+inline void vec3_print(const vec3 *v) {
+    SDL_Log("%f, %f, %f", v->x, v->y, v->z);
 }
 
 void vec3_fmul(vec3 *vec, const float mul) {
@@ -115,6 +116,11 @@ float vec3_dot(const vec3 a, const vec3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+typedef union mat4 {
+    float v[16];
+    float m[4][4];
+} mat4;
+
 void mat4_print(const mat4* mat) {
     
     SDL_Log("\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f",
@@ -124,7 +130,7 @@ void mat4_print(const mat4* mat) {
             mat->v[12],mat->v[13],mat->v[14],mat->v[15]);
 }
 
-mat4 mat4_mul(mat4* a, const mat4* b) {
+mat4 mat4_mul(const mat4* a, const mat4* b) {
     
     mat4 result = {};
     result.m[0][0] = a->m[0][0] * b->m[0][0] + a->m[0][1] * b->m[1][0] + a->m[0][2] * b->m[2][0] + a->m[0][3] * b->m[3][0];

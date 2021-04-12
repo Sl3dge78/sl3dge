@@ -19,7 +19,7 @@
 
 extern "C" __declspec(dllexport) GAME_START(GameStart) {
     
-    game_data->rotation = { 0.0f };
+    game_data->spherical_coordinates = { 0.0f, PI/2.0f };
     game_data->position = { 0.0f };
     game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.0f, 1000.0f);
     game_data->matrices.view = mat4_identity();
@@ -50,49 +50,7 @@ extern "C" __declspec(dllexport) GAME_GET_SCENE(GameGetScene) {
 
 extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
-    const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
-    
-    bool moved = false;
-    
-    vec3 movement = {};
-    
     const float speed = delta_time;
-    
-    vec3 forward = { (float)sin(-game_data->rotation.y), 0.0f, (float)cos(-game_data->rotation.y)}; 
-    vec3 right = { (float)sin(-game_data->rotation.y - PI/2.f), 0.0f, (float)cos(-game_data->rotation.y - PI/2.f)}; 
-    
-    if(keyboard[SDL_SCANCODE_W]) {
-        movement = movement + vec3_fmul(forward, -speed);
-        moved = true;
-    }
-    if(keyboard[SDL_SCANCODE_S]) {
-        
-        movement = movement + vec3_fmul(forward, speed);
-        moved = true;
-    }
-    if(keyboard[SDL_SCANCODE_A]){
-        movement = movement + vec3_fmul(right, -speed);
-        //movement.x += speed;
-        moved = true;
-    }
-    if(keyboard[SDL_SCANCODE_D]){
-        movement = movement + vec3_fmul(right, speed);
-        //movement.x -= speed;
-        moved = true;
-    }
-    if(keyboard[SDL_SCANCODE_Q]){
-        movement.y -= speed;
-        moved = true;
-    }
-    if(keyboard[SDL_SCANCODE_E]){
-        movement.y += speed;
-        moved = true;
-    }
-    
-    // Reset
-    if(keyboard[SDL_SCANCODE_SPACE]){
-        GameStart(game_data);
-    }
     
     i32 mouse_x;
     i32 mouse_y;
@@ -100,30 +58,65 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     if(mouse_state == SDL_BUTTON(3)) {
         if(mouse_x != 0) {
-            game_data->rotation.y += speed * mouse_x * 2.5f;
-            moved = true;
+            game_data->spherical_coordinates.x += speed * mouse_x * -2.5f;
         }
         if(mouse_y != 0){
-            float new_rot = game_data->rotation.x + speed * mouse_y * -2.5f;
-            if(new_rot < PI/2.0f && new_rot > -PI/2.0f) {
-                game_data->rotation.x = new_rot;
+            float new_rot = game_data->spherical_coordinates.y + speed * mouse_y * -2.5f;
+            if(new_rot > 0.0f && new_rot < PI) {
+                game_data->spherical_coordinates.y = new_rot;
             }
-            moved = true;
         }
         SDL_SetRelativeMouseMode(SDL_TRUE);
     } else {
         SDL_SetRelativeMouseMode(SDL_FALSE);
     }
     
-    if(moved) {
-        mat4_rotate_euler(&game_data->matrices.view, {game_data->rotation.x, 0.0f, 0.0f});
-        mat4_translate(&game_data->matrices.view, movement);
-        
-        
-        game_data->position = game_data->position + movement;
-        //game_data->matrices.view = mat4_look_at({0.0f,-0.5f,0.0f}, game_data->position, {0.0f,1.0f,0.0f} );
-        //game_data->matrices.mesh = mat4_identity();
-        moved = false;
+    vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
+    vec3 right = vec3_cross(forward, vec3{0.0f, 1.0f, 0.0f});
+    vec3 up = vec3_cross(right, forward);
+    
+    /*
+    vec3 right = { (float)sin(-game_data->rotation.y - PI/2.f), 0.0f, (float)cos(-game_data->rotation.y - PI/2.f)}; 
+*/
+    
+    vec3 movement = {};
+    const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
+    if(keyboard[SDL_SCANCODE_W]) {
+        movement = movement + vec3_fmul(forward, speed);
+    }
+    if(keyboard[SDL_SCANCODE_S]) {
+        movement = movement + vec3_fmul(forward,-speed);
+    }
+    if(keyboard[SDL_SCANCODE_A]){
+        movement = movement + vec3_fmul(right, speed);
+    }
+    if(keyboard[SDL_SCANCODE_D]){
+        movement = movement + vec3_fmul(right, -speed);
+    }
+    if(keyboard[SDL_SCANCODE_Q]){
+        movement.y -= speed;
+    }
+    if(keyboard[SDL_SCANCODE_E]){
+        movement.y += speed;
     }
     
+    // Reset
+    if(keyboard[SDL_SCANCODE_SPACE]){
+        GameStart(game_data);
+    }
+    
+    
+    /*
+    mat4_rotate_y(&game_data->matrices.view, game_data->rotation.y);
+    mat4_translate(&game_data->matrices.view, movement);
+    */
+    //mat4_rotate_euler(&game_data->matrices.view, {0.0f, game_data->rotation.y, 0.0f});
+    
+    game_data->position = game_data->position + movement;
+    game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
+    
+    //SDL_Log("%f, %f", game_data->spherical_coordinates.x, game_data->spherical_coordinates.y);
+    vec2_print(&game_data->spherical_coordinates);
+    
+    game_data->matrices.mesh = mat4_mul(&game_data->matrices.view, &game_data->matrices.proj);
 }

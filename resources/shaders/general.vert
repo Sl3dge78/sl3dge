@@ -9,6 +9,7 @@ layout (binding = 0) uniform CameraMatrices {
 
 void main() {
 	
-	gl_Position =vec4(in_position, 1.0) * cam.proj * cam.view;
+	gl_Position = cam.proj * cam.view * vec4(in_position, 1.0);
+    //gl_Position = cam.mesh * vec4(in_position, 1.0);
 
 }
