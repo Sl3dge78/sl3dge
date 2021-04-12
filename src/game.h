@@ -26,10 +26,16 @@ typedef struct PushConstant {
     alignas(16) vec3 light_color;
 } PushConstant;
 
+typedef struct CameraMatrices {
+    alignas(16) mat4 proj;
+    alignas(16) mat4 view;
+    alignas(16) mat4 mesh;
+} CameraMatrices;
+
 typedef struct GameData {
-    mat4 cam_matrix;
-    float rotation_z;
-    float rotation_x;
+    CameraMatrices matrices;
+    vec3 position;
+    vec3 rotation;
 } GameData ;
 
 #define GAME_GET_SCENE(name) void name(u32 *vtx_count, vec3 *vertices, u32 *idx_count, u32 *indices)

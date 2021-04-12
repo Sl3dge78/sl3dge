@@ -18,10 +18,12 @@
 */
 
 extern "C" __declspec(dllexport) GAME_START(GameStart) {
-    game_data->cam_matrix = mat4_identity();
-    game_data->rotation_z = 0.f;
-    game_data->rotation_x = 0.f;
-    mat4_translate(&game_data->cam_matrix, {0.5f, 1.0f, -0.1f});
+    
+    game_data->rotation = { 0.0f };
+    game_data->position = { 0.0f };
+    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.0f, 1000.0f);
+    game_data->matrices.view = mat4_identity();
+    game_data->matrices.mesh = mat4_identity();
 }
 
 extern "C" __declspec(dllexport) GAME_GET_SCENE(GameGetScene) {
@@ -56,32 +58,34 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     const float speed = delta_time;
     
-    vec3 forward = { (float)sin(-game_data->rotation_z), (float)cos(-game_data->rotation_z), 0.f}; 
-    vec3 right = { (float)sin(-game_data->rotation_z + PI/2.f), (float)cos(-game_data->rotation_z + PI/2.f), 0.f}; 
+    vec3 forward = { (float)sin(-game_data->rotation.y), 0.0f, (float)cos(-game_data->rotation.y)}; 
+    vec3 right = { (float)sin(-game_data->rotation.y - PI/2.f), 0.0f, (float)cos(-game_data->rotation.y - PI/2.f)}; 
     
     if(keyboard[SDL_SCANCODE_W]) {
-        vec3_add(&movement, vec3_fmul(forward, -speed));
+        movement = movement + vec3_fmul(forward, -speed);
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_S]) {
-        vec3_add(&movement, vec3_fmul(forward, speed));
+        
+        movement = movement + vec3_fmul(forward, speed);
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_A]){
-        
-        vec3_add(&movement, vec3_fmul(right, -speed));
+        movement = movement + vec3_fmul(right, -speed);
+        //movement.x += speed;
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_D]){
-        vec3_add(&movement, vec3_fmul(right, speed));
+        movement = movement + vec3_fmul(right, speed);
+        //movement.x -= speed;
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_Q]){
-        movement.z += speed;
+        movement.y -= speed;
         moved = true;
     }
     if(keyboard[SDL_SCANCODE_E]){
-        movement.z -= speed;
+        movement.y += speed;
         moved = true;
     }
     
@@ -96,13 +100,13 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     if(mouse_state == SDL_BUTTON(3)) {
         if(mouse_x != 0) {
-            game_data->rotation_z += speed * mouse_x * 2.5f;
+            game_data->rotation.y += speed * mouse_x * 2.5f;
             moved = true;
         }
         if(mouse_y != 0){
-            float new_rot = game_data->rotation_x + speed * mouse_y * -2.5f;
+            float new_rot = game_data->rotation.x + speed * mouse_y * -2.5f;
             if(new_rot < PI/2.0f && new_rot > -PI/2.0f) {
-                game_data->rotation_x = new_rot;
+                game_data->rotation.x = new_rot;
             }
             moved = true;
         }
@@ -112,8 +116,14 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     }
     
     if(moved) {
-        mat4_rotate_euler(&game_data->cam_matrix, {game_data->rotation_x, 0, game_data->rotation_z});
-        mat4_translate(&game_data->cam_matrix, movement);
+        mat4_rotate_euler(&game_data->matrices.view, {game_data->rotation.x, 0.0f, 0.0f});
+        mat4_translate(&game_data->matrices.view, movement);
+        
+        
+        game_data->position = game_data->position + movement;
+        //game_data->matrices.view = mat4_look_at({0.0f,-0.5f,0.0f}, game_data->position, {0.0f,1.0f,0.0f} );
+        //game_data->matrices.mesh = mat4_identity();
+        moved = false;
     }
     
 }

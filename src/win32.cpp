@@ -39,6 +39,7 @@ typedef struct GameCode {
     game_start* GameStart;
 } GameCode;
 
+#include "gltf.cpp"
 #include "vulkan.cpp"
 #include "vulkan_rtx.cpp"
 

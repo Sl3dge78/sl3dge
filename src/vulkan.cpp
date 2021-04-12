@@ -753,7 +753,7 @@ internal void CreateOrUpdateSwapchain(const VulkanContext* context, SDL_Window* 
 }
 
 void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
-    UploadToBuffer(context->device, &context->cam_buffer, &game_data->cam_matrix, sizeof(game_data->cam_matrix));
+    UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 }
 
 internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkPipeline *pipeline, VkRenderPass *render_pass) {
@@ -879,7 +879,7 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     rasterization_state.depthClampEnable = VK_FALSE;
     rasterization_state.rasterizerDiscardEnable = VK_FALSE;
     rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterization_state.cullMode = VK_CULL_MODE_NONE;
+    rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterization_state.depthBiasEnable = VK_FALSE;
     rasterization_state.depthBiasConstantFactor = 0.f;
@@ -982,35 +982,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
             0,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             1,
-            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-            NULL
-        },
-        { // SCENE DESCRIPTION
-            1,
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            1,
-            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-            NULL
-        },
-        { // VERTEX BUFFER
-            2,
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            mesh_count,
-            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-            NULL
-        },
-        { // INDEX BUFFER
-            3,
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            mesh_count,
-            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-            NULL
-        },
-        { // MATERIAL BUFFER
-            4,
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            material_count,
-            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            VK_SHADER_STAGE_VERTEX_BIT,
             NULL
         }
     };
@@ -1027,11 +999,9 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     // Descriptor Pool
     // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
     VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0},
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
     };
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
-    
     
     //Game
     for(u32 d = 0; d < game_descriptor_count; d++) {
@@ -1082,11 +1052,12 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
 }
 
 void DrawGLTF(VkCommandBuffer cmd, cgltf_data *data, Buffer *buffer) {
-    VkDeviceSize vertex_offset = 8;
-    VkDeviceSize index_offset = 0;
+    VkDeviceSize vertex_offset = GLTFGetPositionOffset(data, 0);
+    VkDeviceSize index_offset = GLTFGetIndicesBufferView(data, 0)->offset;
+    u32 indices_count = data->meshes[0].primitives[0].indices->count;
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &vertex_offset);
     vkCmdBindIndexBuffer(cmd, buffer->buffer, index_offset, VK_INDEX_TYPE_UINT16);
-    vkCmdDrawIndexed(cmd, 3, 1, 0, 0, 0);
+    vkCmdDrawIndexed(cmd, indices_count, 1, 0, 0, 0);
 }
 
 void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
@@ -1122,6 +1093,7 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
     
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->layout, 0, 1, renderer->descriptor_sets, 0, NULL);
     DrawGLTF(cmd, renderer->gltf_data, &renderer->gltf_buffer);
     
     vkCmdEndRenderPass(cmd);
@@ -1197,10 +1169,11 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     context->swapchain.swapchain = VK_NULL_HANDLE; //Not sure if this is required
     CreateOrUpdateSwapchain(context, window, &context->swapchain);
     
-    
-    mat4 id = mat4_identity();
-    CreateBuffer(context, sizeof(mat4), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
-    UploadToBuffer(context->device, &context->cam_buffer, &id, sizeof(mat4));
+    CameraMatrices mat;
+    mat.proj = mat4_identity();
+    mat.view = mat4_identity();
+    CreateBuffer(context, sizeof(CameraMatrices), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
+    UploadToBuffer(context->device, &context->cam_buffer, &mat, sizeof(CameraMatrices));
     DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
     
     return context;
@@ -1230,7 +1203,7 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     }
     // Load gltf
     cgltf_options options = {0};
-    const char *file = "resources/models/triangle.gltf";
+    const char *file = "resources/models/box/Box.gltf";
     cgltf_result result = cgltf_parse_file(&options, file, &renderer->gltf_data);
     if(result != cgltf_result_success) {
         SDL_LogError(0, "Error reading scene");

@@ -38,7 +38,22 @@ typedef struct vec3 {
     alignas(4) float x;
     alignas(4) float y;
     alignas(4) float z;
+    
 } vec3;
+
+vec3 operator+(vec3 l, const vec3 r) {
+    l.x += r.x;
+    l.y += r.y;
+    l.z += r.z;
+    return l;
+};
+
+vec3 operator-(vec3 l, const vec3 r) {
+    l.x -= r.x;
+    l.y -= r.y;
+    l.z -= r.z;
+    return l;
+};
 
 typedef union mat4 {
     float v[16];
@@ -53,9 +68,13 @@ typedef struct quat {
 } quat;
 
 void vec3_add(vec3 *vec, const vec3 add) {
-    vec->x += add.x;
-    vec->y += add.y;
-    vec->z += add.z;
+    
+}
+
+void vec3_sub(vec3 *vec, const vec3 sub) {
+    vec->x -= sub.x;
+    vec->y -= sub.y;
+    vec->z -= sub.z;
 }
 
 void vec3_fmul(vec3 *vec, const float mul) {
@@ -73,6 +92,27 @@ vec3 vec3_fmul(const vec3 vec, const float mul) {
     result.z *= mul;
     
     return (result);
+}
+
+vec3 vec3_normalize(const vec3 v) {
+    
+    float length = sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
+    return vec3 { v.x / length, v.y / length, v.z / length };
+    
+}
+
+vec3 vec3_cross(const vec3 a, const vec3 b) {
+    vec3 result;
+    
+    result.x = a.y * b.z - a.z * b.y;
+    result.y = a.z * b.x - a.x * b.z;
+    result.z = a.x * b.y - a.y * b.x;
+    
+    return result;
+}
+
+float vec3_dot(const vec3 a, const vec3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
 void mat4_print(const mat4* mat) {
@@ -143,21 +183,22 @@ mat4 mat4_perspective(const float fov, const float aspect_ratio, const float nea
     
     mat4 result = {};
     
-    const float tan_theta_2 = tan(fov/2.0f);
+    const float tan_theta_2 = tan(PI/4.0f);
     
-    result.m[0][0] = 1.0f / tan_theta_2;
-    result.m[1][1] = aspect_ratio / tan_theta_2;
-    result.m[2][2] = (near + far) / (near - far);
-    result.m[2][3] = (2.0f * near * far) / (near - far);
-    result.m[3][2] = -1.0f;
+    result.m[0][0] = 1.0f / (aspect_ratio * tan_theta_2);
+    result.m[1][1] = 1.0f / tan_theta_2;
+    result.m[2][2] = (near + far) / (far - near);
+    result.m[2][3] = 1.0f;
+    result.m[3][2] = -(2.0f * near * far) / (far - near);
+    result.m[3][3] = 1.0f;
     
     return result;
 }
 
 void mat4_translate(mat4 *mat, const vec3 vec) {
-    mat->m[0][3] += vec.x;
-    mat->m[1][3] += vec.y;
-    mat->m[2][3] += vec.z;
+    mat->m[3][0] += vec.x;
+    mat->m[3][1] += vec.y;
+    mat->m[3][2] += vec.z;
 }
 
 void mat4_rotate_x(mat4 *mat, const float radians) {
@@ -188,7 +229,6 @@ void mat4_rotate_z(mat4 *mat, const float radians) {
     mat->m[3][3] = 1.0f;
 }
 
-
 void mat4_rotate_euler(mat4 *mat, const vec3 euler) {
     
     const float cx = cos(euler.x);
@@ -216,4 +256,32 @@ void mat4_rotate_euler(mat4 *mat, const vec3 euler) {
     mat->m[2][2] = cx*cy;
 }
 
-
+mat4 mat4_look_at(vec3 target, vec3 eye, vec3 up) {
+    vec3 z_axis = vec3_normalize(target - eye);
+    vec3 x_axis = vec3_normalize(vec3_cross(up, z_axis));
+    vec3 y_axis = vec3_cross(z_axis, x_axis);
+    
+    mat4 mat = mat4_identity();
+    
+    mat.m[0][0] = x_axis.x;
+    mat.m[0][1] = y_axis.x;
+    mat.m[0][2] = z_axis.x;
+    mat.m[0][3] = 0;
+    
+    mat.m[1][0] = x_axis.y;
+    mat.m[1][1] = y_axis.y;
+    mat.m[1][2] = z_axis.y;
+    mat.m[1][3] = 0;
+    
+    mat.m[2][0] = x_axis.z;
+    mat.m[2][1] = y_axis.z;
+    mat.m[2][2] = z_axis.z;
+    mat.m[2][3] = 0;
+    
+    mat.m[3][0] = -vec3_dot(x_axis, eye);
+    mat.m[3][1] = -vec3_dot(y_axis, eye);
+    mat.m[3][2] = -vec3_dot(z_axis, eye);
+    mat.m[3][3] = 1;
+    
+    return mat;
+}
