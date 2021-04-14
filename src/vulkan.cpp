@@ -5,8 +5,7 @@
  CRITICAL
  
  MAJOR
-  - Depth buffer
-
+  
  BACKLOG
  - Window Resize
 
@@ -208,8 +207,10 @@ internal void LoadDeviceFuncPointers(VkDevice device) {
 internal i32 FindMemoryType(const VkPhysicalDeviceMemoryProperties *memory_properties, const u32 type, const VkMemoryPropertyFlags flags) {
     
     for(u32 i = 0; i < memory_properties->memoryTypeCount; i++) {
-        if ((type & (1 << i))  && (memory_properties->memoryTypes[i].propertyFlags & flags) == flags) {
-            return i;
+        if (type & (1 << i)) {
+            if((memory_properties->memoryTypes[i].propertyFlags & flags) == flags) {
+                return i;
+            }
         }
     }
     ASSERT(0); // TODO(Guigui): Handle this more cleanly
@@ -296,7 +297,63 @@ internal void DestroyBuffer(const VkDevice device, Buffer *buffer) {
     buffer = {};
 }
 
-internal void DestroyImage(const VkDevice device, Image* image) {
+internal void CreateImage(const VkDevice device, const VkPhysicalDeviceMemoryProperties* memory_properties, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const VkMemoryPropertyFlags memory_flags, Image *image) {
+    
+    VkImageCreateInfo image_ci = {};
+    image_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_ci.pNext = NULL;
+    image_ci.flags = 0;
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = format;
+    image_ci.extent = extent;
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = usage;
+    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_ci.queueFamilyIndexCount = 0;
+    image_ci.pQueueFamilyIndices = 0;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    
+    AssertVkResult(vkCreateImage(device, &image_ci, NULL, &image->image));
+    
+    VkMemoryRequirements requirements = {};
+    vkGetImageMemoryRequirements(device, image->image, &requirements);
+    
+    VkMemoryAllocateFlagsInfo flags_info = {};
+    flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+    flags_info.pNext = NULL;
+    flags_info.flags = 0;
+    flags_info.deviceMask = 0;
+    
+    VkMemoryAllocateInfo alloc_info = {};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.pNext = &flags_info;
+    alloc_info.allocationSize = requirements.size;
+    alloc_info.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
+    AssertVkResult(vkAllocateMemory(device, &alloc_info, NULL, &image->memory));
+    
+    AssertVkResult(vkBindImageMemory(device, image->image, image->memory, 0));
+    
+    VkImageViewCreateInfo image_view_ci = {};
+    image_view_ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    image_view_ci.pNext = NULL;
+    image_view_ci.flags = 0;
+    image_view_ci.image = image->image;
+    image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D ;
+    image_view_ci.format = format;
+    image_view_ci.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+    image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    image_view_ci.subresourceRange.baseMipLevel = 0;
+    image_view_ci.subresourceRange.levelCount = 1;
+    image_view_ci.subresourceRange.baseArrayLayer = 0;
+    image_view_ci.subresourceRange.layerCount = 1;
+    vkCreateImageView(device, &image_view_ci, NULL, &image->image_view);
+    
+}
+
+internal void DestroyImage(const VkDevice device, Image *image) {
     vkDestroyImage(device, image->image, NULL);
     vkDestroyImageView(device, image->image_view, NULL);
     vkFreeMemory(device, image->memory, NULL);
@@ -854,7 +911,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
 }
 
-internal void CreateRenderPass(const VkDevice device, const Swapchain * swapchain, VkRenderPass *render_pass) {
+internal void CreateRenderPass(const VkDevice device, const Swapchain *swapchain, VkRenderPass *render_pass) {
     VkRenderPassCreateInfo render_pass_ci = {};
     render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_ci.pNext = NULL;
@@ -870,8 +927,25 @@ internal void CreateRenderPass(const VkDevice device, const Swapchain * swapchai
     color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    render_pass_ci.attachmentCount = 1;
-    render_pass_ci.pAttachments = &color_attachment;
+    
+    VkAttachmentDescription depth_attachment = {};
+    depth_attachment.flags = 0;
+    depth_attachment.format = VK_FORMAT_D32_SFLOAT;
+    depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT ;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
+    VkAttachmentDescription attachments[] = {
+        color_attachment,
+        depth_attachment
+    };
+    
+    render_pass_ci.attachmentCount = 2;
+    render_pass_ci.pAttachments = attachments;
     
     VkSubpassDescription subpss_desc = {};
     subpss_desc.flags = 0;
@@ -880,10 +954,11 @@ internal void CreateRenderPass(const VkDevice device, const Swapchain * swapchai
     subpss_desc.pInputAttachments = NULL;
     
     VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    VkAttachmentReference depth_ref = {1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
     subpss_desc.colorAttachmentCount = 1;
     subpss_desc.pColorAttachments = &color_ref;
     subpss_desc.pResolveAttachments = NULL;
-    subpss_desc.pDepthStencilAttachment = NULL;
+    subpss_desc.pDepthStencilAttachment = &depth_ref;
     subpss_desc.preserveAttachmentCount = 0;
     subpss_desc.pPreserveAttachments = NULL;
     
@@ -1001,7 +1076,20 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     multisample_state.alphaToOneEnable = VK_FALSE;
     pipeline_ci.pMultisampleState = &multisample_state;
     
-    pipeline_ci.pDepthStencilState = NULL;
+    VkPipelineDepthStencilStateCreateInfo stencil_state = {};
+    stencil_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    stencil_state.pNext = NULL;
+    stencil_state.flags = 0;
+    stencil_state.depthTestEnable = VK_TRUE;
+    stencil_state.depthWriteEnable = VK_TRUE;
+    stencil_state.depthCompareOp = VK_COMPARE_OP_LESS;
+    stencil_state.depthBoundsTestEnable = VK_FALSE;
+    stencil_state.stencilTestEnable = VK_FALSE;
+    stencil_state.front = {};
+    stencil_state.back = {};
+    stencil_state.minDepthBounds = 0.0f;
+    stencil_state.maxDepthBounds = 1.0f;
+    pipeline_ci.pDepthStencilState = &stencil_state;
     
     VkPipelineColorBlendStateCreateInfo color_blend_state = {};
     color_blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -1061,8 +1149,12 @@ internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet *
 VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
     CreatePipelineLayout(context->device, renderer);
+    // Depth image
+    CreateImage(context->device, &context->memory_properties, VK_FORMAT_D32_SFLOAT, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &renderer->depth_image);
+    
     CreateRenderPass(context->device, &context->swapchain, &renderer->render_pass);
     CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
+    
     
     
     // Framebuffers
@@ -1074,8 +1166,14 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
         create_info.pNext = NULL;
         create_info.flags = 0;
         create_info.renderPass = renderer->render_pass;
-        create_info.attachmentCount = 1;
-        create_info.pAttachments = &context->swapchain.image_views[i];
+        create_info.attachmentCount = 2;
+        
+        VkImageView attachments[] = {
+            context->swapchain.image_views[i],
+            renderer->depth_image.image_view
+        };
+        
+        create_info.pAttachments = attachments;
         create_info.width = context->swapchain.extent.width;
         create_info.height = context->swapchain.extent.height;
         create_info.layers = 1;
@@ -1123,6 +1221,8 @@ void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     }
     free(renderer->framebuffers);
     
+    DestroyImage(context->device, &renderer->depth_image);
+    
     vkDestroyRenderPass(context->device, renderer->render_pass, NULL);
     
     vkFreeDescriptorSets(context->device, renderer->descriptor_pool, 1, renderer->descriptor_sets);
@@ -1146,7 +1246,7 @@ void DrawGLTF(VkCommandBuffer cmd, GLTFAsset *asset, Buffer *buffer) {
     
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &vtx_offset);
     vkCmdBindIndexBuffer(cmd, buffer->buffer, asset->index_offset, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(cmd, asset->index_count, 1, 0, 0, 0);
+    vkCmdDrawIndexed(cmd, asset->index_count, 2, 0, 0, 0);
 }
 
 void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
@@ -1174,10 +1274,13 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     renderpass_begin.renderPass = renderer->render_pass;
     renderpass_begin.framebuffer = renderer->framebuffers[image_id];
     renderpass_begin.renderArea = {{0,0}, swapchain->extent};
-    renderpass_begin.clearValueCount = 1;
-    VkClearValue clear_value = {};
-    clear_value.color = {0.0f, 0.0f, 0.0f, 0.0f};
-    renderpass_begin.pClearValues = &clear_value;
+    
+    VkClearValue clear_values[2] = {};
+    clear_values[0].color = {0.0f, 0.0f, 0.0f, 0.0f};
+    clear_values[1].depthStencil = {1.0f, 0};
+    renderpass_begin.clearValueCount = 2;
+    renderpass_begin.pClearValues = clear_values;
+    
     vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE );
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);

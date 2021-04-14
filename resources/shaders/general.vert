@@ -12,7 +12,12 @@ layout(location = 0) out vec3 normal;
 
 void main() {
 	
-	gl_Position = cam.proj * cam.view * vec4(in_position, 1.0);
+	vec3 position = in_position;
+
+	if(gl_InstanceIndex > 0)
+		position.x += 1.5;
+
+	gl_Position = cam.proj * cam.view * vec4(position, 1.0);
 	normal = in_normal;
     
 }
