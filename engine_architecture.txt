@@ -15,6 +15,7 @@
 ==================              
 |     WIN 32     |
 ==================
+
 Win32AllocateAndLoadBinary
 
 ==========
@@ -38,6 +39,9 @@ VulkanDestroyRenderer
 VulkanUpdateDescriptors
 VulkanReloadShaders
 VulkanDrawFrame
+
+VulkanLoadGLTF
+VulkanFreeGLTF
 
 ==========
 || GLTF ||

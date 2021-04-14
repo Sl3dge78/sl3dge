@@ -112,6 +112,4 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
     
     game_data->matrices.pos = game_data->position;
-    mat4_translate(&game_data->transforms[0], vec3 {delta_time/5.0f, 0.0, 0.0});
-    mat4_translate(&game_data->transforms[1], vec3 {0.0, delta_time/5.0f, 0.0});
 }

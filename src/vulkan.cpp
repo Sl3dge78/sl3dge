@@ -11,7 +11,6 @@
 
  IMPROVEMENTS
  - Envoyer les buffers au shaders
- - Scene data (qui vient du gltf) 
  - Staging buffers
  - Handle pipeline caches
  - Pipline dynamic states ?
@@ -98,7 +97,8 @@ typedef struct VulkanContext {
     
     Buffer cam_buffer;
     
-    Buffer scene_buffer;
+    Buffer scene_vtx_buffer;
+    Buffer scene_idx_buffer;
     GLTFSceneInfo scene_info;
     
 } VulkanContext;
@@ -799,21 +799,90 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
 }
 
 void VulkanLoadGLTF(const char* file, VulkanContext *context, mat4 **transforms) {
-    cgltf_data *data;
-    GLTFOpen(file, &data, &context->scene_info);
-    *transforms =  (mat4 *)calloc(context->scene_info.nodes_count, sizeof(mat4));
-    CreateBuffer(context->device, &context->memory_properties, context->scene_info.buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_buffer);
-    DEBUGNameBuffer(context->device, &context->scene_buffer, "GLTF");
-    void *mapped_buffer;
-    MapBuffer(context->device, &context->scene_buffer, &mapped_buffer);
-    GLTFLoad(data, &context->scene_info, *transforms, &mapped_buffer);
-    UnmapBuffer(context->device, &context->scene_buffer);
-    GLTFClose(data);
     
+    cgltf_data *data;
+    cgltf_options options = {0};
+    cgltf_result result = cgltf_parse_file(&options, file, &data);
+    if(result != cgltf_result_success) {
+        SDL_LogError(0, "Error reading scene");
+        ASSERT(0);
+    }
+    cgltf_load_buffers(&options, data, file);
+    
+    GLTFSceneInfo *scene = &context->scene_info;
+    
+    *scene = {};
+    
+    scene->meshes_count = data->meshes_count;
+    scene->vertex_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    scene->index_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    
+    scene->vertex_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    scene->index_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    
+    for(u32 i = 0; i < scene->meshes_count; ++i) {
+        if(data->meshes[i].primitives_count > 1) {
+            SDL_LogWarn(0, "This mesh has multiple primitives. This isn't handled yet");
+        }
+        cgltf_primitive *prim = &data->meshes[i].primitives[0];
+        
+        scene->vertex_offsets[i] = scene->total_vertex_count;
+        scene->vertex_counts[i] = (u32) prim->attributes[0].data->count;
+        scene->total_vertex_count += (u32) prim->attributes[0].data->count;;
+        
+        scene->index_offsets[i] = scene->total_index_count;
+        scene->index_counts[i] += prim->indices->count;
+        scene->total_index_count += (u32) prim->indices->count;
+    }
+    
+    scene->vertex_buffer_size = scene->total_vertex_count * sizeof(Vertex);
+    scene->index_buffer_size = scene->total_index_count * sizeof(u32);
+    
+    scene->nodes_count = data->nodes_count;
+    scene->node_mesh = (u32 *)calloc(scene->nodes_count, sizeof(u32));
+    
+    for(u32 i = 0; i < scene->nodes_count; ++i) {
+        // TODO(Guigui): This is kind of dirty, is there any other way?
+        for(u32 m = 0; m < data->meshes_count; ++m) {
+            if(&data->meshes[m] == data->nodes[i].mesh) {
+                scene->node_mesh[i] = m;
+                break;
+            }
+        }
+    }
+    
+    *transforms =  (mat4 *)calloc(context->scene_info.nodes_count, sizeof(mat4));
+    
+    CreateBuffer(context->device, &context->memory_properties, context->scene_info.vertex_buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_vtx_buffer);
+    CreateBuffer(context->device, &context->memory_properties, context->scene_info.index_buffer_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_idx_buffer);
+    
+    DEBUGNameBuffer(context->device, &context->scene_vtx_buffer, "GLTF VTX");
+    DEBUGNameBuffer(context->device, &context->scene_idx_buffer, "GLTF IDX");
+    
+    void *mapped_vtx_buffer;
+    MapBuffer(context->device, &context->scene_vtx_buffer, &mapped_vtx_buffer);
+    void *mapped_idx_buffer;
+    MapBuffer(context->device, &context->scene_idx_buffer, &mapped_idx_buffer);
+    
+    GLTFLoad(data, &context->scene_info, *transforms, &mapped_vtx_buffer, &mapped_idx_buffer);
+    
+    UnmapBuffer(context->device, &context->scene_vtx_buffer);
+    UnmapBuffer(context->device, &context->scene_idx_buffer);
+    
+    cgltf_free(data);
 }
 
 void VulkanFreeGLTF(VulkanContext *context, mat4 **transforms) {
-    DestroyBuffer(context->device, &context->scene_buffer);
+    free(context->scene_info.vertex_offsets);
+    free(context->scene_info.index_offsets);
+    
+    free(context->scene_info.vertex_counts);
+    free(context->scene_info.index_counts);
+    
+    free(context->scene_info.node_mesh);
+    
+    DestroyBuffer(context->device, &context->scene_vtx_buffer);
+    DestroyBuffer(context->device, &context->scene_idx_buffer);
     free(*transforms);
 }
 
@@ -1280,14 +1349,20 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->layout, 0, 1, renderer->descriptor_sets, 0, NULL);
     
-    VkDeviceSize vtx_offset = context->scene_info.vertex_offset;
-    vkCmdBindVertexBuffers(cmd, 0, 1, &context->scene_buffer.buffer, &vtx_offset);
-    vkCmdBindIndexBuffer(cmd, context->scene_buffer.buffer, context->scene_info.index_offset, VK_INDEX_TYPE_UINT32);
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &context->scene_vtx_buffer.buffer, &offset);
+    vkCmdBindIndexBuffer(cmd, context->scene_idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
     
     for(u32 i = 0; i < context->scene_info.nodes_count ; i ++) {
         vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &game_data->transforms[i]);
+        u32 mesh_id = context->scene_info.node_mesh[i];
         
-        vkCmdDrawIndexed(cmd, context->scene_info.index_count, 1, 0, 0, 0);
+        vkCmdDrawIndexed(cmd, 
+                         context->scene_info.index_counts[mesh_id],
+                         1,
+                         context->scene_info.index_offsets[mesh_id],
+                         context->scene_info.vertex_offsets[mesh_id],
+                         0);
     }
     
     vkCmdEndRenderPass(cmd);
