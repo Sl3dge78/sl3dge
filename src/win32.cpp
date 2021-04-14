@@ -195,7 +195,7 @@ internal int main(int argc, char *argv[]) {
         }
         game_code.GameLoop(delta_time, &game_data);
         VulkanUpdateDescriptors(context, &game_data);
-        VulkanDrawFrame(context, renderer);
+        VulkanDrawFrame(context, renderer, &game_data);
     }
     
     Win32UnloadGameCode(&game_code);

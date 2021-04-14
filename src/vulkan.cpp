@@ -896,7 +896,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     // TODO(Guigui): Currently limited to 1 PC
     
     VkPushConstantRange push_constant_range = 
-    { VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 0, sizeof(PushConstant) };
+    { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4) };
     const u32 push_constant_count = 1;
     renderer->push_constant_size = push_constant_range.size;
     
@@ -1183,7 +1183,7 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     }
     // Load gltf
     //const char *file = "resources/models/triangle.gltf";
-    const char *file = "resources/models/box/Box.gltf";
+    const char *file = "resources/models/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf";
     
     cgltf_data *data;
     GLTFOpen(file, &data, &renderer->asset);
@@ -1247,10 +1247,11 @@ void DrawGLTF(VkCommandBuffer cmd, GLTFAsset *asset, Buffer *buffer) {
     
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &vtx_offset);
     vkCmdBindIndexBuffer(cmd, buffer->buffer, asset->index_offset, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(cmd, asset->index_count, 100, 0, 0, 0);
+    
+    vkCmdDrawIndexed(cmd, asset->index_count, 1, 0, 0, 0);
 }
 
-void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
+void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData *game_data) {
     
     u32 image_id;
     Swapchain* swapchain = &context->swapchain;
@@ -1287,6 +1288,7 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
     
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->layout, 0, 1, renderer->descriptor_sets, 0, NULL);
+    vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &game_data->transform);
     DrawGLTF(cmd, &renderer->asset, &renderer->gltf);
     
     vkCmdEndRenderPass(cmd);

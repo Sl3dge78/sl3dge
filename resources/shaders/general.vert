@@ -14,12 +14,13 @@ layout(location = 0) out vec3 normal;
 layout(location = 1) out vec3 frag_pos;
 layout(location = 2) out vec3 cam_pos;
 
+layout(push_constant) uniform PushConstants {
+ mat4 transform;
+} constants;
+
 void main() {
 	
-	vec3 position = in_position;
-	position.x += gl_InstanceIndex * 1.5;
-
-	gl_Position = cam.proj * cam.view * vec4(position, 1.0);
+	gl_Position = cam.proj * cam.view * constants.transform * vec4(in_position, 1.0);
 	normal = in_normal;
 	cam_pos = cam.pos;
 }

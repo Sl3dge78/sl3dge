@@ -21,16 +21,12 @@ typedef int32_t i32;
 #include "math.cpp"
 
 typedef struct PushConstant {
-    alignas(16) vec4 clear_color;
-    alignas(16) vec3 light_dir;
-    alignas(4) float light_instensity;
-    alignas(16) vec3 light_color;
+    alignas(16) mat4 transform;
 } PushConstant;
 
 typedef struct CameraMatrices {
     alignas(16) mat4 proj;
     alignas(16) mat4 view;
-    alignas(16) mat4 mesh;
     alignas(16) vec3 pos;
 } CameraMatrices;
 
@@ -38,6 +34,7 @@ typedef struct GameData {
     CameraMatrices matrices;
     vec3 position;
     vec2 spherical_coordinates;
+    mat4 transform;
 } GameData ;
 
 #define GAME_GET_SCENE(name) void name(u32 *vtx_count, vec3 *vertices, u32 *idx_count, u32 *indices)
