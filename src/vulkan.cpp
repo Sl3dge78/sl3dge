@@ -79,6 +79,7 @@ typedef struct VulkanRenderer {
     
     cgltf_data *gltf_data;
     Buffer gltf_buffer;
+    Buffer gltf_idx_buffer;
     
 } VulkanRenderer;
 
@@ -830,13 +831,14 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vertex_input.vertexBindingDescriptionCount = 1;
     VkVertexInputBindingDescription vtx_input_binding = {};
     vtx_input_binding.binding = 0;
-    vtx_input_binding.stride = sizeof(vec3); // TODO(Guigui): Needs to be dependent on the gltf
+    vtx_input_binding.stride = sizeof(Vertex);
     vtx_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     vertex_input.pVertexBindingDescriptions = &vtx_input_binding;
     
-    vertex_input.vertexAttributeDescriptionCount = 1;
+    vertex_input.vertexAttributeDescriptionCount = 2;
     VkVertexInputAttributeDescription vtx_descriptions[] = {
-        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, // Position
+        {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos)},
+        {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal)},
     };
     vertex_input.pVertexAttributeDescriptions = vtx_descriptions;
     
@@ -1051,12 +1053,12 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
 }
 
-void DrawGLTF(VkCommandBuffer cmd, cgltf_data *data, Buffer *buffer) {
-    VkDeviceSize vertex_offset = GLTFGetPositionOffset(data, 0);
-    VkDeviceSize index_offset = GLTFGetIndicesBufferView(data, 0)->offset;
+void DrawGLTF(VkCommandBuffer cmd, cgltf_data *data, Buffer *vertex_buffer, Buffer *index_buffer) {
+    VkDeviceSize vertex_offset = 0;//GLTFGetPositionOffset(data, 0);
+    VkDeviceSize index_offset = 0;//GLTFGetIndicesBufferView(data, 0)->offset;
     u32 indices_count = data->meshes[0].primitives[0].indices->count;
-    vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &vertex_offset);
-    vkCmdBindIndexBuffer(cmd, buffer->buffer, index_offset, VK_INDEX_TYPE_UINT16);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer->buffer, &vertex_offset);
+    vkCmdBindIndexBuffer(cmd, index_buffer->buffer, index_offset, VK_INDEX_TYPE_UINT32);
     vkCmdDrawIndexed(cmd, indices_count, 1, 0, 0, 0);
 }
 
@@ -1094,7 +1096,7 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
     
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->layout, 0, 1, renderer->descriptor_sets, 0, NULL);
-    DrawGLTF(cmd, renderer->gltf_data, &renderer->gltf_buffer);
+    DrawGLTF(cmd, renderer->gltf_data, &renderer->gltf_buffer, &renderer->gltf_idx_buffer);
     
     vkCmdEndRenderPass(cmd);
     AssertVkResult(vkEndCommandBuffer(cmd));
@@ -1204,6 +1206,7 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     // Load gltf
     cgltf_options options = {0};
     const char *file = "resources/models/box/Box.gltf";
+    //const char *file = "resources/models/triangle.gltf";
     cgltf_result result = cgltf_parse_file(&options, file, &renderer->gltf_data);
     if(result != cgltf_result_success) {
         SDL_LogError(0, "Error reading scene");
@@ -1211,9 +1214,31 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     }
     cgltf_load_buffers(&options, renderer->gltf_data, file);
     
+    u32 vtx_count = 0;
+    GLTFGetVertexArray(renderer->gltf_data, &vtx_count, NULL);
+    Vertex *array = (Vertex *)calloc(vtx_count, sizeof(Vertex));
+    GLTFGetVertexArray(renderer->gltf_data, &vtx_count, array);
+    
+    CreateBuffer(context, vtx_count * sizeof(Vertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf_buffer);
+    DEBUGNameBuffer(context->device, &renderer->gltf_buffer, "GLTF");
+    UploadToBuffer(context->device, &renderer->gltf_buffer, array, vtx_count * sizeof(Vertex));
+    
+    u32 idx_count = 0;
+    GLTFGetIndexArray(renderer->gltf_data, &idx_count, NULL);
+    u32 *idx_array = (u32 *)calloc(idx_count, sizeof(u32));
+    GLTFGetIndexArray(renderer->gltf_data, &idx_count, idx_array);
+    
+    CreateBuffer(context, idx_count * sizeof(u32), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf_idx_buffer);
+    DEBUGNameBuffer(context->device, &renderer->gltf_idx_buffer, "GLTF idx");
+    UploadToBuffer(context->device, &renderer->gltf_idx_buffer, idx_array, idx_count * sizeof(u32));
+    /*
     CreateBuffer(context, renderer->gltf_data->buffers[0].size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf_buffer);
     DEBUGNameBuffer(context->device, &renderer->gltf_buffer, "GLTF");
     UploadToBuffer(context->device, &renderer->gltf_buffer, renderer->gltf_data->buffers[0].data, renderer->gltf_data->buffers[0].size);
+    */
+    
+    free(array);
+    free(idx_array);
     
     if(renderer->gltf_data->meshes_count > 1) {
         SDL_LogError(0, "Multiple meshes not supported, yet");
@@ -1230,6 +1255,7 @@ void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     cgltf_free(renderer->gltf_data);
     
     DestroyBuffer(context->device, &renderer->gltf_buffer);
+    DestroyBuffer(context->device, &renderer->gltf_idx_buffer);
     
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         

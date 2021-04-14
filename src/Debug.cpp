@@ -2,7 +2,7 @@
 
 #if DEBUG
 
-#define ASSERT(expression) if(!(expression)) { *(int *)0 = 0;}
+#define ASSERT(expression) if(!(expression)) { KEEP_CONSOLE_OPEN(1); *(int *)0 = 0;}
 
 global bool DBG_keep_console_open = false;
 #define KEEP_CONSOLE_OPEN(value) DBG_keep_console_open |= value

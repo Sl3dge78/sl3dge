@@ -75,10 +75,6 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     vec3 right = vec3_cross(forward, vec3{0.0f, 1.0f, 0.0f});
     vec3 up = vec3_cross(right, forward);
     
-    /*
-    vec3 right = { (float)sin(-game_data->rotation.y - PI/2.f), 0.0f, (float)cos(-game_data->rotation.y - PI/2.f)}; 
-*/
-    
     vec3 movement = {};
     const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
     if(keyboard[SDL_SCANCODE_W]) {
@@ -105,18 +101,8 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
         GameStart(game_data);
     }
     
-    
-    /*
-    mat4_rotate_y(&game_data->matrices.view, game_data->rotation.y);
-    mat4_translate(&game_data->matrices.view, movement);
-    */
-    //mat4_rotate_euler(&game_data->matrices.view, {0.0f, game_data->rotation.y, 0.0f});
-    
     game_data->position = game_data->position + movement;
     game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
-    
-    //SDL_Log("%f, %f", game_data->spherical_coordinates.x, game_data->spherical_coordinates.y);
-    vec2_print(&game_data->spherical_coordinates);
     
     game_data->matrices.mesh = mat4_mul(&game_data->matrices.view, &game_data->matrices.proj);
 }
