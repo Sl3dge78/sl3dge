@@ -3,14 +3,14 @@ typedef struct Vertex {
     vec3 normal;
 } Vertex;
 
-typedef struct GLTFAsset {
-    u32 size;
+typedef struct GLTFSceneInfo {
+    u32 buffer_size;
     u32 vertex_count;
     u32 index_count;
     u32 vertex_offset;
     u32 index_offset;
-    
-} GLTFAsset;
+    u32 nodes_count;
+} GLTFSceneInfo;
 
 void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u32 dst_stride) {
     
@@ -55,7 +55,7 @@ void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u3
     }
 }
 
-void GLTFOpen(const char* file, cgltf_data **data, GLTFAsset *asset) {
+void GLTFOpen(const char* file, cgltf_data **data, GLTFSceneInfo *asset) {
     cgltf_options options = {0};
     cgltf_result result = cgltf_parse_file(&options, file, data);
     if(result != cgltf_result_success) {
@@ -74,17 +74,18 @@ void GLTFOpen(const char* file, cgltf_data **data, GLTFAsset *asset) {
     asset->vertex_count = (u32) prim->attributes[0].data->count;
     asset->index_count = prim->indices->count;
     
-    asset->size = asset->vertex_count * sizeof(Vertex) + asset->index_count * sizeof(u32);
+    asset->buffer_size = asset->vertex_count * sizeof(Vertex) + asset->index_count * sizeof(u32);
     
     asset->vertex_offset = 0;
     asset->index_offset = asset->vertex_count * sizeof(Vertex);
+    asset->nodes_count = (*data)->nodes_count;
 }
 
 void GLTFClose(cgltf_data *data) {
     cgltf_free(data);
 }
 
-void GLTFLoad(cgltf_data *data, GLTFAsset *asset, void **mapped_buffer) {
+void GLTFLoad(cgltf_data *data, GLTFSceneInfo *asset, mat4 *transforms, void **mapped_buffer) {
     
     cgltf_primitive *prim = &data->meshes[0].primitives[0];
     
@@ -98,6 +99,15 @@ void GLTFLoad(cgltf_data *data, GLTFAsset *asset, void **mapped_buffer) {
         if(prim->attributes[i].type == cgltf_attribute_type_normal) {
             GLTFCopyAccessor(prim->attributes[i].data, *mapped_buffer, asset->vertex_offset + offsetof(Vertex, normal), sizeof(Vertex));
             continue;
+        }
+    }
+    
+    for(u32 i = 0; i < data->nodes_count; i ++) {
+        transforms[i] = mat4_identity();
+        cgltf_node *node = &data->nodes[i];
+        if(node->has_translation) {
+            
+            mat4_translate(&transforms[i], {node->translation[0], node->translation[1], node->translation[2]});
         }
     }
     

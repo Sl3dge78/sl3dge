@@ -74,8 +74,10 @@ typedef struct VulkanRenderer {
     
     Image depth_image;
     
-    GLTFAsset asset;
     Buffer gltf;
+    GLTFSceneInfo scene_info;
+    mat4 *gltf_transforms;
+    
     
 } VulkanRenderer;
 
@@ -1186,13 +1188,15 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     const char *file = "resources/models/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf";
     
     cgltf_data *data;
-    GLTFOpen(file, &data, &renderer->asset);
+    GLTFOpen(file, &data, &renderer->scene_info);
     
-    CreateBuffer(context->device, &context->memory_properties, renderer->asset.size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf);
+    renderer->gltf_transforms = (mat4 *)calloc(renderer->scene_info.nodes_count, sizeof(mat4));
+    
+    CreateBuffer(context->device, &context->memory_properties, renderer->scene_info.buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf);
     DEBUGNameBuffer(context->device, &renderer->gltf, "GLTF");
     void *mapped_buffer;
     MapBuffer(context->device, &renderer->gltf, &mapped_buffer);
-    GLTFLoad(data, &renderer->asset, &mapped_buffer);
+    GLTFLoad(data, &renderer->scene_info, renderer->gltf_transforms, &mapped_buffer);
     UnmapBuffer(context->device, &renderer->gltf);
     
     GLTFClose(data);
@@ -1218,9 +1222,10 @@ void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         
         vkDestroyFramebuffer(context->device, renderer->framebuffers[i], NULL);
-        
     }
     free(renderer->framebuffers);
+    
+    free(renderer->gltf_transforms);
     
     DestroyImage(context->device, &renderer->depth_image);
     
@@ -1241,15 +1246,6 @@ void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
 // DRAWING
 //
 // ================
-
-void DrawGLTF(VkCommandBuffer cmd, GLTFAsset *asset, Buffer *buffer) {
-    VkDeviceSize vtx_offset = asset->vertex_offset;
-    
-    vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &vtx_offset);
-    vkCmdBindIndexBuffer(cmd, buffer->buffer, asset->index_offset, VK_INDEX_TYPE_UINT32);
-    
-    vkCmdDrawIndexed(cmd, asset->index_count, 1, 0, 0, 0);
-}
 
 void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData *game_data) {
     
@@ -1286,10 +1282,17 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
     vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE );
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
-    
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->layout, 0, 1, renderer->descriptor_sets, 0, NULL);
-    vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &game_data->transform);
-    DrawGLTF(cmd, &renderer->asset, &renderer->gltf);
+    
+    VkDeviceSize vtx_offset = renderer->scene_info.vertex_offset;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &renderer->gltf.buffer, &vtx_offset);
+    vkCmdBindIndexBuffer(cmd, renderer->gltf.buffer, renderer->scene_info.index_offset, VK_INDEX_TYPE_UINT32);
+    
+    for(u32 i = 0; i < renderer->scene_info.nodes_count ; i ++) {
+        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &renderer->gltf_transforms[i]);
+        
+        vkCmdDrawIndexed(cmd, renderer->scene_info.index_count, 1, 0, 0, 0);
+    }
     
     vkCmdEndRenderPass(cmd);
     AssertVkResult(vkEndCommandBuffer(cmd));

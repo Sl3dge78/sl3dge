@@ -23,7 +23,7 @@ extern "C" __declspec(dllexport) GAME_START(GameStart) {
     game_data->position = { 1.5f, 0.0f, 2.0f };
     game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.0f, 1000.0f);
     game_data->matrices.view = mat4_identity();
-    game_data->transform = mat4_identity();
+    //game_data->transform = mat4_identity();
 }
 
 extern "C" __declspec(dllexport) GAME_GET_SCENE(GameGetScene) {
@@ -104,7 +104,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     // Reset
     if(keyboard[SDL_SCANCODE_SPACE]){
-        game_data->transform = mat4_identity();
+        //game_data->transform = mat4_identity();
         //GameStart(game_data);
     }
     
@@ -112,5 +112,5 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
     
     game_data->matrices.pos = game_data->position;
-    mat4_translate(&game_data->transform, vec3 {delta_time/5.0f, 0.0, 0.0});
+    //mat4_translate(&game_data->transform, vec3 {delta_time/5.0f, 0.0, 0.0});
 }
