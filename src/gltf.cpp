@@ -55,19 +55,7 @@ void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u3
     }
 }
 
-void GLTFGetAssetInfo(cgltf_data *data, GLTFAsset *asset) {
-    cgltf_primitive *prim = &data->meshes[0].primitives[0];
-    
-    asset->vertex_count = (u32) prim->attributes[0].data->count;
-    asset->index_count = prim->indices->count;
-    
-    asset->size = asset->vertex_count * sizeof(Vertex) + asset->index_count * sizeof(u32);
-    
-    asset->vertex_offset = 0;
-    asset->index_offset = asset->vertex_count * sizeof(Vertex);
-}
-
-void GLTFOpen(const char* file, cgltf_data **data) {
+void GLTFOpen(const char* file, cgltf_data **data, GLTFAsset *asset) {
     cgltf_options options = {0};
     cgltf_result result = cgltf_parse_file(&options, file, data);
     if(result != cgltf_result_success) {
@@ -80,6 +68,16 @@ void GLTFOpen(const char* file, cgltf_data **data) {
         SDL_LogError(0, "Multiple meshes not supported, yet");
         ASSERT(0);
     }
+    
+    cgltf_primitive *prim = &(*data)->meshes[0].primitives[0];
+    
+    asset->vertex_count = (u32) prim->attributes[0].data->count;
+    asset->index_count = prim->indices->count;
+    
+    asset->size = asset->vertex_count * sizeof(Vertex) + asset->index_count * sizeof(u32);
+    
+    asset->vertex_offset = 0;
+    asset->index_offset = asset->vertex_count * sizeof(Vertex);
 }
 
 void GLTFLoad(cgltf_data *data, GLTFAsset *asset, void **mapped_buffer) {

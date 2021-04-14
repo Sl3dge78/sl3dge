@@ -1207,27 +1207,23 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
         
     }
     // Load gltf
-    const char *file = "resources/models/box/Box.gltf";
     //const char *file = "resources/models/triangle.gltf";
+    const char *file = "resources/models/box/Box.gltf";
     
     cgltf_data *data;
     
-    GLTFOpen(file, &data);
-    
-    GLTFGetAssetInfo(data, &renderer->asset);
+    GLTFOpen(file, &data, &renderer->asset);
     
     CreateBuffer(context, renderer->asset.size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf);
     DEBUGNameBuffer(context->device, &renderer->gltf, "GLTF");
     void *mapped_buffer;
     MapBuffer(context->device, &renderer->gltf, &mapped_buffer);
-    
     GLTFLoad(data, &renderer->asset, &mapped_buffer);
-    
     UnmapBuffer(context->device, &renderer->gltf);
     
-    WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
-    
     cgltf_free(data);
+    
+    WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
     
     return renderer;
 }
