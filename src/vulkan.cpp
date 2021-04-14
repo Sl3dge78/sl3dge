@@ -15,6 +15,7 @@
  - Staging buffers
  - Handle pipeline caches
  - Pipline dynamic states ?
+- MSAA
 */
 
 #define DECL_FUNC(name) global PFN_##name pfn_##name
@@ -1246,7 +1247,7 @@ void DrawGLTF(VkCommandBuffer cmd, GLTFAsset *asset, Buffer *buffer) {
     
     vkCmdBindVertexBuffers(cmd, 0, 1, &buffer->buffer, &vtx_offset);
     vkCmdBindIndexBuffer(cmd, buffer->buffer, asset->index_offset, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(cmd, asset->index_count, 2, 0, 0, 0);
+    vkCmdDrawIndexed(cmd, asset->index_count, 100, 0, 0, 0);
 }
 
 void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
@@ -1276,7 +1277,7 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     renderpass_begin.renderArea = {{0,0}, swapchain->extent};
     
     VkClearValue clear_values[2] = {};
-    clear_values[0].color = {0.0f, 0.0f, 0.0f, 0.0f};
+    clear_values[0].color = {0.43f, 0.77f, 0.91f, 0.0f};
     clear_values[1].depthStencil = {1.0f, 0};
     renderpass_begin.clearValueCount = 2;
     renderpass_begin.pClearValues = clear_values;

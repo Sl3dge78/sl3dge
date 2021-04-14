@@ -31,6 +31,7 @@ typedef struct CameraMatrices {
     alignas(16) mat4 proj;
     alignas(16) mat4 view;
     alignas(16) mat4 mesh;
+    alignas(16) vec3 pos;
 } CameraMatrices;
 
 typedef struct GameData {

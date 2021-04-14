@@ -50,7 +50,7 @@ extern "C" __declspec(dllexport) GAME_GET_SCENE(GameGetScene) {
 
 extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
-    const float speed = delta_time;
+    float speed = delta_time;
     
     i32 mouse_x;
     i32 mouse_y;
@@ -77,6 +77,12 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     vec3 movement = {};
     const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
+    
+    
+    if(keyboard[SDL_SCANCODE_LSHIFT]){
+        speed *= 10.0f;
+    }
+    
     if(keyboard[SDL_SCANCODE_W]) {
         movement = movement + vec3_fmul(forward, speed);
     }
@@ -105,4 +111,5 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
     
     game_data->matrices.mesh = mat4_mul(&game_data->matrices.view, &game_data->matrices.proj);
+    game_data->matrices.pos = game_data->position;
 }
