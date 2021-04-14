@@ -761,8 +761,7 @@ void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
     UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 }
 
-internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkPipeline *pipeline, VkRenderPass *render_pass) {
-    
+internal void CreateRenderPass(const VkDevice device, const Swapchain * swapchain, VkRenderPass *render_pass) {
     VkRenderPassCreateInfo render_pass_ci = {};
     render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_ci.pNext = NULL;
@@ -801,6 +800,9 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     render_pass_ci.pDependencies = NULL;
     
     AssertVkResult(vkCreateRenderPass(device, &render_pass_ci, NULL, render_pass));
+}
+
+internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkRenderPass render_pass, VkPipeline *pipeline) {
     
     VkGraphicsPipelineCreateInfo pipeline_ci = {};
     pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -938,7 +940,7 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     pipeline_ci.pDynamicState = NULL; // TODO(Guigui): look at this
     pipeline_ci.layout = layout;
     
-    pipeline_ci.renderPass = *render_pass;
+    pipeline_ci.renderPass = render_pass;
     pipeline_ci.subpass = 0;
     pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_ci.basePipelineIndex = 0;
@@ -954,7 +956,7 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
 
 void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
     vkDestroyPipeline(context->device, renderer->pipeline, NULL);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, &renderer->pipeline, &renderer->render_pass);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
 }
 
 
@@ -1187,7 +1189,9 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
 VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
     CreatePipelineLayout(context->device, renderer);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, &renderer->pipeline, &renderer->render_pass);
+    CreateRenderPass(context->device, &context->swapchain, &renderer->render_pass);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
+    
     
     // Framebuffers
     renderer->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
