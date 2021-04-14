@@ -1,8 +1,9 @@
-#if DEBUG
 #include <stdio.h>
-#include <assert.h>
 
-#define ASSERT(expression) assert(expression)
+
+#if DEBUG
+
+#define ASSERT(expression) if(!(expression)) {  *(int *)0 = 0;}
 
 global bool DBG_keep_console_open = false;
 #define KEEP_CONSOLE_OPEN(value) DBG_keep_console_open |= value

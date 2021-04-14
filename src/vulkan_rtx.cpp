@@ -31,6 +31,55 @@ typedef struct VulkanRTXRenderer {
     
 } VulkanRTXRenderer;
 
+/*
+    LOAD_DEVICE_FUNC(vkCreateRayTracingPipelinesKHR);
+    LOAD_DEVICE_FUNC(vkCmdTraceRaysKHR);
+    LOAD_DEVICE_FUNC(vkGetRayTracingShaderGroupHandlesKHR);
+    LOAD_DEVICE_FUNC(vkGetBufferDeviceAddressKHR);
+    LOAD_DEVICE_FUNC(vkCreateAccelerationStructureKHR);
+    LOAD_DEVICE_FUNC(vkGetAccelerationStructureBuildSizesKHR);
+    LOAD_DEVICE_FUNC(vkCmdBuildAccelerationStructuresKHR);
+    LOAD_DEVICE_FUNC(vkDestroyAccelerationStructureKHR);
+    LOAD_DEVICE_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
+
+const char* extensions[] = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+        VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+        VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+        VK_KHR_RAY_QUERY_EXTENSION_NAME,
+        VK_KHR_SHADER_CLOCK_EXTENSION_NAME
+
+};
+
+// Features
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features = {};
+    descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    descriptor_indexing_features.pNext = NULL;
+    descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
+    descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
+    
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_feature = {};
+    accel_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    accel_feature.pNext = &descriptor_indexing_features;
+    accel_feature.accelerationStructure = VK_TRUE;
+    
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_feature = {};
+    rt_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+    rt_feature.pNext = &accel_feature;
+    rt_feature.rayTracingPipeline = VK_TRUE;
+    
+    VkPhysicalDeviceBufferDeviceAddressFeatures device_address = {};
+    device_address.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    device_address.pNext = &rt_feature;
+    device_address.bufferDeviceAddress = VK_TRUE;
+
+
+*/
+
 internal void CreateRtxRenderImage(const VkDevice device, const Swapchain *swapchain, const VkPhysicalDeviceMemoryProperties *memory_properties, Image *image) {
     VkImageCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;

@@ -41,7 +41,7 @@ typedef struct GameCode {
 
 #include "gltf.cpp"
 #include "vulkan.cpp"
-#include "vulkan_rtx.cpp"
+//#include "vulkan_rtx.cpp"
 
 typedef struct ShaderCode {
     char *spv_path;

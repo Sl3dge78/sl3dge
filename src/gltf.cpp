@@ -80,6 +80,10 @@ void GLTFOpen(const char* file, cgltf_data **data, GLTFAsset *asset) {
     asset->index_offset = asset->vertex_count * sizeof(Vertex);
 }
 
+void GLTFClose(cgltf_data *data) {
+    cgltf_free(data);
+}
+
 void GLTFLoad(cgltf_data *data, GLTFAsset *asset, void **mapped_buffer) {
     
     cgltf_primitive *prim = &data->meshes[0].primitives[0];

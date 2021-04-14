@@ -3,14 +3,12 @@
 /*
  === TODO ===
  CRITICAL
- - Draw the cube in raster
-
+ 
  MAJOR
-  - Remove RTX from reqs
+  - Depth buffer
 
  BACKLOG
- - Normals
-  - Window Resize
+ - Window Resize
 
  IMPROVEMENTS
  - Envoyer les buffers au shaders
@@ -76,14 +74,6 @@ typedef struct VulkanRenderer {
     
     GLTFAsset asset;
     Buffer gltf;
-    /*
-    Buffer vtx_buffer;
-    Buffer idx_buffer;
-    
-    cgltf_data *gltf_data;
-    
-    Buffer gltf_idx_buffer;
-*/
     
 } VulkanRenderer;
 
@@ -93,7 +83,6 @@ typedef struct VulkanContext {
     VkSurfaceKHR surface;
     
     VkPhysicalDeviceMemoryProperties memory_properties;
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties;
     
     VkDevice device;
     u32 graphics_queue_id;
@@ -204,15 +193,8 @@ internal void AssertVkResult(VkResult result) {
 
 internal void LoadDeviceFuncPointers(VkDevice device) {
     
-    LOAD_DEVICE_FUNC(vkCreateRayTracingPipelinesKHR);
-    LOAD_DEVICE_FUNC(vkCmdTraceRaysKHR);
-    LOAD_DEVICE_FUNC(vkGetRayTracingShaderGroupHandlesKHR);
-    LOAD_DEVICE_FUNC(vkGetBufferDeviceAddressKHR);
-    LOAD_DEVICE_FUNC(vkCreateAccelerationStructureKHR);
-    LOAD_DEVICE_FUNC(vkGetAccelerationStructureBuildSizesKHR);
-    LOAD_DEVICE_FUNC(vkCmdBuildAccelerationStructuresKHR);
-    LOAD_DEVICE_FUNC(vkDestroyAccelerationStructureKHR);
-    LOAD_DEVICE_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
+    
+    
 }
 
 // ================================
@@ -261,8 +243,10 @@ internal void CreateBuffer(const VulkanContext *context, const VkDeviceSize size
         VkMemoryAllocateFlagsInfo flags_info = {};
         flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
         flags_info.pNext = NULL;
-        flags_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        flags_info.flags = 0;
         flags_info.deviceMask = 0;
+        if(buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR)
+            flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
         
         VkMemoryAllocateInfo alloc_info = {};
         alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -283,7 +267,7 @@ internal void CreateBuffer(const VulkanContext *context, const VkDeviceSize size
             NULL,
             buffer->buffer
         };
-        buffer->address = pfn_vkGetBufferDeviceAddressKHR(context->device,&dai);
+        buffer->address = pfn_vkGetBufferDeviceAddressKHR(context->device, &dai);
     }
 }
 
@@ -530,47 +514,16 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device, const u32 graphic
     queues_ci[2].pQueuePriorities = &queue_priority;
     
     // Extensions
-    const u32 extension_count = 9;
+    const u32 extension_count = 1;
     const char* extensions[] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
-        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
-        VK_KHR_MAINTENANCE3_EXTENSION_NAME,
-        VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-        VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
-        VK_KHR_RAY_QUERY_EXTENSION_NAME,
-        VK_KHR_SHADER_CLOCK_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
-    
-    // Features
-    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features = {};
-    descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-    descriptor_indexing_features.pNext = NULL;
-    descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
-    descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
-    
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_feature = {};
-    accel_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-    accel_feature.pNext = &descriptor_indexing_features;
-    accel_feature.accelerationStructure = VK_TRUE;
-    
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_feature = {};
-    rt_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-    rt_feature.pNext = &accel_feature;
-    rt_feature.rayTracingPipeline = VK_TRUE;
-    
-    VkPhysicalDeviceBufferDeviceAddressFeatures device_address = {};
-    device_address.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-    device_address.pNext = &rt_feature;
-    device_address.bufferDeviceAddress = VK_TRUE;
     
     VkPhysicalDeviceFeatures2 features2 = {};
     features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     features2.features = {};
     features2.features.samplerAnisotropy = VK_TRUE;
     features2.features.shaderInt64 = VK_TRUE;
-    features2.pNext = &device_address;
     
     VkDeviceCreateInfo device_create_info = {};
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1139,7 +1092,6 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     vkDeviceWaitIdle(context->device);
 }
 
-
 VulkanContext* VulkanCreateContext(SDL_Window* window){
     VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
     CreateVkInstance(window, &context->instance);
@@ -1148,15 +1100,6 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     
     // Get device properties
     vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
-    
-    context->rtx_properties = {};
-    context->rtx_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-    
-    VkPhysicalDeviceProperties2 properties = {};
-    properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    properties.pNext = &context->rtx_properties;
-    
-    vkGetPhysicalDeviceProperties2(context->physical_device, &properties);
     
     GetQueuesId(context);
     CreateVkDevice(context->physical_device, context->graphics_queue_id, context->transfer_queue_id,context->present_queue_id, &context->device);
@@ -1215,7 +1158,6 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     const char *file = "resources/models/box/Box.gltf";
     
     cgltf_data *data;
-    
     GLTFOpen(file, &data, &renderer->asset);
     
     CreateBuffer(context, renderer->asset.size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf);
@@ -1225,7 +1167,7 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     GLTFLoad(data, &renderer->asset, &mapped_buffer);
     UnmapBuffer(context->device, &renderer->gltf);
     
-    cgltf_free(data);
+    GLTFClose(data);
     
     WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
     
