@@ -1,0 +1,48 @@
+
+
+      ========  ==========            ========
+      | GAME |  | VULKAN | --Calls--> | GLTF |
+      ========  ==========            ========
+          ^        ^   |
+          |        |   |
+        Calls      Calls
+          |        |   |
+          |        |   v
+      ==================              
+      |     WIN 32     |
+      ==================
+
+==================              
+|     WIN 32     |
+==================
+Win32AllocateAndLoadBinary
+
+==========
+|| GAME ||
+==========
+
+GameStart 	
+GameGetScene  
+GameLoop      
+
+============
+|| VULKAN ||
+============
+
+VulkanCreateContext
+VulkanDestroyContext
+
+VulkanCreateRenderer
+VulkanDestroyRenderer
+
+VulkanUpdateDescriptors
+VulkanReloadShaders
+VulkanDrawFrame
+
+==========
+|| GLTF ||
+==========
+
+GLTFOpen
+GLTFLoad
+GLTFClose

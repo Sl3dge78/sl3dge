@@ -12,7 +12,7 @@ typedef struct GLTFSceneInfo {
     u32 nodes_count;
 } GLTFSceneInfo;
 
-void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u32 dst_stride) {
+internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u32 dst_stride) {
     
     const cgltf_buffer_view *view = acc->buffer_view;
     char *buf = (char *)view->buffer->data + view->offset + acc->offset;
@@ -105,10 +105,24 @@ void GLTFLoad(cgltf_data *data, GLTFSceneInfo *asset, mat4 *transforms, void **m
     for(u32 i = 0; i < data->nodes_count; i ++) {
         transforms[i] = mat4_identity();
         cgltf_node *node = &data->nodes[i];
-        if(node->has_translation) {
-            
-            mat4_translate(&transforms[i], {node->translation[0], node->translation[1], node->translation[2]});
+        if(node->has_matrix) {
+            ASSERT(0);
+            // TODO(Guigui): 
+            continue;
+        } else {
+            if(node->has_translation) {
+                mat4_translate(&transforms[i], {node->translation[0], node->translation[1], node->translation[2]});
+            }
+            if(node->has_rotation) {
+                ASSERT(0);
+                // TODO(Guigui): 
+            }
+            if(node->has_scale) {
+                ASSERT(0);
+                // TODO(Guigui): 
+            }
         }
+        
     }
     
     GLTFCopyAccessor(prim->indices, *mapped_buffer, asset->index_offset, sizeof(u32));

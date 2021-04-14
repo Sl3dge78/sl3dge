@@ -48,7 +48,7 @@ typedef struct ShaderCode {
     FILETIME last_write_time;
 } ShaderCode;
 
-inline FILETIME Win32GetLastWriteTime(char *file_name) {
+internal inline FILETIME Win32GetLastWriteTime(char *file_name) {
     
     FILETIME last_write_time = {};
     
@@ -107,7 +107,7 @@ internal void Win32UnloadGameCode(GameCode* game_code) {
 }
 
 // This allocates memory, free it!
-internal u32* Win32AllocateAndLoadBinary(const char* path, i64 *file_size) {
+u32* Win32AllocateAndLoadBinary(const char* path, i64 *file_size) {
     
     FILE *file = fopen(path,"rb");
     if(!file) {
@@ -153,6 +153,8 @@ internal int main(int argc, char *argv[]) {
     
     GameData game_data = {};
     
+    VulkanLoadGLTF("resources/models/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf", context, &game_data.transforms);
+    
     game_code.GameStart(&game_data);
     
     bool running = true;
@@ -180,8 +182,6 @@ internal int main(int argc, char *argv[]) {
         if(CompareFileTime(&game_code.last_write_time, &game_code_time)){
             Win32UnloadGameCode(&game_code);
             if(Win32LoadGameCode(&game_code)) {
-                VulkanDestroyRenderer(context, renderer);
-                renderer = VulkanCreateRenderer(context);
                 SDL_Log("Game code successfully reloaded");
             }
         }
@@ -197,6 +197,8 @@ internal int main(int argc, char *argv[]) {
         VulkanUpdateDescriptors(context, &game_data);
         VulkanDrawFrame(context, renderer, &game_data);
     }
+    
+    VulkanFreeGLTF(context, &game_data.transforms);
     
     Win32UnloadGameCode(&game_code);
     

@@ -34,6 +34,7 @@ typedef struct GameData {
     CameraMatrices matrices;
     vec3 position;
     vec2 spherical_coordinates;
+    mat4 *transforms;
 }GameData ;
 
 #define GAME_GET_SCENE(name) void name(u32 *vtx_count, vec3 *vertices, u32 *idx_count, u32 *indices)

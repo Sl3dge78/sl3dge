@@ -74,11 +74,6 @@ typedef struct VulkanRenderer {
     
     Image depth_image;
     
-    Buffer gltf;
-    GLTFSceneInfo scene_info;
-    mat4 *gltf_transforms;
-    
-    
 } VulkanRenderer;
 
 typedef struct VulkanContext {
@@ -102,6 +97,9 @@ typedef struct VulkanContext {
     PushConstant push_constants;
     
     Buffer cam_buffer;
+    
+    Buffer scene_buffer;
+    GLTFSceneInfo scene_info;
     
 } VulkanContext;
 
@@ -744,7 +742,7 @@ internal void CreateSwapchain(const VulkanContext* context, SDL_Window* window, 
     SDL_Log("Swapchain created with %d images", swapchain->image_count);
 }
 
-void DestroySwapchain(const VulkanContext* context, Swapchain *swapchain) {
+internal void DestroySwapchain(const VulkanContext* context, Swapchain *swapchain) {
     
     vkFreeCommandBuffers(context->device,context->graphics_command_pool,swapchain->image_count, swapchain->command_buffers);
     free(swapchain->command_buffers);
@@ -798,6 +796,25 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
     
     return context;
+}
+
+void VulkanLoadGLTF(const char* file, VulkanContext *context, mat4 **transforms) {
+    cgltf_data *data;
+    GLTFOpen(file, &data, &context->scene_info);
+    *transforms =  (mat4 *)calloc(context->scene_info.nodes_count, sizeof(mat4));
+    CreateBuffer(context->device, &context->memory_properties, context->scene_info.buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_buffer);
+    DEBUGNameBuffer(context->device, &context->scene_buffer, "GLTF");
+    void *mapped_buffer;
+    MapBuffer(context->device, &context->scene_buffer, &mapped_buffer);
+    GLTFLoad(data, &context->scene_info, *transforms, &mapped_buffer);
+    UnmapBuffer(context->device, &context->scene_buffer);
+    GLTFClose(data);
+    
+}
+
+void VulkanFreeGLTF(VulkanContext *context, mat4 **transforms) {
+    DestroyBuffer(context->device, &context->scene_buffer);
+    free(*transforms);
 }
 
 void VulkanDestroyContext(VulkanContext *context){
@@ -1183,23 +1200,6 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
         AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &renderer->framebuffers[i]));
         
     }
-    // Load gltf
-    //const char *file = "resources/models/triangle.gltf";
-    const char *file = "resources/models/gltf_samples/SimpleMeshes/glTF/SimpleMeshes.gltf";
-    
-    cgltf_data *data;
-    GLTFOpen(file, &data, &renderer->scene_info);
-    
-    renderer->gltf_transforms = (mat4 *)calloc(renderer->scene_info.nodes_count, sizeof(mat4));
-    
-    CreateBuffer(context->device, &context->memory_properties, renderer->scene_info.buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf);
-    DEBUGNameBuffer(context->device, &renderer->gltf, "GLTF");
-    void *mapped_buffer;
-    MapBuffer(context->device, &renderer->gltf, &mapped_buffer);
-    GLTFLoad(data, &renderer->scene_info, renderer->gltf_transforms, &mapped_buffer);
-    UnmapBuffer(context->device, &renderer->gltf);
-    
-    GLTFClose(data);
     
     WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
     
@@ -1217,15 +1217,11 @@ void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
 
 void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     
-    DestroyBuffer(context->device, &renderer->gltf);
-    
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         
         vkDestroyFramebuffer(context->device, renderer->framebuffers[i], NULL);
     }
     free(renderer->framebuffers);
-    
-    free(renderer->gltf_transforms);
     
     DestroyImage(context->device, &renderer->depth_image);
     
@@ -1284,14 +1280,14 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->layout, 0, 1, renderer->descriptor_sets, 0, NULL);
     
-    VkDeviceSize vtx_offset = renderer->scene_info.vertex_offset;
-    vkCmdBindVertexBuffers(cmd, 0, 1, &renderer->gltf.buffer, &vtx_offset);
-    vkCmdBindIndexBuffer(cmd, renderer->gltf.buffer, renderer->scene_info.index_offset, VK_INDEX_TYPE_UINT32);
+    VkDeviceSize vtx_offset = context->scene_info.vertex_offset;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &context->scene_buffer.buffer, &vtx_offset);
+    vkCmdBindIndexBuffer(cmd, context->scene_buffer.buffer, context->scene_info.index_offset, VK_INDEX_TYPE_UINT32);
     
-    for(u32 i = 0; i < renderer->scene_info.nodes_count ; i ++) {
-        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &renderer->gltf_transforms[i]);
+    for(u32 i = 0; i < context->scene_info.nodes_count ; i ++) {
+        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &game_data->transforms[i]);
         
-        vkCmdDrawIndexed(cmd, renderer->scene_info.index_count, 1, 0, 0, 0);
+        vkCmdDrawIndexed(cmd, context->scene_info.index_count, 1, 0, 0, 0);
     }
     
     vkCmdEndRenderPass(cmd);
