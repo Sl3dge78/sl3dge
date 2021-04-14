@@ -72,6 +72,8 @@ typedef struct VulkanRenderer {
     
     VkFramebuffer *framebuffers;
     
+    Image depth_image;
+    
     GLTFAsset asset;
     Buffer gltf;
     
@@ -215,7 +217,7 @@ internal i32 FindMemoryType(const VkPhysicalDeviceMemoryProperties *memory_prope
 }
 
 // TODO(Guigui): Check to see if this really requires the entire context
-internal void CreateBuffer(const VulkanContext *context, const VkDeviceSize size, const VkBufferUsageFlags buffer_usage, const VkMemoryPropertyFlags memory_flags, Buffer *buffer) {
+internal void CreateBuffer(const VkDevice device, VkPhysicalDeviceMemoryProperties* memory_properties, const VkDeviceSize size, const VkBufferUsageFlags buffer_usage, const VkMemoryPropertyFlags memory_flags, Buffer *buffer) {
     *buffer = {};
     
     buffer->size = size;
@@ -232,13 +234,13 @@ internal void CreateBuffer(const VulkanContext *context, const VkDeviceSize size
         buffer_ci.queueFamilyIndexCount = 0;
         buffer_ci.pQueueFamilyIndices = NULL;
         
-        VkResult result = vkCreateBuffer(context->device, &buffer_ci, NULL, &buffer->buffer);
+        VkResult result = vkCreateBuffer(device, &buffer_ci, NULL, &buffer->buffer);
         AssertVkResult(result);
     }
     // Allocate the memory
     {
         VkMemoryRequirements requirements = {};
-        vkGetBufferMemoryRequirements(context->device, buffer->buffer, &requirements);
+        vkGetBufferMemoryRequirements(device, buffer->buffer, &requirements);
         
         VkMemoryAllocateFlagsInfo flags_info = {};
         flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
@@ -252,12 +254,12 @@ internal void CreateBuffer(const VulkanContext *context, const VkDeviceSize size
         alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         alloc_info.pNext = &flags_info;
         alloc_info.allocationSize = requirements.size;
-        alloc_info.memoryTypeIndex = FindMemoryType(&context->memory_properties, requirements.memoryTypeBits, memory_flags);
-        VkResult result = vkAllocateMemory(context->device, &alloc_info, NULL, &buffer->memory);
+        alloc_info.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
+        VkResult result = vkAllocateMemory(device, &alloc_info, NULL, &buffer->memory);
         AssertVkResult(result);
     }
     // Bind the buffer to the memory
-    VkResult result = vkBindBufferMemory(context->device, buffer->buffer, buffer->memory, 0);
+    VkResult result = vkBindBufferMemory(device, buffer->buffer, buffer->memory, 0);
     AssertVkResult(result);
     
     if(buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR) {
@@ -267,7 +269,7 @@ internal void CreateBuffer(const VulkanContext *context, const VkDeviceSize size
             NULL,
             buffer->buffer
         };
-        buffer->address = pfn_vkGetBufferDeviceAddressKHR(context->device, &dai);
+        buffer->address = pfn_vkGetBufferDeviceAddressKHR(device, &dai);
     }
 }
 
@@ -352,7 +354,7 @@ internal void CreateVkShaderModule(const char *path, VkDevice device, VkShaderMo
 
 // ========================
 //
-// NOTE(Guigui): Instance & Devices Creation
+// CONTEXT
 //
 // ========================
 
@@ -543,12 +545,6 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device, const u32 graphic
     LoadDeviceFuncPointers(*device);
 }
 
-// =======================
-//
-// NOTE(Guigui): SWAPCHAIN
-//
-// =======================
-
 // TODO(Guigui): Is this needed?
 internal void FillSwapchainCreateInfo(VkPhysicalDevice physical_device, VkSurfaceKHR surface, SDL_Window* window, VkSwapchainCreateInfoKHR *create_info){
     VkSurfaceCapabilitiesKHR surface_capabilities = {};
@@ -616,29 +612,7 @@ internal void FillSwapchainCreateInfo(VkPhysicalDevice physical_device, VkSurfac
     create_info->oldSwapchain = VK_NULL_HANDLE;
 }
 
-void DestroySwapchain(const VulkanContext* context, Swapchain *swapchain) {
-    
-    vkFreeCommandBuffers(context->device,context->graphics_command_pool,swapchain->image_count, swapchain->command_buffers);
-    free(swapchain->command_buffers);
-    
-    free(swapchain->images);
-    
-    for(u32 i = 0; i < swapchain->image_count; i++) {
-        vkDestroyFence(context->device, swapchain->fences[i], NULL);
-        vkDestroySemaphore(context->device, swapchain->image_acquired_semaphore[i], NULL);
-        vkDestroySemaphore(context->device, swapchain->render_complete_semaphore[i], NULL);
-        vkDestroyImageView(context->device, swapchain->image_views[i], NULL);
-    }
-    free(swapchain->image_views);
-    free(swapchain->fences);
-    free(swapchain->image_acquired_semaphore);
-    free(swapchain->render_complete_semaphore);
-}
-
-internal void CreateOrUpdateSwapchain(const VulkanContext* context, SDL_Window* window, Swapchain *swapchain) {
-    if(swapchain->swapchain != VK_NULL_HANDLE) {
-        DestroySwapchain(context, swapchain);
-    }
+internal void CreateSwapchain(const VulkanContext* context, SDL_Window* window, Swapchain *swapchain) {
     
     VkSwapchainCreateInfoKHR create_info = {};
     FillSwapchainCreateInfo(context->physical_device, context->surface, window, &create_info);
@@ -710,8 +684,174 @@ internal void CreateOrUpdateSwapchain(const VulkanContext* context, SDL_Window* 
     SDL_Log("Swapchain created with %d images", swapchain->image_count);
 }
 
-void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
-    UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
+void DestroySwapchain(const VulkanContext* context, Swapchain *swapchain) {
+    
+    vkFreeCommandBuffers(context->device,context->graphics_command_pool,swapchain->image_count, swapchain->command_buffers);
+    free(swapchain->command_buffers);
+    
+    free(swapchain->images);
+    
+    for(u32 i = 0; i < swapchain->image_count; i++) {
+        vkDestroyFence(context->device, swapchain->fences[i], NULL);
+        vkDestroySemaphore(context->device, swapchain->image_acquired_semaphore[i], NULL);
+        vkDestroySemaphore(context->device, swapchain->render_complete_semaphore[i], NULL);
+        vkDestroyImageView(context->device, swapchain->image_views[i], NULL);
+    }
+    free(swapchain->image_views);
+    free(swapchain->fences);
+    free(swapchain->image_acquired_semaphore);
+    free(swapchain->render_complete_semaphore);
+}
+
+VulkanContext* VulkanCreateContext(SDL_Window* window){
+    VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
+    CreateVkInstance(window, &context->instance);
+    SDL_Vulkan_CreateSurface(window,context->instance,&context->surface);
+    CreateVkPhysicalDevice(context->instance, &context->physical_device);
+    
+    // Get device properties
+    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
+    
+    GetQueuesId(context);
+    CreateVkDevice(context->physical_device, context->graphics_queue_id, context->transfer_queue_id,context->present_queue_id, &context->device);
+    
+    vkGetDeviceQueue(context->device, context->graphics_queue_id, 0, &context->graphics_queue);
+    vkGetDeviceQueue(context->device, context->present_queue_id, 0, &context->present_queue);
+    vkGetDeviceQueue(context->device, context->transfer_queue_id, 0, &context->transfer_queue);
+    
+    VkCommandPoolCreateInfo pool_create_info = {};
+    pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_create_info.pNext = NULL;
+    pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    pool_create_info.queueFamilyIndex = context->graphics_queue_id;
+    VkResult result = vkCreateCommandPool(context->device, &pool_create_info, NULL, &context->graphics_command_pool);
+    AssertVkResult(result);
+    
+    context->swapchain.swapchain = VK_NULL_HANDLE;
+    CreateSwapchain(context, window, &context->swapchain);
+    
+    CameraMatrices mat;
+    mat.proj = mat4_identity();
+    mat.view = mat4_identity();
+    CreateBuffer(context->device, &context->memory_properties, sizeof(CameraMatrices), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
+    UploadToBuffer(context->device, &context->cam_buffer, &mat, sizeof(CameraMatrices));
+    DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
+    
+    return context;
+}
+
+void VulkanDestroyContext(VulkanContext *context){
+    
+    vkDeviceWaitIdle(context->device);
+    
+    DestroyBuffer(context->device, &context->cam_buffer);
+    
+    DestroySwapchain(context, &context->swapchain);
+    vkDestroySwapchainKHR(context->device, context->swapchain.swapchain, NULL);
+    vkDestroySurfaceKHR(context->instance, context->surface, NULL);
+    
+    vkDestroyCommandPool(context->device,context->graphics_command_pool,NULL);
+    
+    vkDestroyDevice(context->device, NULL);
+    pfn_vkDestroyDebugUtilsMessengerEXT(context->instance, debug_messenger, NULL);
+    vkDestroyInstance(context->instance, NULL);
+    
+    free(context);
+}
+
+// ===============
+//
+//  RENDERER
+//
+// ===============
+
+
+internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer) {
+    
+    // Set Layout
+    
+    // TODO(Guigui): TEMP
+    const u32 mesh_count = 1;
+    const u32 material_count = 1;
+    
+    // Our set layout
+    renderer->descriptor_set_count = 1;
+    
+    const u32 app_descriptor_count = 0;
+    
+    // Get the game set layout
+    const VkDescriptorSetLayoutBinding game_bindings[] = {
+        { // CAMERA MATRICES
+            0,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            1,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            NULL
+        }
+    };
+    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
+    
+    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+    game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    game_set_create_info.pNext = NULL;
+    game_set_create_info.flags = 0;
+    game_set_create_info.bindingCount = game_descriptor_count;
+    game_set_create_info.pBindings = game_bindings;
+    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->game_set_layout));
+    
+    // Descriptor Pool
+    // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
+    };
+    const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
+    
+    //Game
+    for(u32 d = 0; d < game_descriptor_count; d++) {
+        for(u32 i = 0; i < pool_sizes_count ; i ++){
+            if(game_bindings[d].descriptorType == pool_sizes[i].type) {
+                pool_sizes[i].descriptorCount ++;
+            }
+        }
+    }
+    
+    VkDescriptorPoolCreateInfo pool_ci = {};
+    pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_ci.pNext = NULL;
+    pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_ci.maxSets = renderer->descriptor_set_count;
+    pool_ci.poolSizeCount = pool_sizes_count;
+    pool_ci.pPoolSizes = pool_sizes;
+    AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
+    
+    // Descriptor Set
+    VkDescriptorSetLayout set_layouts[1] = {renderer->game_set_layout};
+    VkDescriptorSetAllocateInfo allocate_info = {};
+    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocate_info.pNext = NULL;
+    allocate_info.descriptorPool = renderer->descriptor_pool;
+    allocate_info.descriptorSetCount = renderer->descriptor_set_count;
+    allocate_info.pSetLayouts = set_layouts;
+    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, renderer->descriptor_sets));
+    
+    // Push constants
+    // TODO(Guigui): Currently limited to 1 PC
+    
+    VkPushConstantRange push_constant_range = 
+    { VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 0, sizeof(PushConstant) };
+    const u32 push_constant_count = 1;
+    renderer->push_constant_size = push_constant_range.size;
+    
+    VkPipelineLayoutCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    create_info.pNext = NULL;
+    create_info.flags = 0;
+    create_info.setLayoutCount = renderer->descriptor_set_count;
+    create_info.pSetLayouts = set_layouts;
+    create_info.pushConstantRangeCount = push_constant_count;
+    create_info.pPushConstantRanges = &push_constant_range;
+    
+    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
 }
 
 internal void CreateRenderPass(const VkDevice device, const Swapchain * swapchain, VkRenderPass *render_pass) {
@@ -907,12 +1047,6 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     
 }
 
-void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
-    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
-}
-
-
 internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet *descriptor_set, Buffer *cam_buffer) {
     
     u32 game_writes_count = 1;
@@ -924,93 +1058,88 @@ internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet *
     vkUpdateDescriptorSets(device, game_writes_count, game_writes, 0, NULL);
 }
 
-internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer) {
+VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
+    VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
+    CreatePipelineLayout(context->device, renderer);
+    CreateRenderPass(context->device, &context->swapchain, &renderer->render_pass);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
     
-    // Set Layout
     
-    // TODO(Guigui): TEMP
-    const u32 mesh_count = 1;
-    const u32 material_count = 1;
-    
-    // Our set layout
-    renderer->descriptor_set_count = 1;
-    
-    const u32 app_descriptor_count = 0;
-    
-    // Get the game set layout
-    const VkDescriptorSetLayoutBinding game_bindings[] = {
-        { // CAMERA MATRICES
-            0,
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            1,
-            VK_SHADER_STAGE_VERTEX_BIT,
-            NULL
-        }
-    };
-    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
-    
-    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
-    game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    game_set_create_info.pNext = NULL;
-    game_set_create_info.flags = 0;
-    game_set_create_info.bindingCount = game_descriptor_count;
-    game_set_create_info.pBindings = game_bindings;
-    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->game_set_layout));
-    
-    // Descriptor Pool
-    // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
-    VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
-    };
-    const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
-    
-    //Game
-    for(u32 d = 0; d < game_descriptor_count; d++) {
-        for(u32 i = 0; i < pool_sizes_count ; i ++){
-            if(game_bindings[d].descriptorType == pool_sizes[i].type) {
-                pool_sizes[i].descriptorCount ++;
-            }
-        }
+    // Framebuffers
+    renderer->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+        
+        VkFramebufferCreateInfo create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        create_info.pNext = NULL;
+        create_info.flags = 0;
+        create_info.renderPass = renderer->render_pass;
+        create_info.attachmentCount = 1;
+        create_info.pAttachments = &context->swapchain.image_views[i];
+        create_info.width = context->swapchain.extent.width;
+        create_info.height = context->swapchain.extent.height;
+        create_info.layers = 1;
+        AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &renderer->framebuffers[i]));
+        
     }
+    // Load gltf
+    //const char *file = "resources/models/triangle.gltf";
+    const char *file = "resources/models/box/Box.gltf";
     
-    VkDescriptorPoolCreateInfo pool_ci = {};
-    pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_ci.pNext = NULL;
-    pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_ci.maxSets = renderer->descriptor_set_count;
-    pool_ci.poolSizeCount = pool_sizes_count;
-    pool_ci.pPoolSizes = pool_sizes;
-    AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
+    cgltf_data *data;
+    GLTFOpen(file, &data, &renderer->asset);
     
-    // Descriptor Set
-    VkDescriptorSetLayout set_layouts[1] = {renderer->game_set_layout};
-    VkDescriptorSetAllocateInfo allocate_info = {};
-    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocate_info.pNext = NULL;
-    allocate_info.descriptorPool = renderer->descriptor_pool;
-    allocate_info.descriptorSetCount = renderer->descriptor_set_count;
-    allocate_info.pSetLayouts = set_layouts;
-    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, renderer->descriptor_sets));
+    CreateBuffer(context->device, &context->memory_properties, renderer->asset.size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf);
+    DEBUGNameBuffer(context->device, &renderer->gltf, "GLTF");
+    void *mapped_buffer;
+    MapBuffer(context->device, &renderer->gltf, &mapped_buffer);
+    GLTFLoad(data, &renderer->asset, &mapped_buffer);
+    UnmapBuffer(context->device, &renderer->gltf);
     
-    // Push constants
-    // TODO(Guigui): Currently limited to 1 PC
+    GLTFClose(data);
     
-    VkPushConstantRange push_constant_range = 
-    { VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 0, sizeof(PushConstant) };
-    const u32 push_constant_count = 1;
-    renderer->push_constant_size = push_constant_range.size;
+    WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
     
-    VkPipelineLayoutCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create_info.pNext = NULL;
-    create_info.flags = 0;
-    create_info.setLayoutCount = renderer->descriptor_set_count;
-    create_info.pSetLayouts = set_layouts;
-    create_info.pushConstantRangeCount = push_constant_count;
-    create_info.pPushConstantRanges = &push_constant_range;
-    
-    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
+    return renderer;
 }
+
+void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
+    UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
+}
+
+void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
+    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
+}
+
+void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
+    
+    DestroyBuffer(context->device, &renderer->gltf);
+    
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+        
+        vkDestroyFramebuffer(context->device, renderer->framebuffers[i], NULL);
+        
+    }
+    free(renderer->framebuffers);
+    
+    vkDestroyRenderPass(context->device, renderer->render_pass, NULL);
+    
+    vkFreeDescriptorSets(context->device, renderer->descriptor_pool, 1, renderer->descriptor_sets);
+    vkDestroyDescriptorPool(context->device, renderer->descriptor_pool, NULL);
+    
+    vkDestroyDescriptorSetLayout(context->device, renderer->game_set_layout, NULL);
+    vkDestroyPipelineLayout(context->device, renderer->layout, NULL);
+    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
+    
+    free(renderer);
+}
+
+// ================
+//
+// DRAWING
+//
+// ================
 
 void DrawGLTF(VkCommandBuffer cmd, GLTFAsset *asset, Buffer *buffer) {
     VkDeviceSize vtx_offset = asset->vertex_offset;
@@ -1090,128 +1219,4 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer) {
     swapchain->semaphore_id = (swapchain->semaphore_id + 1) % swapchain->image_count;
     
     vkDeviceWaitIdle(context->device);
-}
-
-VulkanContext* VulkanCreateContext(SDL_Window* window){
-    VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
-    CreateVkInstance(window, &context->instance);
-    SDL_Vulkan_CreateSurface(window,context->instance,&context->surface);
-    CreateVkPhysicalDevice(context->instance, &context->physical_device);
-    
-    // Get device properties
-    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
-    
-    GetQueuesId(context);
-    CreateVkDevice(context->physical_device, context->graphics_queue_id, context->transfer_queue_id,context->present_queue_id, &context->device);
-    
-    vkGetDeviceQueue(context->device, context->graphics_queue_id, 0, &context->graphics_queue);
-    vkGetDeviceQueue(context->device, context->present_queue_id, 0, &context->present_queue);
-    vkGetDeviceQueue(context->device, context->transfer_queue_id, 0, &context->transfer_queue);
-    
-    VkCommandPoolCreateInfo pool_create_info = {};
-    pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_create_info.pNext = NULL;
-    pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_create_info.queueFamilyIndex = context->graphics_queue_id;
-    VkResult result = vkCreateCommandPool(context->device, &pool_create_info, NULL, &context->graphics_command_pool);
-    AssertVkResult(result);
-    
-    context->swapchain.swapchain = VK_NULL_HANDLE; //Not sure if this is required
-    CreateOrUpdateSwapchain(context, window, &context->swapchain);
-    
-    CameraMatrices mat;
-    mat.proj = mat4_identity();
-    mat.view = mat4_identity();
-    CreateBuffer(context, sizeof(CameraMatrices), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
-    UploadToBuffer(context->device, &context->cam_buffer, &mat, sizeof(CameraMatrices));
-    DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
-    
-    return context;
-}
-
-VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
-    VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
-    CreatePipelineLayout(context->device, renderer);
-    CreateRenderPass(context->device, &context->swapchain, &renderer->render_pass);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
-    
-    
-    // Framebuffers
-    renderer->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
-        
-        VkFramebufferCreateInfo create_info = {};
-        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        create_info.pNext = NULL;
-        create_info.flags = 0;
-        create_info.renderPass = renderer->render_pass;
-        create_info.attachmentCount = 1;
-        create_info.pAttachments = &context->swapchain.image_views[i];
-        create_info.width = context->swapchain.extent.width;
-        create_info.height = context->swapchain.extent.height;
-        create_info.layers = 1;
-        AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &renderer->framebuffers[i]));
-        
-    }
-    // Load gltf
-    //const char *file = "resources/models/triangle.gltf";
-    const char *file = "resources/models/box/Box.gltf";
-    
-    cgltf_data *data;
-    GLTFOpen(file, &data, &renderer->asset);
-    
-    CreateBuffer(context, renderer->asset.size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &renderer->gltf);
-    DEBUGNameBuffer(context->device, &renderer->gltf, "GLTF");
-    void *mapped_buffer;
-    MapBuffer(context->device, &renderer->gltf, &mapped_buffer);
-    GLTFLoad(data, &renderer->asset, &mapped_buffer);
-    UnmapBuffer(context->device, &renderer->gltf);
-    
-    GLTFClose(data);
-    
-    WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
-    
-    return renderer;
-}
-
-void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
-    
-    DestroyBuffer(context->device, &renderer->gltf);
-    
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
-        
-        vkDestroyFramebuffer(context->device, renderer->framebuffers[i], NULL);
-        
-    }
-    free(renderer->framebuffers);
-    
-    vkDestroyRenderPass(context->device, renderer->render_pass, NULL);
-    
-    vkFreeDescriptorSets(context->device, renderer->descriptor_pool, 1, renderer->descriptor_sets);
-    vkDestroyDescriptorPool(context->device, renderer->descriptor_pool, NULL);
-    
-    vkDestroyDescriptorSetLayout(context->device, renderer->game_set_layout, NULL);
-    vkDestroyPipelineLayout(context->device, renderer->layout, NULL);
-    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
-    
-    free(renderer);
-}
-
-void VulkanDestroyContext(VulkanContext *context){
-    
-    vkDeviceWaitIdle(context->device);
-    
-    DestroyBuffer(context->device, &context->cam_buffer);
-    
-    DestroySwapchain(context, &context->swapchain);
-    vkDestroySwapchainKHR(context->device, context->swapchain.swapchain, NULL);
-    vkDestroySurfaceKHR(context->instance, context->surface, NULL);
-    
-    vkDestroyCommandPool(context->device,context->graphics_command_pool,NULL);
-    
-    vkDestroyDevice(context->device, NULL);
-    pfn_vkDestroyDebugUtilsMessengerEXT(context->instance, debug_messenger, NULL);
-    vkDestroyInstance(context->instance, NULL);
-    
-    free(context);
 }
