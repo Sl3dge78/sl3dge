@@ -155,15 +155,5 @@ void GLTFLoad(cgltf_data *data, GLTFSceneInfo *scene, mat4 *transforms, void **m
             parent = parent->parent;
             
         }
-        
-        mat4_print(&transforms[i]);
-        
-        float mat[16];
-        cgltf_node_transform_world(node, mat);
-        mat4 mama = {};
-        memcpy(&mama, mat, sizeof(mat4));
-        mat4_print(&mama);
-        SDL_Log("==============\n\n");
-        
     }
 }
