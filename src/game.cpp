@@ -60,7 +60,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
             game_data->spherical_coordinates.x += speed * mouse_x * -2.5f;
         }
         if(mouse_y != 0){
-            float new_rot = game_data->spherical_coordinates.y + speed * mouse_y * -2.5f;
+            float new_rot = game_data->spherical_coordinates.y + speed * mouse_y * 2.5f;
             if(new_rot > 0.0f && new_rot < PI) {
                 game_data->spherical_coordinates.y = new_rot;
             }
@@ -71,7 +71,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     }
     
     vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
-    vec3 right = vec3_cross(forward, vec3{0.0f, 1.0f, 0.0f});
+    vec3 right = vec3_cross(forward, vec3{0.0f, -1.0f, 0.0f});
     vec3 up = vec3_cross(right, forward);
     
     vec3 movement = {};
@@ -89,10 +89,10 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
         movement = movement + vec3_fmul(forward,-speed);
     }
     if(keyboard[SDL_SCANCODE_A]){
-        movement = movement + vec3_fmul(right, speed);
+        movement = movement + vec3_fmul(right, -speed);
     }
     if(keyboard[SDL_SCANCODE_D]){
-        movement = movement + vec3_fmul(right, -speed);
+        movement = movement + vec3_fmul(right, speed);
     }
     if(keyboard[SDL_SCANCODE_Q]){
         movement.y -= speed;

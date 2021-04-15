@@ -841,13 +841,23 @@ void VulkanLoadGLTF(const char* file, VulkanContext *context, mat4 **transforms)
     scene->nodes_count = data->nodes_count;
     scene->node_mesh = (u32 *)calloc(scene->nodes_count, sizeof(u32));
     
+    if(data->meshes_count >= UINT_MAX) {
+        SDL_LogError(0, "that's way to many meshes!!!");
+        ASSERT(0);
+    }
+    
     for(u32 i = 0; i < scene->nodes_count; ++i) {
         // TODO(Guigui): This is kind of dirty, is there any other way?
+        bool found = false;
         for(u32 m = 0; m < data->meshes_count; ++m) {
             if(&data->meshes[m] == data->nodes[i].mesh) {
                 scene->node_mesh[i] = m;
+                found = true;
                 break;
             }
+        }
+        if(!found) {
+            scene->node_mesh[i] = UINT_MAX;
         }
     }
     
@@ -1145,7 +1155,7 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     rasterization_state.rasterizerDiscardEnable = VK_FALSE;
     rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
     rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterization_state.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterization_state.depthBiasEnable = VK_FALSE;
     rasterization_state.depthBiasConstantFactor = 0.f;
     rasterization_state.depthBiasClamp = 0.f;
@@ -1354,9 +1364,13 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
     vkCmdBindIndexBuffer(cmd, context->scene_idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
     
     for(u32 i = 0; i < context->scene_info.nodes_count ; i ++) {
-        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &game_data->transforms[i]);
         u32 mesh_id = context->scene_info.node_mesh[i];
         
+        if(mesh_id == UINT_MAX) {
+            continue;
+        }
+        
+        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &game_data->transforms[i]);
         vkCmdDrawIndexed(cmd, 
                          context->scene_info.index_counts[mesh_id],
                          1,
