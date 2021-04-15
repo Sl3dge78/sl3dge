@@ -19,6 +19,12 @@ typedef struct Vertex {
     vec3 normal;
 } Vertex;
 
+typedef struct Material {
+    alignas(16) vec3 base_color;
+    alignas(4)  float metallic;
+    alignas(4)  float roughness;
+} Material;
+
 typedef struct GLTFSceneInfo {
     u32 vertex_buffer_size;
     u32 index_buffer_size;
@@ -36,6 +42,9 @@ typedef struct GLTFSceneInfo {
     
     u32 nodes_count;
     u32 *node_mesh;
+    
+    u32 materials_count;
+    u32 *materials;
     
 } GLTFSceneInfo;
 
@@ -85,20 +94,31 @@ internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset,
     }
 }
 
-void GLTFGetNodeTransform(const cgltf_node *node, mat4 *transform) {
-    
-    if(node->has_matrix) {
-        memcpy(transform, node->matrix, sizeof(mat4));
-    } else {
-        vec3 t = {node->translation[0], node->translation[1], node->translation[2] };
-        quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3] };
-        vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
-        
-        trs_to_mat4(transform, &t, &r, &s);
+// TODO(Guigui): This is kind of dirty, is there any other way?
+inline u32 GLTFGetMeshID(cgltf_data *data, cgltf_mesh *mesh) {
+    if(!mesh) {
+        return UINT_MAX;
     }
+    for(u32 m = 0; m < data->meshes_count; ++m) {
+        
+        if(&data->meshes[m] == mesh) {
+            return m;
+        }
+    }
+    return UINT_MAX;
 }
 
-void GLTFLoad(cgltf_data *data, GLTFSceneInfo *scene, mat4 *transforms, void **mapped_vtx_buffer, void **mapped_idx_buffer) {
+// TODO(Guigui): This is kind of dirty, is there any other way?
+inline u32 GLTFGetMaterialID(cgltf_data *data, cgltf_material *mat) {
+    for(u32 mat_id = 0; mat_id < data->materials_count; ++mat_id) {
+        if(&data->materials[mat_id] == mat) {
+            return mat_id;
+        }
+    }
+    return UINT_MAX;
+}
+
+void GLTFLoadVertexBuffer(cgltf_data *data, GLTFSceneInfo *scene, void *buffer) {
     
     for(u32 m = 0; m < scene->meshes_count; ++m) {
         
@@ -107,19 +127,67 @@ void GLTFLoad(cgltf_data *data, GLTFSceneInfo *scene, mat4 *transforms, void **m
         for(u32 a = 0; a < prim->attributes_count ; ++a) {
             if(prim->attributes[a].type == cgltf_attribute_type_position) {
                 
-                GLTFCopyAccessor(prim->attributes[a].data, *mapped_vtx_buffer, scene->vertex_offsets[m] * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
+                GLTFCopyAccessor(prim->attributes[a].data, buffer, scene->vertex_offsets[m] * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
                 continue;
             }
             
             if(prim->attributes[a].type == cgltf_attribute_type_normal) {
-                GLTFCopyAccessor(prim->attributes[a].data, *mapped_vtx_buffer, scene->vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
+                GLTFCopyAccessor(prim->attributes[a].data, buffer, scene->vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
                 continue;
             }
         }
-        
-        GLTFCopyAccessor(prim->indices, *mapped_idx_buffer, scene->index_offsets[m] * sizeof(u32), sizeof(u32));
     }
+}
+
+void GLTFLoadIndexBuffer(cgltf_data *data,  GLTFSceneInfo *scene, void *buffer) {
     
+    for(u32 m = 0; m < scene->meshes_count; ++m) {
+        cgltf_primitive *prim = &data->meshes[m].primitives[0];
+        GLTFCopyAccessor(prim->indices, buffer, scene->index_offsets[m] * sizeof(u32), sizeof(u32));
+    }
+}
+
+void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
+    
+    for(u32 i = 0; i < data->materials_count; ++i) {
+        
+        cgltf_material *mat = &data->materials[i];
+        Material dst = {};
+        
+        if(!mat->has_pbr_metallic_roughness) {
+            // TODO(Guigui)
+            SDL_LogError(0, "Only metallic_roughness is supported");
+            ASSERT(0);
+        }
+        
+        float *color = mat->pbr_metallic_roughness.base_color_factor;
+        
+        dst.base_color = {color[0], color[1], color[2]};
+        dst.metallic = mat->pbr_metallic_roughness.metallic_factor;
+        dst.roughness = mat->pbr_metallic_roughness.roughness_factor;
+        
+        //SDL_Log("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2], dst.metallic, dst.roughness);
+        
+        memcpy(buffer, &dst, sizeof(Material));
+        
+        buffer++;
+    }
+}
+
+void GLTFGetNodeTransform(const cgltf_node *node, mat4 *transform) {
+    
+    if(node->has_matrix) {
+        memcpy(transform, node->matrix, sizeof(mat4));
+    } else {
+        vec3 t = {node->translation[0]*10, node->translation[1]*10, node->translation[2]*10 };
+        quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3] };
+        vec3 s = {node->scale[0]*10, node->scale[1]*10, node->scale[2]*10};
+        
+        trs_to_mat4(transform, &t, &r, &s);
+    }
+}
+
+void GLTFLoadTransforms(cgltf_data* data, mat4 *transforms) {
     for(u32 i = 0; i < data->nodes_count; i ++) {
         transforms[i] = mat4_identity();
         cgltf_node *node = &data->nodes[i];

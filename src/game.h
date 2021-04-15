@@ -22,12 +22,14 @@ typedef int32_t i32;
 
 typedef struct PushConstant {
     alignas(16) mat4 transform;
+    alignas(4) u32 material;
 } PushConstant;
 
 typedef struct CameraMatrices {
     alignas(16) mat4 proj;
     alignas(16) mat4 view;
     alignas(16) vec3 pos;
+    alignas(16) vec3 view_dir;
 } CameraMatrices;
 
 typedef struct GameData {

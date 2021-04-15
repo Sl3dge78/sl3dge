@@ -204,7 +204,7 @@ mat4 mat4_perspective(const float fov, const float aspect_ratio, const float nea
     
     result.m[0][0] = 1.0f / (aspect_ratio * tan_theta_2);
     result.m[1][1] = -1.0f / tan_theta_2;
-    result.m[2][2] = (near + far) / (far - near);
+    result.m[2][2] = (far + near) / (far - near);
     result.m[2][3] = 1.0f;
     result.m[3][2] = -(2.0f * near * far) / (far - near);
     result.m[3][3] = 1.0f;

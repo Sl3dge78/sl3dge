@@ -5,13 +5,15 @@
  CRITICAL
  
  MAJOR
-  
+  - Textures
+
  BACKLOG
- - Window Resize
+ - IBL
 
  IMPROVEMENTS
- - Envoyer les buffers au shaders
+- Envoyer les buffers au shaders
  - Staging buffers
+- Window Resize
  - Handle pipeline caches
  - Pipline dynamic states ?
 - MSAA
@@ -99,6 +101,7 @@ typedef struct VulkanContext {
     
     Buffer scene_vtx_buffer;
     Buffer scene_idx_buffer;
+    Buffer scene_mat_buffer;
     GLTFSceneInfo scene_info;
     
 } VulkanContext;
@@ -841,48 +844,56 @@ void VulkanLoadGLTF(const char* file, VulkanContext *context, mat4 **transforms)
     scene->nodes_count = data->nodes_count;
     scene->node_mesh = (u32 *)calloc(scene->nodes_count, sizeof(u32));
     
+    scene->materials_count = data->materials_count;
+    scene->materials = (u32*) calloc(data->nodes_count, sizeof(u32));
+    
+    // Meshes
     if(data->meshes_count >= UINT_MAX) {
         SDL_LogError(0, "that's way to many meshes!!!");
         ASSERT(0);
     }
     
     for(u32 i = 0; i < scene->nodes_count; ++i) {
-        // TODO(Guigui): This is kind of dirty, is there any other way?
-        bool found = false;
-        for(u32 m = 0; m < data->meshes_count; ++m) {
-            if(&data->meshes[m] == data->nodes[i].mesh) {
-                scene->node_mesh[i] = m;
-                found = true;
-                break;
-            }
-        }
-        if(!found) {
-            scene->node_mesh[i] = UINT_MAX;
+        scene->node_mesh[i] = GLTFGetMeshID(data, data->nodes[i].mesh);
+        if(data->nodes[i].mesh) {
+            scene->materials[i] = GLTFGetMaterialID(data, data->nodes[i].mesh->primitives[0].material);
         }
     }
     
-    *transforms =  (mat4 *)calloc(context->scene_info.nodes_count, sizeof(mat4));
-    
+    // Vertex Buffer
     CreateBuffer(context->device, &context->memory_properties, context->scene_info.vertex_buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_vtx_buffer);
-    CreateBuffer(context->device, &context->memory_properties, context->scene_info.index_buffer_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_idx_buffer);
-    
     DEBUGNameBuffer(context->device, &context->scene_vtx_buffer, "GLTF VTX");
-    DEBUGNameBuffer(context->device, &context->scene_idx_buffer, "GLTF IDX");
-    
     void *mapped_vtx_buffer;
     MapBuffer(context->device, &context->scene_vtx_buffer, &mapped_vtx_buffer);
+    GLTFLoadVertexBuffer(data, &context->scene_info, mapped_vtx_buffer);
+    UnmapBuffer(context->device, &context->scene_vtx_buffer);
+    
+    // Index Buffer
+    CreateBuffer(context->device, &context->memory_properties, context->scene_info.index_buffer_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_idx_buffer);
+    DEBUGNameBuffer(context->device, &context->scene_idx_buffer, "GLTF IDX");
     void *mapped_idx_buffer;
     MapBuffer(context->device, &context->scene_idx_buffer, &mapped_idx_buffer);
-    
-    GLTFLoad(data, &context->scene_info, *transforms, &mapped_vtx_buffer, &mapped_idx_buffer);
-    
-    UnmapBuffer(context->device, &context->scene_vtx_buffer);
+    GLTFLoadIndexBuffer(data, &context->scene_info, mapped_idx_buffer);
     UnmapBuffer(context->device, &context->scene_idx_buffer);
+    
+    // Material Buffer
+    CreateBuffer(context->device, &context->memory_properties, context->scene_info.materials_count * sizeof(Material),  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_mat_buffer);
+    DEBUGNameBuffer(context->device, &context->scene_mat_buffer, "GLTF MATS");
+    void *mapped_mat_buffer;
+    MapBuffer(context->device, &context->scene_mat_buffer, &mapped_mat_buffer);
+    GLTFLoadMaterialBuffer(data, (Material*)mapped_mat_buffer);
+    UnmapBuffer(context->device, &context->scene_mat_buffer);
+    
+    // Transforms
+    *transforms =  (mat4 *)calloc(context->scene_info.nodes_count, sizeof(mat4));
+    GLTFLoadTransforms(data, *transforms);
     
     cgltf_free(data);
 }
 
 void VulkanFreeGLTF(VulkanContext *context, mat4 **transforms) {
+    free(context->scene_info.materials);
+    
     free(context->scene_info.vertex_offsets);
     free(context->scene_info.index_offsets);
     
@@ -893,6 +904,7 @@ void VulkanFreeGLTF(VulkanContext *context, mat4 **transforms) {
     
     DestroyBuffer(context->device, &context->scene_vtx_buffer);
     DestroyBuffer(context->device, &context->scene_idx_buffer);
+    DestroyBuffer(context->device, &context->scene_mat_buffer);
     free(*transforms);
 }
 
@@ -925,23 +937,24 @@ void VulkanDestroyContext(VulkanContext *context){
 internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer) {
     
     // Set Layout
-    
-    // TODO(Guigui): TEMP
-    const u32 mesh_count = 1;
-    const u32 material_count = 1;
-    
     // Our set layout
     renderer->descriptor_set_count = 1;
-    
     const u32 app_descriptor_count = 0;
     
-    // Get the game set layout
+    // Game set layout
     const VkDescriptorSetLayoutBinding game_bindings[] = {
         { // CAMERA MATRICES
             0,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             1,
             VK_SHADER_STAGE_VERTEX_BIT,
+            NULL
+        },
+        {  // MATERIALS
+            1,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            1,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
             NULL
         }
     };
@@ -959,6 +972,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
     VkDescriptorPoolSize pool_sizes[] = {
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0}
     };
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
     
@@ -994,7 +1008,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     // TODO(Guigui): Currently limited to 1 PC
     
     VkPushConstantRange push_constant_range = 
-    { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4) };
+    { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
     const u32 push_constant_count = 1;
     renderer->push_constant_size = push_constant_range.size;
     
@@ -1234,15 +1248,19 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     
 }
 
-internal void WriteDescriptorSets(const VkDevice device, const VkDescriptorSet *descriptor_set, Buffer *cam_buffer) {
+internal void VulkanWriteDescriptorSets(VulkanContext *context, VulkanRenderer *renderer) {
     
-    u32 game_writes_count = 1;
-    VkDescriptorBufferInfo bi_cam = { cam_buffer->buffer, 0, VK_WHOLE_SIZE };
-    VkWriteDescriptorSet game_writes[1];
+    const u32 game_writes_count = 2;
+    VkWriteDescriptorSet game_writes[game_writes_count];
+    
+    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
     game_writes[0] = 
-    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[0], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
+    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
     
-    vkUpdateDescriptorSets(device, game_writes_count, game_writes, 0, NULL);
+    VkDescriptorBufferInfo materials = { context->scene_mat_buffer.buffer, 0, VK_WHOLE_SIZE };
+    game_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
+    
+    vkUpdateDescriptorSets(context->device, game_writes_count, game_writes, 0, NULL);
 }
 
 VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
@@ -1253,8 +1271,6 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
     
     CreateRenderPass(context->device, &context->swapchain, &renderer->render_pass);
     CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
-    
-    
     
     // Framebuffers
     renderer->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
@@ -1279,8 +1295,6 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
         AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &renderer->framebuffers[i]));
         
     }
-    
-    WriteDescriptorSets(context->device, renderer->descriptor_sets, &context->cam_buffer);
     
     return renderer;
 }
@@ -1349,7 +1363,7 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
     renderpass_begin.renderArea = {{0,0}, swapchain->extent};
     
     VkClearValue clear_values[2] = {};
-    clear_values[0].color = {0.43f, 0.77f, 0.91f, 0.0f};
+    clear_values[0].color = {0.2f, 0.2f, 0.2f, 0.0f};
     clear_values[1].depthStencil = {1.0f, 0};
     renderpass_begin.clearValueCount = 2;
     renderpass_begin.pClearValues = clear_values;
@@ -1369,8 +1383,8 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
         if(mesh_id == UINT_MAX) {
             continue;
         }
-        
-        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &game_data->transforms[i]);
+        PushConstant push = { game_data->transforms[i], context->scene_info.materials[i] };
+        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
         vkCmdDrawIndexed(cmd, 
                          context->scene_info.index_counts[mesh_id],
                          1,
