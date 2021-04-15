@@ -1,13 +1,14 @@
 /*
  === TODO ===
  CRITICAL
- 
- MAJOR
-  - Multiple meshes
-- Multiple primitives
-- Materials
+ - Materials
 
- BACKLOG
+ MAJOR
+  - Node hierarchy
+
+- Multiple primitives
+
+BACKLOG
  
 
  IMPROVEMENTS
@@ -56,6 +57,9 @@ internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset,
         break;
         case cgltf_component_type_r_32f:
         size = sizeof(float);
+        break;
+        case cgltf_component_type_r_8u:
+        size = sizeof(u8);
         break;
         default:
         SDL_LogError(0,"Unsupported component type : %d", acc->component_type);
@@ -110,24 +114,15 @@ void GLTFLoad(cgltf_data *data, GLTFSceneInfo *scene, mat4 *transforms, void **m
         transforms[i] = mat4_identity();
         cgltf_node *node = &data->nodes[i];
         if(node->has_matrix) {
-            SDL_LogWarn(0, "Node has matrix, but it isn't supported yet!");
-            // TODO(Guigui): 
+            memcpy(&transforms[i], node->matrix, sizeof(mat4));
             continue;
         } else {
-            if(node->has_translation) {
-                mat4_translate(&transforms[i], {node->translation[0], node->translation[1], node->translation[2]});
-            }
-            if(node->has_rotation) {
-                SDL_LogWarn(0, "Node has rotation, but it isn't supported yet!");
-                // TODO(Guigui): 
-            }
-            if(node->has_scale) {
-                SDL_LogWarn(0, "Node has scale, but it isn't supported yet!");
-                // TODO(Guigui): 
-            }
+            
+            vec3 t = {node->translation[0], node->translation[1], node->translation[2] };
+            quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3] };
+            vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
+            
+            trs_to_mat4(&transforms[i], &t, &r, &s);
         }
-        
     }
-    
-    
 }

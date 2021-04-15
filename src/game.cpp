@@ -103,9 +103,9 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     // Reset
     if(keyboard[SDL_SCANCODE_SPACE]){
-        game_data->transforms[0] = mat4_identity();
-        game_data->transforms[1] = mat4_identity();
-        //GameStart(game_data);
+        //game_data->transforms[0] = mat4_identity();
+        //game_data->transforms[1] = mat4_identity();
+        GameStart(game_data);
     }
     
     game_data->position = game_data->position + movement;

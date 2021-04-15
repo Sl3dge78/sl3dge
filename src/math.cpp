@@ -49,6 +49,20 @@ typedef struct vec4 {
     alignas(4) float w;
 } vec4;
 
+typedef struct quat {
+    float x;
+    float y;
+    float z;
+    float w;
+} quat;
+
+typedef union mat4 {
+    float v[16];
+    float m[4][4];
+} mat4;
+
+// =====================================================
+
 vec3 operator+(vec3 l, const vec3 r) {
     l.x += r.x;
     l.y += r.y;
@@ -116,10 +130,7 @@ float vec3_dot(const vec3 a, const vec3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-typedef union mat4 {
-    float v[16];
-    float m[4][4];
-} mat4;
+// =====================================================
 
 void mat4_print(const mat4* mat) {
     
@@ -290,4 +301,98 @@ mat4 mat4_look_at(vec3 target, vec3 eye, vec3 up) {
     mat.m[3][3] = 1;
     
     return mat;
+}
+
+void trs_to_mat4(mat4 *dst, const vec3 *t, const quat *r, const vec3 *s) {
+    
+    const float sqx = 2.0f * r->x * r->x;
+    const float sqy = 2.0f * r->y * r->y;
+    const float sqz = 2.0f * r->z * r->z;
+    const float sqw = 2.0f * r->w * r->w;
+    
+    const float xy = r->x * r->y;
+    const float zw = r->z * r->w;
+    
+    const float xz = r->x * r->z;
+    const float yw = r->y * r->w;
+    
+    const float yz = r->y * r->z;
+    const float xw = r->x * r->w;
+    
+    dst->v[0] = (1 - sqy - sqz) * s->x;
+    dst->v[1] = 2.0f * (xy + zw) * s->x;
+    dst->v[2] = 2.0f * (xz - yw) * s->x;
+    dst->v[3] = 0.0f;
+    
+    dst->v[4] = 2.0f * (xy - zw) * s->y;
+    dst->v[5] = (1.0f - sqx - sqz) * s->y;
+    dst->v[6] = 2.0f * (yz + xw) * s->y;
+    dst->v[7] = 0.0f;
+    
+    dst->v[8] = 2.0f * (xz + yw) * s->z;
+    dst->v[9] = 2.0f * (yz - xw) * s->z;
+    dst->v[10] = (1.0f - sqx - sqy) * s->z;
+    dst->v[11] = 0.0f;
+    
+    dst->v[12] = t->x;
+    dst->v[13] = t->y;
+    dst->v[14] = t->z;
+    dst->v[15] = 1.0f;
+    
+}
+
+// =====================================================
+
+void quat_to_mat4(mat4 *dst, const quat *q) {
+    
+    const float sqx = 2.0f * q->x * q->x;
+    const float sqy = 2.0f * q->y * q->y;
+    const float sqz = 2.0f * q->z * q->z;
+    const float sqw = 2.0f * q->w * q->w;
+    
+    const float xy = q->x * q->y;
+    const float zw = q->z * q->w;
+    
+    const float xz = q->x * q->z;
+    const float yw = q->y * q->w;
+    
+    const float yz = q->y * q->z;
+    const float xw = q->x * q->w;
+    
+    //const float invs = 1.0f / (sqx + sqy + sqz + sqw);
+    
+    dst->v[0] = (1 - sqy - sqz);
+    dst->v[1] = 2.0f * (xy + zw);
+    dst->v[2] = 2.0f * (xz - yw);
+    dst->v[3] = 0.0f;
+    
+    dst->v[4] = 2.0f * (xy - zw);
+    dst->v[5] = (1.0f - sqx - sqz);
+    dst->v[6] = 2.0f * (yz - xw);
+    dst->v[7] = 0.0f;
+    
+    dst->v[8] = 2.0f * (xz + yw);
+    dst->v[9] = 2.0f * (yz + xw);
+    dst->v[10] = (1 - sqx - sqy);
+    dst->v[11] = 0.0f;
+    
+    dst->v[12] = 0.0f;
+    dst->v[13] = 0.0f;
+    dst->v[14] = 0.0f;
+    dst->v[15] = 1.0f;
+    
+    /*
+    dst->m[0][0] = ( sqx - sqy - sqz + sqw) * invs;
+    dst->m[1][1] = (-sqx + sqy - sqz + sqw) * invs;
+    dst->m[2][2] = (-sqx - sqy + sqz + sqw) * invs;
+    
+    dst->m[0][1] = 2.0f * (xy + zw) * invs;
+    dst->m[1][0] = 2.0f * (xy - zw) * invs;
+    
+    dst->m[0][2] = 2.0f * (xz - yw) * invs;
+    dst->m[2][0] = 2.0f * (xz + yw) * invs;
+    
+    dst->m[1][2] = 2.0f * (yz - xw) * invs;
+    dst->m[2][1] = 2.0f * (yz + xw) * invs;
+*/
 }
