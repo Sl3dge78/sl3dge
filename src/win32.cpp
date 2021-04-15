@@ -153,7 +153,7 @@ internal int main(int argc, char *argv[]) {
     
     GameData game_data = {};
     
-    VulkanLoadGLTF("resources/models/gltf_samples/Lantern/glTF/Lantern.gltf", context, &game_data.transforms);
+    VulkanLoadGLTF("resources/models/gltf_samples/ReciprocatingSaw/glTF/ReciprocatingSaw.gltf", context, &game_data.transforms);
     //VulkanLoadGLTF("resources/models/cube_plane.gltf", context, &game_data.transforms);
     
     game_code.GameStart(&game_data);
