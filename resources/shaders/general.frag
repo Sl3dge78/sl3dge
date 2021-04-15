@@ -15,10 +15,11 @@ struct Material {
     */
 };
 
-layout(location = 0) in vec3 normal;
-layout(location = 1) in vec3 frag_pos;
-layout(location = 2) in vec3 cam_pos;
-layout(location = 3) flat in uint material_id;
+layout(location = 0) in vec3 worldpos;
+layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 texcoord;
+layout(location = 3) in vec3 cam_pos;
+layout(location = 4) flat in uint material_id;
 
 layout(location = 0) out vec4 out_color;
 
@@ -173,7 +174,7 @@ vec3 pbr2(Material mat) {
     vec3 light_dir = normalize(vec3(0, 1, 1));
 
     vec3 N = normal;
-    vec3 V = normalize(cam_pos - frag_pos);
+    vec3 V = normalize(cam_pos - worldpos);
     vec3 L = normalize(light_dir);
     vec3 H = normalize(L+V);
     vec3 reflection = -normalize(reflect(V, N));
@@ -204,8 +205,7 @@ vec3 pbr2(Material mat) {
 
 void main() {
 	
-	//vec3 color = pbr(materials.m[material_id]);
-    vec3 color = pbr2(materials.m[material_id]);
-
+	vec3 color = pbr2(materials.m[material_id]);
+    
     out_color = vec4(color, 1.0);
 }

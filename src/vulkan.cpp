@@ -1122,10 +1122,11 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vtx_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     vertex_input.pVertexBindingDescriptions = &vtx_input_binding;
     
-    vertex_input.vertexAttributeDescriptionCount = 2;
+    vertex_input.vertexAttributeDescriptionCount = 3;
     VkVertexInputAttributeDescription vtx_descriptions[] = {
         {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos)},
         {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal)},
+        {2, 0, VK_FORMAT_R32G32_SFLOAT,    offsetof(Vertex, uv)},
     };
     vertex_input.pVertexAttributeDescriptions = vtx_descriptions;
     

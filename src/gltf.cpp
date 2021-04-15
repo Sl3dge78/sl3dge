@@ -17,6 +17,7 @@ BACKLOG
 typedef struct Vertex {
     vec3 pos;
     vec3 normal;
+    vec2 uv;
 } Vertex;
 
 typedef struct Material {
@@ -79,6 +80,9 @@ internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset,
         case cgltf_type_vec3:
         size *= 3;
         break;
+        case cgltf_type_vec2:
+        size *= 2;
+        break;
         default:
         SDL_LogError(0,"Unsupported type : %d", acc->type);
         ASSERT(0);
@@ -135,6 +139,10 @@ void GLTFLoadVertexBuffer(cgltf_data *data, GLTFSceneInfo *scene, void *buffer) 
                 GLTFCopyAccessor(prim->attributes[a].data, buffer, scene->vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
                 continue;
             }
+            if(prim->attributes[a].type == cgltf_attribute_type_texcoord) {
+                GLTFCopyAccessor(prim->attributes[a].data, buffer, scene->vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
+                continue;
+            }
         }
     }
 }
@@ -179,9 +187,9 @@ void GLTFGetNodeTransform(const cgltf_node *node, mat4 *transform) {
     if(node->has_matrix) {
         memcpy(transform, node->matrix, sizeof(mat4));
     } else {
-        vec3 t = {node->translation[0]*10, node->translation[1]*10, node->translation[2]*10 };
+        vec3 t = {node->translation[0], node->translation[1]*10, node->translation[2]*10 };
         quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3] };
-        vec3 s = {node->scale[0]*10, node->scale[1]*10, node->scale[2]*10};
+        vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
         
         trs_to_mat4(transform, &t, &r, &s);
     }
