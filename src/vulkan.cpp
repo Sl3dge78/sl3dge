@@ -6,16 +6,16 @@
  
  MAJOR
   - Textures
+- Shadow Mapping
 
  BACKLOG
  - IBL
 
  IMPROVEMENTS
-- Envoyer les buffers au shaders
- - Staging buffers
-- Window Resize
+- Utiliser des Staging buffers
+- Window Resize > Pipline dynamic states ?
  - Handle pipeline caches
- - Pipline dynamic states ?
+ 
 - MSAA
 */
 
@@ -83,6 +83,7 @@ typedef struct VulkanContext {
     VkSurfaceKHR surface;
     
     VkPhysicalDeviceMemoryProperties memory_properties;
+    VkPhysicalDeviceProperties physical_device_properties;
     
     VkDevice device;
     u32 graphics_queue_id;
@@ -103,6 +104,10 @@ typedef struct VulkanContext {
     Buffer scene_idx_buffer;
     Buffer scene_mat_buffer;
     GLTFSceneInfo scene_info;
+    
+    VkSampler texture_sampler;
+    
+    Image color_texture;
     
 } VulkanContext;
 
@@ -348,12 +353,60 @@ internal void CreateImage(const VkDevice device, const VkPhysicalDeviceMemoryPro
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D ;
     image_view_ci.format = format;
     image_view_ci.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
-    image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if(usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+        image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    else 
+        image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     image_view_ci.subresourceRange.baseMipLevel = 0;
     image_view_ci.subresourceRange.levelCount = 1;
     image_view_ci.subresourceRange.baseArrayLayer = 0;
     image_view_ci.subresourceRange.layerCount = 1;
-    vkCreateImageView(device, &image_view_ci, NULL, &image->image_view);
+    AssertVkResult(vkCreateImageView(device, &image_view_ci, NULL, &image->image_view));
+}
+
+internal void CopyBufferToImage(VkCommandBuffer cmd, VkExtent3D extent, u32 pitch, Buffer *image_buffer, Image *image) {
+    
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = extent;
+    
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.pNext = NULL;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image->image;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}; 
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, NULL,
+                         0, NULL,
+                         1, &barrier);
+    
+    vkCmdCopyBufferToImage(cmd, image_buffer->buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    
+    VkImageMemoryBarrier barrier2 = {};
+    barrier2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier2.pNext = NULL;
+    barrier2.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier2.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier2.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier2.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier2.image = image->image;
+    barrier2.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}; 
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+                         0, NULL,
+                         0, NULL,
+                         1, &barrier2);
     
 }
 
@@ -772,6 +825,7 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     
     // Get device properties
     vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
+    vkGetPhysicalDeviceProperties(context->physical_device, &context->physical_device_properties);
     
     GetQueuesId(context);
     CreateVkDevice(context->physical_device, context->graphics_queue_id, context->transfer_queue_id,context->present_queue_id, &context->device);
@@ -798,10 +852,40 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     UploadToBuffer(context->device, &context->cam_buffer, &mat, sizeof(CameraMatrices));
     DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
     
+    //Sampler
+    VkSamplerCreateInfo sampler_ci = {};
+    sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_ci.pNext = NULL;
+    sampler_ci.flags = 0;
+    sampler_ci.magFilter = VK_FILTER_NEAREST;
+    sampler_ci.minFilter = VK_FILTER_NEAREST;
+    sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.mipLodBias = 0.0f;
+    sampler_ci.anisotropyEnable = VK_TRUE;
+    sampler_ci.maxAnisotropy = context->physical_device_properties.limits.maxSamplerAnisotropy;
+    sampler_ci.compareEnable = VK_FALSE;
+    sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_ci.minLod = 0.0f;
+    sampler_ci.maxLod = 0.0f;
+    sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_ci.unnormalizedCoordinates = VK_FALSE;
+    AssertVkResult(vkCreateSampler(context->device, &sampler_ci, NULL, &context->texture_sampler));
+    
     return context;
 }
 
-void VulkanLoadGLTF(const char* file, VulkanContext *context, mat4 **transforms) {
+void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
+    
+    char *directory;
+    char *last_sep = strrchr(file, '/');
+    u32 size = last_sep - file;
+    directory = (char *)calloc(size + 2, sizeof(char));
+    strncpy(directory, file, size);
+    directory[size] = '/';
+    directory[size+1] = '\0';
     
     cgltf_data *data;
     cgltf_options options = {0};
@@ -888,10 +972,51 @@ void VulkanLoadGLTF(const char* file, VulkanContext *context, mat4 **transforms)
     *transforms =  (mat4 *)calloc(context->scene_info.nodes_count, sizeof(mat4));
     GLTFLoadTransforms(data, *transforms);
     
+    // Texture
+    char* image_path = data->textures[0].image->uri;
+    u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
+    char* full_image_path = (char *)calloc(file_path_length, sizeof(char *));
+    strcat(full_image_path, directory);
+    strcat(full_image_path, image_path);
+    
+    SDL_Surface *surface = IMG_Load(full_image_path);
+    if(!surface) {
+        SDL_LogError(0, IMG_GetError());
+    }
+    
+    free(full_image_path);
+    
+    Buffer image_buffer;
+    SDL_Surface *img_surf = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
+    if(!img_surf) {
+        SDL_LogError(0, SDL_GetError());
+    }
+    
+    VkDeviceSize image_size = img_surf->h * img_surf->pitch;
+    VkExtent3D extent = {(u32)img_surf->h, (u32)img_surf->w, 1};
+    
+    CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->color_texture);
+    CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffer); 
+    UploadToBuffer(context->device, &image_buffer, surface->pixels, image_size);
+    
+    VkCommandBuffer cmd;
+    AllocateAndBeginCommandBuffer(context->device, context->graphics_command_pool, &cmd);
+    CopyBufferToImage(cmd, extent, img_surf->pitch, &image_buffer, &context->color_texture);
+    EndAndExecuteCommandBuffer(context->device, context->graphics_queue, context->graphics_command_pool, cmd);
+    
+    SDL_FreeSurface(img_surf);
+    DestroyBuffer(context->device, &image_buffer);
+    SDL_FreeSurface(surface);
+    
     cgltf_free(data);
+    free(directory);
+    
 }
 
 void VulkanFreeGLTF(VulkanContext *context, mat4 **transforms) {
+    
+    DestroyImage(context->device, &context->color_texture);
+    
     free(context->scene_info.materials);
     
     free(context->scene_info.vertex_offsets);
@@ -911,6 +1036,8 @@ void VulkanFreeGLTF(VulkanContext *context, mat4 **transforms) {
 void VulkanDestroyContext(VulkanContext *context){
     
     vkDeviceWaitIdle(context->device);
+    
+    vkDestroySampler(context->device, context->texture_sampler, NULL);
     
     DestroyBuffer(context->device, &context->cam_buffer);
     
@@ -956,6 +1083,13 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
             1,
             VK_SHADER_STAGE_FRAGMENT_BIT,
             NULL
+        },
+        {  // TEXTURES
+            2,
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            1,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            NULL
         }
     };
     const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
@@ -972,7 +1106,8 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
     VkDescriptorPoolSize pool_sizes[] = {
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0}
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0},
     };
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
     
@@ -1251,7 +1386,7 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
 
 internal void VulkanWriteDescriptorSets(VulkanContext *context, VulkanRenderer *renderer) {
     
-    const u32 game_writes_count = 2;
+    const u32 game_writes_count = 3;
     VkWriteDescriptorSet game_writes[game_writes_count];
     
     VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
@@ -1260,6 +1395,23 @@ internal void VulkanWriteDescriptorSets(VulkanContext *context, VulkanRenderer *
     
     VkDescriptorBufferInfo materials = { context->scene_mat_buffer.buffer, 0, VK_WHOLE_SIZE };
     game_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
+    
+    // TODO(Guigui): One per texture
+    VkDescriptorImageInfo image_info = {};
+    image_info.sampler = context->texture_sampler;
+    image_info.imageView = context->color_texture.image_view;
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    game_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    game_writes[2].pNext = NULL;
+    game_writes[2].dstSet = renderer->descriptor_sets[0];
+    game_writes[2].dstBinding = 2;
+    game_writes[2].dstArrayElement = 0;
+    game_writes[2].descriptorCount = 1;
+    game_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ;
+    game_writes[2].pImageInfo = &image_info;
+    game_writes[2].pBufferInfo = NULL;
+    game_writes[2].pTexelBufferView = NULL;
     
     vkUpdateDescriptorSets(context->device, game_writes_count, game_writes, 0, NULL);
 }
@@ -1294,7 +1446,6 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
         create_info.height = context->swapchain.extent.height;
         create_info.layers = 1;
         AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &renderer->framebuffers[i]));
-        
     }
     
     return renderer;

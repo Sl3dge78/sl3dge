@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include <SDL/SDL.h>
+#include <SDL/SDL_image.h>
 #include <vulkan/vulkan.h>
 
 #include "game.h"
@@ -137,6 +138,8 @@ internal int main(int argc, char *argv[]) {
     SDL_Window* window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
     
+    IMG_Init(IMG_INIT_PNG);
+    
     VulkanContext *context = VulkanCreateContext(window);
     
     GameCode game_code = {};
@@ -208,6 +211,7 @@ internal int main(int argc, char *argv[]) {
     VulkanDestroyRenderer(context, renderer);
     VulkanDestroyContext(context);
     SDL_DestroyWindow(window);
+    IMG_Quit();
     SDL_Quit();
     
     DBG_END();
