@@ -494,6 +494,7 @@ extern "C" {
         cgltf_extras extras;
         cgltf_size extensions_count;
         cgltf_extension* extensions;
+        cgltf_uint id;
     } cgltf_material;
     
     typedef struct cgltf_material_mapping
@@ -542,6 +543,7 @@ extern "C" {
         cgltf_extras extras;
         cgltf_size extensions_count;
         cgltf_extension* extensions;
+        cgltf_uint id;
     } cgltf_mesh;
     
     typedef struct cgltf_node cgltf_node;
@@ -2955,6 +2957,8 @@ static int cgltf_parse_json_meshes(cgltf_options* options, jsmntok_t const* toke
 	for (cgltf_size j = 0; j < out_data->meshes_count; ++j)
 	{
 		i = cgltf_parse_json_mesh(options, tokens, i, json_chunk, &out_data->meshes[j]);
+        out_data->meshes[j].id = j;
+        
 		if (i < 0)
 		{
 			return i;
@@ -4106,6 +4110,7 @@ static int cgltf_parse_json_materials(cgltf_options* options, jsmntok_t const* t
 	for (cgltf_size j = 0; j < out_data->materials_count; ++j)
 	{
 		i = cgltf_parse_json_material(options, tokens, i, json_chunk, &out_data->materials[j]);
+        out_data->materials[j].id = j;
 		if (i < 0)
 		{
 			return i;

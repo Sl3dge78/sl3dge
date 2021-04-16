@@ -98,28 +98,19 @@ internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset,
     }
 }
 
-// TODO(Guigui): This is kind of dirty, is there any other way?
 inline u32 GLTFGetMeshID(cgltf_data *data, cgltf_mesh *mesh) {
+    
     if(!mesh) {
         return UINT_MAX;
     }
-    for(u32 m = 0; m < data->meshes_count; ++m) {
-        
-        if(&data->meshes[m] == mesh) {
-            return m;
-        }
-    }
-    return UINT_MAX;
+    return mesh->id;
 }
 
-// TODO(Guigui): This is kind of dirty, is there any other way?
 inline u32 GLTFGetMaterialID(cgltf_data *data, cgltf_material *mat) {
-    for(u32 mat_id = 0; mat_id < data->materials_count; ++mat_id) {
-        if(&data->materials[mat_id] == mat) {
-            return mat_id;
-        }
+    if(!mat) {
+        return UINT_MAX;
     }
-    return UINT_MAX;
+    return mat->id;
 }
 
 void GLTFLoadVertexBuffer(cgltf_data *data, GLTFSceneInfo *scene, void *buffer) {
