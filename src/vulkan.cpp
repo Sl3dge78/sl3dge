@@ -77,6 +77,31 @@ typedef struct VulkanRenderer {
     
 } VulkanRenderer;
 
+typedef struct SceneInfo {
+    u32 vertex_buffer_size;
+    u32 index_buffer_size;
+    
+    u32 total_vertex_count;
+    u32 total_index_count;
+    
+    u32 meshes_count;
+    
+    u32 *vertex_counts;
+    u32 *index_counts;
+    
+    u32 *vertex_offsets;   
+    u32 *index_offsets;    
+    
+    u32 nodes_count;
+    u32 *node_mesh;
+    
+    u32 materials_count;
+    u32 *materials;
+    
+    u32 textures_count;
+    
+} SceneInfo;
+
 typedef struct VulkanContext {
     VkInstance instance;
     VkPhysicalDevice physical_device;
@@ -96,20 +121,27 @@ typedef struct VulkanContext {
     VkCommandPool graphics_command_pool;
     
     Swapchain swapchain;
-    PushConstant push_constants;
     
     Buffer cam_buffer;
     
     Buffer scene_vtx_buffer;
     Buffer scene_idx_buffer;
     Buffer scene_mat_buffer;
-    GLTFSceneInfo scene_info;
+    SceneInfo scene_info;
     
     VkSampler texture_sampler;
     
     Image color_texture;
     
 } VulkanContext;
+
+
+
+typedef struct PushConstant {
+    alignas(16) mat4 transform;
+    alignas(4) u32 material;
+    alignas(4) u32 color_texture;
+} PushConstant;
 
 global VkDebugUtilsMessengerEXT debug_messenger;
 
@@ -635,8 +667,21 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device, const u32 graphic
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
     
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness = {};
+    robustness.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
+    robustness.pNext = NULL;
+    robustness.robustBufferAccess2 = VK_FALSE;
+    robustness.robustImageAccess2 = VK_FALSE;
+    robustness.nullDescriptor = VK_TRUE;
+    
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing = {};
+    descriptor_indexing.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    descriptor_indexing.pNext = &robustness;
+    descriptor_indexing.runtimeDescriptorArray = VK_TRUE;
+    
     VkPhysicalDeviceFeatures2 features2 = {};
     features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features2.pNext = &descriptor_indexing;
     features2.features = {};
     features2.features.samplerAnisotropy = VK_TRUE;
     features2.features.shaderInt64 = VK_TRUE;
@@ -896,7 +941,7 @@ void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
     }
     cgltf_load_buffers(&options, data, file);
     
-    GLTFSceneInfo *scene = &context->scene_info;
+    SceneInfo *scene = &context->scene_info;
     
     *scene = {};
     
@@ -931,6 +976,8 @@ void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
     scene->materials_count = data->materials_count;
     scene->materials = (u32*) calloc(data->nodes_count, sizeof(u32));
     
+    scene->textures_count = data->textures_count;
+    
     // Meshes
     if(data->meshes_count >= UINT_MAX) {
         SDL_LogError(0, "that's way to many meshes!!!");
@@ -938,9 +985,9 @@ void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
     }
     
     for(u32 i = 0; i < scene->nodes_count; ++i) {
-        scene->node_mesh[i] = GLTFGetMeshID(data, data->nodes[i].mesh);
+        scene->node_mesh[i] = GLTFGetMeshID(data->nodes[i].mesh);
         if(data->nodes[i].mesh) {
-            scene->materials[i] = GLTFGetMaterialID(data, data->nodes[i].mesh->primitives[0].material);
+            scene->materials[i] = GLTFGetMaterialID(data->nodes[i].mesh->primitives[0].material);
         }
     }
     
@@ -949,7 +996,7 @@ void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
     DEBUGNameBuffer(context->device, &context->scene_vtx_buffer, "GLTF VTX");
     void *mapped_vtx_buffer;
     MapBuffer(context->device, &context->scene_vtx_buffer, &mapped_vtx_buffer);
-    GLTFLoadVertexBuffer(data, &context->scene_info, mapped_vtx_buffer);
+    GLTFLoadVertexBuffer(data, context->scene_info.vertex_offsets, mapped_vtx_buffer);
     UnmapBuffer(context->device, &context->scene_vtx_buffer);
     
     // Index Buffer
@@ -957,7 +1004,7 @@ void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
     DEBUGNameBuffer(context->device, &context->scene_idx_buffer, "GLTF IDX");
     void *mapped_idx_buffer;
     MapBuffer(context->device, &context->scene_idx_buffer, &mapped_idx_buffer);
-    GLTFLoadIndexBuffer(data, &context->scene_info, mapped_idx_buffer);
+    GLTFLoadIndexBuffer(data, context->scene_info.index_offsets, mapped_idx_buffer);
     UnmapBuffer(context->device, &context->scene_idx_buffer);
     
     // Material Buffer
@@ -973,41 +1020,47 @@ void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
     GLTFLoadTransforms(data, *transforms);
     
     // Texture
-    char* image_path = data->textures[0].image->uri;
-    u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
-    char* full_image_path = (char *)calloc(file_path_length, sizeof(char *));
-    strcat(full_image_path, directory);
-    strcat(full_image_path, image_path);
     
-    SDL_Surface *surface = IMG_Load(full_image_path);
-    if(!surface) {
-        SDL_LogError(0, IMG_GetError());
+    if(data->textures_count > 0) {
+        if(data->textures_count > 1) {
+            SDL_LogWarn(0, "There are multiple textures, but we only handle 1");
+        }
+        
+        char* image_path = data->textures[0].image->uri;
+        u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
+        char* full_image_path = (char *)calloc(file_path_length, sizeof(char *));
+        strcat(full_image_path, directory);
+        strcat(full_image_path, image_path);
+        
+        SDL_Surface *surface = IMG_Load(full_image_path);
+        if(!surface) {
+            SDL_LogError(0, IMG_GetError());
+        }
+        
+        free(full_image_path);
+        
+        Buffer image_buffer;
+        SDL_Surface *img_surf = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
+        if(!img_surf) {
+            SDL_LogError(0, SDL_GetError());
+        }
+        
+        VkDeviceSize image_size = img_surf->h * img_surf->pitch;
+        VkExtent3D extent = {(u32)img_surf->h, (u32)img_surf->w, 1};
+        
+        CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->color_texture);
+        CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffer); 
+        UploadToBuffer(context->device, &image_buffer, surface->pixels, image_size);
+        
+        VkCommandBuffer cmd;
+        AllocateAndBeginCommandBuffer(context->device, context->graphics_command_pool, &cmd);
+        CopyBufferToImage(cmd, extent, img_surf->pitch, &image_buffer, &context->color_texture);
+        EndAndExecuteCommandBuffer(context->device, context->graphics_queue, context->graphics_command_pool, cmd);
+        
+        SDL_FreeSurface(img_surf);
+        DestroyBuffer(context->device, &image_buffer);
+        SDL_FreeSurface(surface);
     }
-    
-    free(full_image_path);
-    
-    Buffer image_buffer;
-    SDL_Surface *img_surf = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
-    if(!img_surf) {
-        SDL_LogError(0, SDL_GetError());
-    }
-    
-    VkDeviceSize image_size = img_surf->h * img_surf->pitch;
-    VkExtent3D extent = {(u32)img_surf->h, (u32)img_surf->w, 1};
-    
-    CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->color_texture);
-    CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffer); 
-    UploadToBuffer(context->device, &image_buffer, surface->pixels, image_size);
-    
-    VkCommandBuffer cmd;
-    AllocateAndBeginCommandBuffer(context->device, context->graphics_command_pool, &cmd);
-    CopyBufferToImage(cmd, extent, img_surf->pitch, &image_buffer, &context->color_texture);
-    EndAndExecuteCommandBuffer(context->device, context->graphics_queue, context->graphics_command_pool, cmd);
-    
-    SDL_FreeSurface(img_surf);
-    DestroyBuffer(context->device, &image_buffer);
-    SDL_FreeSurface(surface);
-    
     cgltf_free(data);
     free(directory);
     
@@ -1381,39 +1434,45 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vkDeviceWaitIdle(device);
     vkDestroyShaderModule(device, pipeline_ci.pStages[0].module, NULL);
     vkDestroyShaderModule(device, pipeline_ci.pStages[1].module, NULL);
-    
 }
 
 internal void VulkanWriteDescriptorSets(VulkanContext *context, VulkanRenderer *renderer) {
     
-    const u32 game_writes_count = 3;
-    VkWriteDescriptorSet game_writes[game_writes_count];
+    const u32 static_writes_count = 2;
+    VkWriteDescriptorSet static_writes[static_writes_count];
     
     VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
-    game_writes[0] = 
+    static_writes[0] = 
     { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
     
     VkDescriptorBufferInfo materials = { context->scene_mat_buffer.buffer, 0, VK_WHOLE_SIZE };
-    game_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
+    static_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
     
-    // TODO(Guigui): One per texture
+    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
+    
     VkDescriptorImageInfo image_info = {};
     image_info.sampler = context->texture_sampler;
-    image_info.imageView = context->color_texture.image_view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if(context->scene_info.textures_count > 0) {
+        image_info.imageView = context->color_texture.image_view;
+    } else {
+        image_info.imageView = VK_NULL_HANDLE;
+    }
     
-    game_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    game_writes[2].pNext = NULL;
-    game_writes[2].dstSet = renderer->descriptor_sets[0];
-    game_writes[2].dstBinding = 2;
-    game_writes[2].dstArrayElement = 0;
-    game_writes[2].descriptorCount = 1;
-    game_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ;
-    game_writes[2].pImageInfo = &image_info;
-    game_writes[2].pBufferInfo = NULL;
-    game_writes[2].pTexelBufferView = NULL;
+    VkWriteDescriptorSet textures_buffer = {};
+    textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    textures_buffer.pNext = NULL;
+    textures_buffer.dstSet = renderer->descriptor_sets[0];
+    textures_buffer.dstBinding = 2;
+    textures_buffer.dstArrayElement = 0;
+    textures_buffer.descriptorCount = 1;
+    textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textures_buffer.pImageInfo = &image_info;
+    textures_buffer.pBufferInfo = NULL;
+    textures_buffer.pTexelBufferView = NULL;
     
-    vkUpdateDescriptorSets(context->device, game_writes_count, game_writes, 0, NULL);
+    vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
+    
 }
 
 VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {

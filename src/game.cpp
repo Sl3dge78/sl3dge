@@ -1,7 +1,5 @@
 #include "game.h"
 
-#include <string.h>
-
 /*
 === TODO ===
 
@@ -23,28 +21,6 @@ extern "C" __declspec(dllexport) GAME_START(GameStart) {
     game_data->position = { 1.5f, 0.0f, 2.0f };
     game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 1000.0f);
     game_data->matrices.view = mat4_identity();
-}
-
-extern "C" __declspec(dllexport) GAME_GET_SCENE(GameGetScene) {
-    
-    const vec3 vtx[] = {
-        {0.0f, 0.f, 0.0f}, {0.0f, 1.f, 0.0f},
-        {1.0f, 0.0f, 0.f}, {1.0f, 1.0f, 0.0f}
-    };
-    const u32 idx[] = { 
-        0, 3, 1, 0, 2, 3 
-    };
-    
-    *vtx_count = sizeof(vtx) / sizeof(vtx[0]);
-    *idx_count = sizeof(idx) / sizeof(idx[0]);
-    
-    if(vertices) {
-        memcpy(vertices, vtx, sizeof(vtx));
-    }
-    
-    if(indices) {
-        memcpy(indices, idx, sizeof(idx));
-    }
 }
 
 extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {

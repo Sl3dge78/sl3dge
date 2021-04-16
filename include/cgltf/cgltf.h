@@ -375,6 +375,7 @@ extern "C" {
         cgltf_extras extras;
         cgltf_size extensions_count;
         cgltf_extension* extensions;
+        cgltf_uint id;
     } cgltf_texture;
     
     typedef struct cgltf_texture_transform
@@ -4149,6 +4150,7 @@ static int cgltf_parse_json_textures(cgltf_options* options, jsmntok_t const* to
 	for (cgltf_size j = 0; j < out_data->textures_count; ++j)
 	{
 		i = cgltf_parse_json_texture(options, tokens, i, json_chunk, &out_data->textures[j]);
+        out_data->textures[j].id = j;
 		if (i < 0)
 		{
 			return i;

@@ -21,33 +21,11 @@ typedef struct Vertex {
 } Vertex;
 
 typedef struct Material {
-    alignas(16) vec3 base_color;
+    alignas(16) vec3  base_color;
+    alignas(4)  u32   base_color_texture;
     alignas(4)  float metallic;
     alignas(4)  float roughness;
 } Material;
-
-typedef struct GLTFSceneInfo {
-    u32 vertex_buffer_size;
-    u32 index_buffer_size;
-    
-    u32 total_vertex_count;
-    u32 total_index_count;
-    
-    u32 meshes_count;
-    
-    u32 *vertex_counts;
-    u32 *index_counts;
-    
-    u32 *vertex_offsets;   
-    u32 *index_offsets;    
-    
-    u32 nodes_count;
-    u32 *node_mesh;
-    
-    u32 materials_count;
-    u32 *materials;
-    
-} GLTFSceneInfo;
 
 internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u32 dst_stride) {
     
@@ -98,7 +76,7 @@ internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset,
     }
 }
 
-inline u32 GLTFGetMeshID(cgltf_data *data, cgltf_mesh *mesh) {
+inline u32 GLTFGetMeshID(cgltf_mesh *mesh) {
     
     if(!mesh) {
         return UINT_MAX;
@@ -106,43 +84,50 @@ inline u32 GLTFGetMeshID(cgltf_data *data, cgltf_mesh *mesh) {
     return mesh->id;
 }
 
-inline u32 GLTFGetMaterialID(cgltf_data *data, cgltf_material *mat) {
+inline u32 GLTFGetMaterialID(cgltf_material *mat) {
     if(!mat) {
         return UINT_MAX;
     }
     return mat->id;
 }
 
-void GLTFLoadVertexBuffer(cgltf_data *data, GLTFSceneInfo *scene, void *buffer) {
+inline u32 GLTFGetTextureID(cgltf_texture *texture) {
+    if(!texture)
+        return UINT_MAX;
     
-    for(u32 m = 0; m < scene->meshes_count; ++m) {
+    return texture->id;
+}
+
+void GLTFLoadVertexBuffer(cgltf_data *data, u32 *vertex_offsets, void *buffer) {
+    
+    for(u32 m = 0; m < data->meshes_count; ++m) {
         
         cgltf_primitive *prim = &data->meshes[m].primitives[0];
         
         for(u32 a = 0; a < prim->attributes_count ; ++a) {
             if(prim->attributes[a].type == cgltf_attribute_type_position) {
                 
-                GLTFCopyAccessor(prim->attributes[a].data, buffer, scene->vertex_offsets[m] * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
+                GLTFCopyAccessor(prim->attributes[a].data, buffer, vertex_offsets[m] * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
                 continue;
             }
             
             if(prim->attributes[a].type == cgltf_attribute_type_normal) {
-                GLTFCopyAccessor(prim->attributes[a].data, buffer, scene->vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
+                GLTFCopyAccessor(prim->attributes[a].data, buffer, vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
                 continue;
             }
             if(prim->attributes[a].type == cgltf_attribute_type_texcoord) {
-                GLTFCopyAccessor(prim->attributes[a].data, buffer, scene->vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
+                GLTFCopyAccessor(prim->attributes[a].data, buffer, vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
                 continue;
             }
         }
     }
 }
 
-void GLTFLoadIndexBuffer(cgltf_data *data,  GLTFSceneInfo *scene, void *buffer) {
+void GLTFLoadIndexBuffer(cgltf_data *data,  u32 *index_offsets, void *buffer) {
     
-    for(u32 m = 0; m < scene->meshes_count; ++m) {
+    for(u32 m = 0; m < data->meshes_count; ++m) {
         cgltf_primitive *prim = &data->meshes[m].primitives[0];
-        GLTFCopyAccessor(prim->indices, buffer, scene->index_offsets[m] * sizeof(u32), sizeof(u32));
+        GLTFCopyAccessor(prim->indices, buffer, index_offsets[m] * sizeof(u32), sizeof(u32));
     }
 }
 
@@ -161,10 +146,13 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         
         float *color = mat->pbr_metallic_roughness.base_color_factor;
         
+        if(mat->pbr_metallic_roughness.base_color_texture.has_transform){
+            SDL_LogWarn(0, "Texture has transform, this isn't supported yet");
+        }
         dst.base_color = {color[0], color[1], color[2]};
+        dst.base_color_texture = GLTFGetTextureID(mat->pbr_metallic_roughness.base_color_texture.texture);
         dst.metallic = mat->pbr_metallic_roughness.metallic_factor;
         dst.roughness = mat->pbr_metallic_roughness.roughness_factor;
-        
         //SDL_Log("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2], dst.metallic, dst.roughness);
         
         memcpy(buffer, &dst, sizeof(Material));

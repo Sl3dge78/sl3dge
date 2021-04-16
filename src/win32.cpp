@@ -7,6 +7,8 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 #include <vulkan/vulkan.h>
+#define CGLTF_IMPLEMENTATION
+#include <cgltf/cgltf.h>
 
 #include "game.h"
 
@@ -35,7 +37,7 @@ typedef struct GameCode {
     FILETIME last_write_time;
     HMODULE game_dll;
     
-    game_get_scene* GetScene;
+    //game_get_scene* GetScene;
     game_loop* GameLoop;
     game_start* GameStart;
 } GameCode;
@@ -70,7 +72,6 @@ internal bool Win32LoadGameCode(GameCode* game_code) {
     
     game_code->dll_path = "bin\\game.dll";
     
-    game_code->GetScene = GameGetSceneStub;
     game_code->GameLoop = GameLoopStub;
     game_code->GameStart = GameStartStub;
     
@@ -88,8 +89,6 @@ internal bool Win32LoadGameCode(GameCode* game_code) {
     game_code->game_dll = LoadLibrary("bin\\game_temp.dll");
     
     if(game_code->game_dll) {
-        // Load function pointers
-        game_code->GetScene = (game_get_scene*)GetProcAddress(game_code->game_dll, "GameGetScene");
         game_code->GameLoop = (game_loop *) GetProcAddress(game_code->game_dll, "GameLoop");
         game_code->GameStart = (game_start *) GetProcAddress(game_code->game_dll, "GameStart");
     }
@@ -102,7 +101,6 @@ internal void Win32UnloadGameCode(GameCode* game_code) {
         FreeLibrary(game_code->game_dll);
     }
     game_code->game_dll = NULL;
-    game_code->GetScene = GameGetSceneStub;
     game_code->GameLoop = GameLoopStub;
     game_code->GameStart = GameStartStub;
 }

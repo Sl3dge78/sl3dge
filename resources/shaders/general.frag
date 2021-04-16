@@ -3,9 +3,11 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 #define M_PI 3.141592653589793
+#define UINT_MAX 4294967295
 
 struct Material {
     vec3 albedo;
+    uint base_color_texture;
     float metallic;
     float roughness;
     /*
@@ -157,11 +159,20 @@ vec3 get_ibl_contribution() {
     return vec3(0.0);
 }
 
+vec3 get_base_color(Material mat) {
+
+    if(mat.base_color_texture < UINT_MAX) {
+        return texture(textures[mat.base_color_texture], texcoord).xyz * mat.albedo;
+    } else {
+        return mat.albedo;
+    }
+}
+
 vec3 pbr2(Material mat) {
 
     vec3 f0 = vec3(0.04);
 
-    vec3 diffuse_color = mat.albedo.rgb * (vec3(1.0) - f0);
+    vec3 diffuse_color = get_base_color(mat) * (vec3(1.0) - f0);
     diffuse_color *= 1.0 - mat.metallic;
 
     float alpha_roughness = mat.roughness * mat.roughness;
@@ -172,7 +183,7 @@ vec3 pbr2(Material mat) {
     vec3 specular_environment_R0 = specular_color.rgb;
     vec3 specular_environment_R90 = vec3(1.0) * reflectance90;
 
-    vec3 light_dir = normalize(vec3(0, 1, 1));
+    vec3 light_dir = normalize(vec3(1, 1, 1));
 
     vec3 N = normal;
     vec3 V = normalize(cam_pos - worldpos);
@@ -207,8 +218,5 @@ vec3 pbr2(Material mat) {
 void main() {
 	
 	vec3 color = pbr2(materials.m[material_id]);
-
-    color = texture(textures[0], texcoord).xyz;
-
     out_color = vec4(color, 1.0);
 }

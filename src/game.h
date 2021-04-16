@@ -3,10 +3,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <vulkan/vulkan.h>
 #include <SDL/SDL.h>
-#define CGLTF_IMPLEMENTATION
-#include <cgltf/cgltf.h>
 
 #define internal static;
 #define global static;
@@ -19,11 +16,6 @@ typedef int32_t i32;
 
 #include "debug.cpp"
 #include "math.cpp"
-
-typedef struct PushConstant {
-    alignas(16) mat4 transform;
-    alignas(4) u32 material;
-} PushConstant;
 
 typedef struct CameraMatrices {
     alignas(16) mat4 proj;
@@ -38,10 +30,6 @@ typedef struct GameData {
     vec2 spherical_coordinates;
     mat4 *transforms;
 }GameData ;
-
-#define GAME_GET_SCENE(name) void name(u32 *vtx_count, vec3 *vertices, u32 *idx_count, u32 *indices)
-typedef GAME_GET_SCENE(game_get_scene);
-GAME_GET_SCENE(GameGetSceneStub) {}
 
 #define GAME_LOOP(name) void name(float delta_time, GameData *game_data)
 typedef GAME_LOOP(game_loop);
