@@ -24,11 +24,11 @@ layout(push_constant) uniform PushConstants {
 
 void main() {
 	
-	vec4 pos = cam.proj * cam.view * constants.transform * vec4(in_position, 1.0);
+	vec4 pos = constants.transform * vec4(in_position, 1.0);
 	
-	gl_Position = pos;
+	gl_Position = cam.proj * cam.view * pos;
 	worldpos = pos.xyz;
-	normal = in_normal;
+	normal = normalize(transpose(inverse(mat3(constants.transform))) * in_normal);
 	texcoord = in_texcoord;
 	cam_pos = cam.pos;
 	material_id = constants.material_id;

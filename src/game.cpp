@@ -88,4 +88,5 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
     game_data->matrices.view_dir = forward;
     game_data->matrices.pos = game_data->position;
+    
 }
