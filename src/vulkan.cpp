@@ -1371,35 +1371,37 @@ internal void VulkanWriteDescriptorSets(VulkanContext *context, Scene *scene) {
     
     vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
     
-    const u32 nb_tex = scene->textures_count; 
-    u32 nb_info = nb_tex > 0 ? nb_tex : 1;
-    
-    VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
-    
-    for(u32 i = 0; i < nb_info; ++i) {
-        images_info[i].sampler = context->texture_sampler;
-        images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        if(nb_tex == 0) {
-            images_info[i].imageView = VK_NULL_HANDLE;
-            break;
+    if(scene->textures_count != 0) {
+        const u32 nb_tex = scene->textures_count; 
+        u32 nb_info = nb_tex > 0 ? nb_tex : 1;
+        
+        VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
+        
+        for(u32 i = 0; i < nb_info; ++i) {
+            images_info[i].sampler = context->texture_sampler;
+            images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            if(nb_tex == 0) {
+                images_info[i].imageView = VK_NULL_HANDLE;
+                break;
+            }
+            images_info[i].imageView = scene->textures[i].image_view;
         }
-        images_info[i].imageView = scene->textures[i].image_view;
+        
+        VkWriteDescriptorSet textures_buffer = {};
+        textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        textures_buffer.pNext = NULL;
+        textures_buffer.dstSet = scene->renderer->descriptor_sets[0];
+        textures_buffer.dstBinding = 2;
+        textures_buffer.dstArrayElement = 0;
+        textures_buffer.descriptorCount = nb_info;
+        textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        textures_buffer.pImageInfo = images_info;
+        textures_buffer.pBufferInfo = NULL;
+        textures_buffer.pTexelBufferView = NULL;
+        
+        vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
+        free(images_info);
     }
-    
-    VkWriteDescriptorSet textures_buffer = {};
-    textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    textures_buffer.pNext = NULL;
-    textures_buffer.dstSet = scene->renderer->descriptor_sets[0];
-    textures_buffer.dstBinding = 2;
-    textures_buffer.dstArrayElement = 0;
-    textures_buffer.descriptorCount = nb_info;
-    textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    textures_buffer.pImageInfo = images_info;
-    textures_buffer.pBufferInfo = NULL;
-    textures_buffer.pTexelBufferView = NULL;
-    
-    vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
-    free(images_info);
 }
 
 // ===============

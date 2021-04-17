@@ -42,7 +42,7 @@ vec3 get_base_color(Material mat) {
 vec3 get_normal(Material mat) {
 
     if(mat.normal_texture < UINT_MAX) {
-        vec3 tangent = texture(textures[mat.normal_texture], in_texcoord) * 2.0 - 1.0;
+        vec3 tangent = texture(textures[mat.normal_texture], in_texcoord).rgb * 2.0 - 1.0;
         vec3 q1 = dFdx(in_worldpos);
         vec3 q2 = dFdy(in_worldpos);
         vec2 st1 = dFdx(in_texcoord);
@@ -114,7 +114,7 @@ vec3 pbr(Material mat) {
         roughness *= tex.g;
         metallic *= tex.b;
     } 
-    
+    return base_color;
     vec3 F0 = vec3(0.04);  
     F0 = mix(F0, base_color, metallic);
 
@@ -139,8 +139,6 @@ vec3 pbr(Material mat) {
     
     vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);   
     vec3 diffuse = kD * base_color / M_PI;
-
-    return vec3(F);
 
     //vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
     vec3 rim_light = vec3(0.0);
@@ -247,7 +245,7 @@ vec3 pbr2(Material mat) {
 void main() {
 	
 	vec3 color = pbr2(materials.m[material_id]);
-    //color = pbr(materials.m[material_id]);
+    color = pbr(materials.m[material_id]);
         
     out_color = vec4(color, 1.0);
 }

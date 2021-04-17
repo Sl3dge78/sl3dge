@@ -170,7 +170,7 @@ void GLTFGetNodeTransform(const cgltf_node *node, mat4 *transform) {
     if(node->has_matrix) {
         memcpy(transform, node->matrix, sizeof(mat4));
     } else {
-        vec3 t = {node->translation[0], node->translation[1]*10, node->translation[2]*10 };
+        vec3 t = {node->translation[0], node->translation[1], node->translation[2] };
         quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3] };
         vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
         
