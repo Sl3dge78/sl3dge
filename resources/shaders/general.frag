@@ -162,7 +162,7 @@ vec3 get_ibl_contribution() {
 vec3 get_base_color(Material mat) {
 
     if(mat.base_color_texture < UINT_MAX) {
-        return texture(textures[mat.base_color_texture], texcoord).xyz * mat.albedo;
+        return texture(textures[nonuniformEXT(mat.base_color_texture)], texcoord).xyz * mat.albedo;
     } else {
         return mat.albedo;
     }

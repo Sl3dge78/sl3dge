@@ -28,7 +28,6 @@ typedef struct GameData {
     CameraMatrices matrices;
     vec3 position;
     vec2 spherical_coordinates;
-    mat4 *transforms;
 }GameData ;
 
 #define GAME_LOOP(name) void name(float delta_time, GameData *game_data)

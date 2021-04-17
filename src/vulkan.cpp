@@ -61,8 +61,6 @@ typedef struct VulkanRenderer {
     VkPipelineLayout layout;
     VkDescriptorPool descriptor_pool;
     
-    VkRenderPass render_pass;
-    
     VkDescriptorSet descriptor_sets[2];
     u32 descriptor_set_count;
     
@@ -71,13 +69,11 @@ typedef struct VulkanRenderer {
     VkDescriptorSetLayout app_set_layout;
     VkDescriptorSetLayout game_set_layout;
     
-    VkFramebuffer *framebuffers;
-    
-    Image depth_image;
-    
 } VulkanRenderer;
 
-typedef struct SceneInfo {
+typedef struct Scene {
+    VulkanRenderer *renderer;
+    
     u32 vertex_buffer_size;
     u32 index_buffer_size;
     
@@ -100,7 +96,14 @@ typedef struct SceneInfo {
     
     u32 textures_count;
     
-} SceneInfo;
+    Buffer vtx_buffer;
+    Buffer idx_buffer;
+    Buffer mat_buffer;
+    Image *textures;
+    
+    mat4 *transforms;
+    
+} Scene;
 
 typedef struct VulkanContext {
     VkInstance instance;
@@ -121,21 +124,14 @@ typedef struct VulkanContext {
     VkCommandPool graphics_command_pool;
     
     Swapchain swapchain;
+    VkRenderPass render_pass;
+    VkSampler texture_sampler;
+    VkFramebuffer *framebuffers;
+    Image depth_image;
     
     Buffer cam_buffer;
     
-    Buffer scene_vtx_buffer;
-    Buffer scene_idx_buffer;
-    Buffer scene_mat_buffer;
-    SceneInfo scene_info;
-    
-    VkSampler texture_sampler;
-    
-    Image color_texture;
-    
 } VulkanContext;
-
-
 
 typedef struct PushConstant {
     alignas(16) mat4 transform;
@@ -678,6 +674,8 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device, const u32 graphic
     descriptor_indexing.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
     descriptor_indexing.pNext = &robustness;
     descriptor_indexing.runtimeDescriptorArray = VK_TRUE;
+    descriptor_indexing.descriptorBindingVariableDescriptorCount = VK_TRUE;
+    descriptor_indexing.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     
     VkPhysicalDeviceFeatures2 features2 = {};
     features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -862,356 +860,6 @@ internal void DestroySwapchain(const VulkanContext* context, Swapchain *swapchai
     free(swapchain->render_complete_semaphore);
 }
 
-VulkanContext* VulkanCreateContext(SDL_Window* window){
-    VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
-    CreateVkInstance(window, &context->instance);
-    SDL_Vulkan_CreateSurface(window,context->instance,&context->surface);
-    CreateVkPhysicalDevice(context->instance, &context->physical_device);
-    
-    // Get device properties
-    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
-    vkGetPhysicalDeviceProperties(context->physical_device, &context->physical_device_properties);
-    
-    GetQueuesId(context);
-    CreateVkDevice(context->physical_device, context->graphics_queue_id, context->transfer_queue_id,context->present_queue_id, &context->device);
-    
-    vkGetDeviceQueue(context->device, context->graphics_queue_id, 0, &context->graphics_queue);
-    vkGetDeviceQueue(context->device, context->present_queue_id, 0, &context->present_queue);
-    vkGetDeviceQueue(context->device, context->transfer_queue_id, 0, &context->transfer_queue);
-    
-    VkCommandPoolCreateInfo pool_create_info = {};
-    pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_create_info.pNext = NULL;
-    pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_create_info.queueFamilyIndex = context->graphics_queue_id;
-    VkResult result = vkCreateCommandPool(context->device, &pool_create_info, NULL, &context->graphics_command_pool);
-    AssertVkResult(result);
-    
-    context->swapchain.swapchain = VK_NULL_HANDLE;
-    CreateSwapchain(context, window, &context->swapchain);
-    
-    CameraMatrices mat;
-    mat.proj = mat4_identity();
-    mat.view = mat4_identity();
-    CreateBuffer(context->device, &context->memory_properties, sizeof(CameraMatrices), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
-    UploadToBuffer(context->device, &context->cam_buffer, &mat, sizeof(CameraMatrices));
-    DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
-    
-    //Sampler
-    VkSamplerCreateInfo sampler_ci = {};
-    sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_ci.pNext = NULL;
-    sampler_ci.flags = 0;
-    sampler_ci.magFilter = VK_FILTER_NEAREST;
-    sampler_ci.minFilter = VK_FILTER_NEAREST;
-    sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_ci.mipLodBias = 0.0f;
-    sampler_ci.anisotropyEnable = VK_TRUE;
-    sampler_ci.maxAnisotropy = context->physical_device_properties.limits.maxSamplerAnisotropy;
-    sampler_ci.compareEnable = VK_FALSE;
-    sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
-    sampler_ci.minLod = 0.0f;
-    sampler_ci.maxLod = 0.0f;
-    sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    sampler_ci.unnormalizedCoordinates = VK_FALSE;
-    AssertVkResult(vkCreateSampler(context->device, &sampler_ci, NULL, &context->texture_sampler));
-    
-    return context;
-}
-
-void VulkanLoadGLTF(char *file, VulkanContext *context, mat4 **transforms) {
-    
-    char *directory;
-    char *last_sep = strrchr(file, '/');
-    u32 size = last_sep - file;
-    directory = (char *)calloc(size + 2, sizeof(char));
-    strncpy(directory, file, size);
-    directory[size] = '/';
-    directory[size+1] = '\0';
-    
-    cgltf_data *data;
-    cgltf_options options = {0};
-    cgltf_result result = cgltf_parse_file(&options, file, &data);
-    if(result != cgltf_result_success) {
-        SDL_LogError(0, "Error reading scene");
-        ASSERT(0);
-    }
-    cgltf_load_buffers(&options, data, file);
-    
-    SceneInfo *scene = &context->scene_info;
-    
-    *scene = {};
-    
-    scene->meshes_count = data->meshes_count;
-    scene->vertex_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
-    scene->index_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
-    
-    scene->vertex_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
-    scene->index_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
-    
-    for(u32 i = 0; i < scene->meshes_count; ++i) {
-        if(data->meshes[i].primitives_count > 1) {
-            SDL_LogWarn(0, "This mesh has multiple primitives. This isn't handled yet");
-        }
-        cgltf_primitive *prim = &data->meshes[i].primitives[0];
-        
-        scene->vertex_offsets[i] = scene->total_vertex_count;
-        scene->vertex_counts[i] = (u32) prim->attributes[0].data->count;
-        scene->total_vertex_count += (u32) prim->attributes[0].data->count;;
-        
-        scene->index_offsets[i] = scene->total_index_count;
-        scene->index_counts[i] += prim->indices->count;
-        scene->total_index_count += (u32) prim->indices->count;
-    }
-    
-    scene->vertex_buffer_size = scene->total_vertex_count * sizeof(Vertex);
-    scene->index_buffer_size = scene->total_index_count * sizeof(u32);
-    
-    scene->nodes_count = data->nodes_count;
-    scene->node_mesh = (u32 *)calloc(scene->nodes_count, sizeof(u32));
-    
-    scene->materials_count = data->materials_count;
-    scene->materials = (u32*) calloc(data->nodes_count, sizeof(u32));
-    
-    scene->textures_count = data->textures_count;
-    
-    // Meshes
-    if(data->meshes_count >= UINT_MAX) {
-        SDL_LogError(0, "that's way to many meshes!!!");
-        ASSERT(0);
-    }
-    
-    for(u32 i = 0; i < scene->nodes_count; ++i) {
-        scene->node_mesh[i] = GLTFGetMeshID(data->nodes[i].mesh);
-        if(data->nodes[i].mesh) {
-            scene->materials[i] = GLTFGetMaterialID(data->nodes[i].mesh->primitives[0].material);
-        }
-    }
-    
-    // Vertex Buffer
-    CreateBuffer(context->device, &context->memory_properties, context->scene_info.vertex_buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_vtx_buffer);
-    DEBUGNameBuffer(context->device, &context->scene_vtx_buffer, "GLTF VTX");
-    void *mapped_vtx_buffer;
-    MapBuffer(context->device, &context->scene_vtx_buffer, &mapped_vtx_buffer);
-    GLTFLoadVertexBuffer(data, context->scene_info.vertex_offsets, mapped_vtx_buffer);
-    UnmapBuffer(context->device, &context->scene_vtx_buffer);
-    
-    // Index Buffer
-    CreateBuffer(context->device, &context->memory_properties, context->scene_info.index_buffer_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_idx_buffer);
-    DEBUGNameBuffer(context->device, &context->scene_idx_buffer, "GLTF IDX");
-    void *mapped_idx_buffer;
-    MapBuffer(context->device, &context->scene_idx_buffer, &mapped_idx_buffer);
-    GLTFLoadIndexBuffer(data, context->scene_info.index_offsets, mapped_idx_buffer);
-    UnmapBuffer(context->device, &context->scene_idx_buffer);
-    
-    // Material Buffer
-    CreateBuffer(context->device, &context->memory_properties, context->scene_info.materials_count * sizeof(Material),  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &context->scene_mat_buffer);
-    DEBUGNameBuffer(context->device, &context->scene_mat_buffer, "GLTF MATS");
-    void *mapped_mat_buffer;
-    MapBuffer(context->device, &context->scene_mat_buffer, &mapped_mat_buffer);
-    GLTFLoadMaterialBuffer(data, (Material*)mapped_mat_buffer);
-    UnmapBuffer(context->device, &context->scene_mat_buffer);
-    
-    // Transforms
-    *transforms =  (mat4 *)calloc(context->scene_info.nodes_count, sizeof(mat4));
-    GLTFLoadTransforms(data, *transforms);
-    
-    // Texture
-    
-    if(data->textures_count > 0) {
-        if(data->textures_count > 1) {
-            SDL_LogWarn(0, "There are multiple textures, but we only handle 1");
-        }
-        
-        char* image_path = data->textures[0].image->uri;
-        u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
-        char* full_image_path = (char *)calloc(file_path_length, sizeof(char *));
-        strcat(full_image_path, directory);
-        strcat(full_image_path, image_path);
-        
-        SDL_Surface *surface = IMG_Load(full_image_path);
-        if(!surface) {
-            SDL_LogError(0, IMG_GetError());
-        }
-        
-        free(full_image_path);
-        
-        Buffer image_buffer;
-        SDL_Surface *img_surf = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
-        if(!img_surf) {
-            SDL_LogError(0, SDL_GetError());
-        }
-        
-        VkDeviceSize image_size = img_surf->h * img_surf->pitch;
-        VkExtent3D extent = {(u32)img_surf->h, (u32)img_surf->w, 1};
-        
-        CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->color_texture);
-        CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffer); 
-        UploadToBuffer(context->device, &image_buffer, surface->pixels, image_size);
-        
-        VkCommandBuffer cmd;
-        AllocateAndBeginCommandBuffer(context->device, context->graphics_command_pool, &cmd);
-        CopyBufferToImage(cmd, extent, img_surf->pitch, &image_buffer, &context->color_texture);
-        EndAndExecuteCommandBuffer(context->device, context->graphics_queue, context->graphics_command_pool, cmd);
-        
-        SDL_FreeSurface(img_surf);
-        DestroyBuffer(context->device, &image_buffer);
-        SDL_FreeSurface(surface);
-    }
-    cgltf_free(data);
-    free(directory);
-    
-}
-
-void VulkanFreeGLTF(VulkanContext *context, mat4 **transforms) {
-    
-    DestroyImage(context->device, &context->color_texture);
-    
-    free(context->scene_info.materials);
-    
-    free(context->scene_info.vertex_offsets);
-    free(context->scene_info.index_offsets);
-    
-    free(context->scene_info.vertex_counts);
-    free(context->scene_info.index_counts);
-    
-    free(context->scene_info.node_mesh);
-    
-    DestroyBuffer(context->device, &context->scene_vtx_buffer);
-    DestroyBuffer(context->device, &context->scene_idx_buffer);
-    DestroyBuffer(context->device, &context->scene_mat_buffer);
-    free(*transforms);
-}
-
-void VulkanDestroyContext(VulkanContext *context){
-    
-    vkDeviceWaitIdle(context->device);
-    
-    vkDestroySampler(context->device, context->texture_sampler, NULL);
-    
-    DestroyBuffer(context->device, &context->cam_buffer);
-    
-    DestroySwapchain(context, &context->swapchain);
-    vkDestroySwapchainKHR(context->device, context->swapchain.swapchain, NULL);
-    vkDestroySurfaceKHR(context->instance, context->surface, NULL);
-    
-    vkDestroyCommandPool(context->device,context->graphics_command_pool,NULL);
-    
-    vkDestroyDevice(context->device, NULL);
-    pfn_vkDestroyDebugUtilsMessengerEXT(context->instance, debug_messenger, NULL);
-    vkDestroyInstance(context->instance, NULL);
-    
-    free(context);
-}
-
-// ===============
-//
-//  RENDERER
-//
-// ===============
-
-
-internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer) {
-    
-    // Set Layout
-    // Our set layout
-    renderer->descriptor_set_count = 1;
-    const u32 app_descriptor_count = 0;
-    
-    // Game set layout
-    const VkDescriptorSetLayoutBinding game_bindings[] = {
-        { // CAMERA MATRICES
-            0,
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            1,
-            VK_SHADER_STAGE_VERTEX_BIT,
-            NULL
-        },
-        {  // MATERIALS
-            1,
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            1,
-            VK_SHADER_STAGE_FRAGMENT_BIT,
-            NULL
-        },
-        {  // TEXTURES
-            2,
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            1,
-            VK_SHADER_STAGE_FRAGMENT_BIT,
-            NULL
-        }
-    };
-    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
-    
-    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
-    game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    game_set_create_info.pNext = NULL;
-    game_set_create_info.flags = 0;
-    game_set_create_info.bindingCount = game_descriptor_count;
-    game_set_create_info.pBindings = game_bindings;
-    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->game_set_layout));
-    
-    // Descriptor Pool
-    // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
-    VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0},
-    };
-    const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
-    
-    //Game
-    for(u32 d = 0; d < game_descriptor_count; d++) {
-        for(u32 i = 0; i < pool_sizes_count ; i ++){
-            if(game_bindings[d].descriptorType == pool_sizes[i].type) {
-                pool_sizes[i].descriptorCount ++;
-            }
-        }
-    }
-    
-    VkDescriptorPoolCreateInfo pool_ci = {};
-    pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_ci.pNext = NULL;
-    pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_ci.maxSets = renderer->descriptor_set_count;
-    pool_ci.poolSizeCount = pool_sizes_count;
-    pool_ci.pPoolSizes = pool_sizes;
-    AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
-    
-    // Descriptor Set
-    VkDescriptorSetLayout set_layouts[1] = {renderer->game_set_layout};
-    VkDescriptorSetAllocateInfo allocate_info = {};
-    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocate_info.pNext = NULL;
-    allocate_info.descriptorPool = renderer->descriptor_pool;
-    allocate_info.descriptorSetCount = renderer->descriptor_set_count;
-    allocate_info.pSetLayouts = set_layouts;
-    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, renderer->descriptor_sets));
-    
-    // Push constants
-    // TODO(Guigui): Currently limited to 1 PC
-    
-    VkPushConstantRange push_constant_range = 
-    { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
-    const u32 push_constant_count = 1;
-    renderer->push_constant_size = push_constant_range.size;
-    
-    VkPipelineLayoutCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    create_info.pNext = NULL;
-    create_info.flags = 0;
-    create_info.setLayoutCount = renderer->descriptor_set_count;
-    create_info.pSetLayouts = set_layouts;
-    create_info.pushConstantRangeCount = push_constant_count;
-    create_info.pPushConstantRanges = &push_constant_range;
-    
-    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
-}
-
 internal void CreateRenderPass(const VkDevice device, const Swapchain *swapchain, VkRenderPass *render_pass) {
     VkRenderPassCreateInfo render_pass_ci = {};
     render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -1269,6 +917,245 @@ internal void CreateRenderPass(const VkDevice device, const Swapchain *swapchain
     render_pass_ci.pDependencies = NULL;
     
     AssertVkResult(vkCreateRenderPass(device, &render_pass_ci, NULL, render_pass));
+}
+
+VulkanContext* VulkanCreateContext(SDL_Window* window){
+    VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
+    CreateVkInstance(window, &context->instance);
+    SDL_Vulkan_CreateSurface(window,context->instance,&context->surface);
+    CreateVkPhysicalDevice(context->instance, &context->physical_device);
+    
+    // Get device properties
+    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
+    vkGetPhysicalDeviceProperties(context->physical_device, &context->physical_device_properties);
+    
+    GetQueuesId(context);
+    CreateVkDevice(context->physical_device, context->graphics_queue_id, context->transfer_queue_id,context->present_queue_id, &context->device);
+    
+    vkGetDeviceQueue(context->device, context->graphics_queue_id, 0, &context->graphics_queue);
+    vkGetDeviceQueue(context->device, context->present_queue_id, 0, &context->present_queue);
+    vkGetDeviceQueue(context->device, context->transfer_queue_id, 0, &context->transfer_queue);
+    
+    VkCommandPoolCreateInfo pool_create_info = {};
+    pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_create_info.pNext = NULL;
+    pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    pool_create_info.queueFamilyIndex = context->graphics_queue_id;
+    VkResult result = vkCreateCommandPool(context->device, &pool_create_info, NULL, &context->graphics_command_pool);
+    AssertVkResult(result);
+    
+    context->swapchain.swapchain = VK_NULL_HANDLE;
+    CreateSwapchain(context, window, &context->swapchain);
+    
+    CameraMatrices mat;
+    mat.proj = mat4_identity();
+    mat.view = mat4_identity();
+    CreateBuffer(context->device, &context->memory_properties, sizeof(CameraMatrices), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &context->cam_buffer);
+    UploadToBuffer(context->device, &context->cam_buffer, &mat, sizeof(CameraMatrices));
+    DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
+    
+    //Sampler
+    VkSamplerCreateInfo sampler_ci = {};
+    sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_ci.pNext = NULL;
+    sampler_ci.flags = 0;
+    sampler_ci.magFilter = VK_FILTER_NEAREST;
+    sampler_ci.minFilter = VK_FILTER_NEAREST;
+    sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.mipLodBias = 0.0f;
+    sampler_ci.anisotropyEnable = VK_TRUE;
+    sampler_ci.maxAnisotropy = context->physical_device_properties.limits.maxSamplerAnisotropy;
+    sampler_ci.compareEnable = VK_FALSE;
+    sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_ci.minLod = 0.0f;
+    sampler_ci.maxLod = 0.0f;
+    sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_ci.unnormalizedCoordinates = VK_FALSE;
+    AssertVkResult(vkCreateSampler(context->device, &sampler_ci, NULL, &context->texture_sampler));
+    
+    // Depth image
+    CreateImage(context->device, &context->memory_properties, VK_FORMAT_D32_SFLOAT, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->depth_image);
+    CreateRenderPass(context->device, &context->swapchain, &context->render_pass);
+    // Framebuffers
+    context->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+        
+        VkFramebufferCreateInfo create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        create_info.pNext = NULL;
+        create_info.flags = 0;
+        create_info.renderPass = context->render_pass;
+        create_info.attachmentCount = 2;
+        
+        VkImageView attachments[] = {
+            context->swapchain.image_views[i],
+            context->depth_image.image_view
+        };
+        
+        create_info.pAttachments = attachments;
+        create_info.width = context->swapchain.extent.width;
+        create_info.height = context->swapchain.extent.height;
+        create_info.layers = 1;
+        AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &context->framebuffers[i]));
+    }
+    
+    return context;
+}
+
+void VulkanDestroyContext(VulkanContext *context){
+    
+    vkDeviceWaitIdle(context->device);
+    
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+        
+        vkDestroyFramebuffer(context->device, context->framebuffers[i], NULL);
+    }
+    free(context->framebuffers);
+    
+    DestroyImage(context->device, &context->depth_image);
+    
+    vkDestroyRenderPass(context->device, context->render_pass, NULL);
+    
+    vkDestroySampler(context->device, context->texture_sampler, NULL);
+    
+    DestroyBuffer(context->device, &context->cam_buffer);
+    
+    DestroySwapchain(context, &context->swapchain);
+    vkDestroySwapchainKHR(context->device, context->swapchain.swapchain, NULL);
+    vkDestroySurfaceKHR(context->instance, context->surface, NULL);
+    
+    vkDestroyCommandPool(context->device,context->graphics_command_pool,NULL);
+    
+    vkDestroyDevice(context->device, NULL);
+    pfn_vkDestroyDebugUtilsMessengerEXT(context->instance, debug_messenger, NULL);
+    vkDestroyInstance(context->instance, NULL);
+    
+    free(context);
+}
+
+// ===============
+//
+//  RENDERER
+//
+// ===============
+
+
+internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer, const u32 textures_count) {
+    
+    // Set Layout
+    // Our set layout
+    renderer->descriptor_set_count = 1;
+    const u32 app_descriptor_count = 0;
+    
+    // Game set layout
+    const VkDescriptorSetLayoutBinding game_bindings[] = {
+        { // CAMERA MATRICES
+            0,
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            1,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            NULL
+        },
+        {  // MATERIALS
+            1,
+            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            1,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            NULL
+        },
+        {  // TEXTURES
+            2,
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            textures_count,
+            VK_SHADER_STAGE_FRAGMENT_BIT,
+            NULL
+        }
+    };
+    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
+    
+    VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {};
+    binding_flags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    binding_flags.pNext = NULL;
+    binding_flags.bindingCount = game_descriptor_count;
+    VkDescriptorBindingFlags flags[] = {
+        0,
+        0,
+        VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
+    };
+    binding_flags.pBindingFlags = flags;
+    
+    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+    game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    game_set_create_info.pNext = &binding_flags;
+    game_set_create_info.flags = 0;
+    game_set_create_info.bindingCount = game_descriptor_count;
+    game_set_create_info.pBindings = game_bindings;
+    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->game_set_layout));
+    
+    // Descriptor Pool
+    // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0},
+    };
+    const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
+    
+    //Game
+    for(u32 d = 0; d < game_descriptor_count; d++) {
+        for(u32 i = 0; i < pool_sizes_count ; i ++){
+            if(game_bindings[d].descriptorType == pool_sizes[i].type) {
+                pool_sizes[i].descriptorCount ++;
+            }
+        }
+    }
+    
+    VkDescriptorPoolCreateInfo pool_ci = {};
+    pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_ci.pNext = NULL;
+    pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_ci.maxSets = renderer->descriptor_set_count;
+    pool_ci.poolSizeCount = pool_sizes_count;
+    pool_ci.pPoolSizes = pool_sizes;
+    AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
+    
+    // Descriptor Set
+    VkDescriptorSetVariableDescriptorCountAllocateInfo variable_desc = {};
+    variable_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+    variable_desc.pNext = NULL;
+    variable_desc.descriptorSetCount = 1;
+    u32 descriptor_counts = textures_count;
+    variable_desc.pDescriptorCounts = &descriptor_counts;
+    
+    VkDescriptorSetLayout set_layouts[1] = {renderer->game_set_layout};
+    VkDescriptorSetAllocateInfo allocate_info = {};
+    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocate_info.pNext = &variable_desc;
+    allocate_info.descriptorPool = renderer->descriptor_pool;
+    allocate_info.descriptorSetCount = renderer->descriptor_set_count;
+    allocate_info.pSetLayouts = set_layouts;
+    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, renderer->descriptor_sets));
+    
+    // Push constants
+    // TODO(Guigui): Currently limited to 1 PC
+    VkPushConstantRange push_constant_range = 
+    { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
+    const u32 push_constant_count = 1;
+    renderer->push_constant_size = push_constant_range.size;
+    
+    VkPipelineLayoutCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    create_info.pNext = NULL;
+    create_info.flags = 0;
+    create_info.setLayoutCount = renderer->descriptor_set_count;
+    create_info.pSetLayouts = set_layouts;
+    create_info.pushConstantRangeCount = push_constant_count;
+    create_info.pPushConstantRanges = &push_constant_range;
+    
+    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
 }
 
 internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkRenderPass render_pass, VkPipeline *pipeline) {
@@ -1436,76 +1323,11 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vkDestroyShaderModule(device, pipeline_ci.pStages[1].module, NULL);
 }
 
-internal void VulkanWriteDescriptorSets(VulkanContext *context, VulkanRenderer *renderer) {
-    
-    const u32 static_writes_count = 2;
-    VkWriteDescriptorSet static_writes[static_writes_count];
-    
-    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
-    static_writes[0] = 
-    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
-    
-    VkDescriptorBufferInfo materials = { context->scene_mat_buffer.buffer, 0, VK_WHOLE_SIZE };
-    static_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, renderer->descriptor_sets[0], 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
-    
-    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
-    
-    VkDescriptorImageInfo image_info = {};
-    image_info.sampler = context->texture_sampler;
-    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    if(context->scene_info.textures_count > 0) {
-        image_info.imageView = context->color_texture.image_view;
-    } else {
-        image_info.imageView = VK_NULL_HANDLE;
-    }
-    
-    VkWriteDescriptorSet textures_buffer = {};
-    textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    textures_buffer.pNext = NULL;
-    textures_buffer.dstSet = renderer->descriptor_sets[0];
-    textures_buffer.dstBinding = 2;
-    textures_buffer.dstArrayElement = 0;
-    textures_buffer.descriptorCount = 1;
-    textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    textures_buffer.pImageInfo = &image_info;
-    textures_buffer.pBufferInfo = NULL;
-    textures_buffer.pTexelBufferView = NULL;
-    
-    vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
-    
-}
-
-VulkanRenderer *VulkanCreateRenderer(VulkanContext *context) {
+VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, Scene *scene_info) {
     VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
-    CreatePipelineLayout(context->device, renderer);
-    // Depth image
-    CreateImage(context->device, &context->memory_properties, VK_FORMAT_D32_SFLOAT, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &renderer->depth_image);
     
-    CreateRenderPass(context->device, &context->swapchain, &renderer->render_pass);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
-    
-    // Framebuffers
-    renderer->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
-        
-        VkFramebufferCreateInfo create_info = {};
-        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        create_info.pNext = NULL;
-        create_info.flags = 0;
-        create_info.renderPass = renderer->render_pass;
-        create_info.attachmentCount = 2;
-        
-        VkImageView attachments[] = {
-            context->swapchain.image_views[i],
-            renderer->depth_image.image_view
-        };
-        
-        create_info.pAttachments = attachments;
-        create_info.width = context->swapchain.extent.width;
-        create_info.height = context->swapchain.extent.height;
-        create_info.layers = 1;
-        AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &renderer->framebuffers[i]));
-    }
+    CreatePipelineLayout(context->device, renderer, scene_info->textures_count);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, context->render_pass, &renderer->pipeline);
     
     return renderer;
 }
@@ -1514,22 +1336,12 @@ void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
     UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 }
 
-void VulkanReloadShaders(VulkanContext *context, VulkanRenderer *renderer) {
-    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, renderer->render_pass, &renderer->pipeline);
+void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
+    vkDestroyPipeline(context->device, scene->renderer->pipeline, NULL);
+    CreateRasterPipeline(context->device, scene->renderer->layout, &context->swapchain, context->render_pass, &scene->renderer->pipeline);
 }
 
 void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
-    
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
-        
-        vkDestroyFramebuffer(context->device, renderer->framebuffers[i], NULL);
-    }
-    free(renderer->framebuffers);
-    
-    DestroyImage(context->device, &renderer->depth_image);
-    
-    vkDestroyRenderPass(context->device, renderer->render_pass, NULL);
     
     vkFreeDescriptorSets(context->device, renderer->descriptor_pool, 1, renderer->descriptor_sets);
     vkDestroyDescriptorPool(context->device, renderer->descriptor_pool, NULL);
@@ -1541,13 +1353,244 @@ void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     free(renderer);
 }
 
+internal void VulkanWriteDescriptorSets(VulkanContext *context, Scene *scene) {
+    
+    const u32 static_writes_count = 2;
+    VkWriteDescriptorSet static_writes[static_writes_count];
+    
+    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
+    static_writes[0] = 
+    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_sets[0], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
+    
+    VkDescriptorBufferInfo materials = { scene->mat_buffer.buffer, 0, VK_WHOLE_SIZE };
+    static_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_sets[0], 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
+    
+    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
+    
+    const u32 nb_tex = scene->textures_count; 
+    u32 nb_info = nb_tex > 0 ? nb_tex : 1;
+    
+    VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
+    
+    for(u32 i = 0; i < nb_info; ++i) {
+        images_info[i].sampler = context->texture_sampler;
+        images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        if(nb_tex == 0) {
+            images_info[i].imageView = VK_NULL_HANDLE;
+            break;
+        }
+        images_info[i].imageView = scene->textures[i].image_view;
+    }
+    
+    VkWriteDescriptorSet textures_buffer = {};
+    textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    textures_buffer.pNext = NULL;
+    textures_buffer.dstSet = scene->renderer->descriptor_sets[0];
+    textures_buffer.dstBinding = 2;
+    textures_buffer.dstArrayElement = 0;
+    textures_buffer.descriptorCount = nb_info;
+    textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textures_buffer.pImageInfo = images_info;
+    textures_buffer.pBufferInfo = NULL;
+    textures_buffer.pTexelBufferView = NULL;
+    
+    vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
+    free(images_info);
+}
+
+// ===============
+//
+//  RENDERER
+//
+// ===============
+
+
+Scene *VulkanLoadScene(char *file, VulkanContext *context) {
+    
+    Scene *scene = (Scene *) malloc(sizeof(Scene));
+    
+    char *directory;
+    char *last_sep = strrchr(file, '/');
+    u32 size = last_sep - file;
+    directory = (char *)calloc(size + 2, sizeof(char));
+    strncpy(directory, file, size);
+    directory[size] = '/';
+    directory[size+1] = '\0';
+    
+    cgltf_data *data;
+    cgltf_options options = {0};
+    cgltf_result result = cgltf_parse_file(&options, file, &data);
+    if(result != cgltf_result_success) {
+        SDL_LogError(0, "Error reading scene");
+        ASSERT(0);
+    }
+    cgltf_load_buffers(&options, data, file);
+    
+    *scene = {};
+    
+    scene->meshes_count = data->meshes_count;
+    scene->vertex_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    scene->index_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    
+    scene->vertex_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    scene->index_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    
+    for(u32 i = 0; i < scene->meshes_count; ++i) {
+        if(data->meshes[i].primitives_count > 1) {
+            SDL_LogWarn(0, "This mesh has multiple primitives. This isn't handled yet");
+        }
+        cgltf_primitive *prim = &data->meshes[i].primitives[0];
+        
+        scene->vertex_offsets[i] = scene->total_vertex_count;
+        scene->vertex_counts[i] = (u32) prim->attributes[0].data->count;
+        scene->total_vertex_count += (u32) prim->attributes[0].data->count;;
+        
+        scene->index_offsets[i] = scene->total_index_count;
+        scene->index_counts[i] += prim->indices->count;
+        scene->total_index_count += (u32) prim->indices->count;
+    }
+    
+    scene->vertex_buffer_size = scene->total_vertex_count * sizeof(Vertex);
+    scene->index_buffer_size = scene->total_index_count * sizeof(u32);
+    
+    scene->nodes_count = data->nodes_count;
+    scene->node_mesh = (u32 *)calloc(scene->nodes_count, sizeof(u32));
+    
+    scene->materials_count = data->materials_count;
+    scene->materials = (u32*) calloc(data->nodes_count, sizeof(u32));
+    
+    scene->textures_count = data->textures_count;
+    
+    // Meshes
+    if(data->meshes_count >= UINT_MAX) {
+        SDL_LogError(0, "that's way to many meshes!!!");
+        ASSERT(0);
+    }
+    
+    for(u32 i = 0; i < scene->nodes_count; ++i) {
+        scene->node_mesh[i] = GLTFGetMeshID(data->nodes[i].mesh);
+        if(data->nodes[i].mesh) {
+            scene->materials[i] = GLTFGetMaterialID(data->nodes[i].mesh->primitives[0].material);
+        }
+    }
+    
+    // Vertex Buffer
+    CreateBuffer(context->device, &context->memory_properties, scene->vertex_buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->vtx_buffer);
+    DEBUGNameBuffer(context->device, &scene->vtx_buffer, "GLTF VTX");
+    void *mapped_vtx_buffer;
+    MapBuffer(context->device, &scene->vtx_buffer, &mapped_vtx_buffer);
+    GLTFLoadVertexBuffer(data, scene->vertex_offsets, mapped_vtx_buffer);
+    UnmapBuffer(context->device, &scene->vtx_buffer);
+    
+    // Index Buffer
+    CreateBuffer(context->device, &context->memory_properties, scene->index_buffer_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->idx_buffer);
+    DEBUGNameBuffer(context->device, &scene->idx_buffer, "GLTF IDX");
+    void *mapped_idx_buffer;
+    MapBuffer(context->device, &scene->idx_buffer, &mapped_idx_buffer);
+    GLTFLoadIndexBuffer(data, scene->index_offsets, mapped_idx_buffer);
+    UnmapBuffer(context->device, &scene->idx_buffer);
+    
+    // Material Buffer
+    CreateBuffer(context->device, &context->memory_properties, scene->materials_count * sizeof(Material),  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->mat_buffer);
+    DEBUGNameBuffer(context->device, &scene->mat_buffer, "GLTF MATS");
+    void *mapped_mat_buffer;
+    MapBuffer(context->device, &scene->mat_buffer, &mapped_mat_buffer);
+    GLTFLoadMaterialBuffer(data, (Material*)mapped_mat_buffer);
+    UnmapBuffer(context->device, &scene->mat_buffer);
+    
+    // Transforms
+    scene->transforms =  (mat4 *)calloc(scene->nodes_count, sizeof(mat4));
+    GLTFLoadTransforms(data, scene->transforms);
+    
+    // Texture
+    scene->textures = (Image *)calloc(data->textures_count, sizeof(Image));
+    
+    if(data->textures_count > 0) {
+        if(data->textures_count > 1) {
+            //SDL_LogWarn(0, "gltf has %u textures, but we only handle 1", data->textures_count);
+        }
+        for(u32 i = 0; i < data->textures_count; ++i) {
+            char* image_path = data->textures[i].image->uri;
+            u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
+            char* full_image_path = (char *)calloc(file_path_length, sizeof(char *));
+            strcat(full_image_path, directory);
+            strcat(full_image_path, image_path);
+            
+            SDL_Surface *surface = IMG_Load(full_image_path);
+            if(!surface) {
+                SDL_LogError(0, IMG_GetError());
+            }
+            
+            free(full_image_path);
+            
+            Buffer image_buffer;
+            SDL_Surface *img_surf = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
+            if(!img_surf) {
+                SDL_LogError(0, SDL_GetError());
+            }
+            
+            VkDeviceSize image_size = img_surf->h * img_surf->pitch;
+            VkExtent3D extent = {(u32)img_surf->h, (u32)img_surf->w, 1};
+            
+            CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scene->textures[i]);
+            CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffer); 
+            SDL_LockSurface(img_surf);
+            UploadToBuffer(context->device, &image_buffer, img_surf->pixels, image_size);
+            SDL_UnlockSurface(img_surf);
+            
+            VkCommandBuffer cmd;
+            AllocateAndBeginCommandBuffer(context->device, context->graphics_command_pool, &cmd);
+            CopyBufferToImage(cmd, extent, img_surf->pitch, &image_buffer, &scene->textures[i]);
+            EndAndExecuteCommandBuffer(context->device, context->graphics_queue, context->graphics_command_pool, cmd);
+            
+            SDL_FreeSurface(img_surf);
+            DestroyBuffer(context->device, &image_buffer);
+            SDL_FreeSurface(surface);
+        }
+    }
+    cgltf_free(data);
+    free(directory);
+    
+    scene->renderer = VulkanCreateRenderer(context, scene);
+    VulkanWriteDescriptorSets(context, scene);
+    
+    return scene;
+}
+
+void VulkanFreeScene(VulkanContext *context, Scene *scene) {
+    
+    VulkanDestroyRenderer(context, scene->renderer);
+    
+    for(u32 i = 0; i < scene->textures_count; ++i) {
+        DestroyImage(context->device, &scene->textures[i]);
+    }
+    free(scene->textures);
+    
+    free(scene->materials);
+    
+    free(scene->vertex_offsets);
+    free(scene->index_offsets);
+    
+    free(scene->vertex_counts);
+    free(scene->index_counts);
+    
+    free(scene->node_mesh);
+    
+    DestroyBuffer(context->device, &scene->vtx_buffer);
+    DestroyBuffer(context->device, &scene->idx_buffer);
+    DestroyBuffer(context->device, &scene->mat_buffer);
+    free(scene->transforms);
+    
+    free(scene);
+}
+
 // ================
 //
 // DRAWING
 //
 // ================
 
-void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData *game_data) {
+void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
     
     u32 image_id;
     Swapchain* swapchain = &context->swapchain;
@@ -1569,8 +1612,8 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
     VkRenderPassBeginInfo renderpass_begin = {};
     renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderpass_begin.pNext = 0;
-    renderpass_begin.renderPass = renderer->render_pass;
-    renderpass_begin.framebuffer = renderer->framebuffers[image_id];
+    renderpass_begin.renderPass = context->render_pass;
+    renderpass_begin.framebuffer = context->framebuffers[image_id];
     renderpass_begin.renderArea = {{0,0}, swapchain->extent};
     
     VkClearValue clear_values[2] = {};
@@ -1581,26 +1624,26 @@ void VulkanDrawFrame(VulkanContext* context, VulkanRenderer *renderer, GameData 
     
     vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE );
     
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->pipeline);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->layout, 0, 1, renderer->descriptor_sets, 0, NULL);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->layout, 0, 1, scene->renderer->descriptor_sets, 0, NULL);
     
     VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(cmd, 0, 1, &context->scene_vtx_buffer.buffer, &offset);
-    vkCmdBindIndexBuffer(cmd, context->scene_idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &scene->vtx_buffer.buffer, &offset);
+    vkCmdBindIndexBuffer(cmd, scene->idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
     
-    for(u32 i = 0; i < context->scene_info.nodes_count ; i ++) {
-        u32 mesh_id = context->scene_info.node_mesh[i];
+    for(u32 i = 0; i < scene->nodes_count ; i ++) {
+        u32 mesh_id = scene->node_mesh[i];
         
         if(mesh_id == UINT_MAX) {
             continue;
         }
-        PushConstant push = { game_data->transforms[i], context->scene_info.materials[i] };
-        vkCmdPushConstants(cmd, renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
+        PushConstant push = { scene->transforms[i], scene->materials[i] };
+        vkCmdPushConstants(cmd, scene->renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
         vkCmdDrawIndexed(cmd, 
-                         context->scene_info.index_counts[mesh_id],
+                         scene->index_counts[mesh_id],
                          1,
-                         context->scene_info.index_offsets[mesh_id],
-                         context->scene_info.vertex_offsets[mesh_id],
+                         scene->index_offsets[mesh_id],
+                         scene->vertex_offsets[mesh_id],
                          0);
     }
     

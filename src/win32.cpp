@@ -136,14 +136,12 @@ internal int main(int argc, char *argv[]) {
     SDL_Window* window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
     
-    IMG_Init(IMG_INIT_PNG);
+    IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
     
     VulkanContext *context = VulkanCreateContext(window);
     
     GameCode game_code = {};
     Win32LoadGameCode(&game_code);
-    
-    VulkanRenderer *renderer = VulkanCreateRenderer(context);
     
     SDL_Log("Vulkan Succesfully Loaded!");
     SDL_ShowWindow(window);
@@ -153,13 +151,12 @@ internal int main(int argc, char *argv[]) {
     shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
     
     GameData game_data = {};
+    Scene *scene;
     
-    VulkanLoadGLTF("resources/models/gltf_samples/BoxTextured/glTF/BoxTextured.gltf", context, &game_data.transforms);
+    scene = VulkanLoadScene("resources/models/gltf_samples/CesiumMilkTruck/glTF/CesiumMilkTruck.gltf", context);
     //VulkanLoadGLTF("resources/models/cube_plane.gltf", context, &game_data.transforms);
     
     game_code.GameStart(&game_data);
-    
-    VulkanWriteDescriptorSets(context, renderer);
     
     bool running = true;
     float delta_time = 0;
@@ -177,7 +174,7 @@ internal int main(int argc, char *argv[]) {
         FILETIME shader_time = Win32GetLastWriteTime(shader_code.spv_path);
         if(CompareFileTime(& shader_code.last_write_time, &shader_time)){
             shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
-            VulkanReloadShaders(context, renderer);
+            VulkanReloadShaders(context, scene);
             SDL_Log("Shaders reloaded");
         }
         
@@ -199,14 +196,13 @@ internal int main(int argc, char *argv[]) {
         }
         game_code.GameLoop(delta_time, &game_data);
         VulkanUpdateDescriptors(context, &game_data);
-        VulkanDrawFrame(context, renderer, &game_data);
+        VulkanDrawFrame(context, scene);
     }
     
-    VulkanFreeGLTF(context, &game_data.transforms);
+    VulkanFreeScene(context, scene);
     
     Win32UnloadGameCode(&game_code);
     
-    VulkanDestroyRenderer(context, renderer);
     VulkanDestroyContext(context);
     SDL_DestroyWindow(window);
     IMG_Quit();
