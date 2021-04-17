@@ -5,11 +5,11 @@
  CRITICAL
  
  MAJOR
-  - Textures
+  - IBL
 - Shadow Mapping
 
  BACKLOG
- - IBL
+ 
 
  IMPROVEMENTS
 - Utiliser des Staging buffers
@@ -1248,7 +1248,7 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     rasterization_state.depthClampEnable = VK_FALSE;
     rasterization_state.rasterizerDiscardEnable = VK_FALSE;
     rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterization_state.cullMode = VK_CULL_MODE_NONE;
     rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterization_state.depthBiasEnable = VK_FALSE;
     rasterization_state.depthBiasConstantFactor = 0.f;

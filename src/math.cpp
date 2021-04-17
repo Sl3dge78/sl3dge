@@ -204,9 +204,9 @@ mat4 mat4_perspective(const float fov, const float aspect_ratio, const float nea
     
     result.m[0][0] = 1.0f / (aspect_ratio * tan_theta_2);
     result.m[1][1] = -1.0f / tan_theta_2;
-    result.m[2][2] = (far + near) / (far - near);
-    result.m[2][3] = 1.0f;
-    result.m[3][2] = -(2.0f * near * far) / (far - near);
+    result.m[2][2] = (far) / (near - far);
+    result.m[2][3] = -1.0f;
+    result.m[3][2] = -(near * far) / (far - near);
     result.m[3][3] = 1.0f;
     
     return result;
@@ -274,7 +274,7 @@ void mat4_rotate_euler(mat4 *mat, const vec3 euler) {
 }
 
 mat4 mat4_look_at(vec3 target, vec3 eye, vec3 up) {
-    vec3 z_axis = vec3_normalize(target - eye);
+    vec3 z_axis = vec3_normalize(eye - target);
     vec3 x_axis = vec3_normalize(vec3_cross(up, z_axis));
     vec3 y_axis = vec3_cross(z_axis, x_axis);
     
@@ -295,9 +295,9 @@ mat4 mat4_look_at(vec3 target, vec3 eye, vec3 up) {
     mat.m[2][2] = z_axis.z;
     mat.m[2][3] = 0;
     
-    mat.m[3][0] = -vec3_dot(x_axis, eye);
-    mat.m[3][1] = -vec3_dot(y_axis, eye);
-    mat.m[3][2] = -vec3_dot(z_axis, eye);
+    mat.m[3][0] = -vec3_dot(x_axis, target);
+    mat.m[3][1] = -vec3_dot(y_axis, target);
+    mat.m[3][2] = -vec3_dot(z_axis, target);
     mat.m[3][3] = 1;
     
     return mat;

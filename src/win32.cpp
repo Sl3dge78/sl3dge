@@ -153,7 +153,7 @@ internal int main(int argc, char *argv[]) {
     GameData game_data = {};
     Scene *scene;
     
-    scene = VulkanLoadScene("resources/models/gltf_samples/WaterBottle/glTF/WaterBottle.gltf", context);
+    scene = VulkanLoadScene("resources/models/gltf_samples/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf", context);
     //VulkanLoadGLTF("resources/models/cube_plane.gltf", context, &game_data.transforms);
     
     game_code.GameStart(&game_data);

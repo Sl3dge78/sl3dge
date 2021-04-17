@@ -19,8 +19,8 @@ extern "C" __declspec(dllexport) GAME_START(GameStart) {
     
     game_data->spherical_coordinates = { -PI/2.0f, PI/2.0f };
     game_data->position = { 1.5f, 0.0f, 2.0f };
-    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 1000.0f);
-    game_data->matrices.view = mat4_identity();
+    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 10000.0f);
+    //game_data->matrices.view = mat4_identity();
 }
 
 extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
@@ -33,7 +33,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     if(mouse_state == SDL_BUTTON(3)) {
         if(mouse_x != 0) {
-            game_data->spherical_coordinates.x += speed * mouse_x * -2.5f;
+            game_data->spherical_coordinates.x += speed * mouse_x * 2.5f;
         }
         if(mouse_y != 0){
             float new_rot = game_data->spherical_coordinates.y + speed * mouse_y * 2.5f;
@@ -47,7 +47,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     }
     
     vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
-    vec3 right = vec3_cross(forward, vec3{0.0f, -1.0f, 0.0f});
+    vec3 right = vec3_cross(forward, vec3{0.0f, 1.0f, 0.0f});
     vec3 up = vec3_cross(right, forward);
     
     vec3 movement = {};
