@@ -23,8 +23,10 @@ typedef struct Vertex {
 typedef struct Material {
     alignas(16) vec3  base_color;
     alignas(4)  u32   base_color_texture;
-    alignas(4)  float metallic;
-    alignas(4)  float roughness;
+    alignas(4)  u32   metallic_roughness_texture;
+    alignas(4)  float metallic_factor;
+    alignas(4)  float roughness_factor;
+    alignas(4)  u32   normal_texture;
 } Material;
 
 internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u32 dst_stride) {
@@ -151,8 +153,10 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         }
         dst.base_color = {color[0], color[1], color[2]};
         dst.base_color_texture = GLTFGetTextureID(mat->pbr_metallic_roughness.base_color_texture.texture);
-        dst.metallic = mat->pbr_metallic_roughness.metallic_factor;
-        dst.roughness = mat->pbr_metallic_roughness.roughness_factor;
+        dst.metallic_roughness_texture = GLTFGetTextureID(mat->pbr_metallic_roughness.metallic_roughness_texture.texture);
+        dst.metallic_factor = mat->pbr_metallic_roughness.metallic_factor;
+        dst.roughness_factor = mat->pbr_metallic_roughness.roughness_factor;
+        dst.normal_texture = GLTFGetTextureID(mat->normal_texture.texture);
         //SDL_Log("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2], dst.metallic, dst.roughness);
         
         memcpy(buffer, &dst, sizeof(Material));

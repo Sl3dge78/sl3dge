@@ -8,8 +8,10 @@
 struct Material {
     vec3 albedo;
     uint base_color_texture;
-    float metallic;
-    float roughness;
+    uint metallic_roughness_texture;
+    float metallic_factor;
+    float roughness_factor;
+    uint normal_texture;
     /*
     float ao;
     float rim_pow;
@@ -18,7 +20,7 @@ struct Material {
 };
 
 layout(location = 0) in vec3 worldpos;
-layout(location = 1) in vec3 normal;
+layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec2 texcoord;
 layout(location = 3) in vec3 cam_pos;
 layout(location = 4) flat in uint material_id;
@@ -162,10 +164,30 @@ vec3 get_ibl_contribution() {
 vec3 get_base_color(Material mat) {
 
     if(mat.base_color_texture < UINT_MAX) {
-        return texture(textures[nonuniformEXT(mat.base_color_texture)], texcoord).xyz * mat.albedo;
+        return texture(textures[mat.base_color_texture], texcoord).xyz * mat.albedo;
     } else {
         return mat.albedo;
     }
+}
+
+vec3 get_normal(Material mat) {
+
+    if(mat.normal_texture < UINT_MAX) {
+        vec3 tangent = texture(textures[mat.normal_texture], texcoord).xyz * 2.0 - 1.0;
+        vec3 q1 = dFdx(worldpos);
+        vec3 q2 = dFdy(worldpos);
+        vec2 st1 = dFdx(texcoord);
+        vec2 st2 = dFdx(texcoord);
+
+        vec3 N = normalize (in_normal);
+        vec3 T = normalize( q1 * st2.t - q2 * st1.t);
+        vec3 B = -normalize(cross(N, T));
+        mat3 TBN = mat3(T, B, N);
+        return normalize(TBN * tangent);
+    } else {
+        return in_normal;
+    }
+   
 }
 
 vec3 pbr2(Material mat) {
@@ -173,19 +195,30 @@ vec3 pbr2(Material mat) {
     vec3 f0 = vec3(0.04);
 
     vec3 diffuse_color = get_base_color(mat) * (vec3(1.0) - f0);
-    diffuse_color *= 1.0 - mat.metallic;
 
-    float alpha_roughness = mat.roughness * mat.roughness;
-    vec3 specular_color = mix(f0, mat.albedo.rgb, mat.metallic);
+    float metallic = mat.metallic_factor;
+    float roughness = mat.roughness_factor;
+
+    if(mat.metallic_roughness_texture < UINT_MAX) {
+        vec3 tex = texture(textures[mat.base_color_texture], texcoord).xyz;
+        roughness *= tex.r;
+        metallic *= tex.b;
+    } 
+
+    diffuse_color *= 1.0 - metallic; 
+
+    float alpha_roughness = roughness * roughness;
+    vec3 specular_color = mix(f0, mat.albedo.rgb, metallic);
 
     float reflectance = max(max(specular_color.r, specular_color.g), specular_color.b);
     float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
     vec3 specular_environment_R0 = specular_color.rgb;
     vec3 specular_environment_R90 = vec3(1.0) * reflectance90;
 
-    vec3 light_dir = normalize(vec3(1, 1, 1));
+    vec3 light_dir = normalize(vec3(1, 1, -1));
 
-    vec3 N = normal;
+    vec3 N = get_normal(mat);
+    //return N;
     vec3 V = normalize(cam_pos - worldpos);
     vec3 L = normalize(light_dir);
     vec3 H = normalize(L+V);
@@ -218,5 +251,9 @@ vec3 pbr2(Material mat) {
 void main() {
 	
 	vec3 color = pbr2(materials.m[material_id]);
+
+    uint texture_id = materials.m[material_id].base_color_texture;
+    //color = texture(textures[texture_id], texcoord).xyz;
+    
     out_color = vec4(color, 1.0);
 }

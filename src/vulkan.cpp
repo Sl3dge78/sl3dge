@@ -1076,6 +1076,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     };
     const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
     
+    /*
     VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {};
     binding_flags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
     binding_flags.pNext = NULL;
@@ -1086,10 +1087,11 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
         VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
     };
     binding_flags.pBindingFlags = flags;
+    */
     
     VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
     game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    game_set_create_info.pNext = &binding_flags;
+    game_set_create_info.pNext = NULL;
     game_set_create_info.flags = 0;
     game_set_create_info.bindingCount = game_descriptor_count;
     game_set_create_info.pBindings = game_bindings;
@@ -1123,17 +1125,19 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
     
     // Descriptor Set
+    /*
     VkDescriptorSetVariableDescriptorCountAllocateInfo variable_desc = {};
     variable_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
     variable_desc.pNext = NULL;
     variable_desc.descriptorSetCount = 1;
     u32 descriptor_counts = textures_count;
     variable_desc.pDescriptorCounts = &descriptor_counts;
+    */
     
     VkDescriptorSetLayout set_layouts[1] = {renderer->game_set_layout};
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocate_info.pNext = &variable_desc;
+    allocate_info.pNext = NULL;
     allocate_info.descriptorPool = renderer->descriptor_pool;
     allocate_info.descriptorSetCount = renderer->descriptor_set_count;
     allocate_info.pSetLayouts = set_layouts;
@@ -1533,6 +1537,7 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
             VkExtent3D extent = {(u32)img_surf->h, (u32)img_surf->w, 1};
             
             CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scene->textures[i]);
+            DEBUGNameImage(context->device, &scene->textures[i], data->textures[i].image->uri);
             CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffer); 
             SDL_LockSurface(img_surf);
             UploadToBuffer(context->device, &image_buffer, img_surf->pixels, image_size);
