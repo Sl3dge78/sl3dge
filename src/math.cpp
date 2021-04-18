@@ -84,10 +84,10 @@ vec3 operator-(vec3 l, const vec3 r) {
 /// Y up
 inline vec3 spherical_to_carthesian(const vec2 v) {
     vec3 result;
-    
-    result.x = cos(v.x) * sin(v.y);
-    result.y = cos(v.y);
-    result.z = sin(v.x) * sin(v.y);
+    const vec2 o = {v.x - (PI/2.0f), v.y + (PI/2.0f) };
+    result.x = cos(o.x) * sin(o.y);
+    result.y = cos(o.y);
+    result.z = sin(o.x) * sin(o.y);
     
     return result;
 }
@@ -299,9 +299,9 @@ mat4 mat4_look_at(vec3 target, vec3 eye, vec3 up) {
     mat.m[2][2] = z_axis.z;
     mat.m[2][3] = 0;
     
-    mat.m[3][0] = -vec3_dot(x_axis, target);
-    mat.m[3][1] = -vec3_dot(y_axis, target);
-    mat.m[3][2] = -vec3_dot(z_axis, target);
+    mat.m[3][0] = -vec3_dot(x_axis, eye);
+    mat.m[3][1] = -vec3_dot(y_axis, eye);
+    mat.m[3][2] = -vec3_dot(z_axis, eye);
     mat.m[3][3] = 1;
     
     return mat;

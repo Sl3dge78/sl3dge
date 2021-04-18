@@ -29,6 +29,14 @@ typedef struct Material {
     alignas(4)  u32   normal_texture;
 } Material;
 
+typedef struct Primitive {
+    u32 material_id;
+    u32 node_id;
+    u32 index_count;
+    u32 index_offset;
+    u32 vertex_offset;
+} Primitive;
+
 internal void GLTFCopyAccessor(cgltf_accessor *acc, void* dst, const u32 offset, const u32 dst_stride) {
     
     const cgltf_buffer_view *view = acc->buffer_view;
@@ -100,34 +108,28 @@ inline u32 GLTFGetTextureID(cgltf_texture *texture) {
     return texture->id;
 }
 
-void GLTFLoadVertexAndIndexBuffer(cgltf_data *data, u32 *vertex_offsets, u32 *index_offsets, void *vtx_buffer, void* idx_buffer) {
-    u32 i = 0;
-    for(u32 m = 0; m < data->meshes_count; ++m) {
-        for(u32 p = 0; p < data->meshes[m].primitives_count; ++p) {
-            cgltf_primitive *prim = &data->meshes[m].primitives[p];
+void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim, Primitive *primitive, void *vtx_buffer, void* idx_buffer) {
+    
+    GLTFCopyAccessor(prim->indices, idx_buffer, primitive->index_offset * sizeof(u32), sizeof(u32));
+    
+    for(u32 a = 0; a < prim->attributes_count ; ++a) {
+        switch(prim->attributes[a].type) {
+            case cgltf_attribute_type_position : {
+                GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+                                 primitive->vertex_offset * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
+            } break;
             
-            GLTFCopyAccessor(prim->indices, idx_buffer, index_offsets[i] * sizeof(u32), sizeof(u32));
-            
-            for(u32 a = 0; a < prim->attributes_count ; ++a) {
-                switch(prim->attributes[a].type) {
-                    case cgltf_attribute_type_position : {
-                        GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
-                                         vertex_offsets[i] * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
-                    } break;
-                    
-                    case cgltf_attribute_type_normal: {
-                        GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
-                                         vertex_offsets[i] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
-                    } break;
-                    case cgltf_attribute_type_texcoord: {
-                        GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
-                                         vertex_offsets[i] * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
-                    } break;
-                }
-            }
-            ++i;
+            case cgltf_attribute_type_normal: {
+                GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+                                 primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
+            } break;
+            case cgltf_attribute_type_texcoord: {
+                GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+                                 primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
+            } break;
         }
     }
+    
 }
 
 

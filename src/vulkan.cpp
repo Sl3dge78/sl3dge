@@ -75,37 +75,23 @@ typedef struct VulkanRenderer {
 typedef struct Scene {
     VulkanRenderer *renderer;
     
-    u32 vertex_buffer_size;
-    u32 index_buffer_size;
+    Buffer vtx_buffer;
+    Buffer idx_buffer;
     
     u32 total_vertex_count;
     u32 total_index_count;
     
     u32 nodes_count;
-    u32 *nodeid_to_meshid;
-    
-    u32 meshes_count;
-    u32 *meshid_to_first_primitiveid;
-    u32 *mesh_primitives_count;
+    mat4 *transforms;
     
     u32 total_primitives_count;
-    u32 *primitive_vertex_counts;
-    u32 *primitive_index_counts;
-    
-    u32 *primitive_vertex_offsets;   
-    u32 *primitive_index_offsets;    
+    Primitive *primitives;
     
     u32 materials_count;
-    u32 *primitiveid_to_materialid;
+    Buffer mat_buffer;
     
     u32 textures_count;
-    
-    Buffer vtx_buffer;
-    Buffer idx_buffer;
-    Buffer mat_buffer;
     Image *textures;
-    
-    mat4 *transforms;
     
 } Scene;
 
@@ -315,7 +301,7 @@ internal void CreateBuffer(const VkDevice device, VkPhysicalDeviceMemoryProperti
     }
 }
 
-internal void UploadToBuffer(const VkDevice device, Buffer* buffer, void* data, size_t size) {
+internal inline void UploadToBuffer(const VkDevice device, Buffer* buffer, void* data, size_t size) {
     void* dst;
     VkResult result = vkMapMemory(device, buffer->memory, 0, buffer->size, 0, &dst);
     AssertVkResult(result);
@@ -455,7 +441,7 @@ internal void AllocateCommandBuffers(const VkDevice device, const VkCommandPool 
     allocate_info.pNext = NULL;
     allocate_info.commandPool = pool;
     allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocate_info.commandBufferCount = 1;
+    allocate_info.commandBufferCount = count;
     AssertVkResult(vkAllocateCommandBuffers(device, &allocate_info, command_buffers));
 }
 
@@ -1416,8 +1402,9 @@ internal void VulkanWriteDescriptorSets(VulkanContext *context, Scene *scene) {
 
 
 Scene *VulkanLoadScene(char *file, VulkanContext *context) {
-    
+    double start = SDL_GetPerformanceCounter();
     Scene *scene = (Scene *) malloc(sizeof(Scene));
+    *scene = {};
     
     char *directory;
     char *last_sep = strrchr(file, '/');
@@ -1434,77 +1421,63 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
         SDL_LogError(0, "Error reading scene");
         ASSERT(0);
     }
+    
     cgltf_load_buffers(&options, data, file);
     
-    *scene = {};
+    // Transforms
+    scene->nodes_count = data->nodes_count;
+    scene->transforms =  (mat4 *)calloc(scene->nodes_count, sizeof(mat4));
+    GLTFLoadTransforms(data, scene->transforms);
     
-    scene->meshes_count = data->meshes_count;
-    ASSERT(data->meshes_count < UINT_MAX);
-    
+    // Primitives
     scene->total_primitives_count = 0;
     for(u32 m = 0; m < data->meshes_count; ++m) {
         scene->total_primitives_count += data->meshes[m].primitives_count;
     };
-    
-    scene->meshid_to_first_primitiveid = (u32 *) calloc(scene->meshes_count, sizeof(u32));
-    scene->mesh_primitives_count = (u32 *) calloc(scene->meshes_count, sizeof(u32));
-    
-    scene->primitive_vertex_counts = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
-    scene->primitive_index_counts = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
-    
-    scene->primitive_vertex_offsets = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
-    scene->primitive_index_offsets = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
-    
-    scene->materials_count = data->materials_count;
-    scene->primitiveid_to_materialid = (u32*) calloc(scene->total_primitives_count, sizeof(u32));
+    scene->primitives = (Primitive *)calloc(scene->total_primitives_count, sizeof(Primitive));
     
     u32 i = 0;
-    
-    for(u32 m = 0; m < scene->meshes_count; ++m) {
-        scene->meshid_to_first_primitiveid[m] = i;
-        scene->mesh_primitives_count[m] = (u32)data->meshes[m].primitives_count;
+    for(u32 m = 0; m < data->meshes_count; ++m) {
+        
         for(u32 p = 0; p < data->meshes[m].primitives_count; p++) {
             cgltf_primitive *prim = &data->meshes[m].primitives[p];
             
-            scene->primitive_vertex_offsets[i] = scene->total_vertex_count;
-            scene->primitive_vertex_counts[i] = (u32) prim->attributes[0].data->count;
+            Primitive *primitive = &scene->primitives[i];
+            
+            primitive->vertex_offset = scene->total_vertex_count;
             scene->total_vertex_count += (u32) prim->attributes[0].data->count;
             
-            scene->primitive_index_offsets[i] = scene->total_index_count;
-            scene->primitive_index_counts[i] += prim->indices->count;
+            primitive->index_offset = scene->total_index_count;
+            primitive->index_count += prim->indices->count;
             scene->total_index_count += (u32) prim->indices->count;
             
-            scene->primitiveid_to_materialid[i] = GLTFGetMaterialID(prim->material);
+            primitive->material_id = GLTFGetMaterialID(prim->material);
             ++i;
         }
     }
     
-    scene->vertex_buffer_size = scene->total_vertex_count * sizeof(Vertex);
-    scene->index_buffer_size = scene->total_index_count * sizeof(u32);
-    
-    scene->nodes_count = data->nodes_count;
-    scene->nodeid_to_meshid = (u32 *)calloc(scene->nodes_count, sizeof(u32));
-    
-    scene->textures_count = data->textures_count;
-    
-    for(u32 i = 0; i < scene->nodes_count; ++i) {
-        scene->nodeid_to_meshid[i] = GLTFGetMeshID(data->nodes[i].mesh);
-    }
-    
     // Vertex & Index Buffer
-    CreateBuffer(context->device, &context->memory_properties, scene->vertex_buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->vtx_buffer);
-    CreateBuffer(context->device, &context->memory_properties, scene->index_buffer_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->idx_buffer);
+    CreateBuffer(context->device, &context->memory_properties, scene->total_vertex_count * sizeof(Vertex), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->vtx_buffer);
+    CreateBuffer(context->device, &context->memory_properties, scene->total_index_count * sizeof(u32),  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->idx_buffer);
     DEBUGNameBuffer(context->device, &scene->vtx_buffer, "GLTF VTX");
     DEBUGNameBuffer(context->device, &scene->idx_buffer, "GLTF IDX");
     void *mapped_vtx_buffer;
     void *mapped_idx_buffer;
     MapBuffer(context->device, &scene->vtx_buffer, &mapped_vtx_buffer);
     MapBuffer(context->device, &scene->idx_buffer, &mapped_idx_buffer);
-    GLTFLoadVertexAndIndexBuffer(data, scene->primitive_vertex_offsets, scene->primitive_index_offsets, mapped_vtx_buffer, mapped_idx_buffer);
+    
+    i = 0;
+    for(u32 m = 0; m < data->meshes_count; ++m) {
+        for(u32 p = 0; p < data->meshes[m].primitives_count; ++p) {
+            GLTFLoadVertexAndIndexBuffer(&data->meshes[m].primitives[p], &scene->primitives[i], mapped_vtx_buffer, mapped_idx_buffer);
+            ++i;
+        }
+    }
     UnmapBuffer(context->device, &scene->vtx_buffer);
     UnmapBuffer(context->device, &scene->idx_buffer);
     
-    // Material Buffer
+    // Materials
+    scene->materials_count = data->materials_count;
     CreateBuffer(context->device, &context->memory_properties, scene->materials_count * sizeof(Material),  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->mat_buffer);
     DEBUGNameBuffer(context->device, &scene->mat_buffer, "GLTF MATS");
     void *mapped_mat_buffer;
@@ -1512,14 +1485,20 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     GLTFLoadMaterialBuffer(data, (Material*)mapped_mat_buffer);
     UnmapBuffer(context->device, &scene->mat_buffer);
     
-    // Transforms
-    scene->transforms =  (mat4 *)calloc(scene->nodes_count, sizeof(mat4));
-    GLTFLoadTransforms(data, scene->transforms);
     
-    // Texture
-    scene->textures = (Image *)calloc(data->textures_count, sizeof(Image));
-    
+    // Textures
+    SDL_Log("Loading textures...");
+    scene->textures_count = data->textures_count;
     if(data->textures_count > 0) {
+        
+        scene->textures = (Image *)calloc(data->textures_count, sizeof(Image));
+        
+        SDL_Surface **surfaces = (SDL_Surface **)calloc(data->textures_count, sizeof(SDL_Surface *));
+        Buffer *image_buffers = (Buffer *)calloc(data->textures_count, sizeof(Buffer));
+        VkCommandBuffer *cmds = (VkCommandBuffer *)calloc(data->textures_count, sizeof(VkCommandBuffer));
+        
+        AllocateCommandBuffers(context->device, context->graphics_command_pool, data->textures_count, cmds);
+        
         for(u32 i = 0; i < data->textures_count; ++i) {
             char* image_path = data->textures[i].image->uri;
             u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
@@ -1527,44 +1506,60 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
             strcat(full_image_path, directory);
             strcat(full_image_path, image_path);
             
-            SDL_Surface *surface = IMG_Load(full_image_path);
-            if(!surface) {
+            SDL_Surface* temp_surf = IMG_Load(full_image_path);
+            if(!temp_surf) {
                 SDL_LogError(0, IMG_GetError());
             }
             
-            free(full_image_path);
-            
-            Buffer image_buffer;
-            SDL_Surface *img_surf = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
-            if(!img_surf) {
-                SDL_LogError(0, SDL_GetError());
+            if(temp_surf->format->format != SDL_PIXELFORMAT_ABGR8888) {
+                surfaces[i]= SDL_ConvertSurfaceFormat(temp_surf, SDL_PIXELFORMAT_ABGR8888, 0);
+                if(!surfaces[i]) {
+                    SDL_LogError(0, SDL_GetError());
+                }
+                SDL_FreeSurface(temp_surf);
+            } else {
+                surfaces[i] = temp_surf;
             }
-            
-            VkDeviceSize image_size = img_surf->h * img_surf->pitch;
-            VkExtent3D extent = {(u32)img_surf->h, (u32)img_surf->w, 1};
+            free(full_image_path);
+        }
+        
+        for(u32 i = 0; i < data->textures_count; ++i) {
+            VkDeviceSize image_size = surfaces[i]->h * surfaces[i]->pitch;
+            VkExtent3D extent = {(u32)surfaces[i]->h, (u32)surfaces[i]->w, 1};
             
             CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scene->textures[i]);
             DEBUGNameImage(context->device, &scene->textures[i], data->textures[i].image->uri);
-            CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffer); 
-            SDL_LockSurface(img_surf);
-            UploadToBuffer(context->device, &image_buffer, img_surf->pixels, image_size);
-            SDL_UnlockSurface(img_surf);
-            
-            VkCommandBuffer cmd;
-            AllocateAndBeginCommandBuffer(context->device, context->graphics_command_pool, &cmd);
-            CopyBufferToImage(cmd, extent, img_surf->pitch, &image_buffer, &scene->textures[i]);
-            EndAndExecuteCommandBuffer(context->device, context->graphics_queue, context->graphics_command_pool, cmd);
-            
-            SDL_FreeSurface(img_surf);
-            DestroyBuffer(context->device, &image_buffer);
-            SDL_FreeSurface(surface);
+            CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffers[i]); 
+            SDL_LockSurface(surfaces[i]);
+            UploadToBuffer(context->device, &image_buffers[i], surfaces[i]->pixels, image_size);
+            SDL_UnlockSurface(surfaces[i]);
+            BeginCommandBuffer(context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+            CopyBufferToImage(cmds[i], extent, surfaces[i]->pitch, &image_buffers[i], &scene->textures[i]);
+            vkEndCommandBuffer(cmds[i]);
+            VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmds[i], 0, NULL};
+            vkQueueSubmit(context->graphics_queue, 1, &si, VK_NULL_HANDLE);
         }
+        
+        vkQueueWaitIdle(context->graphics_queue);
+        
+        vkFreeCommandBuffers(context->device, context->graphics_command_pool, data->textures_count, cmds);
+        free(cmds);
+        for(u32 i = 0; i < data->textures_count; ++i) {
+            SDL_FreeSurface(surfaces[i]);
+            DestroyBuffer(context->device, &image_buffers[i]);
+        }
+        free(surfaces);
+        free(image_buffers);
     }
-    cgltf_free(data);
-    free(directory);
     
     scene->renderer = VulkanCreateRenderer(context, scene);
     VulkanWriteDescriptorSets(context, scene);
+    
+    cgltf_free(data);
+    free(directory);
+    
+    double end = SDL_GetPerformanceCounter();
+    SDL_Log("Scene loaded in : %.2fms", (double)((end - start)*1000)/SDL_GetPerformanceFrequency());
     
     return scene;
 }
@@ -1578,15 +1573,7 @@ void VulkanFreeScene(VulkanContext *context, Scene *scene) {
     }
     free(scene->textures);
     
-    free(scene->primitiveid_to_materialid);
-    
-    free(scene->primitive_vertex_offsets);
-    free(scene->primitive_index_offsets);
-    
-    free(scene->primitive_vertex_counts);
-    free(scene->primitive_index_counts);
-    
-    free(scene->nodeid_to_meshid);
+    free(scene->primitives);
     
     DestroyBuffer(context->device, &scene->vtx_buffer);
     DestroyBuffer(context->device, &scene->idx_buffer);
@@ -1643,6 +1630,21 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
     vkCmdBindVertexBuffers(cmd, 0, 1, &scene->vtx_buffer.buffer, &offset);
     vkCmdBindIndexBuffer(cmd, scene->idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
     
+    for(u32 i = 0; i < scene->total_primitives_count; i++) {
+        
+        Primitive *prim = &scene->primitives[i];
+        
+        PushConstant push = { scene->transforms[prim->node_id], prim->material_id };
+        vkCmdPushConstants(cmd, scene->renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
+        vkCmdDrawIndexed(cmd, 
+                         prim->index_count,
+                         1,
+                         prim->index_offset,
+                         prim->vertex_offset,
+                         0);
+        
+    }
+    /*
     for(u32 i = 0; i < scene->nodes_count ; i ++) {
         u32 mesh_id = scene->nodeid_to_meshid[i];
         
@@ -1662,6 +1664,7 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
                              0);
         }
     }
+*/
     
     vkCmdEndRenderPass(cmd);
     AssertVkResult(vkEndCommandBuffer(cmd));
