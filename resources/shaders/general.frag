@@ -121,7 +121,9 @@ vec3 pbr(Material mat) {
 
     vec3 L = normalize(vec3(0, 0, -1));
     vec3 H = normalize(V + L);
+    H = V;
     float NdotL = max(dot(N, L), 0.0);
+    NdotL = 1;
     float NdotH = max(dot(N, H), 0.0);
     float NdotV = max(dot(N, V), 0.0);
     float HdotV = max(dot(H, V), 0.0);
@@ -140,7 +142,9 @@ vec3 pbr(Material mat) {
     
     //vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
     vec3 rim_light = vec3(0.0);
-
+    
+    //return vec3(G);
+    
     // Main color
     Lo += (diffuse + specular) * radiance * NdotL;
     
@@ -156,11 +160,12 @@ vec3 pbr(Material mat) {
         } 
     //}
     */
-    return Lo;
+    
     vec3 color = Lo;
+    /*
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
-
+    */
     return color;
 }
 
@@ -225,8 +230,8 @@ vec3 pbr2(Material mat) {
 
 void main() {
 	
-	//vec3 color = pbr2(materials.m[material_id]);
-    vec3 color = pbr(materials.m[material_id]);
+	vec3 color = pbr2(materials.m[material_id]);
+     color = pbr(materials.m[material_id]);
         
     out_color = vec4(color, 1.0);
 }

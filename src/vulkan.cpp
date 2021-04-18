@@ -5,13 +5,14 @@
  CRITICAL
  
  MAJOR
-  - IBL
+  - Optimise the draw calls : figure out what we need, put that and only that in a struct for each primitive, go through each. Might need to store the nb of occurences.
 - Shadow Mapping
 
  BACKLOG
  
 
  IMPROVEMENTS
+- IBL
 - Utiliser des Staging buffers
 - Window Resize > Pipline dynamic states ?
  - Handle pipeline caches
@@ -80,19 +81,22 @@ typedef struct Scene {
     u32 total_vertex_count;
     u32 total_index_count;
     
-    u32 meshes_count;
-    
-    u32 *vertex_counts;
-    u32 *index_counts;
-    
-    u32 *vertex_offsets;   
-    u32 *index_offsets;    
-    
     u32 nodes_count;
-    u32 *node_mesh;
+    u32 *nodeid_to_meshid;
+    
+    u32 meshes_count;
+    u32 *meshid_to_first_primitiveid;
+    u32 *mesh_primitives_count;
+    
+    u32 total_primitives_count;
+    u32 *primitive_vertex_counts;
+    u32 *primitive_index_counts;
+    
+    u32 *primitive_vertex_offsets;   
+    u32 *primitive_index_offsets;    
     
     u32 materials_count;
-    u32 *materials;
+    u32 *primitiveid_to_materialid;
     
     u32 textures_count;
     
@@ -1435,65 +1439,69 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     *scene = {};
     
     scene->meshes_count = data->meshes_count;
-    scene->vertex_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
-    scene->index_counts = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    ASSERT(data->meshes_count < UINT_MAX);
     
-    scene->vertex_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
-    scene->index_offsets = (u32 *)calloc(scene->meshes_count, sizeof(u32));
+    scene->total_primitives_count = 0;
+    for(u32 m = 0; m < data->meshes_count; ++m) {
+        scene->total_primitives_count += data->meshes[m].primitives_count;
+    };
     
-    for(u32 i = 0; i < scene->meshes_count; ++i) {
-        if(data->meshes[i].primitives_count > 1) {
-            SDL_LogWarn(0, "This mesh has multiple primitives. This isn't handled yet");
+    scene->meshid_to_first_primitiveid = (u32 *) calloc(scene->meshes_count, sizeof(u32));
+    scene->mesh_primitives_count = (u32 *) calloc(scene->meshes_count, sizeof(u32));
+    
+    scene->primitive_vertex_counts = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
+    scene->primitive_index_counts = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
+    
+    scene->primitive_vertex_offsets = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
+    scene->primitive_index_offsets = (u32 *)calloc(scene->total_primitives_count, sizeof(u32));
+    
+    scene->materials_count = data->materials_count;
+    scene->primitiveid_to_materialid = (u32*) calloc(scene->total_primitives_count, sizeof(u32));
+    
+    u32 i = 0;
+    
+    for(u32 m = 0; m < scene->meshes_count; ++m) {
+        scene->meshid_to_first_primitiveid[m] = i;
+        scene->mesh_primitives_count[m] = (u32)data->meshes[m].primitives_count;
+        for(u32 p = 0; p < data->meshes[m].primitives_count; p++) {
+            cgltf_primitive *prim = &data->meshes[m].primitives[p];
+            
+            scene->primitive_vertex_offsets[i] = scene->total_vertex_count;
+            scene->primitive_vertex_counts[i] = (u32) prim->attributes[0].data->count;
+            scene->total_vertex_count += (u32) prim->attributes[0].data->count;
+            
+            scene->primitive_index_offsets[i] = scene->total_index_count;
+            scene->primitive_index_counts[i] += prim->indices->count;
+            scene->total_index_count += (u32) prim->indices->count;
+            
+            scene->primitiveid_to_materialid[i] = GLTFGetMaterialID(prim->material);
+            ++i;
         }
-        cgltf_primitive *prim = &data->meshes[i].primitives[0];
-        
-        scene->vertex_offsets[i] = scene->total_vertex_count;
-        scene->vertex_counts[i] = (u32) prim->attributes[0].data->count;
-        scene->total_vertex_count += (u32) prim->attributes[0].data->count;;
-        
-        scene->index_offsets[i] = scene->total_index_count;
-        scene->index_counts[i] += prim->indices->count;
-        scene->total_index_count += (u32) prim->indices->count;
     }
     
     scene->vertex_buffer_size = scene->total_vertex_count * sizeof(Vertex);
     scene->index_buffer_size = scene->total_index_count * sizeof(u32);
     
     scene->nodes_count = data->nodes_count;
-    scene->node_mesh = (u32 *)calloc(scene->nodes_count, sizeof(u32));
-    
-    scene->materials_count = data->materials_count;
-    scene->materials = (u32*) calloc(data->nodes_count, sizeof(u32));
+    scene->nodeid_to_meshid = (u32 *)calloc(scene->nodes_count, sizeof(u32));
     
     scene->textures_count = data->textures_count;
     
-    // Meshes
-    if(data->meshes_count >= UINT_MAX) {
-        SDL_LogError(0, "that's way to many meshes!!!");
-        ASSERT(0);
-    }
-    
     for(u32 i = 0; i < scene->nodes_count; ++i) {
-        scene->node_mesh[i] = GLTFGetMeshID(data->nodes[i].mesh);
-        if(data->nodes[i].mesh) {
-            scene->materials[i] = GLTFGetMaterialID(data->nodes[i].mesh->primitives[0].material);
-        }
+        scene->nodeid_to_meshid[i] = GLTFGetMeshID(data->nodes[i].mesh);
     }
     
-    // Vertex Buffer
+    // Vertex & Index Buffer
     CreateBuffer(context->device, &context->memory_properties, scene->vertex_buffer_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->vtx_buffer);
-    DEBUGNameBuffer(context->device, &scene->vtx_buffer, "GLTF VTX");
-    void *mapped_vtx_buffer;
-    MapBuffer(context->device, &scene->vtx_buffer, &mapped_vtx_buffer);
-    GLTFLoadVertexBuffer(data, scene->vertex_offsets, mapped_vtx_buffer);
-    UnmapBuffer(context->device, &scene->vtx_buffer);
-    
-    // Index Buffer
     CreateBuffer(context->device, &context->memory_properties, scene->index_buffer_size,  VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->idx_buffer);
+    DEBUGNameBuffer(context->device, &scene->vtx_buffer, "GLTF VTX");
     DEBUGNameBuffer(context->device, &scene->idx_buffer, "GLTF IDX");
+    void *mapped_vtx_buffer;
     void *mapped_idx_buffer;
+    MapBuffer(context->device, &scene->vtx_buffer, &mapped_vtx_buffer);
     MapBuffer(context->device, &scene->idx_buffer, &mapped_idx_buffer);
-    GLTFLoadIndexBuffer(data, scene->index_offsets, mapped_idx_buffer);
+    GLTFLoadVertexAndIndexBuffer(data, scene->primitive_vertex_offsets, scene->primitive_index_offsets, mapped_vtx_buffer, mapped_idx_buffer);
+    UnmapBuffer(context->device, &scene->vtx_buffer);
     UnmapBuffer(context->device, &scene->idx_buffer);
     
     // Material Buffer
@@ -1512,9 +1520,6 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     scene->textures = (Image *)calloc(data->textures_count, sizeof(Image));
     
     if(data->textures_count > 0) {
-        if(data->textures_count > 1) {
-            //SDL_LogWarn(0, "gltf has %u textures, but we only handle 1", data->textures_count);
-        }
         for(u32 i = 0; i < data->textures_count; ++i) {
             char* image_path = data->textures[i].image->uri;
             u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
@@ -1573,15 +1578,15 @@ void VulkanFreeScene(VulkanContext *context, Scene *scene) {
     }
     free(scene->textures);
     
-    free(scene->materials);
+    free(scene->primitiveid_to_materialid);
     
-    free(scene->vertex_offsets);
-    free(scene->index_offsets);
+    free(scene->primitive_vertex_offsets);
+    free(scene->primitive_index_offsets);
     
-    free(scene->vertex_counts);
-    free(scene->index_counts);
+    free(scene->primitive_vertex_counts);
+    free(scene->primitive_index_counts);
     
-    free(scene->node_mesh);
+    free(scene->nodeid_to_meshid);
     
     DestroyBuffer(context->device, &scene->vtx_buffer);
     DestroyBuffer(context->device, &scene->idx_buffer);
@@ -1639,19 +1644,23 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
     vkCmdBindIndexBuffer(cmd, scene->idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
     
     for(u32 i = 0; i < scene->nodes_count ; i ++) {
-        u32 mesh_id = scene->node_mesh[i];
+        u32 mesh_id = scene->nodeid_to_meshid[i];
         
         if(mesh_id == UINT_MAX) {
             continue;
         }
-        PushConstant push = { scene->transforms[i], scene->materials[i] };
-        vkCmdPushConstants(cmd, scene->renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
-        vkCmdDrawIndexed(cmd, 
-                         scene->index_counts[mesh_id],
-                         1,
-                         scene->index_offsets[mesh_id],
-                         scene->vertex_offsets[mesh_id],
-                         0);
+        const u32 primitive_id = scene->meshid_to_first_primitiveid[mesh_id];
+        const u32 primitive_count = scene->mesh_primitives_count[mesh_id];
+        for(u32 p = primitive_id; p < primitive_count; ++p){
+            PushConstant push = { scene->transforms[i], scene->primitiveid_to_materialid[p] };
+            vkCmdPushConstants(cmd, scene->renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
+            vkCmdDrawIndexed(cmd, 
+                             scene->primitive_index_counts[p],
+                             1,
+                             scene->primitive_index_offsets[p],
+                             scene->primitive_vertex_offsets[p],
+                             0);
+        }
     }
     
     vkCmdEndRenderPass(cmd);

@@ -153,7 +153,7 @@ internal int main(int argc, char *argv[]) {
     GameData game_data = {};
     Scene *scene;
     
-    scene = VulkanLoadScene("resources/models/gltf_samples/WaterBottle/glTF/WaterBottle.gltf", context);
+    scene = VulkanLoadScene("resources/models/gltf_samples/Sponza/glTF/Sponza.gltf", context);
     //VulkanLoadGLTF("resources/models/cube_plane.gltf", context, &game_data.transforms);
     
     game_code.GameStart(&game_data);
@@ -183,6 +183,7 @@ internal int main(int argc, char *argv[]) {
         if(CompareFileTime(&game_code.last_write_time, &game_code_time)){
             Win32UnloadGameCode(&game_code);
             if(Win32LoadGameCode(&game_code)) {
+                game_code.GameStart(&game_data);
                 SDL_Log("Game code successfully reloaded");
             }
         }

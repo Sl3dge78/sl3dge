@@ -100,38 +100,36 @@ inline u32 GLTFGetTextureID(cgltf_texture *texture) {
     return texture->id;
 }
 
-void GLTFLoadVertexBuffer(cgltf_data *data, u32 *vertex_offsets, void *buffer) {
-    
+void GLTFLoadVertexAndIndexBuffer(cgltf_data *data, u32 *vertex_offsets, u32 *index_offsets, void *vtx_buffer, void* idx_buffer) {
+    u32 i = 0;
     for(u32 m = 0; m < data->meshes_count; ++m) {
-        
-        cgltf_primitive *prim = &data->meshes[m].primitives[0];
-        
-        for(u32 a = 0; a < prim->attributes_count ; ++a) {
-            if(prim->attributes[a].type == cgltf_attribute_type_position) {
-                
-                GLTFCopyAccessor(prim->attributes[a].data, buffer, vertex_offsets[m] * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
-                continue;
-            }
+        for(u32 p = 0; p < data->meshes[m].primitives_count; ++p) {
+            cgltf_primitive *prim = &data->meshes[m].primitives[p];
             
-            if(prim->attributes[a].type == cgltf_attribute_type_normal) {
-                GLTFCopyAccessor(prim->attributes[a].data, buffer, vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
-                continue;
+            GLTFCopyAccessor(prim->indices, idx_buffer, index_offsets[i] * sizeof(u32), sizeof(u32));
+            
+            for(u32 a = 0; a < prim->attributes_count ; ++a) {
+                switch(prim->attributes[a].type) {
+                    case cgltf_attribute_type_position : {
+                        GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+                                         vertex_offsets[i] * sizeof(Vertex) +  offsetof(Vertex, pos), sizeof(Vertex));
+                    } break;
+                    
+                    case cgltf_attribute_type_normal: {
+                        GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+                                         vertex_offsets[i] * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
+                    } break;
+                    case cgltf_attribute_type_texcoord: {
+                        GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+                                         vertex_offsets[i] * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
+                    } break;
+                }
             }
-            if(prim->attributes[a].type == cgltf_attribute_type_texcoord) {
-                GLTFCopyAccessor(prim->attributes[a].data, buffer, vertex_offsets[m] * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
-                continue;
-            }
+            ++i;
         }
     }
 }
 
-void GLTFLoadIndexBuffer(cgltf_data *data,  u32 *index_offsets, void *buffer) {
-    
-    for(u32 m = 0; m < data->meshes_count; ++m) {
-        cgltf_primitive *prim = &data->meshes[m].primitives[0];
-        GLTFCopyAccessor(prim->indices, buffer, index_offsets[m] * sizeof(u32), sizeof(u32));
-    }
-}
 
 void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
     
