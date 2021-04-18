@@ -234,6 +234,14 @@ extern "C" {
         cgltf_light_type_spot,
     } cgltf_light_type;
     
+    typedef enum cgltf_texture_type {
+        cgltf_texture_type_base_color,
+        cgltf_texture_type_metallic_roughness,
+        cgltf_texture_type_normal,
+        cgltf_texture_type_occlusion,
+        cgltf_texture_type_emissive,
+    } cgltf_texture_type;
+    
     typedef struct cgltf_extras {
         cgltf_size start_offset;
         cgltf_size end_offset;
@@ -376,6 +384,7 @@ extern "C" {
         cgltf_size extensions_count;
         cgltf_extension* extensions;
         cgltf_uint id;
+        cgltf_texture_type type;
     } cgltf_texture;
     
     typedef struct cgltf_texture_transform
@@ -3420,12 +3429,12 @@ static int cgltf_parse_json_pbr_metallic_roughness(cgltf_options* options, jsmnt
 		{
 			i = cgltf_parse_json_texture_view(options, tokens, i + 1, json_chunk,
                                               &out_pbr->base_color_texture);
-		}
+        }
 		else if (cgltf_json_strcmp(tokens + i, json_chunk, "metallicRoughnessTexture") == 0)
 		{
 			i = cgltf_parse_json_texture_view(options, tokens, i + 1, json_chunk,
                                               &out_pbr->metallic_roughness_texture);
-		}
+        }
 		else if (cgltf_json_strcmp(tokens + i, json_chunk, "extras") == 0)
 		{
 			i = cgltf_parse_json_extras(tokens, i + 1, json_chunk, &out_pbr->extras);
@@ -3947,17 +3956,17 @@ static int cgltf_parse_json_material(cgltf_options* options, jsmntok_t const* to
 		{
 			i = cgltf_parse_json_texture_view(options, tokens, i + 1, json_chunk,
                                               &out_material->normal_texture);
-		}
+        }
 		else if (cgltf_json_strcmp(tokens + i, json_chunk, "occlusionTexture") == 0)
 		{
 			i = cgltf_parse_json_texture_view(options, tokens, i + 1, json_chunk,
                                               &out_material->occlusion_texture);
-		}
+        }
 		else if (cgltf_json_strcmp(tokens + i, json_chunk, "emissiveTexture") == 0)
 		{
 			i = cgltf_parse_json_texture_view(options, tokens, i + 1, json_chunk,
                                               &out_material->emissive_texture);
-		}
+        }
 		else if (cgltf_json_strcmp(tokens + i, json_chunk, "alphaMode") == 0)
 		{
 			++i;
@@ -5869,11 +5878,21 @@ static int cgltf_fixup_pointers(cgltf_data* data)
 	for (cgltf_size i = 0; i < data->materials_count; ++i)
 	{
 		CGLTF_PTRFIXUP(data->materials[i].normal_texture.texture, data->textures, data->textures_count);
+        if(data->materials[i].normal_texture.texture)
+            data->materials[i].normal_texture.texture->type = cgltf_texture_type_normal;
 		CGLTF_PTRFIXUP(data->materials[i].emissive_texture.texture, data->textures, data->textures_count);
+        if(data->materials[i].emissive_texture.texture)
+            data->materials[i].emissive_texture.texture->type = cgltf_texture_type_emissive;
 		CGLTF_PTRFIXUP(data->materials[i].occlusion_texture.texture, data->textures, data->textures_count);
+        if(data->materials[i].occlusion_texture.texture)
+            data->materials[i].occlusion_texture.texture->type = cgltf_texture_type_emissive;
         
 		CGLTF_PTRFIXUP(data->materials[i].pbr_metallic_roughness.base_color_texture.texture, data->textures, data->textures_count);
+        if(data->materials[i].pbr_metallic_roughness.base_color_texture.texture)
+            data->materials[i].pbr_metallic_roughness.base_color_texture.texture->type = cgltf_texture_type_base_color;
 		CGLTF_PTRFIXUP(data->materials[i].pbr_metallic_roughness.metallic_roughness_texture.texture, data->textures, data->textures_count);
+        if(data->materials[i].pbr_metallic_roughness.metallic_roughness_texture.texture)
+            data->materials[i].pbr_metallic_roughness.metallic_roughness_texture.texture->type = cgltf_texture_type_metallic_roughness;
         
 		CGLTF_PTRFIXUP(data->materials[i].pbr_specular_glossiness.diffuse_texture.texture, data->textures, data->textures_count);
 		CGLTF_PTRFIXUP(data->materials[i].pbr_specular_glossiness.specular_glossiness_texture.texture, data->textures, data->textures_count);

@@ -5,11 +5,10 @@
  CRITICAL
  
  MAJOR
-  - Optimise the draw calls : figure out what we need, put that and only that in a struct for each primitive, go through each. Might need to store the nb of occurences.
-- Shadow Mapping
+  - Shadow Mapping
 
  BACKLOG
- 
+ - Mipmaps
 
  IMPROVEMENTS
 - IBL
@@ -103,6 +102,8 @@ typedef struct VulkanContext {
     VkPhysicalDeviceMemoryProperties memory_properties;
     VkPhysicalDeviceProperties physical_device_properties;
     
+    VkSampleCountFlagBits msaa_level;
+    
     VkDevice device;
     u32 graphics_queue_id;
     VkQueue graphics_queue;
@@ -114,10 +115,14 @@ typedef struct VulkanContext {
     VkCommandPool graphics_command_pool;
     
     Swapchain swapchain;
+    
+    VkRenderPass depth_render_pass;
     VkRenderPass render_pass;
     VkSampler texture_sampler;
     VkFramebuffer *framebuffers;
+    
     Image depth_image;
+    Image msaa_image;
     
     Buffer cam_buffer;
     
@@ -336,6 +341,63 @@ internal void CreateImage(const VkDevice device, const VkPhysicalDeviceMemoryPro
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = usage;
+    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_ci.queueFamilyIndexCount = 0;
+    image_ci.pQueueFamilyIndices = 0;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    
+    AssertVkResult(vkCreateImage(device, &image_ci, NULL, &image->image));
+    
+    VkMemoryRequirements requirements = {};
+    vkGetImageMemoryRequirements(device, image->image, &requirements);
+    
+    VkMemoryAllocateFlagsInfo flags_info = {};
+    flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+    flags_info.pNext = NULL;
+    flags_info.flags = 0;
+    flags_info.deviceMask = 0;
+    
+    VkMemoryAllocateInfo alloc_info = {};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.pNext = &flags_info;
+    alloc_info.allocationSize = requirements.size;
+    alloc_info.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
+    AssertVkResult(vkAllocateMemory(device, &alloc_info, NULL, &image->memory));
+    
+    AssertVkResult(vkBindImageMemory(device, image->image, image->memory, 0));
+    
+    VkImageViewCreateInfo image_view_ci = {};
+    image_view_ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    image_view_ci.pNext = NULL;
+    image_view_ci.flags = 0;
+    image_view_ci.image = image->image;
+    image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D ;
+    image_view_ci.format = format;
+    image_view_ci.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
+    if(usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+        image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    else 
+        image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_view_ci.subresourceRange.baseMipLevel = 0;
+    image_view_ci.subresourceRange.levelCount = 1;
+    image_view_ci.subresourceRange.baseArrayLayer = 0;
+    image_view_ci.subresourceRange.layerCount = 1;
+    AssertVkResult(vkCreateImageView(device, &image_view_ci, NULL, &image->image_view));
+}
+
+internal void CreateMultiSampledImage(const VkDevice device, const VkPhysicalDeviceMemoryProperties* memory_properties, const VkFormat format, const VkExtent3D extent, const VkImageUsageFlags usage, const VkMemoryPropertyFlags memory_flags, VkSampleCountFlagBits sample_count, Image *image){
+    VkImageCreateInfo image_ci = {};
+    image_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_ci.pNext = NULL;
+    image_ci.flags = 0;
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = format;
+    image_ci.extent = extent;
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = sample_count;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = usage;
     image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -717,8 +779,21 @@ internal void FillSwapchainCreateInfo(VkPhysicalDevice physical_device, VkSurfac
     vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, NULL);
     VkSurfaceFormatKHR* formats = (VkSurfaceFormatKHR*)calloc(format_count, sizeof(VkSurfaceFormatKHR));
     vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device,surface, &format_count, formats);
-    create_info->imageFormat = formats[0].format; //TODO: Maybe pick a format instead of taking the first one?
-    create_info->imageColorSpace = formats[1].colorSpace;
+    
+    VkSurfaceFormatKHR picked_format = formats[0];
+    for(u32 i = 0; i < format_count; ++i) {
+        if(formats[i].format == VK_FORMAT_B8G8R8A8_SRGB && formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            picked_format = formats[i];
+            SDL_Log("Swapchain format: VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR");
+            break;
+        }
+    }
+    
+    
+    create_info->imageFormat = picked_format.format;
+    create_info->imageColorSpace = picked_format.colorSpace;
+    
+    
     free(formats);
     
     // Extent
@@ -850,7 +925,7 @@ internal void DestroySwapchain(const VulkanContext* context, Swapchain *swapchai
     free(swapchain->render_complete_semaphore);
 }
 
-internal void CreateRenderPass(const VkDevice device, const Swapchain *swapchain, VkRenderPass *render_pass) {
+internal void CreateRenderPass(const VkDevice device, const Swapchain *swapchain, VkSampleCountFlagBits sample_count, VkRenderPass *render_pass) {
     VkRenderPassCreateInfo render_pass_ci = {};
     render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_ci.pNext = NULL;
@@ -859,50 +934,63 @@ internal void CreateRenderPass(const VkDevice device, const Swapchain *swapchain
     VkAttachmentDescription color_attachment = {};
     color_attachment.flags = 0;
     color_attachment.format = swapchain->format;
-    color_attachment.samples = VK_SAMPLE_COUNT_1_BIT ;
+    color_attachment.samples =  sample_count;
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     
     VkAttachmentDescription depth_attachment = {};
     depth_attachment.flags = 0;
     depth_attachment.format = VK_FORMAT_D32_SFLOAT;
-    depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT ;
+    depth_attachment.samples = sample_count;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     
+    VkAttachmentDescription msaa_attachment = {};
+    msaa_attachment.flags = 0;
+    msaa_attachment.format = swapchain->format;
+    msaa_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    msaa_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    msaa_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    msaa_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    msaa_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    msaa_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    msaa_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    
     VkAttachmentDescription attachments[] = {
         color_attachment,
-        depth_attachment
+        depth_attachment,
+        msaa_attachment
     };
     
-    render_pass_ci.attachmentCount = 2;
+    render_pass_ci.attachmentCount = 3;
     render_pass_ci.pAttachments = attachments;
     
-    VkSubpassDescription subpss_desc = {};
-    subpss_desc.flags = 0;
-    subpss_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpss_desc.inputAttachmentCount = 0;
-    subpss_desc.pInputAttachments = NULL;
+    VkSubpassDescription subpass_desc = {};
+    subpass_desc.flags = 0;
+    subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass_desc.inputAttachmentCount = 0;
+    subpass_desc.pInputAttachments = NULL;
     
     VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
     VkAttachmentReference depth_ref = {1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-    subpss_desc.colorAttachmentCount = 1;
-    subpss_desc.pColorAttachments = &color_ref;
-    subpss_desc.pResolveAttachments = NULL;
-    subpss_desc.pDepthStencilAttachment = &depth_ref;
-    subpss_desc.preserveAttachmentCount = 0;
-    subpss_desc.pPreserveAttachments = NULL;
+    VkAttachmentReference resolve_ref = {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    subpass_desc.colorAttachmentCount = 1;
+    subpass_desc.pColorAttachments = &color_ref;
+    subpass_desc.pResolveAttachments = &resolve_ref;
+    subpass_desc.pDepthStencilAttachment = &depth_ref;
+    subpass_desc.preserveAttachmentCount = 0;
+    subpass_desc.pPreserveAttachments = NULL;
     
     render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpss_desc;
+    render_pass_ci.pSubpasses = &subpass_desc;
     render_pass_ci.dependencyCount = 0;
     render_pass_ci.pDependencies = NULL;
     
@@ -918,6 +1006,22 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     // Get device properties
     vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
     vkGetPhysicalDeviceProperties(context->physical_device, &context->physical_device_properties);
+    
+    // MSAA
+    VkSampleCountFlags msaa_levels = context->physical_device_properties.limits.framebufferColorSampleCounts & context->physical_device_properties.limits.framebufferDepthSampleCounts;
+    if(msaa_levels & VK_SAMPLE_COUNT_8_BIT) {
+        context->msaa_level = VK_SAMPLE_COUNT_8_BIT;
+        SDL_Log("VK_SAMPLE_COUNT_8_BIT");
+    }else if(msaa_levels & VK_SAMPLE_COUNT_4_BIT) {
+        context->msaa_level = VK_SAMPLE_COUNT_4_BIT;
+        SDL_Log("VK_SAMPLE_COUNT_4_BIT");
+    }else if(msaa_levels & VK_SAMPLE_COUNT_2_BIT) {
+        context->msaa_level = VK_SAMPLE_COUNT_2_BIT;
+        SDL_Log("VK_SAMPLE_COUNT_2_BIT");
+    } else {
+        context->msaa_level = VK_SAMPLE_COUNT_1_BIT;
+        SDL_Log("VK_SAMPLE_COUNT_1_BIT");
+    }
     
     GetQueuesId(context);
     CreateVkDevice(context->physical_device, context->graphics_queue_id, context->transfer_queue_id,context->present_queue_id, &context->device);
@@ -949,8 +1053,8 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     sampler_ci.pNext = NULL;
     sampler_ci.flags = 0;
-    sampler_ci.magFilter = VK_FILTER_NEAREST;
-    sampler_ci.minFilter = VK_FILTER_NEAREST;
+    sampler_ci.magFilter = VK_FILTER_LINEAR;
+    sampler_ci.minFilter = VK_FILTER_LINEAR;
     sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
     sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -967,8 +1071,11 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     AssertVkResult(vkCreateSampler(context->device, &sampler_ci, NULL, &context->texture_sampler));
     
     // Depth image
-    CreateImage(context->device, &context->memory_properties, VK_FORMAT_D32_SFLOAT, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &context->depth_image);
-    CreateRenderPass(context->device, &context->swapchain, &context->render_pass);
+    CreateMultiSampledImage(context->device, &context->memory_properties, VK_FORMAT_D32_SFLOAT, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, context->msaa_level, &context->depth_image);
+    // MSAA Image
+    CreateMultiSampledImage(context->device, &context->memory_properties, context->swapchain.format, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, context->msaa_level, &context->msaa_image);
+    
+    CreateRenderPass(context->device, &context->swapchain, context->msaa_level, &context->render_pass);
     // Framebuffers
     context->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
@@ -978,11 +1085,12 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
         create_info.pNext = NULL;
         create_info.flags = 0;
         create_info.renderPass = context->render_pass;
-        create_info.attachmentCount = 2;
+        create_info.attachmentCount = 3;
         
         VkImageView attachments[] = {
+            context->msaa_image.image_view,
+            context->depth_image.image_view,
             context->swapchain.image_views[i],
-            context->depth_image.image_view
         };
         
         create_info.pAttachments = attachments;
@@ -1006,6 +1114,7 @@ void VulkanDestroyContext(VulkanContext *context){
     free(context->framebuffers);
     
     DestroyImage(context->device, &context->depth_image);
+    DestroyImage(context->device, &context->msaa_image);
     
     vkDestroyRenderPass(context->device, context->render_pass, NULL);
     
@@ -1152,7 +1261,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
 }
 
-internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkRenderPass render_pass, VkPipeline *pipeline) {
+internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkRenderPass render_pass, VkSampleCountFlagBits sample_count, VkPipeline *pipeline) {
     
     VkGraphicsPipelineCreateInfo pipeline_ci = {};
     pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1251,7 +1360,7 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisample_state.pNext = NULL;
     multisample_state.flags = 0;
-    multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisample_state.rasterizationSamples = sample_count;
     multisample_state.sampleShadingEnable = VK_FALSE;
     multisample_state.minSampleShading = 0.f;
     multisample_state.pSampleMask = 0;
@@ -1321,7 +1430,7 @@ VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, Scene *scene_info) 
     VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
     
     CreatePipelineLayout(context->device, renderer, scene_info->textures_count);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, context->render_pass, &renderer->pipeline);
+    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, context->render_pass, context->msaa_level, &renderer->pipeline);
     
     return renderer;
 }
@@ -1332,7 +1441,7 @@ void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
 
 void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
     vkDestroyPipeline(context->device, scene->renderer->pipeline, NULL);
-    CreateRasterPipeline(context->device, scene->renderer->layout, &context->swapchain, context->render_pass, &scene->renderer->pipeline);
+    CreateRasterPipeline(context->device, scene->renderer->layout, &context->swapchain, context->render_pass,context->msaa_level, &scene->renderer->pipeline);
 }
 
 void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
@@ -1527,7 +1636,11 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
             VkDeviceSize image_size = surfaces[i]->h * surfaces[i]->pitch;
             VkExtent3D extent = {(u32)surfaces[i]->h, (u32)surfaces[i]->w, 1};
             
-            CreateImage(context->device, &context->memory_properties, VK_FORMAT_R8G8B8A8_UNORM, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scene->textures[i]);
+            VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+            if(data->textures[i].type == cgltf_texture_type_base_color)
+                format = VK_FORMAT_R8G8B8A8_SRGB;
+            
+            CreateImage(context->device, &context->memory_properties, format, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scene->textures[i]);
             DEBUGNameImage(context->device, &scene->textures[i], data->textures[i].image->uri);
             CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffers[i]); 
             SDL_LockSurface(surfaces[i]);
@@ -1589,6 +1702,23 @@ void VulkanFreeScene(VulkanContext *context, Scene *scene) {
 //
 // ================
 
+void BeginRenderPass(VkCommandBuffer cmd, VkFramebuffer framebuffer, VkRenderPass render_pass, Swapchain *swapchain) {
+    VkRenderPassBeginInfo renderpass_begin = {};
+    renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderpass_begin.pNext = 0;
+    renderpass_begin.renderPass = render_pass;
+    renderpass_begin.framebuffer = framebuffer;
+    renderpass_begin.renderArea = {{0,0}, swapchain->extent};
+    
+    VkClearValue clear_values[2] = {};
+    clear_values[0].color = {0.2f, 0.2f, 0.2f, 0.0f};
+    clear_values[1].depthStencil = {1.0f, 0};
+    renderpass_begin.clearValueCount = 2;
+    renderpass_begin.pClearValues = clear_values;
+    
+    vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE );
+}
+
 void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
     
     u32 image_id;
@@ -1608,20 +1738,7 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
     const VkCommandBufferBeginInfo begin_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL, 0, NULL };
     AssertVkResult(vkBeginCommandBuffer(cmd, &begin_info));
     
-    VkRenderPassBeginInfo renderpass_begin = {};
-    renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderpass_begin.pNext = 0;
-    renderpass_begin.renderPass = context->render_pass;
-    renderpass_begin.framebuffer = context->framebuffers[image_id];
-    renderpass_begin.renderArea = {{0,0}, swapchain->extent};
-    
-    VkClearValue clear_values[2] = {};
-    clear_values[0].color = {0.2f, 0.2f, 0.2f, 0.0f};
-    clear_values[1].depthStencil = {1.0f, 0};
-    renderpass_begin.clearValueCount = 2;
-    renderpass_begin.pClearValues = clear_values;
-    
-    vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE );
+    BeginRenderPass(cmd, context->framebuffers[image_id], context->render_pass, swapchain);
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->layout, 0, 1, scene->renderer->descriptor_sets, 0, NULL);
