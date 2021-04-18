@@ -27,6 +27,10 @@ u32 aligned_size(const u32 value, const u32 alignment) {
     return (value + alignment - 1) & ~(alignment - 1);
 }
 
+inline float radians(const float angle) {
+    return angle / 180.f * PI;
+}
+
 typedef struct vec2 {
     alignas(4) float x;
     alignas(4) float y;
@@ -200,14 +204,14 @@ mat4 mat4_perspective(const float fov, const float aspect_ratio, const float nea
     
     mat4 result = {};
     
-    const float tan_theta_2 = tan(PI/4.0f);
+    const float tan_theta_2 = tan(radians(fov) * 0.5f);
     
     result.m[0][0] = 1.0f / (aspect_ratio * tan_theta_2);
     result.m[1][1] = -1.0f / tan_theta_2;
-    result.m[2][2] = (far) / (near - far);
+    result.m[2][2] = far / (near - far);
     result.m[2][3] = -1.0f;
-    result.m[3][2] = -(near * far) / (far - near);
-    result.m[3][3] = 1.0f;
+    result.m[3][2] = (near * far) / (near - far);
+    result.m[3][3] = 0.0f;
     
     return result;
 }

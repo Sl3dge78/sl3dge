@@ -17,9 +17,9 @@
 
 extern "C" __declspec(dllexport) GAME_START(GameStart) {
     
-    game_data->spherical_coordinates = { -PI/2.0f, PI/2.0f };
-    game_data->position = { 1.5f, 0.0f, 2.0f };
-    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 10000.0f);
+    //game_data->spherical_coordinates = { -PI/2.0f, PI/2.0f };
+    //game_data->position = { 1.5f, 0.0f, 2.0f };
+    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 50.0f);
     //game_data->matrices.view = mat4_identity();
 }
 
