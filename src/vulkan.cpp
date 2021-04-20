@@ -61,13 +61,10 @@ typedef struct VulkanRenderer {
     VkPipelineLayout layout;
     VkDescriptorPool descriptor_pool;
     
-    VkDescriptorSet descriptor_sets[2];
+    VkDescriptorSetLayout set_layout;
+    VkDescriptorSet descriptor_set;
     u32 descriptor_set_count;
-    
     u32 push_constant_size;
-    
-    VkDescriptorSetLayout app_set_layout;
-    VkDescriptorSetLayout game_set_layout;
     
 } VulkanRenderer;
 
@@ -1173,28 +1170,15 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
             NULL
         }
     };
-    const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
-    
-    /*
-    VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags = {};
-    binding_flags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-    binding_flags.pNext = NULL;
-    binding_flags.bindingCount = game_descriptor_count;
-    VkDescriptorBindingFlags flags[] = {
-        0,
-        0,
-        VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
-    };
-    binding_flags.pBindingFlags = flags;
-    */
+    const u32 descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
     
     VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
     game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     game_set_create_info.pNext = NULL;
     game_set_create_info.flags = 0;
-    game_set_create_info.bindingCount = game_descriptor_count;
+    game_set_create_info.bindingCount = descriptor_count;
     game_set_create_info.pBindings = game_bindings;
-    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->game_set_layout));
+    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->set_layout));
     
     // Descriptor Pool
     // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
@@ -1206,7 +1190,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
     
     //Game
-    for(u32 d = 0; d < game_descriptor_count; d++) {
+    for(u32 d = 0; d < descriptor_count; d++) {
         for(u32 i = 0; i < pool_sizes_count ; i ++){
             if(game_bindings[d].descriptorType == pool_sizes[i].type) {
                 pool_sizes[i].descriptorCount ++;
@@ -1224,23 +1208,13 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
     
     // Descriptor Set
-    /*
-    VkDescriptorSetVariableDescriptorCountAllocateInfo variable_desc = {};
-    variable_desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
-    variable_desc.pNext = NULL;
-    variable_desc.descriptorSetCount = 1;
-    u32 descriptor_counts = textures_count;
-    variable_desc.pDescriptorCounts = &descriptor_counts;
-    */
-    
-    VkDescriptorSetLayout set_layouts[1] = {renderer->game_set_layout};
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
     allocate_info.descriptorPool = renderer->descriptor_pool;
     allocate_info.descriptorSetCount = renderer->descriptor_set_count;
-    allocate_info.pSetLayouts = set_layouts;
-    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, renderer->descriptor_sets));
+    allocate_info.pSetLayouts = &renderer->set_layout;
+    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, &renderer->descriptor_set));
     
     // Push constants
     // TODO(Guigui): Currently limited to 1 PC
@@ -1254,7 +1228,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     create_info.pNext = NULL;
     create_info.flags = 0;
     create_info.setLayoutCount = renderer->descriptor_set_count;
-    create_info.pSetLayouts = set_layouts;
+    create_info.pSetLayouts = &renderer->set_layout;
     create_info.pushConstantRangeCount = push_constant_count;
     create_info.pPushConstantRanges = &push_constant_range;
     
@@ -1446,10 +1420,10 @@ void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
 
 void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     
-    vkFreeDescriptorSets(context->device, renderer->descriptor_pool, 1, renderer->descriptor_sets);
+    vkFreeDescriptorSets(context->device, renderer->descriptor_pool, renderer->descriptor_set_count, &renderer->descriptor_set);
     vkDestroyDescriptorPool(context->device, renderer->descriptor_pool, NULL);
     
-    vkDestroyDescriptorSetLayout(context->device, renderer->game_set_layout, NULL);
+    vkDestroyDescriptorSetLayout(context->device, renderer->set_layout, NULL);
     vkDestroyPipelineLayout(context->device, renderer->layout, NULL);
     vkDestroyPipeline(context->device, renderer->pipeline, NULL);
     
@@ -1463,10 +1437,10 @@ internal void VulkanWriteDescriptorSets(VulkanContext *context, Scene *scene) {
     
     VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
     static_writes[0] = 
-    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_sets[0], 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
+    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_set, 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
     
     VkDescriptorBufferInfo materials = { scene->mat_buffer.buffer, 0, VK_WHOLE_SIZE };
-    static_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_sets[0], 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
+    static_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_set, 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
     
     vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
     
@@ -1489,7 +1463,7 @@ internal void VulkanWriteDescriptorSets(VulkanContext *context, Scene *scene) {
         VkWriteDescriptorSet textures_buffer = {};
         textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         textures_buffer.pNext = NULL;
-        textures_buffer.dstSet = scene->renderer->descriptor_sets[0];
+        textures_buffer.dstSet = scene->renderer->descriptor_set;
         textures_buffer.dstBinding = 2;
         textures_buffer.dstArrayElement = 0;
         textures_buffer.descriptorCount = nb_info;
@@ -1741,7 +1715,7 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
     BeginRenderPass(cmd, context->framebuffers[image_id], context->render_pass, swapchain);
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->pipeline);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->layout, 0, 1, scene->renderer->descriptor_sets, 0, NULL);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->layout, 0, 1, &scene->renderer->descriptor_set, 0, NULL);
     
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cmd, 0, 1, &scene->vtx_buffer.buffer, &offset);
