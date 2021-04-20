@@ -58,12 +58,14 @@ typedef struct Swapchain {
 
 typedef struct VulkanLayout {
     VkPipelineLayout layout;
-    VkDescriptorPool descriptor_pool;
     
     VkDescriptorSetLayout set_layout;
-    VkDescriptorSet descriptor_set;
+    
     u32 descriptor_set_count;
+    VkDescriptorSet descriptor_set;
+    
     u32 push_constant_size;
+    
 } VulkanLayout;
 
 typedef struct Scene {
@@ -109,6 +111,7 @@ typedef struct VulkanContext {
     VkQueue present_queue;
     
     VkCommandPool graphics_command_pool;
+    VkDescriptorPool descriptor_pool;
     
     Swapchain swapchain;
     
@@ -121,6 +124,9 @@ typedef struct VulkanContext {
     Image msaa_image;
     
     Buffer cam_buffer;
+    
+    VulkanLayout shadow_map_layout;
+    VkPipeline shadow_map_pipeline;
     
 } VulkanContext;
 
@@ -993,6 +999,12 @@ internal void CreateRenderPass(const VkDevice device, const Swapchain *swapchain
     AssertVkResult(vkCreateRenderPass(device, &render_pass_ci, NULL, render_pass));
 }
 
+internal void CreateShadowMapLayout() {
+    
+    
+    
+}
+
 VulkanContext* VulkanCreateContext(SDL_Window* window){
     VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
     CreateVkInstance(window, &context->instance);
@@ -1070,8 +1082,8 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     CreateMultiSampledImage(context->device, &context->memory_properties, VK_FORMAT_D32_SFLOAT, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, context->msaa_level, &context->depth_image);
     // MSAA Image
     CreateMultiSampledImage(context->device, &context->memory_properties, context->swapchain.format, { context->swapchain.extent.width, context->swapchain.extent.height, 1}, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, context->msaa_level, &context->msaa_image);
-    
     CreateRenderPass(context->device, &context->swapchain, context->msaa_level, &context->render_pass);
+    
     // Framebuffers
     context->framebuffers = (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
@@ -1096,12 +1108,35 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
         AssertVkResult(vkCreateFramebuffer(context->device, &create_info, NULL, &context->framebuffers[i]));
     }
     
+    // Descriptor Pool
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+    };
+    const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
+    
+    VkDescriptorPoolCreateInfo pool_ci = {};
+    pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_ci.pNext = NULL;
+    pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_ci.maxSets = 2;
+    pool_ci.poolSizeCount = pool_sizes_count;
+    pool_ci.pPoolSizes = pool_sizes;
+    AssertVkResult(vkCreateDescriptorPool(context->device, &pool_ci, NULL, &context->descriptor_pool));
+    
+    // ShadowMap pipe
+    
+    
+    
     return context;
 }
 
 void VulkanDestroyContext(VulkanContext *context){
     
     vkDeviceWaitIdle(context->device);
+    
+    vkDestroyDescriptorPool(context->device, context->descriptor_pool, NULL);
     
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         
@@ -1137,10 +1172,10 @@ void VulkanDestroyContext(VulkanContext *context){
 //
 // ===============
 
-internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayout *pipeline) {
+internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayout *layout) {
     
     // Set Layout
-    pipeline->descriptor_set_count = 1;
+    layout->descriptor_set_count = 1;
     
     const VkDescriptorSetLayoutBinding bindings[] = {
         { // CAMERA MATRICES
@@ -1173,63 +1208,35 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
     game_set_create_info.flags = 0;
     game_set_create_info.bindingCount = descriptor_count;
     game_set_create_info.pBindings = bindings;
-    AssertVkResult(vkCreateDescriptorSetLayout(context->device, &game_set_create_info, NULL, &pipeline->set_layout));
-    
-    // Descriptor Pool
-    // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
-    VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0},
-    };
-    const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
-    
-    //Game
-    for(u32 d = 0; d < descriptor_count; d++) {
-        for(u32 i = 0; i < pool_sizes_count ; i ++){
-            if(bindings[d].descriptorType == pool_sizes[i].type) {
-                pool_sizes[i].descriptorCount ++;
-            }
-        }
-    }
-    
-    VkDescriptorPoolCreateInfo pool_ci = {};
-    pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_ci.pNext = NULL;
-    pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_ci.maxSets = pipeline->descriptor_set_count;
-    pool_ci.poolSizeCount = pool_sizes_count;
-    pool_ci.pPoolSizes = pool_sizes;
-    AssertVkResult(vkCreateDescriptorPool(context->device, &pool_ci, NULL, &pipeline->descriptor_pool));
+    AssertVkResult(vkCreateDescriptorSetLayout(context->device, &game_set_create_info, NULL, &layout->set_layout));
     
     // Descriptor Set
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
-    allocate_info.descriptorPool = pipeline->descriptor_pool;
-    allocate_info.descriptorSetCount = pipeline->descriptor_set_count;
-    allocate_info.pSetLayouts = &pipeline->set_layout;
-    AssertVkResult(vkAllocateDescriptorSets(context->device, &allocate_info, &pipeline->descriptor_set));
+    allocate_info.descriptorPool = context->descriptor_pool;
+    allocate_info.descriptorSetCount = layout->descriptor_set_count;
+    allocate_info.pSetLayouts = &layout->set_layout;
+    AssertVkResult(vkAllocateDescriptorSets(context->device, &allocate_info, &layout->descriptor_set));
     
     // Push constants
     VkPushConstantRange push_constant_range = 
     { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
     const u32 push_constant_count = 1;
-    pipeline->push_constant_size = push_constant_range.size;
+    layout->push_constant_size = push_constant_range.size;
     
     VkPipelineLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.flags = 0;
-    create_info.setLayoutCount = pipeline->descriptor_set_count;
-    create_info.pSetLayouts = &pipeline->set_layout;
+    create_info.setLayoutCount = layout->descriptor_set_count;
+    create_info.pSetLayouts = &layout->set_layout;
     create_info.pushConstantRangeCount = push_constant_count;
     create_info.pPushConstantRanges = &push_constant_range;
     
-    AssertVkResult(vkCreatePipelineLayout(context->device, &create_info, NULL, &pipeline->layout));
+    AssertVkResult(vkCreatePipelineLayout(context->device, &create_info, NULL, &layout->layout));
     
-    
-    
+    // Writes
     const u32 static_writes_count = 2;
     VkWriteDescriptorSet static_writes[static_writes_count];
     
@@ -1237,7 +1244,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
     
     static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[0].pNext = NULL;
-    static_writes[0].dstSet = pipeline->descriptor_set;
+    static_writes[0].dstSet = layout->descriptor_set;
     static_writes[0].dstBinding = 0;
     static_writes[0].dstArrayElement = 0;
     static_writes[0].descriptorCount = 1;
@@ -1250,7 +1257,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
     
     static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[1].pNext = NULL;
-    static_writes[1].dstSet = pipeline->descriptor_set;
+    static_writes[1].dstSet = layout->descriptor_set;
     static_writes[1].dstBinding = 1;
     static_writes[1].dstArrayElement = 0;
     static_writes[1].descriptorCount = 1;
@@ -1280,7 +1287,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
         VkWriteDescriptorSet textures_buffer = {};
         textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         textures_buffer.pNext = NULL;
-        textures_buffer.dstSet = pipeline->descriptor_set;
+        textures_buffer.dstSet = layout->descriptor_set;
         textures_buffer.dstBinding = 2;
         textures_buffer.dstArrayElement = 0;
         textures_buffer.descriptorCount = nb_info;
@@ -1460,10 +1467,9 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vkDestroyShaderModule(device, pipeline_ci.pStages[1].module, NULL);
 }
 
-void DestroyLayout(VkDevice device, VulkanLayout *pipeline) {
+void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout *pipeline) {
     
-    vkFreeDescriptorSets(device, pipeline->descriptor_pool, pipeline->descriptor_set_count, &pipeline->descriptor_set);
-    vkDestroyDescriptorPool(device, pipeline->descriptor_pool, NULL);
+    vkFreeDescriptorSets(device, pool, pipeline->descriptor_set_count, &pipeline->descriptor_set);
     
     vkDestroyDescriptorSetLayout(device, pipeline->set_layout, NULL);
     vkDestroyPipelineLayout(device, pipeline->layout, NULL);
@@ -1472,8 +1478,6 @@ void DestroyLayout(VkDevice device, VulkanLayout *pipeline) {
 void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
     UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 }
-
-
 
 Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     double start = SDL_GetPerformanceCounter();
@@ -1649,7 +1653,7 @@ void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
 
 void VulkanFreeScene(VulkanContext *context, Scene *scene) {
     
-    DestroyLayout(context->device, &scene->layout);
+    DestroyLayout(context->device, context->descriptor_pool, &scene->layout);
     
     vkDestroyPipeline(context->device, scene->pipeline, NULL);
     
