@@ -20,6 +20,7 @@ typedef int32_t i32;
 typedef struct CameraMatrices {
     alignas(16) mat4 proj;
     alignas(16) mat4 view;
+    alignas(16) mat4 shadow_mvp;
     alignas(16) vec3 pos;
     alignas(16) vec3 view_dir;
 } CameraMatrices;

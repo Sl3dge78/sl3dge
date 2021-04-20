@@ -7,6 +7,7 @@ layout (location = 2) in vec2 in_texcoord;
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
 	mat4 view;
+	mat4 shadow_mvp;
 	vec3 pos;
 	vec3 view_dir;
 } cam;
@@ -16,20 +17,29 @@ layout(location = 1) out vec3 normal;
 layout(location = 2) out vec2 texcoord;
 layout(location = 3) out vec3 cam_pos;
 layout(location = 4) out uint material_id;
+layout(location = 5) out vec4 shadow_map_texcoord;
 
 layout(push_constant) uniform PushConstants {
 	mat4 transform;
 	uint material_id;
 } constants;
 
+const mat4 bias = mat4 (
+0.5,0.0,0.0,0.0,
+0.0,0.5,0.0,0.0,
+0.0,0.0,1.0,0.0,
+0.5,0.5,0.0,1.0 );
+
 void main() {
 	
 	vec4 pos = constants.transform * vec4(in_position, 1.0);
 	
 	gl_Position = cam.proj * cam.view * pos;
+	//gl_Position = cam.proj * cam.shadow_mvp * constants.transform * vec4(in_position, 1.0);
 	worldpos = pos.xyz;
 	normal = normalize(transpose(inverse(mat3(constants.transform))) * in_normal);
 	texcoord = in_texcoord;
 	cam_pos = cam.pos;
 	material_id = constants.material_id;
+	shadow_map_texcoord = (cam.proj * cam.shadow_mvp) * pos;
 }

@@ -9,8 +9,6 @@
 
  BACKLOG
 
- - mat4 lookat
-
  IMPROVEMENTS
 
 - quaternions
@@ -146,7 +144,7 @@ void mat4_print(const mat4* mat) {
 }
 
 mat4 mat4_mul(const mat4* a, const mat4* b) {
-    
+    SDL_LogError(0,"mat4 mul is bugged");
     mat4 result = {};
     result.m[0][0] = a->m[0][0] * b->m[0][0] + a->m[0][1] * b->m[1][0] + a->m[0][2] * b->m[2][0] + a->m[0][3] * b->m[3][0];
     result.m[0][1] = a->m[0][0] * b->m[0][1] + a->m[0][1] * b->m[1][1] + a->m[0][2] * b->m[2][1] + a->m[0][3] * b->m[3][1];
@@ -287,22 +285,22 @@ mat4 mat4_look_at(vec3 target, vec3 eye, vec3 up) {
     mat.m[0][0] = x_axis.x;
     mat.m[0][1] = y_axis.x;
     mat.m[0][2] = z_axis.x;
-    mat.m[0][3] = 0;
+    mat.m[0][3] = 0.0f;
     
     mat.m[1][0] = x_axis.y;
     mat.m[1][1] = y_axis.y;
     mat.m[1][2] = z_axis.y;
-    mat.m[1][3] = 0;
+    mat.m[1][3] = 0.0f;
     
     mat.m[2][0] = x_axis.z;
     mat.m[2][1] = y_axis.z;
     mat.m[2][2] = z_axis.z;
-    mat.m[2][3] = 0;
+    mat.m[2][3] = 0.0f;
     
     mat.m[3][0] = -vec3_dot(x_axis, eye);
     mat.m[3][1] = -vec3_dot(y_axis, eye);
     mat.m[3][2] = -vec3_dot(z_axis, eye);
-    mat.m[3][3] = 1;
+    mat.m[3][3] = 1.0f;
     
     return mat;
 }

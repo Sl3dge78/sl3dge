@@ -17,10 +17,15 @@
 
 extern "C" __declspec(dllexport) GAME_START(GameStart) {
     
-    game_data->spherical_coordinates = {0.0f, 0.0f };
-    game_data->position = { 1.5f, 0.0f, 2.0f };
+    //game_data->spherical_coordinates = {0.0f, 0.0f };
+    //game_data->position = { 1.5f, 0.0f, 2.0f };
     game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 50.0f);
-    //game_data->matrices.view = mat4_identity();
+    /*
+    mat4 p = mat4_perspective(90.0f, 1.0f, 0.01f, 5000.0f);
+    mat4 v = mat4_look_at({0.0f, 0.0f, 0.0f}, {1000.0f, 2000.0f, 0.0f}, {0.0f,1.0f,0.0f});
+    game_data->matrices.shadow_mvp = mat4_mul(&p,&v);
+*/
+    game_data->matrices.shadow_mvp = mat4_look_at({0.0f, 0.0f, 0.0f}, {10.0f, 20.0f, 0.0f}, {0.0f,1.0f,0.0f});
 }
 
 extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {

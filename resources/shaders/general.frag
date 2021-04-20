@@ -25,13 +25,16 @@ layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec2 in_texcoord;
 layout(location = 3) in vec3 in_cam_pos;
 layout(location = 4) flat in uint material_id;
+layout(location = 5) in vec4 in_shadow_map_texcoord;
 
 layout(location = 0) out vec4 out_color;
 
 layout(binding = 1) buffer Materials { Material m[]; } materials;
 layout(binding = 2) uniform sampler2D textures[];
+layout(binding = 3) uniform sampler2D shadow_map;
 
-vec3 light_dir = normalize(vec3(1, 1, -1));
+vec3 light_dir = normalize(vec3(0.5, 1, 0));
+vec3 light_pos = vec3(10, 20, 0);
 
 vec3 get_base_color(Material mat) {
 
@@ -213,10 +216,43 @@ vec3 pbr2(Material mat) {
     return color;
 }
 
+float bias = 0.000001;
+
+float get_shadow() {
+    float shadow = 1.0;
+    vec4 proj_coords = in_shadow_map_texcoord / in_shadow_map_texcoord.w;
+    float current_depth = proj_coords.z;
+    proj_coords = proj_coords * 0.5 + 0.5;
+    
+    if(1 == 0) {
+        float closest_depth = texture(shadow_map, proj_coords.xy).r;
+        shadow = closest_depth > current_depth - bias ? 1.0 : 0.1;        
+    } else {
+        shadow = 0.0;
+        vec2 tex_dim = 1.0 / textureSize(shadow_map, 0);
+        
+        float scale = 1.0;
+        //tex_dim = tex_dim / scale;
+       
+        int samples = int(scale);
+        int count = 0;
+
+        for(int x = -samples; x <= samples; ++x) {
+            for(int y = -samples; y <= samples; ++y) {
+                float closest_depth = texture(shadow_map, proj_coords.xy + vec2(x, y) * tex_dim).r; 
+                shadow += closest_depth > current_depth - bias ? 1.0 : 0.1;        
+                count ++;
+            }    
+        }
+        shadow /= count;
+    }
+    return shadow;
+}
+
 vec3 custom(Material mat) {
 
     vec3 N = get_normal(mat);
-    vec3 L = normalize(light_dir);
+    vec3 L = normalize(light_pos - in_worldpos);
     float NdotL = max(dot(N, L), 0.0);
 
     const int steps = 4;
@@ -227,12 +263,12 @@ vec3 custom(Material mat) {
     intensity = pow(intensity, factor);
 
     vec3 diffuse = mat.base_color;
-    float pixel_size = 32;
+    float pixel_size = 1024;
     if(mat.base_color_texture < UINT_MAX) {
         vec2 pos = floor(in_texcoord * pixel_size) / pixel_size;
-        diffuse *= texture(textures[mat.base_color_texture], pos).rgb;
+        diffuse = texture(textures[mat.base_color_texture], pos).rgb;
     }      
-    
+    diffuse *= NdotL * 0.5 + 0.5;
     return diffuse;
 }
 
@@ -240,9 +276,19 @@ void main() {
 	
     Material mat = materials.m[material_id];
 
-	vec3 color = pbr2(mat);
-    color = pbr(mat);
-    color = custom(mat);
+	//vec3 color = pbr2(mat);
+    //vec3 color = pbr(mat);
+    vec3 color = custom(mat);
+
     
+    
+    /*
+    color = vec3(pow(current_depth, 16));
+    color = vec3(pow(closest_depth, 16));
+    color = vec3(shadow);
+    */
+
+    color *= get_shadow();
+
     out_color = vec4(color, 1.0);
 }
