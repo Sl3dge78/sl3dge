@@ -9,13 +9,12 @@ layout (binding = 0) uniform CameraMatrices {
 	mat4 view;
 	mat4 shadow_mvp;
 	vec3 pos;
-	vec3 view_dir;
+	vec3 light_pos;
 } cam;
 
 layout(location = 0) out vec3 worldpos;
 layout(location = 1) out vec3 normal;
 layout(location = 2) out vec2 texcoord;
-layout(location = 3) out vec3 cam_pos;
 layout(location = 4) out uint material_id;
 layout(location = 5) out vec4 shadow_map_texcoord;
 
@@ -39,7 +38,6 @@ void main() {
 	worldpos = pos.xyz;
 	normal = normalize(transpose(inverse(mat3(constants.transform))) * in_normal);
 	texcoord = in_texcoord;
-	cam_pos = cam.pos;
 	material_id = constants.material_id;
 	shadow_map_texcoord = (cam.proj * cam.shadow_mvp) * pos;
 }

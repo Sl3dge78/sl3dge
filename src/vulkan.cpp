@@ -1155,7 +1155,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
             0,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             1,
-            VK_SHADER_STAGE_VERTEX_BIT,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             NULL
         },
         {  // MATERIALS
@@ -1674,7 +1674,7 @@ void BeginRenderPass(VkCommandBuffer cmd, VkFramebuffer framebuffer, VkRenderPas
     renderpass_begin.renderArea = {{0,0}, extent};
     
     VkClearValue clear_values[2] = {};
-    clear_values[0].color = {0.2f, 0.2f, 0.2f, 0.0f};
+    clear_values[0].color = {0.53f, 0.80f, 0.92f, 0.0f};
     clear_values[1].depthStencil = {1.0f, 0};
     renderpass_begin.clearValueCount = 2;
     renderpass_begin.pClearValues = clear_values;

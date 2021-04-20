@@ -22,13 +22,15 @@ typedef struct CameraMatrices {
     alignas(16) mat4 view;
     alignas(16) mat4 shadow_mvp;
     alignas(16) vec3 pos;
-    alignas(16) vec3 view_dir;
+    alignas(16) vec3 light_dir;
 } CameraMatrices;
 
 typedef struct GameData {
     CameraMatrices matrices;
     vec3 position;
     vec2 spherical_coordinates;
+    vec3 light_pos;
+    float cos;
 }GameData ;
 
 #define GAME_LOOP(name) void name(float delta_time, GameData *game_data)

@@ -26,6 +26,7 @@ extern "C" __declspec(dllexport) GAME_START(GameStart) {
     game_data->matrices.shadow_mvp = mat4_mul(&p,&v);
 */
     game_data->matrices.shadow_mvp = mat4_look_at({0.0f, 0.0f, 0.0f}, {10.0f, 20.0f, 0.0f}, {0.0f,1.0f,0.0f});
+    game_data->light_pos = {10.0f,20.0f,0.0f};
 }
 
 extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
@@ -88,10 +89,15 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
         //game_data->transforms[1] = mat4_identity();
         GameStart(game_data);
     }
-    
+    if(0){
+        game_data->cos += delta_time / 5.0f;
+        game_data->light_pos.x = 10.0f * cos(game_data->cos);
+        //game_data->light_pos.z = 10.0f * sin(game_data->cos);
+    }
     game_data->position = game_data->position + movement;
     game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
-    game_data->matrices.view_dir = forward;
+    game_data->matrices.light_dir = game_data->light_pos;
     game_data->matrices.pos = game_data->position;
+    game_data->matrices.shadow_mvp = mat4_look_at(vec3{0.0f, 0.0f, 0.0f}, game_data->light_pos, vec3{0.0f, 1.0f, 0.0f});
     
 }

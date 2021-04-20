@@ -13,54 +13,34 @@ struct Material {
     float roughness_factor;
     uint normal_texture;
     uint ao_texture;
-    
-    /*
-    float rim_pow;
-    float rim_strength;
-    */
 };
 
 layout(location = 0) in vec3 in_worldpos;
 layout(location = 1) in vec3 in_normal;
 layout(location = 2) in vec2 in_texcoord;
-layout(location = 3) in vec3 in_cam_pos;
 layout(location = 4) flat in uint material_id;
 layout(location = 5) in vec4 in_shadow_map_texcoord;
 
-layout(location = 0) out vec4 out_color;
-
+layout (binding = 0) uniform CameraMatrices {
+	mat4 proj;
+	mat4 view;
+	mat4 shadow_mvp;
+	vec3 pos;
+	vec3 light_pos;
+} cam;
 layout(binding = 1) buffer Materials { Material m[]; } materials;
 layout(binding = 2) uniform sampler2D textures[];
 layout(binding = 3) uniform sampler2D shadow_map;
 
-vec3 light_dir = normalize(vec3(0.5, 1, 0));
-vec3 light_pos = vec3(10, 20, 0);
+layout(location = 0) out vec4 out_color;
 
+/*
 vec3 get_base_color(Material mat) {
 
     if(mat.base_color_texture < UINT_MAX) {
         return texture(textures[mat.base_color_texture], in_texcoord).rgb * mat.base_color;
     } else {
         return mat.base_color;
-    }
-}
-vec3 get_normal(Material mat) {
-    return in_normal.xyz;
-    if(mat.normal_texture < UINT_MAX) {
-        vec3 tangent = texture(textures[mat.normal_texture], in_texcoord).xyz * 2.0 - 1.0;
-
-        vec3 q1 = dFdx(in_worldpos);
-        vec3 q2 = dFdy(in_worldpos);
-        vec2 st1 = dFdx(in_texcoord);
-        vec2 st2 = dFdx(in_texcoord);
-
-        vec3 N = normalize (in_normal.xyz);
-        vec3 T = normalize( q1 * st2.t - q2 * st1.t);
-        vec3 B = -normalize(cross(N, T));
-        mat3 TBN = mat3(T, B, N);
-        return normalize(TBN * tangent);
-    } else {
-        return in_normal.xyz;
     }
 }
 float geometry_schlick_ggx(float NdotV, float roughness){
@@ -120,7 +100,7 @@ vec3 pbr(Material mat) {
 	
     //vec3 light_color = vec3(.99, .72, 0.07);
     vec3 light_color = vec3(1.0, 1.0, 1.0);
-   	float attenuation = 1.0;
+   	float attenuation = 10.0;
     vec3 radiance = light_color * attenuation;
 
     vec3 V = normalize(in_cam_pos-in_worldpos);
@@ -132,7 +112,6 @@ vec3 pbr(Material mat) {
     float NdotV = max(dot(N, V), 0.0);
     float HdotV = max(dot(H, V), 0.0);
     
-
     float NDF = distribution_ggx(NdotH, alpha_roughness);
     float G = geometry_smith(NdotL, NdotV, roughness);
     vec3 F = fresnel_schlick(HdotV, F0);
@@ -146,8 +125,7 @@ vec3 pbr(Material mat) {
     
    //vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
     vec3 rim_light = vec3(0.0);
-    
-    //return vec3(NDF);
+
     vec3 ambient = vec3(0.1);
 
     Lo += (diffuse + specular) * radiance * NdotL;
@@ -156,10 +134,8 @@ vec3 pbr(Material mat) {
         float ao = texture(textures[mat.ao_texture], in_texcoord).r;
         Lo = mix(Lo, Lo * ao, 0.5);
     }
-
     return Lo;
 }
-
 vec3 specular_reflection(float VdotH, vec3 r0, vec3 r90) {
     return r0 + (r90 - r0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
 }
@@ -215,10 +191,29 @@ vec3 pbr2(Material mat) {
     
     return color;
 }
+*/
 
-float bias = 0.000001;
 
-float get_shadow() {
+vec3 get_normal(Material mat) {
+    return in_normal.xyz;
+    if(mat.normal_texture < UINT_MAX) {
+        vec3 tangent = texture(textures[mat.normal_texture], in_texcoord).xyz * 2.0 - 1.0;
+
+        vec3 q1 = dFdx(in_worldpos);
+        vec3 q2 = dFdy(in_worldpos);
+        vec2 st1 = dFdx(in_texcoord);
+        vec2 st2 = dFdx(in_texcoord);
+
+        vec3 N = normalize (in_normal.xyz);
+        vec3 T = normalize( q1 * st2.t - q2 * st1.t);
+        vec3 B = -normalize(cross(N, T));
+        mat3 TBN = mat3(T, B, N);
+        return normalize(TBN * tangent);
+    } else {
+        return in_normal.xyz;
+    }
+}
+float get_shadow(float bias) {
     float shadow = 1.0;
     vec4 proj_coords = in_shadow_map_texcoord / in_shadow_map_texcoord.w;
     float current_depth = proj_coords.z;
@@ -230,17 +225,14 @@ float get_shadow() {
     } else {
         shadow = 0.0;
         vec2 tex_dim = 1.0 / textureSize(shadow_map, 0);
-        
         float scale = 1.0;
-        //tex_dim = tex_dim / scale;
-       
         int samples = int(scale);
         int count = 0;
 
         for(int x = -samples; x <= samples; ++x) {
             for(int y = -samples; y <= samples; ++y) {
                 float closest_depth = texture(shadow_map, proj_coords.xy + vec2(x, y) * tex_dim).r; 
-                shadow += closest_depth > current_depth - bias ? 1.0 : 0.1;        
+                shadow += closest_depth > current_depth - bias ? 1.0 : 0.0;        
                 count ++;
             }    
         }
@@ -249,18 +241,11 @@ float get_shadow() {
     return shadow;
 }
 
-vec3 custom(Material mat) {
-
-    vec3 N = get_normal(mat);
-    vec3 L = normalize(light_pos - in_worldpos);
-    float NdotL = max(dot(N, L), 0.0);
+vec3 base_color(Material mat) {
 
     const int steps = 4;
     float ambient = 0.1;
     float factor = 1.6;
-
-    float intensity = max(floor(NdotL * steps) / steps, ambient);
-    intensity = pow(intensity, factor);
 
     vec3 diffuse = mat.base_color;
     float pixel_size = 1024;
@@ -268,27 +253,80 @@ vec3 custom(Material mat) {
         vec2 pos = floor(in_texcoord * pixel_size) / pixel_size;
         diffuse = texture(textures[mat.base_color_texture], pos).rgb;
     }      
-    diffuse *= NdotL * 0.5 + 0.5;
+    
     return diffuse;
 }
+
+float Anisotropy = .4;
+vec3 Density = vec3(.005, .005, .004);
+
+float henyey_greenstein(vec3 diri, vec3 diro) {
+    float cos_theta = dot(diri, diro);
+    return M_PI/4.0 * (1.0-Anisotropy*Anisotropy) / pow(1.0 + Anisotropy*Anisotropy - 2.0*Anisotropy*cos_theta, 3.0/2.0);
+}
+
+vec3 volumetric_fog(vec3 L) {
+
+    int steps = 16;
+    vec3 start = cam.pos;
+
+    vec3 dir = normalize(in_worldpos-cam.pos);
+    float frag_distance = length(in_worldpos-cam.pos);
+    float step_dist = min(frag_distance, 100.0);
+    vec3 ray_step = dir * (step_dist) / steps;
+    vec3 density_per_step = Density / steps;
+
+    vec3 accum = vec3(0.0);
+    vec3 current_position = start;
+
+    vec3 step_abs = exp(-Density*step_dist);
+    vec3 step_color = (vec3(1.0) - step_abs) *  henyey_greenstein(L, dir);
+    vec3 vol_abs = vec3(1.0);
+    for (int i = 0; i < steps; i++) {
+        
+        vec4 shadow_coords = cam.proj * cam.shadow_mvp * vec4(current_position, 1.0);
+        vec4 proj_coords = shadow_coords / shadow_coords.w;
+        float current_depth = proj_coords.z;
+
+        proj_coords = proj_coords * 0.5 + 0.5;
+        float closest_depth = texture(shadow_map, proj_coords.xy).r;
+
+        if(closest_depth > current_depth){
+            //accum += vec3(0.5, 0.5, 0.25) * density_per_step;
+            vol_abs *= step_abs;
+            accum += step_color * vol_abs;
+        } 
+
+        current_position += ray_step;
+    }
+    return accum;
+}
+
+vec3 skycolor = vec3(0.53, 0.80, 0.92);
+float ambient_intensity = 0.25;
 
 void main() {
 	
     Material mat = materials.m[material_id];
 
-	//vec3 color = pbr2(mat);
-    //vec3 color = pbr(mat);
-    vec3 color = custom(mat);
+    vec3 N = get_normal(mat);
+    vec3 L = normalize(cam.light_pos - in_worldpos);
+    float NdotL = max(dot(N, L), 0.0);
 
+    vec3 base_color = base_color(mat);
     
+    vec3 diffuse = base_color;
+
+    vec3 ambient = skycolor * ambient_intensity * base_color;
+
+    float bias = max(0.000005 * (1 - NdotL), 0.000001);
+    float shadow = get_shadow(bias);
     
-    /*
-    color = vec3(pow(current_depth, 16));
-    color = vec3(pow(closest_depth, 16));
-    color = vec3(shadow);
-    */
+    float cam_distance = length(cam.pos - in_worldpos);
+    float fog = pow(cam_distance / 20, 2);
 
-    color *= get_shadow();
-
+    vec3 color = (ambient + shadow * diffuse);
+    color += volumetric_fog(L);
+    
     out_color = vec4(color, 1.0);
 }
