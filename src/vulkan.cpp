@@ -56,8 +56,7 @@ typedef struct Swapchain {
     
 } Swapchain;
 
-typedef struct VulkanRenderer {
-    VkPipeline pipeline;
+typedef struct VulkanLayout {
     VkPipelineLayout layout;
     VkDescriptorPool descriptor_pool;
     
@@ -65,11 +64,11 @@ typedef struct VulkanRenderer {
     VkDescriptorSet descriptor_set;
     u32 descriptor_set_count;
     u32 push_constant_size;
-    
-} VulkanRenderer;
+} VulkanLayout;
 
 typedef struct Scene {
-    VulkanRenderer *renderer;
+    VkPipeline pipeline;
+    VulkanLayout layout;
     
     Buffer vtx_buffer;
     Buffer idx_buffer;
@@ -1138,16 +1137,12 @@ void VulkanDestroyContext(VulkanContext *context){
 //
 // ===============
 
-
-internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *renderer, const u32 textures_count) {
+internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayout *pipeline) {
     
     // Set Layout
-    // Our set layout
-    renderer->descriptor_set_count = 1;
-    const u32 app_descriptor_count = 0;
+    pipeline->descriptor_set_count = 1;
     
-    // Game set layout
-    const VkDescriptorSetLayoutBinding game_bindings[] = {
+    const VkDescriptorSetLayoutBinding bindings[] = {
         { // CAMERA MATRICES
             0,
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -1165,20 +1160,20 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
         {  // TEXTURES
             2,
             VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            textures_count,
+            scene->textures_count,
             VK_SHADER_STAGE_FRAGMENT_BIT,
             NULL
         }
     };
-    const u32 descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
+    const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
     
     VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
     game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     game_set_create_info.pNext = NULL;
     game_set_create_info.flags = 0;
     game_set_create_info.bindingCount = descriptor_count;
-    game_set_create_info.pBindings = game_bindings;
-    AssertVkResult(vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL, &renderer->set_layout));
+    game_set_create_info.pBindings = bindings;
+    AssertVkResult(vkCreateDescriptorSetLayout(context->device, &game_set_create_info, NULL, &pipeline->set_layout));
     
     // Descriptor Pool
     // TODO(Guigui): if the game doesn't use one of these types, we get a validation error
@@ -1192,7 +1187,7 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     //Game
     for(u32 d = 0; d < descriptor_count; d++) {
         for(u32 i = 0; i < pool_sizes_count ; i ++){
-            if(game_bindings[d].descriptorType == pool_sizes[i].type) {
+            if(bindings[d].descriptorType == pool_sizes[i].type) {
                 pool_sizes[i].descriptorCount ++;
             }
         }
@@ -1202,38 +1197,103 @@ internal void CreatePipelineLayout(const VkDevice device, VulkanRenderer *render
     pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_ci.pNext = NULL;
     pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_ci.maxSets = renderer->descriptor_set_count;
+    pool_ci.maxSets = pipeline->descriptor_set_count;
     pool_ci.poolSizeCount = pool_sizes_count;
     pool_ci.pPoolSizes = pool_sizes;
-    AssertVkResult(vkCreateDescriptorPool(device, &pool_ci, NULL, &renderer->descriptor_pool));
+    AssertVkResult(vkCreateDescriptorPool(context->device, &pool_ci, NULL, &pipeline->descriptor_pool));
     
     // Descriptor Set
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
-    allocate_info.descriptorPool = renderer->descriptor_pool;
-    allocate_info.descriptorSetCount = renderer->descriptor_set_count;
-    allocate_info.pSetLayouts = &renderer->set_layout;
-    AssertVkResult(vkAllocateDescriptorSets(device, &allocate_info, &renderer->descriptor_set));
+    allocate_info.descriptorPool = pipeline->descriptor_pool;
+    allocate_info.descriptorSetCount = pipeline->descriptor_set_count;
+    allocate_info.pSetLayouts = &pipeline->set_layout;
+    AssertVkResult(vkAllocateDescriptorSets(context->device, &allocate_info, &pipeline->descriptor_set));
     
     // Push constants
-    // TODO(Guigui): Currently limited to 1 PC
     VkPushConstantRange push_constant_range = 
     { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
     const u32 push_constant_count = 1;
-    renderer->push_constant_size = push_constant_range.size;
+    pipeline->push_constant_size = push_constant_range.size;
     
     VkPipelineLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.flags = 0;
-    create_info.setLayoutCount = renderer->descriptor_set_count;
-    create_info.pSetLayouts = &renderer->set_layout;
+    create_info.setLayoutCount = pipeline->descriptor_set_count;
+    create_info.pSetLayouts = &pipeline->set_layout;
     create_info.pushConstantRangeCount = push_constant_count;
     create_info.pPushConstantRanges = &push_constant_range;
     
-    AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &renderer->layout));
+    AssertVkResult(vkCreatePipelineLayout(context->device, &create_info, NULL, &pipeline->layout));
+    
+    
+    
+    const u32 static_writes_count = 2;
+    VkWriteDescriptorSet static_writes[static_writes_count];
+    
+    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
+    
+    static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    static_writes[0].pNext = NULL;
+    static_writes[0].dstSet = pipeline->descriptor_set;
+    static_writes[0].dstBinding = 0;
+    static_writes[0].dstArrayElement = 0;
+    static_writes[0].descriptorCount = 1;
+    static_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    static_writes[0].pImageInfo = NULL;
+    static_writes[0].pBufferInfo = &bi_cam;
+    static_writes[0].pTexelBufferView = NULL;
+    
+    VkDescriptorBufferInfo materials = { scene->mat_buffer.buffer, 0, VK_WHOLE_SIZE };
+    
+    static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    static_writes[1].pNext = NULL;
+    static_writes[1].dstSet = pipeline->descriptor_set;
+    static_writes[1].dstBinding = 1;
+    static_writes[1].dstArrayElement = 0;
+    static_writes[1].descriptorCount = 1;
+    static_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    static_writes[1].pImageInfo = NULL;
+    static_writes[1].pBufferInfo = &materials;
+    static_writes[1].pTexelBufferView = NULL;
+    
+    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
+    
+    if(scene->textures_count != 0) {
+        const u32 nb_tex = scene->textures_count; 
+        u32 nb_info = nb_tex > 0 ? nb_tex : 1;
+        
+        VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
+        
+        for(u32 i = 0; i < nb_info; ++i) {
+            images_info[i].sampler = context->texture_sampler;
+            images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            if(nb_tex == 0) {
+                images_info[i].imageView = VK_NULL_HANDLE;
+                break;
+            }
+            images_info[i].imageView = scene->textures[i].image_view;
+        }
+        
+        VkWriteDescriptorSet textures_buffer = {};
+        textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        textures_buffer.pNext = NULL;
+        textures_buffer.dstSet = pipeline->descriptor_set;
+        textures_buffer.dstBinding = 2;
+        textures_buffer.dstArrayElement = 0;
+        textures_buffer.descriptorCount = nb_info;
+        textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        textures_buffer.pImageInfo = images_info;
+        textures_buffer.pBufferInfo = NULL;
+        textures_buffer.pTexelBufferView = NULL;
+        
+        vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
+        free(images_info);
+    }
 }
+
 
 internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkRenderPass render_pass, VkSampleCountFlagBits sample_count, VkPipeline *pipeline) {
     
@@ -1400,110 +1460,19 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vkDestroyShaderModule(device, pipeline_ci.pStages[1].module, NULL);
 }
 
-internal void WriteDescriptorSet(VulkanContext *context, Scene *scene, VkDescriptorSet descriptor_set) {
+void DestroyLayout(VkDevice device, VulkanLayout *pipeline) {
     
-    const u32 static_writes_count = 2;
-    VkWriteDescriptorSet static_writes[static_writes_count];
+    vkFreeDescriptorSets(device, pipeline->descriptor_pool, pipeline->descriptor_set_count, &pipeline->descriptor_set);
+    vkDestroyDescriptorPool(device, pipeline->descriptor_pool, NULL);
     
-    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
-    
-    static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    static_writes[0].pNext = NULL;
-    static_writes[0].dstSet = descriptor_set;
-    static_writes[0].dstBinding = 0;
-    static_writes[0].dstArrayElement = 0;
-    static_writes[0].descriptorCount = 1;
-    static_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    static_writes[0].pImageInfo = NULL;
-    static_writes[0].pBufferInfo = &bi_cam;
-    static_writes[0].pTexelBufferView = NULL;
-    
-    VkDescriptorBufferInfo materials = { scene->mat_buffer.buffer, 0, VK_WHOLE_SIZE };
-    
-    static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    static_writes[1].pNext = NULL;
-    static_writes[1].dstSet = descriptor_set;
-    static_writes[1].dstBinding = 1;
-    static_writes[1].dstArrayElement = 0;
-    static_writes[1].descriptorCount = 1;
-    static_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    static_writes[1].pImageInfo = NULL;
-    static_writes[1].pBufferInfo = &materials;
-    static_writes[1].pTexelBufferView = NULL;
-    
-    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
-    
-    if(scene->textures_count != 0) {
-        const u32 nb_tex = scene->textures_count; 
-        u32 nb_info = nb_tex > 0 ? nb_tex : 1;
-        
-        VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
-        
-        for(u32 i = 0; i < nb_info; ++i) {
-            images_info[i].sampler = context->texture_sampler;
-            images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            if(nb_tex == 0) {
-                images_info[i].imageView = VK_NULL_HANDLE;
-                break;
-            }
-            images_info[i].imageView = scene->textures[i].image_view;
-        }
-        
-        VkWriteDescriptorSet textures_buffer = {};
-        textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        textures_buffer.pNext = NULL;
-        textures_buffer.dstSet = descriptor_set;
-        textures_buffer.dstBinding = 2;
-        textures_buffer.dstArrayElement = 0;
-        textures_buffer.descriptorCount = nb_info;
-        textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        textures_buffer.pImageInfo = images_info;
-        textures_buffer.pBufferInfo = NULL;
-        textures_buffer.pTexelBufferView = NULL;
-        
-        vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
-        free(images_info);
-    }
-}
-
-VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, Scene *scene) {
-    VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
-    
-    CreatePipelineLayout(context->device, renderer, scene->textures_count);
-    CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, context->render_pass, context->msaa_level, &renderer->pipeline);
-    
-    WriteDescriptorSet(context, scene, renderer->descriptor_set);
-    
-    return renderer;
+    vkDestroyDescriptorSetLayout(device, pipeline->set_layout, NULL);
+    vkDestroyPipelineLayout(device, pipeline->layout, NULL);
 }
 
 void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
     UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 }
 
-void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
-    vkDestroyPipeline(context->device, scene->renderer->pipeline, NULL);
-    CreateRasterPipeline(context->device, scene->renderer->layout, &context->swapchain, context->render_pass,context->msaa_level, &scene->renderer->pipeline);
-}
-
-void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
-    
-    vkFreeDescriptorSets(context->device, renderer->descriptor_pool, renderer->descriptor_set_count, &renderer->descriptor_set);
-    vkDestroyDescriptorPool(context->device, renderer->descriptor_pool, NULL);
-    
-    vkDestroyDescriptorSetLayout(context->device, renderer->set_layout, NULL);
-    vkDestroyPipelineLayout(context->device, renderer->layout, NULL);
-    vkDestroyPipeline(context->device, renderer->pipeline, NULL);
-    
-    free(renderer);
-}
-
-
-// ===============
-//
-//  RENDERER
-//
-// ===============
 
 
 Scene *VulkanLoadScene(char *file, VulkanContext *context) {
@@ -1661,7 +1630,8 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
         free(image_buffers);
     }
     
-    scene->renderer = VulkanCreateRenderer(context, scene);
+    CreateSceneLayout(context, scene, &scene->layout);
+    CreateRasterPipeline(context->device, scene->layout.layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
     
     cgltf_free(data);
     free(directory);
@@ -1672,9 +1642,16 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     return scene;
 }
 
+void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
+    vkDestroyPipeline(context->device, scene->pipeline, NULL);
+    CreateRasterPipeline(context->device, scene->layout.layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
+}
+
 void VulkanFreeScene(VulkanContext *context, Scene *scene) {
     
-    VulkanDestroyRenderer(context, scene->renderer);
+    DestroyLayout(context->device, &scene->layout);
+    
+    vkDestroyPipeline(context->device, scene->pipeline, NULL);
     
     for(u32 i = 0; i < scene->textures_count; ++i) {
         DestroyImage(context->device, &scene->textures[i]);
@@ -1735,8 +1712,8 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
     
     BeginRenderPass(cmd, context->framebuffers[image_id], context->render_pass, swapchain);
     
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->pipeline);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->renderer->layout, 0, 1, &scene->renderer->descriptor_set, 0, NULL);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->layout.layout, 0, 1, &scene->layout.descriptor_set, 0, NULL);
     
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(cmd, 0, 1, &scene->vtx_buffer.buffer, &offset);
@@ -1747,7 +1724,7 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
         Primitive *prim = &scene->primitives[i];
         
         PushConstant push = { scene->transforms[prim->node_id], prim->material_id };
-        vkCmdPushConstants(cmd, scene->renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
+        vkCmdPushConstants(cmd, scene->layout.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
         vkCmdDrawIndexed(cmd, prim->index_count, 1, prim->index_offset, prim->vertex_offset, 0);
     }
     
