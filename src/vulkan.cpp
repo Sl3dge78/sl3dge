@@ -1400,11 +1400,79 @@ internal void CreateRasterPipeline(const VkDevice device, const VkPipelineLayout
     vkDestroyShaderModule(device, pipeline_ci.pStages[1].module, NULL);
 }
 
-VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, Scene *scene_info) {
+internal void WriteDescriptorSet(VulkanContext *context, Scene *scene, VkDescriptorSet descriptor_set) {
+    
+    const u32 static_writes_count = 2;
+    VkWriteDescriptorSet static_writes[static_writes_count];
+    
+    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
+    
+    static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    static_writes[0].pNext = NULL;
+    static_writes[0].dstSet = descriptor_set;
+    static_writes[0].dstBinding = 0;
+    static_writes[0].dstArrayElement = 0;
+    static_writes[0].descriptorCount = 1;
+    static_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    static_writes[0].pImageInfo = NULL;
+    static_writes[0].pBufferInfo = &bi_cam;
+    static_writes[0].pTexelBufferView = NULL;
+    
+    VkDescriptorBufferInfo materials = { scene->mat_buffer.buffer, 0, VK_WHOLE_SIZE };
+    
+    static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    static_writes[1].pNext = NULL;
+    static_writes[1].dstSet = descriptor_set;
+    static_writes[1].dstBinding = 1;
+    static_writes[1].dstArrayElement = 0;
+    static_writes[1].descriptorCount = 1;
+    static_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    static_writes[1].pImageInfo = NULL;
+    static_writes[1].pBufferInfo = &materials;
+    static_writes[1].pTexelBufferView = NULL;
+    
+    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
+    
+    if(scene->textures_count != 0) {
+        const u32 nb_tex = scene->textures_count; 
+        u32 nb_info = nb_tex > 0 ? nb_tex : 1;
+        
+        VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
+        
+        for(u32 i = 0; i < nb_info; ++i) {
+            images_info[i].sampler = context->texture_sampler;
+            images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            if(nb_tex == 0) {
+                images_info[i].imageView = VK_NULL_HANDLE;
+                break;
+            }
+            images_info[i].imageView = scene->textures[i].image_view;
+        }
+        
+        VkWriteDescriptorSet textures_buffer = {};
+        textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        textures_buffer.pNext = NULL;
+        textures_buffer.dstSet = descriptor_set;
+        textures_buffer.dstBinding = 2;
+        textures_buffer.dstArrayElement = 0;
+        textures_buffer.descriptorCount = nb_info;
+        textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        textures_buffer.pImageInfo = images_info;
+        textures_buffer.pBufferInfo = NULL;
+        textures_buffer.pTexelBufferView = NULL;
+        
+        vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
+        free(images_info);
+    }
+}
+
+VulkanRenderer *VulkanCreateRenderer(VulkanContext *context, Scene *scene) {
     VulkanRenderer *renderer = (VulkanRenderer*)malloc(sizeof(VulkanRenderer));
     
-    CreatePipelineLayout(context->device, renderer, scene_info->textures_count);
+    CreatePipelineLayout(context->device, renderer, scene->textures_count);
     CreateRasterPipeline(context->device, renderer->layout, &context->swapchain, context->render_pass, context->msaa_level, &renderer->pipeline);
+    
+    WriteDescriptorSet(context, scene, renderer->descriptor_set);
     
     return renderer;
 }
@@ -1430,52 +1498,6 @@ void VulkanDestroyRenderer(VulkanContext *context, VulkanRenderer *renderer) {
     free(renderer);
 }
 
-internal void VulkanWriteDescriptorSets(VulkanContext *context, Scene *scene) {
-    
-    const u32 static_writes_count = 2;
-    VkWriteDescriptorSet static_writes[static_writes_count];
-    
-    VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
-    static_writes[0] = 
-    { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_set, 0, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL};
-    
-    VkDescriptorBufferInfo materials = { scene->mat_buffer.buffer, 0, VK_WHOLE_SIZE };
-    static_writes[1] = {  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, scene->renderer->descriptor_set, 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &materials, NULL };
-    
-    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
-    
-    if(scene->textures_count != 0) {
-        const u32 nb_tex = scene->textures_count; 
-        u32 nb_info = nb_tex > 0 ? nb_tex : 1;
-        
-        VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
-        
-        for(u32 i = 0; i < nb_info; ++i) {
-            images_info[i].sampler = context->texture_sampler;
-            images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            if(nb_tex == 0) {
-                images_info[i].imageView = VK_NULL_HANDLE;
-                break;
-            }
-            images_info[i].imageView = scene->textures[i].image_view;
-        }
-        
-        VkWriteDescriptorSet textures_buffer = {};
-        textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        textures_buffer.pNext = NULL;
-        textures_buffer.dstSet = scene->renderer->descriptor_set;
-        textures_buffer.dstBinding = 2;
-        textures_buffer.dstArrayElement = 0;
-        textures_buffer.descriptorCount = nb_info;
-        textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        textures_buffer.pImageInfo = images_info;
-        textures_buffer.pBufferInfo = NULL;
-        textures_buffer.pTexelBufferView = NULL;
-        
-        vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
-        free(images_info);
-    }
-}
 
 // ===============
 //
@@ -1640,7 +1662,6 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     }
     
     scene->renderer = VulkanCreateRenderer(context, scene);
-    VulkanWriteDescriptorSets(context, scene);
     
     cgltf_free(data);
     free(directory);
@@ -1727,35 +1748,8 @@ void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
         
         PushConstant push = { scene->transforms[prim->node_id], prim->material_id };
         vkCmdPushConstants(cmd, scene->renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
-        vkCmdDrawIndexed(cmd, 
-                         prim->index_count,
-                         1,
-                         prim->index_offset,
-                         prim->vertex_offset,
-                         0);
-        
+        vkCmdDrawIndexed(cmd, prim->index_count, 1, prim->index_offset, prim->vertex_offset, 0);
     }
-    /*
-    for(u32 i = 0; i < scene->nodes_count ; i ++) {
-        u32 mesh_id = scene->nodeid_to_meshid[i];
-        
-        if(mesh_id == UINT_MAX) {
-            continue;
-        }
-        const u32 primitive_id = scene->meshid_to_first_primitiveid[mesh_id];
-        const u32 primitive_count = scene->mesh_primitives_count[mesh_id];
-        for(u32 p = primitive_id; p < primitive_count; ++p){
-            PushConstant push = { scene->transforms[i], scene->primitiveid_to_materialid[p] };
-            vkCmdPushConstants(cmd, scene->renderer->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
-            vkCmdDrawIndexed(cmd, 
-                             scene->primitive_index_counts[p],
-                             1,
-                             scene->primitive_index_offsets[p],
-                             scene->primitive_vertex_offsets[p],
-                             0);
-        }
-    }
-*/
     
     vkCmdEndRenderPass(cmd);
     AssertVkResult(vkEndCommandBuffer(cmd));
