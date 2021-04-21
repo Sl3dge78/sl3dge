@@ -11,3 +11,4 @@ pushd bin
 cl %args% -Fe%project_name% %include_path% %vulkan_include_path% ../src/win32.cpp %linker_options% %libs%
 cl %args% -Fegame %include_path% %vulkan_include_path% -LD ../src/game.cpp %linker_options% %libs%
 popd
+echo Build completed!
