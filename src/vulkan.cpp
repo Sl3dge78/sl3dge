@@ -3,21 +3,31 @@
 /*
  === TODO ===
  CRITICAL
- - Descriptor set 0 > could be the same for all pipelines
+ - Switch to directional light
+- Can't create a scene without textures
+- Cleanup the pipelines creations. How do we group that?
 
  MAJOR
-  - Shadow Mapping
+- Optimize volumetric fog (get the zbuffer and use it?)
+- Descriptor set 0 > could be the same for all pipelines
+
 
  BACKLOG
- - Mipmaps
+ - Check the frame sync, we might not be at 60.
+- Find a way to draw the sun even though no fragments are on the screen
+- Draw multiple gltf scenes
+- Window Resize > Pipline dynamic states ?
+- Mipmaps
+- Volumetric clouds?
+
 
  IMPROVEMENTS
-- IBL
+- Find the way to display the fps in the window tile, i used to have it
+- IBL?
 - Utiliser des Staging buffers
-- Window Resize > Pipline dynamic states ?
- - Handle pipeline caches
- 
-- MSAA
+- Handle pipeline caches
+ - Pick the device according to our specs
+- Pipeline dynamic state
 */
 
 #define DECL_FUNC(name) global PFN_##name pfn_##name
@@ -1047,7 +1057,7 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     }
     
     // ShadowMap pipe
-    context->shadowmap_extent = {2048,2048};
+    context->shadowmap_extent = {4096,4096};
     CreateShadowMapRenderPass(context->device, &context->swapchain, &context->shadowmap_render_pass);
     CreateShadowMapLayout(context, &context->shadowmap_layout);
     CreateShadowMapPipeline(context->device, &context->swapchain, context->shadowmap_layout.layout, context->shadowmap_render_pass, context->shadowmap_extent, &context->shadowmap_pipeline);

@@ -8,3 +8,4 @@ bin/*.exp
 bin/*.lib
 bin/*.exe
 *.rdbg
+*.spv

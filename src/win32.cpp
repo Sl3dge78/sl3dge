@@ -153,11 +153,12 @@ internal int main(int argc, char *argv[]) {
     GameData game_data = {};
     Scene *scene;
     
+    
+    
     SDL_Log("Loading scene...");
     
     scene = VulkanLoadScene("resources/models/gltf_samples/Sponza/glTF/Sponza.gltf", context);
-    
-    //VulkanLoadGLTF("resources/models/cube_plane.gltf", context, &game_data.transforms);
+    //scene = VulkanLoadScene("resources/models/ref/ref.gltf", context);
     
     game_code.GameStart(&game_data);
     
