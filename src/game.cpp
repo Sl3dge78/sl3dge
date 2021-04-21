@@ -16,17 +16,8 @@
 */
 
 extern "C" __declspec(dllexport) GAME_START(GameStart) {
-    
-    //game_data->spherical_coordinates = {0.0f, 0.0f };
-    //game_data->position = { 1.5f, 0.0f, 2.0f };
-    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 50.0f);
-    /*
-    mat4 p = mat4_perspective(90.0f, 1.0f, 0.01f, 5000.0f);
-    mat4 v = mat4_look_at({0.0f, 0.0f, 0.0f}, {1000.0f, 2000.0f, 0.0f}, {0.0f,1.0f,0.0f});
-    game_data->matrices.shadow_mvp = mat4_mul(&p,&v);
-*/
-    game_data->matrices.shadow_mvp = mat4_look_at({0.0f, 0.0f, 0.0f}, {10.0f, 20.0f, 0.0f}, {0.0f,1.0f,0.0f});
-    game_data->light_pos = {10.0f,20.0f,0.0f};
+    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 1000.0f);
+    game_data->light_pos = {0.0f,10.0f,0.0f};
 }
 
 extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
@@ -85,19 +76,25 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     
     // Reset
     if(keyboard[SDL_SCANCODE_SPACE]){
-        //game_data->transforms[0] = mat4_identity();
-        //game_data->transforms[1] = mat4_identity();
         GameStart(game_data);
     }
-    if(0){
-        game_data->cos += delta_time / 5.0f;
-        game_data->light_pos.x = 10.0f * cos(game_data->cos);
-        //game_data->light_pos.z = 10.0f * sin(game_data->cos);
-    }
-    game_data->position = game_data->position + movement;
-    game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
-    game_data->matrices.light_dir = game_data->light_pos;
-    game_data->matrices.pos = game_data->position;
-    game_data->matrices.shadow_mvp = mat4_look_at(vec3{0.0f, 0.0f, 0.0f}, game_data->light_pos, vec3{0.0f, 1.0f, 0.0f});
     
+    if(keyboard[SDL_SCANCODE_P]) {
+        game_data->cos += delta_time / 10.0f;
+        game_data->light_pos.x = 20.0f * cos(game_data->cos);
+    }
+    if(keyboard[SDL_SCANCODE_O]) {
+        game_data->cos -= delta_time / 10.0f;
+        game_data->light_pos.x = 20.0f * cos(game_data->cos);
+    }
+    
+    game_data->position = game_data->position + movement;
+    game_data->matrices.pos = game_data->position;
+    game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, vec3{0.0f, 1.0f, 0.0f} );
+    
+    mat4 a = mat4_ortho_zoom(1.0f/1.0f, 21.0f, -100.0f, 100.0f);
+    mat4 b = mat4_look_at(vec3{0.0f, 0.0f, 0.0f}, game_data->light_pos, vec3{0.0f, 1.0f, 0.0f});
+    
+    game_data->matrices.shadow_mvp = mat4_mul(&a, &b);
+    game_data->matrices.light_dir = vec3_normalize( game_data->light_pos * -1.0);
 }

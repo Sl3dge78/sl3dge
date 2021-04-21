@@ -7,9 +7,9 @@ layout (location = 2) in vec2 in_texcoord;
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
 	mat4 view;
-    mat4 shadow_mvp;
-	vec3 pos;
-	vec3 view_dir;
+    mat4 light_vp;
+	vec3 view_pos;
+	vec3 light_dir;
 } cam;
 
 layout(push_constant) uniform PushConstants {
@@ -19,6 +19,6 @@ layout(push_constant) uniform PushConstants {
 
 void main() {
 
-    gl_Position = cam.proj * cam.shadow_mvp * constants.transform * vec4(in_position, 1.0);
+    gl_Position = cam.light_vp * constants.transform * vec4(in_position, 1.0);
 
 }

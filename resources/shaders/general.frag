@@ -1,6 +1,6 @@
 #version 460
-
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_ARB_shader_clock : enable
 
 #define M_PI 3.141592653589793
 #define UINT_MAX 4294967295
@@ -24,9 +24,9 @@ layout(location = 5) in vec4 in_shadow_map_texcoord;
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
 	mat4 view;
-	mat4 shadow_mvp;
-	vec3 pos;
-	vec3 light_pos;
+	mat4 light_vp;
+	vec3 view_pos;
+	vec3 light_dir;
 } cam;
 layout(binding = 1) buffer Materials { Material m[]; } materials;
 layout(binding = 2) uniform sampler2D textures[];
@@ -34,165 +34,30 @@ layout(binding = 3) uniform sampler2D shadow_map;
 
 layout(location = 0) out vec4 out_color;
 
-/*
-vec3 get_base_color(Material mat) {
+// RNG
 
-    if(mat.base_color_texture < UINT_MAX) {
-        return texture(textures[mat.base_color_texture], in_texcoord).rgb * mat.base_color;
-    } else {
-        return mat.base_color;
-    }
+
+uint tea(uint val0, uint val1) {
+  uint v0 = val0;
+  uint v1 = val1;
+  uint s0 = 0;
+
+  for(uint n = 0; n < 16; n++) {
+    s0 += 0x9e3779b9;
+    v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
+    v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
+  }
+  return v0;
 }
-float geometry_schlick_ggx(float NdotV, float roughness){
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
-
-    float nom = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-} 
-float geometry_smith(float NdotL, float NdotV, float roughness){
-    float ggx1 = geometry_schlick_ggx(NdotV, roughness);
-    float ggx2 = geometry_schlick_ggx(NdotL, roughness);
-
-    return ggx1 * ggx2;
+uint lcg(inout uint prev) {
+  uint LCG_A = 1664525u;
+  uint LCG_C = 1013904223u;
+  prev       = (LCG_A * prev + LCG_C);
+  return prev & 0x00FFFFFF;
 }
-
-float distribution_ggx(float NdotH, float alpha_roughness) {
-    float a2 = alpha_roughness*alpha_roughness;
-    
-    float NdotH2 = NdotH * NdotH;
-
-    float nom = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = M_PI * denom * denom;
-
-    return nom / denom;
+float rnd(inout uint prev) {
+  return (float(lcg(prev)) / float(0x01000000));
 }
-vec3 fresnel_schlick(float cos_theta, vec3 F0) {
-    return F0 + (1.0 - F0) * pow(max(1.0 - cos_theta, 0.0), 5.0);
-}
-float rim(vec3 N, vec3 V, float power, float strength) {
-    float rim = 1.0 - clamp(dot(N, V), 0.0, 1.0);
-    rim = clamp(pow(rim, power) * strength, 0.0, 1.0);
-    return rim;
-}
-vec3 pbr(Material mat) {
-  
-    vec3 base_color = get_base_color(mat);
-    float metallic = mat.metallic_factor;
-    float roughness = mat.roughness_factor;
-    
-    if(mat.metallic_roughness_texture < UINT_MAX) {
-        vec3 tex = texture(textures[mat.metallic_roughness_texture], in_texcoord).rgb;
-        
-        roughness *= tex.g;
-        metallic *= tex.b;
-    } 
-    
-    float alpha_roughness = roughness * roughness;
-
-    vec3 F0 = vec3(0.04);  
-    F0 = mix(F0, base_color.rgb, metallic);
-    
-    vec3 Lo = vec3(0.0);
-	
-    //vec3 light_color = vec3(.99, .72, 0.07);
-    vec3 light_color = vec3(1.0, 1.0, 1.0);
-   	float attenuation = 10.0;
-    vec3 radiance = light_color * attenuation;
-
-    vec3 V = normalize(in_cam_pos-in_worldpos);
-    vec3 N = get_normal(mat);
-    vec3 L = normalize(light_dir);
-    vec3 H = normalize(V + L);
-    float NdotL = max(dot(N, L), 0.0);
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotV = max(dot(N, V), 0.0);
-    float HdotV = max(dot(H, V), 0.0);
-    
-    float NDF = distribution_ggx(NdotH, alpha_roughness);
-    float G = geometry_smith(NdotL, NdotV, roughness);
-    vec3 F = fresnel_schlick(HdotV, F0);
-        
-    vec3 numer = NDF * G * F;
-    float denom = 4.0 * NdotV * NdotL;
-    vec3 specular = numer / max(denom, 0.001);
-    
-    vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);   
-    vec3 diffuse = kD * (base_color.rgb / M_PI);
-    
-   //vec3 rim_light = vec3(1.0) * rim(normal, V, mat.rim_pow, mat.rim_strength);
-    vec3 rim_light = vec3(0.0);
-
-    vec3 ambient = vec3(0.1);
-
-    Lo += (diffuse + specular) * radiance * NdotL;
-    
-    if(mat.ao_texture < UINT_MAX) {
-        float ao = texture(textures[mat.ao_texture], in_texcoord).r;
-        Lo = mix(Lo, Lo * ao, 0.5);
-    }
-    return Lo;
-}
-vec3 specular_reflection(float VdotH, vec3 r0, vec3 r90) {
-    return r0 + (r90 - r0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
-}
-float geometric_occlusion(float NdotL, float NdotV, float r) {
-    float attenuation_l = 2.0 * NdotL / (NdotL + sqrt(r * r + (1.0 - r * r) * (NdotL * NdotL)));
-    float attenuation_v = 2.0 * NdotV / (NdotV + sqrt(r * r + (1.0 - r * r) * (NdotV * NdotV)));
-    return attenuation_l * attenuation_v;
-}
-vec3 pbr2(Material mat) {
-    vec3 f0 = vec3(0.04);
-    vec3 base_color = get_base_color(mat);
-    
-    float metallic = mat.metallic_factor;
-    float roughness = mat.roughness_factor;
-    if(mat.metallic_roughness_texture < UINT_MAX) {
-        vec3 tex = texture(textures[mat.metallic_roughness_texture], in_texcoord).rgb;
-        roughness *= tex.g;
-        metallic *= tex.b;
-    } 
-
-    vec3 diffuse_color = base_color.rgb * (vec3(1.0) - f0);
-    diffuse_color *= 1.0 - metallic; 
-
-    float alpha_roughness = roughness * roughness;
-    vec3 specular_color = mix(f0, base_color.rgb, metallic);
-
-    float reflectance = max(max(specular_color.r, specular_color.g), specular_color.b);
-    float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
-    vec3 specular_environment_R0 = specular_color.rgb;
-    vec3 specular_environment_R90 = vec3(1.0) * reflectance90;
-
-    vec3 N = get_normal(mat);
-    vec3 V = normalize(in_cam_pos - in_worldpos);
-    vec3 L = normalize(light_dir);
-    vec3 H = normalize(L+V);
-
-    float NdotL = clamp(dot(N, L), 0.001, 1.0);
-    float NdotV = clamp(abs(dot(N, V)), 0.001, 1.0);
-    float NdotH = clamp(dot(N, H), 0.0, 1.0);
-    float LdotH = clamp(dot(L, H), 0.0, 1.0);
-    float VdotH = clamp(dot(V, H), 0.0, 1.0);
-
-    vec3 F = specular_reflection(VdotH, specular_environment_R0, specular_environment_R90);
-    float G = geometric_occlusion(NdotL, NdotV, alpha_roughness);
-    float D = distribution_ggx(NdotH, alpha_roughness);
-    
-    const vec3 light_color = vec3(5.0);
-
-    vec3 diffuse_contrib = (1.0 - F) * (diffuse_color / M_PI);
-    vec3 spec_contrib = F * G * D / (4.0 * NdotL * NdotV);
-
-    vec3 color = NdotL * light_color * (diffuse_contrib + spec_contrib);
-    
-    return color;
-}
-*/
-
 
 vec3 get_normal(Material mat) {
     return in_normal.xyz;
@@ -240,7 +105,6 @@ float get_shadow(float bias) {
     }
     return shadow;
 }
-
 vec3 base_color(Material mat) {
 
     const int steps = 4;
@@ -248,7 +112,7 @@ vec3 base_color(Material mat) {
     float factor = 1.6;
 
     vec3 diffuse = mat.base_color;
-    float pixel_size = 1024;
+    float pixel_size = 32;
     if(mat.base_color_texture < UINT_MAX) {
         vec2 pos = floor(in_texcoord * pixel_size) / pixel_size;
         diffuse = texture(textures[mat.base_color_texture], pos).rgb;
@@ -256,7 +120,6 @@ vec3 base_color(Material mat) {
     
     return diffuse;
 }
-
 float Anisotropy = .4;
 vec3 Density = vec3(.005, .005, .004);
 
@@ -264,38 +127,40 @@ float henyey_greenstein(vec3 diri, vec3 diro) {
     float cos_theta = dot(diri, diro);
     return M_PI/4.0 * (1.0-Anisotropy*Anisotropy) / pow(1.0 + Anisotropy*Anisotropy - 2.0*Anisotropy*cos_theta, 3.0/2.0);
 }
-
 vec3 volumetric_fog(vec3 L) {
 
     int steps = 16;
-    vec3 start = cam.pos;
+    vec3 start = cam.view_pos;
 
-    vec3 dir = normalize(in_worldpos-cam.pos);
-    float frag_distance = length(in_worldpos-cam.pos);
-    float step_dist = min(frag_distance, 100.0);
-    vec3 ray_step = dir * (step_dist) / steps;
-    vec3 density_per_step = Density / steps;
+    vec3 dir = normalize(in_worldpos - cam.view_pos);
+    float frag_distance = length(in_worldpos - cam.view_pos);
+    float total_dist = min(frag_distance, 5.0);
+
+    vec3 ray_step = dir * (total_dist) / steps;
+
+    vec3 step_abs = exp(-Density * total_dist);
+    vec3 step_color = (vec3(1.0) - step_abs) * henyey_greenstein(-L, dir);
+    vec3 vol_abs = vec3(1.0);
+
+    vec3 rnd_v = (in_worldpos + cam.view_pos) * 100.0;
+    float a = (rnd_v.x * rnd_v.y * rnd_v.z) / 100.0;
+    uint seed = tea(0, int(a));
+
+    vec3 current_position = start + (ray_step * rnd(seed));
 
     vec3 accum = vec3(0.0);
-    vec3 current_position = start;
-
-    vec3 step_abs = exp(-Density*step_dist);
-    vec3 step_color = (vec3(1.0) - step_abs) *  henyey_greenstein(L, dir);
-    vec3 vol_abs = vec3(1.0);
     for (int i = 0; i < steps; i++) {
         
-        vec4 shadow_coords = cam.proj * cam.shadow_mvp * vec4(current_position, 1.0);
+        vec4 shadow_coords = cam.light_vp * vec4(current_position, 1.0);
         vec4 proj_coords = shadow_coords / shadow_coords.w;
         float current_depth = proj_coords.z;
 
         proj_coords = proj_coords * 0.5 + 0.5;
         float closest_depth = texture(shadow_map, proj_coords.xy).r;
-
-        if(closest_depth > current_depth){
-            //accum += vec3(0.5, 0.5, 0.25) * density_per_step;
-            vol_abs *= step_abs;
+        vol_abs *= step_abs;
+        if(closest_depth > current_depth){          
             accum += step_color * vol_abs;
-        } 
+        }
 
         current_position += ray_step;
     }
@@ -310,7 +175,7 @@ void main() {
     Material mat = materials.m[material_id];
 
     vec3 N = get_normal(mat);
-    vec3 L = normalize(cam.light_pos - in_worldpos);
+    vec3 L = cam.light_dir;
     float NdotL = max(dot(N, L), 0.0);
 
     vec3 base_color = base_color(mat);
@@ -319,10 +184,10 @@ void main() {
 
     vec3 ambient = skycolor * ambient_intensity * base_color;
 
-    float bias = max(0.000005 * (1 - NdotL), 0.000001);
+    float bias = ( 1 - NdotL) * 0.0005;
     float shadow = get_shadow(bias);
     
-    float cam_distance = length(cam.pos - in_worldpos);
+    float cam_distance = length(cam.view_pos - in_worldpos);
     float fog = pow(cam_distance / 20, 2);
 
     vec3 color = (ambient + shadow * diffuse);
