@@ -3,9 +3,6 @@ resources/models
 *.pdb
 *.ilk
 *.obj
-bin/*.dll
-bin/*.exp
-bin/*.lib
-bin/*.exe
+bin
 *.rdbg
 *.spv
