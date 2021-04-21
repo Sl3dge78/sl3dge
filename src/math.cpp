@@ -11,9 +11,7 @@
 
  IMPROVEMENTS
 
-- quaternions
-
- IDEAS
+IDEAS
  
 
 */
@@ -78,6 +76,12 @@ vec3 operator-(vec3 l, const vec3 r) {
     l.z -= r.z;
     return l;
 };
+vec3 operator*(vec3 l, const float r) {
+    l.x *= r;
+    l.y *= r;
+    l.z *= r;
+    return l;
+};
 
 /// Y up
 inline vec3 spherical_to_carthesian(const vec2 v) {
@@ -136,7 +140,7 @@ float vec3_dot(const vec3 a, const vec3 b) {
 
 void mat4_print(const mat4* mat) {
     
-    SDL_Log("\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f\n%#.1f, %#.1f, %#.1f, %#.1f",
+    SDL_Log("\n%#.3f, %#.3f, %#.3f, %#.3f\n%#.3f, %#.3f, %#.3f, %#.3f\n%#.3f, %#.3f, %#.3f, %#.3f\n%#.3f, %#.3f, %#.3f, %#.3f",
             mat->v[0],mat->v[1],mat->v[2],mat->v[3],
             mat->v[4],mat->v[5],mat->v[6],mat->v[7],
             mat->v[8],mat->v[9],mat->v[10],mat->v[11],
@@ -144,28 +148,15 @@ void mat4_print(const mat4* mat) {
 }
 
 mat4 mat4_mul(const mat4* a, const mat4* b) {
-    SDL_LogError(0,"mat4 mul is bugged");
     mat4 result = {};
-    result.m[0][0] = a->m[0][0] * b->m[0][0] + a->m[0][1] * b->m[1][0] + a->m[0][2] * b->m[2][0] + a->m[0][3] * b->m[3][0];
-    result.m[0][1] = a->m[0][0] * b->m[0][1] + a->m[0][1] * b->m[1][1] + a->m[0][2] * b->m[2][1] + a->m[0][3] * b->m[3][1];
-    result.m[0][2] = a->m[0][0] * b->m[0][2] + a->m[0][1] * b->m[1][2] + a->m[0][2] * b->m[2][2] + a->m[0][3] * b->m[3][2];
-    result.m[0][3] = a->m[0][0] * b->m[0][3] + a->m[0][1] * b->m[1][3] + a->m[0][2] * b->m[2][3] + a->m[0][3] * b->m[3][3];
     
-    result.m[1][0] = a->m[1][0] * b->m[0][0] + a->m[1][1] * b->m[1][0] + a->m[1][2] * b->m[2][0] + a->m[1][3] * b->m[3][0];
-    result.m[1][1] = a->m[1][0] * b->m[0][1] + a->m[1][1] * b->m[1][1] + a->m[1][2] * b->m[2][1] + a->m[1][3] * b->m[3][1];
-    result.m[1][2] = a->m[1][0] * b->m[0][2] + a->m[1][1] * b->m[1][2] + a->m[1][2] * b->m[2][2] + a->m[1][3] * b->m[3][2];
-    result.m[1][3] = a->m[1][0] * b->m[0][3] + a->m[1][1] * b->m[1][3] + a->m[1][2] * b->m[2][3] + a->m[1][3] * b->m[3][3];
-    
-    
-    result.m[2][0] = a->m[2][0] * b->m[0][0] + a->m[2][1] * b->m[1][0] + a->m[2][2] * b->m[2][0] + a->m[2][3] * b->m[3][0];
-    result.m[2][1] = a->m[2][0] * b->m[0][1] + a->m[2][1] * b->m[1][1] + a->m[2][2] * b->m[2][1] + a->m[2][3] * b->m[3][1];
-    result.m[2][2] = a->m[2][0] * b->m[0][2] + a->m[2][1] * b->m[1][2] + a->m[2][2] * b->m[2][2] + a->m[2][3] * b->m[3][2];
-    result.m[2][3] = a->m[2][0] * b->m[0][3] + a->m[2][1] * b->m[1][3] + a->m[2][2] * b->m[2][3] + a->m[2][3] * b->m[3][3];
-    
-    result.m[3][0] = a->m[3][0] * b->m[0][0] + a->m[3][1] * b->m[1][0] + a->m[3][2] * b->m[2][0] + a->m[3][3] * b->m[3][0];
-    result.m[3][1] = a->m[3][0] * b->m[0][1] + a->m[3][1] * b->m[1][1] + a->m[3][2] * b->m[2][1] + a->m[3][3] * b->m[3][1];
-    result.m[3][2] = a->m[3][0] * b->m[0][2] + a->m[3][1] * b->m[1][2] + a->m[3][2] * b->m[2][2] + a->m[3][3] * b->m[3][2];
-    result.m[3][3] = a->m[3][0] * b->m[0][3] + a->m[3][1] * b->m[1][3] + a->m[3][2] * b->m[2][3] + a->m[3][3] * b->m[3][3];
+    for (u32 i = 0; i < 4; i++) {
+        for (u32 j = 0; j < 4; j++) {
+            for (u32 k = 0; k < 4; k++) {
+                result.m[j][i] += (a->m[k][i] * b->m[j][k]);
+            }
+        }
+    }
     
     return result;
 }
@@ -210,6 +201,44 @@ mat4 mat4_perspective(const float fov, const float aspect_ratio, const float nea
     result.m[2][3] = -1.0f;
     result.m[3][2] = (near * far) / (near - far);
     result.m[3][3] = 0.0f;
+    
+    return result;
+}
+
+mat4 mat4_ortho(const float t, const float b, const float l, const float r, const float n, const float f) {
+    
+    mat4 result = {};
+    
+    result.m[0][0] = 2.0f/(r-l);
+    result.m[1][1] = 2.0f/(b-t);
+    result.m[2][2] = -2.0f/(f-n);
+    result.m[3][0] = -(r+l)/(r-l);
+    result.m[3][1] = -(b+t)/(b-t);
+    result.m[3][2] = -n/(f-n);
+    result.m[3][3] = 1.0f;
+    
+    return result;
+    
+}
+
+mat4 mat4_ortho_zoom(float ratio, float zoom, float n, float f) {
+    
+    float width = ratio * zoom;
+    float height = (1.0f/ratio) * zoom;
+    float l = -width;
+    float r = width;
+    float t = height;
+    float b = -height;
+    
+    mat4 result = {};
+    
+    result.m[0][0] = 2.0f/(r-l);
+    result.m[1][1] = 2.0f/(b-t);
+    result.m[2][2] = -2.0f/(f-n);
+    result.m[3][0] = -(r+l)/(r-l);
+    result.m[3][1] = -(b+t)/(b-t);
+    result.m[3][2] = -n/(f-n);
+    result.m[3][3] = 1.0f;
     
     return result;
 }
