@@ -1,5 +1,6 @@
 include/
 resources/models
+resources/3d
 *.pdb
 *.ilk
 *.obj

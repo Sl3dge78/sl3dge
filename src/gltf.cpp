@@ -28,6 +28,7 @@ typedef struct Material {
     alignas(4)  float roughness_factor;
     alignas(4)  u32   normal_texture;
     alignas(4)  u32   ao_texture;
+    alignas(4)  u32   emissive_texture;
 } Material;
 
 typedef struct Primitive {
@@ -159,6 +160,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         dst.roughness_factor = mat->pbr_metallic_roughness.roughness_factor;
         dst.normal_texture = GLTFGetTextureID(mat->normal_texture.texture);
         dst.ao_texture = GLTFGetTextureID(mat->occlusion_texture.texture);
+        dst.emissive_texture = GLTFGetTextureID(mat->emissive_texture.texture);
         //SDL_Log("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2], dst.metallic, dst.roughness);
         
         memcpy(buffer, &dst, sizeof(Material));

@@ -13,6 +13,7 @@ struct Material {
     float roughness_factor;
     uint normal_texture;
     uint ao_texture;
+    uint emissive_texture;
 };
 
 layout(location = 0) in vec3 in_worldpos;
@@ -112,11 +113,15 @@ vec3 base_color(Material mat) {
     float factor = 1.6;
 
     vec3 diffuse = mat.base_color;
-    float pixel_size = 32;
+    vec2 pos = in_texcoord;
+    float pixel_size = 1024;
     if(mat.base_color_texture < UINT_MAX) {
-        vec2 pos = floor(in_texcoord * pixel_size) / pixel_size;
+        pos = floor(in_texcoord * pixel_size) / pixel_size;
         diffuse = texture(textures[mat.base_color_texture], pos).rgb;
-    }      
+    } else if(mat.emissive_texture < UINT_MAX) {
+        diffuse = texture(textures[mat.emissive_texture], pos).rgb;
+
+    }   
     
     return diffuse;
 }
@@ -184,7 +189,7 @@ void main() {
 
     vec3 ambient = skycolor * ambient_intensity * base_color;
 
-    float bias = ( 1 - NdotL) * 0.0005;
+    float bias = ( 1 - NdotL) * 0.005;
     float shadow = get_shadow(bias);
     
     float cam_distance = length(cam.view_pos - in_worldpos);

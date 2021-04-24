@@ -4,6 +4,7 @@
 #if DEBUG
 
 #define ASSERT(expression) if(!(expression)) { while(1); *(int *)0 = 0;}
+#define ASSERT_MSG(expression, msg) if(!(expression)) { SDL_LogError(0,msg); while(1); *(int *)0 = 0;}
 
 global bool DBG_keep_console_open = false;
 #define KEEP_CONSOLE_OPEN(value) DBG_keep_console_open |= value

@@ -1,17 +1,3 @@
-
-typedef struct Buffer {
-    VkBuffer buffer;
-    VkDeviceMemory memory;
-    VkDeviceAddress address;
-    VkDeviceSize size;
-} Buffer;
-
-typedef struct Image {
-    VkImage image;
-    VkDeviceMemory memory;
-    VkImageView image_view;
-} Image;
-
 internal void DEBUGNameObject(const VkDevice device, const u64 object, const VkObjectType type, const char* name) {
     
     VkDebugUtilsObjectNameInfoEXT name_info = {};
