@@ -37,7 +37,7 @@ commands = {
    .mac = "./build.sh",
  },
  .run = { .out = "", .footer_panel = true, .save_dirty_files = false,
-   .win = "bin\\vulkan",
+   .win = "bin\\win32",
    .linux = "bin/handmade",
    .mac = "bin/handmade",
  },

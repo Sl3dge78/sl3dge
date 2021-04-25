@@ -1,17 +1,10 @@
 // Global includes
-#include <stdint.h>
-#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-
-#include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
-#include <vulkan/vulkan.h>
-#define CGLTF_IMPLEMENTATION
-#include <cgltf/cgltf.h>
 
+#include "common.h"
 #include "game.h"
-
+#include "vulkan.h"
 #include <windows.h>
 
 /* 
@@ -27,29 +20,22 @@
 
  IDEAS
  - In game console
-
 */
 
-u32* Win32AllocateAndLoadBinary(const char* path, i64 *file_size);
-
-typedef struct GameCode {
-    char *dll_path;
+typedef struct Module {
+    char *meta_path;
     FILETIME last_write_time;
-    HMODULE game_dll;
-    
-    //game_get_scene* GetScene;
-    game_loop* GameLoop;
-    game_start* GameStart;
-} GameCode;
-
-#include "gltf.cpp"
-#include "vulkan.cpp"
-//#include "vulkan_rtx.cpp"
+    HMODULE dll;
+} Module;
 
 typedef struct ShaderCode {
     char *spv_path;
     FILETIME last_write_time;
 } ShaderCode;
+
+internal inline void *PlatformGetProcAddress(Module *module, const char *fn) {
+    return GetProcAddress(module->dll, fn);
+}
 
 internal inline FILETIME Win32GetLastWriteTime(char *file_name) {
     
@@ -65,85 +51,105 @@ internal inline FILETIME Win32GetLastWriteTime(char *file_name) {
     return last_write_time;
 }
 
-// Returns true if it loaded new gamecode
-internal bool Win32LoadGameCode(GameCode* game_code) {
-    
-    bool result = false;
-    
-    game_code->dll_path = "bin\\game.dll";
-    
-    game_code->GameLoop = GameLoopStub;
-    game_code->GameStart = GameStartStub;
-    
-    // Compiler can still be writing to the file
-    // Try to copy, if we can do it, compiler is done so we can load it
-    // If not, compiler is not done, so copy fails and we're loading the previous one
-    if(CopyFile(game_code->dll_path, "bin\\game_temp.dll", FALSE)) {
-        // We were able to copy
-        game_code->last_write_time = Win32GetLastWriteTime(game_code->dll_path); 
-        result = true;
-    } else {
-        result = false;
+internal bool Win32ShouldReloadModule(Module *module) {
+    FILETIME current_time = Win32GetLastWriteTime(module->meta_path);
+    if(CompareFileTime(& module->last_write_time, &current_time)) { // Has the file changed ?
+        module->last_write_time = current_time;
+        return true;
     }
-    // If we were able to copy, this'll be the new one, if we weren't able to it'll be the old one
-    game_code->game_dll = LoadLibrary("bin\\game_temp.dll");
-    
-    if(game_code->game_dll) {
-        game_code->GameLoop = (game_loop *) GetProcAddress(game_code->game_dll, "GameLoop");
-        game_code->GameStart = (game_start *) GetProcAddress(game_code->game_dll, "GameStart");
-    }
-    
-    return result;
+    return false;
 }
 
-internal void Win32UnloadGameCode(GameCode* game_code) {
-    if(game_code->game_dll) {
-        FreeLibrary(game_code->game_dll);
+internal void Win32LoadModule(Module *module, const char* name) {
+    
+    SDL_Log("Loading module %s", name);
+    
+    u32 name_length = strlen(name);
+    const char *path = "bin\\";
+    const u32 path_length = strlen(path); 
+    
+    module->meta_path = (char *)calloc(path_length + name_length + strlen(".meta") + 1, sizeof(char));
+    strcat(module->meta_path, path);
+    strcat(module->meta_path, name);
+    strcat(module->meta_path, ".meta");
+    
+    char *orig_dll = (char *)calloc(path_length + name_length + strlen(".dll") + 1, sizeof(char));
+    strcat(orig_dll, path);
+    strcat(orig_dll, name);
+    strcat(orig_dll, ".dll");
+    char *tmp_dll = (char *)calloc(path_length + name_length + strlen("_temp.dll") + 1, sizeof(char));
+    strcat(tmp_dll, path);
+    strcat(tmp_dll, name);
+    strcat(tmp_dll, "_temp.dll");
+    CopyFile(orig_dll, tmp_dll, FALSE);
+    module->dll = LoadLibrary(tmp_dll);
+    
+    if(!module->dll) {
+        SDL_LogError(0, "Unable to load module %s", name);
     }
-    game_code->game_dll = NULL;
-    game_code->GameLoop = GameLoopStub;
-    game_code->GameStart = GameStartStub;
+    
+    free(orig_dll);
+    free(tmp_dll);
+    
+    module->last_write_time = Win32GetLastWriteTime(module->meta_path);
+    
+    SDL_Log("%s module loaded", name);
 }
 
-// This allocates memory, free it!
-u32* Win32AllocateAndLoadBinary(const char* path, i64 *file_size) {
-    
-    FILE *file = fopen(path,"rb");
-    if(!file) {
-        SDL_LogError(0, "Unable to open file");
-        SDL_LogError(0, path);
-    }
-    // Get the size
-    fseek(file, 0, SEEK_END);
-    *file_size = ftell(file);
-    rewind(file);
-    
-    // Copy into result
-    u32 *result = (u32 *)malloc(*file_size);
-    fread(result, 1, *file_size, file);
-    
-    fclose(file);
-    return result;
+internal void Win32CloseModule(Module *module) {
+    FreeLibrary(module->dll);
+    free(module->meta_path);
 }
+
+void VulkanLoadFunctions(Module *dll) {
+    pfn_VulkanCreateContext = (fn_VulkanCreateContext *) PlatformGetProcAddress(dll, "VulkanCreateContext");
+    pfn_VulkanDestroyContext = (fn_VulkanDestroyContext *) PlatformGetProcAddress(dll, "VulkanDestroyContext");
+    pfn_VulkanReloadShaders = (fn_VulkanReloadShaders *) PlatformGetProcAddress(dll, "VulkanReloadShaders");
+    pfn_VulkanDrawFrame = (fn_VulkanDrawFrame *) PlatformGetProcAddress(dll, "VulkanDrawFrame");
+    pfn_VulkanLoadScene = (fn_VulkanLoadScene *) PlatformGetProcAddress(dll, "VulkanLoadScene");
+    pfn_VulkanFreeScene = (fn_VulkanFreeScene *) PlatformGetProcAddress(dll, "VulkanFreeScene");
+}
+
+void GameLoadFunctions(Module *dll) {
+    pfn_GameStart = (fn_GameStart *) PlatformGetProcAddress(dll, "GameStart");
+    pfn_GameLoop = (fn_GameLoop *) PlatformGetProcAddress(dll, "GameLoop");
+}
+
+internal void LogOutput(void* userdata, int category, SDL_LogPriority priority, const char* message) {
+    FILE *std_err = fopen("bin/log.txt", "a");
+    //fseek(std_err, 0, SEEK_END);
+    fprintf(std_err, "%s\n",message);
+    fclose(std_err);
+}
+
 
 internal int main(int argc, char *argv[]) {
     
 #if DEBUG
-    AllocConsole();
+    //AllocConsole();
 #endif
     
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window* window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
-    
     IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
     
-    VulkanContext *context = VulkanCreateContext(window);
+    // Clear the log file
+    FILE *std_err = fopen("bin/log.txt", "w+");
+    fclose(std_err);
     
-    GameCode game_code = {};
-    Win32LoadGameCode(&game_code);
+    SDL_LogSetOutputFunction(&LogOutput, NULL);
     
-    SDL_Log("Vulkan Succesfully Loaded!");
+    Module vulkan_module = {};
+    Win32LoadModule(&vulkan_module, "vulkan");
+    VulkanLoadFunctions(&vulkan_module);
+    
+    VulkanContext *context = pfn_VulkanCreateContext(window);
+    
+    Module game_module = {};
+    Win32LoadModule(&game_module, "game");
+    GameLoadFunctions(&game_module);
+    
     SDL_ShowWindow(window);
     
     ShaderCode shader_code = {};
@@ -153,14 +159,11 @@ internal int main(int argc, char *argv[]) {
     GameData game_data = {};
     Scene *scene;
     
-    
-    
     SDL_Log("Loading scene...");
     
-    scene = VulkanLoadScene("resources/3d/map2.gltf", context);
-    //scene = VulkanLoadScene("resources/models/ref/ref.gltf", context);
+    scene = pfn_VulkanLoadScene("resources/3d/map2.gltf", context);
     
-    game_code.GameStart(&game_data);
+    pfn_GameStart(&game_data);
     
     bool running = true;
     float delta_time = 0;
@@ -174,22 +177,34 @@ internal int main(int argc, char *argv[]) {
         delta_time = (float)(time - last_time) / 1000.f;
         last_time = time;
         
+        // Reload vulkan if necessary
+        
+        if(Win32ShouldReloadModule(&vulkan_module)) {
+            pfn_VulkanFreeScene(context, scene);
+            pfn_VulkanDestroyContext(context);
+            Win32CloseModule(&vulkan_module);
+            
+            Win32LoadModule(&vulkan_module, "vulkan");
+            VulkanLoadFunctions(&vulkan_module);
+            context = pfn_VulkanCreateContext(window);
+            scene = pfn_VulkanLoadScene("resources/3d/map2.gltf", context);
+            SDL_Log("Vulkan reloaded");
+        }
+        
+        // Reload gamecode if necessary
+        if(Win32ShouldReloadModule(&game_module)) {
+            Win32CloseModule(&game_module);
+            Win32LoadModule(&game_module, "game");
+            GameLoadFunctions(&game_module);
+            SDL_Log("Game code reloaded");
+        }
+        
         // Reload shaders if necessary
         FILETIME shader_time = Win32GetLastWriteTime(shader_code.spv_path);
         if(CompareFileTime(& shader_code.last_write_time, &shader_time)){
             shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
-            VulkanReloadShaders(context, scene);
+            pfn_VulkanReloadShaders(context, scene);
             SDL_Log("Shaders reloaded");
-        }
-        
-        // Reload gamecode if necessary
-        FILETIME game_code_time = Win32GetLastWriteTime(game_code.dll_path);
-        if(CompareFileTime(&game_code.last_write_time, &game_code_time)){
-            Win32UnloadGameCode(&game_code);
-            if(Win32LoadGameCode(&game_code)) {
-                //game_code.GameStart(&game_data);
-                SDL_Log("Game code successfully reloaded");
-            }
         }
         
         while (SDL_PollEvent(&event)) {
@@ -199,16 +214,17 @@ internal int main(int argc, char *argv[]) {
                 running = false;
             }
         }
-        game_code.GameLoop(delta_time, &game_data);
-        VulkanUpdateDescriptors(context, &game_data);
-        VulkanDrawFrame(context, scene);
+        pfn_GameLoop(delta_time, &game_data);
+        pfn_VulkanDrawFrame(context, scene, &game_data);
     }
     
-    VulkanFreeScene(context, scene);
+    pfn_VulkanFreeScene(context, scene);
+    pfn_VulkanDestroyContext(context);
     
-    Win32UnloadGameCode(&game_code);
+    Win32CloseModule(&game_module);
     
-    VulkanDestroyContext(context);
+    Win32CloseModule(&vulkan_module);
+    
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();

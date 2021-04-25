@@ -335,11 +335,11 @@ internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout 
     vkDestroyShaderModule(device, pipeline_ci.pStages[1].module, NULL);
 }
 
-void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
+internal void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
     UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 }
 
-Scene *VulkanLoadScene(char *file, VulkanContext *context) {
+extern "C" __declspec(dllexport) Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     double start = SDL_GetPerformanceCounter();
     Scene *scene = (Scene *) malloc(sizeof(Scene));
     *scene = {};
@@ -507,7 +507,7 @@ Scene *VulkanLoadScene(char *file, VulkanContext *context) {
     return scene;
 }
 
-void VulkanFreeScene(VulkanContext *context, Scene *scene) {
+extern "C" __declspec(dllexport) void VulkanFreeScene(VulkanContext *context, Scene *scene) {
     
     DestroyLayout(context->device, context->descriptor_pool, &scene->layout);
     

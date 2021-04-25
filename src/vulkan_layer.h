@@ -3,7 +3,6 @@
 #ifndef VULKAN_LAYER_H
 #define VULKAN_LAYER_H
 
-
 #define DECL_FUNC(name) global PFN_##name pfn_##name
 #define LOAD_INSTANCE_FUNC(instance, name) pfn_##name = (PFN_##name)vkGetInstanceProcAddr(instance, #name); \
 ASSERT(pfn_##name)
@@ -115,8 +114,8 @@ typedef struct PushConstant {
     alignas(4) u32 color_texture;
 } PushConstant;
 
-void AssertVkResult(VkResult result);
-void CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module);
-void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout *layout);
+internal void AssertVkResult(VkResult result);
+internal void CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module);
+internal void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout *layout);
 
 #endif //VULKAN_LAYER_H

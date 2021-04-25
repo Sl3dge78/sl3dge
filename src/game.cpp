@@ -1,3 +1,5 @@
+
+#include "common.h"
 #include "game.h"
 
 /*
@@ -15,12 +17,12 @@
  
 */
 
-extern "C" __declspec(dllexport) GAME_START(GameStart) {
+extern "C" __declspec(dllexport) void GameStart(GameData *game_data) {
     game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f/720.0f, 0.01f, 100000.0f);
     game_data->light_pos = {0.0f,0.0f,0.0f};
 }
 
-extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
+extern "C" __declspec(dllexport) void GameLoop(float delta_time, GameData *game_data) {
     
     float speed = delta_time;
     
@@ -81,7 +83,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
     }
     
     if(keyboard[SDL_SCANCODE_P]) {
-        game_data->cos += speed;
+        game_data->cos += delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
         
@@ -90,7 +92,7 @@ extern "C" __declspec(dllexport) GAME_LOOP(GameLoop) {
         }
     }
     if(keyboard[SDL_SCANCODE_O]) {
-        game_data->cos -= speed;
+        game_data->cos -= delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
         if(game_data->cos < 0.0f) {

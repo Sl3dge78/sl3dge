@@ -1,4 +1,11 @@
+#include <SDL/SDL_image.h>
 #include <SDL/SDL_vulkan.h>
+#include <vulkan/vulkan.h>
+#define CGLTF_IMPLEMENTATION
+#include <cgltf/cgltf.h>
+
+#include "common.h"
+#include "game.h"
 
 /*
  === TODO ===
@@ -34,6 +41,7 @@
 
 #include "vulkan_layer.h"
 #include "vulkan_types.cpp"
+#include "gltf.cpp"
 #include "vulkan_scene.cpp"
 
 internal void AssertVkResult(VkResult result) {
@@ -99,9 +107,30 @@ internal void LoadDeviceFuncPointers(VkDevice device) {
     
 }
 
+// This allocates memory, free it!
+internal u32* AllocateAndLoadBinary(const char* path, i64 *file_size) {
+    
+    FILE *file = fopen(path,"rb");
+    if(!file) {
+        SDL_LogError(0, "Unable to open file");
+        SDL_LogError(0, path);
+    }
+    // Get the size
+    fseek(file, 0, SEEK_END);
+    *file_size = ftell(file);
+    rewind(file);
+    
+    // Copy into result
+    u32 *result = (u32 *)malloc(*file_size);
+    fread(result, 1, *file_size, file);
+    
+    fclose(file);
+    return result;
+}
+
 internal void CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module) {
     i64 size = 0;
-    u32 *code = Win32AllocateAndLoadBinary(path, &size);
+    u32 *code = AllocateAndLoadBinary(path, &size);
     
     VkShaderModuleCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -819,7 +848,9 @@ internal void CreateShadowMapPipeline(const VkDevice device, const Swapchain *sw
     vkDestroyShaderModule(device, pipeline_ci.pStages[0].module, NULL);
 }
 
-VulkanContext* VulkanCreateContext(SDL_Window* window){
+extern "C" __declspec(dllexport) VulkanContext* VulkanCreateContext(SDL_Window* window){
+    SDL_Log("o");
+    
     VulkanContext* context = (VulkanContext*)malloc(sizeof(VulkanContext));
     CreateVkInstance(window, &context->instance);
     SDL_Vulkan_CreateSurface(window,context->instance,&context->surface);
@@ -982,14 +1013,14 @@ VulkanContext* VulkanCreateContext(SDL_Window* window){
     return context;
 }
 
-void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout *layout) {
+internal void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout *layout) {
     
     vkFreeDescriptorSets(device, pool, layout->descriptor_set_count, &layout->descriptor_set);
     vkDestroyDescriptorSetLayout(device, layout->set_layout, NULL);
     vkDestroyPipelineLayout(device, layout->layout, NULL);
 }
 
-void VulkanDestroyContext(VulkanContext *context){
+extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *context){
     
     vkDeviceWaitIdle(context->device);
     
@@ -1030,7 +1061,7 @@ void VulkanDestroyContext(VulkanContext *context){
     free(context);
 }
 
-void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
+extern "C" __declspec(dllexport) void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
     vkDestroyPipeline(context->device, scene->pipeline, NULL);
     CreateScenePipeline(context->device, scene->layout.layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
     
@@ -1045,7 +1076,9 @@ void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
 //
 // ================
 
-void VulkanDrawFrame(VulkanContext* context, Scene *scene) {
+extern "C" __declspec(dllexport) void VulkanDrawFrame(VulkanContext* context, Scene *scene, GameData *game_data) {
+    
+    VulkanUpdateDescriptors(context, game_data);
     
     u32 image_id;
     Swapchain* swapchain = &context->swapchain;
