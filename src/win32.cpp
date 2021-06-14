@@ -9,6 +9,7 @@
 
 #include <sl3dge/types.h>
 #include <sl3dge/debug.h>
+#include <sl3dge/module.h>
 
 #include "game.h"
 #include "vulkan.h"
@@ -29,12 +30,6 @@
  - In game console
 */
 
-typedef struct Module {
-	char *meta_path;
-	FILETIME last_write_time;
-	HMODULE dll;
-} Module;
-
 typedef struct ShaderCode {
 	char *spv_path;
 	FILETIME last_write_time;
@@ -42,68 +37,6 @@ typedef struct ShaderCode {
 
 internal inline void *PlatformGetProcAddress(Module *module, const char *fn) {
 	return GetProcAddress(module->dll, fn);
-}
-
-internal inline FILETIME Win32GetLastWriteTime(char *file_name) {
-	FILETIME last_write_time = {};
-
-	WIN32_FIND_DATA data;
-	HANDLE handle = FindFirstFile(file_name, &data);
-	if (handle != INVALID_HANDLE_VALUE) {
-		last_write_time = data.ftLastWriteTime;
-		FindClose(handle);
-	}
-
-	return last_write_time;
-}
-
-internal bool Win32ShouldReloadModule(Module *module) {
-	FILETIME current_time = Win32GetLastWriteTime(module->meta_path);
-	if (CompareFileTime(&module->last_write_time, &current_time)) { // Has the file changed ?
-		module->last_write_time = current_time;
-		return true;
-	}
-	return false;
-}
-
-internal void Win32LoadModule(Module *module, const char *name) {
-	SDL_Log("Loading module %s", name);
-
-	u32 name_length = strlen(name);
-	const char *path = "bin\\";
-	const u32 path_length = strlen(path);
-
-	module->meta_path = (char *)calloc(path_length + name_length + strlen(".meta") + 1, sizeof(char));
-	strcat(module->meta_path, path);
-	strcat(module->meta_path, name);
-	strcat(module->meta_path, ".meta");
-
-	char *orig_dll = (char *)calloc(path_length + name_length + strlen(".dll") + 1, sizeof(char));
-	strcat(orig_dll, path);
-	strcat(orig_dll, name);
-	strcat(orig_dll, ".dll");
-	char *tmp_dll = (char *)calloc(path_length + name_length + strlen("_temp.dll") + 1, sizeof(char));
-	strcat(tmp_dll, path);
-	strcat(tmp_dll, name);
-	strcat(tmp_dll, "_temp.dll");
-	CopyFile(orig_dll, tmp_dll, FALSE);
-	module->dll = LoadLibrary(tmp_dll);
-
-	if (!module->dll) {
-		SDL_LogError(0, "Unable to load module %s", name);
-	}
-
-	free(orig_dll);
-	free(tmp_dll);
-
-	module->last_write_time = Win32GetLastWriteTime(module->meta_path);
-
-	SDL_Log("%s module loaded", name);
-}
-
-internal void Win32CloseModule(Module *module) {
-	FreeLibrary(module->dll);
-	free(module->meta_path);
 }
 
 void VulkanLoadFunctions(Module *dll) {
