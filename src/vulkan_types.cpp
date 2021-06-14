@@ -1,4 +1,4 @@
-#include <sl_debug.h>
+#include <sl3dge/debug.h>
 
 internal void DEBUGNameObject(const VkDevice device, const u64 object, const VkObjectType type, const char *name) {
 	VkDebugUtilsObjectNameInfoEXT name_info = {};

@@ -7,8 +7,8 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 
-#include <sl_types.h>
-#include <sl_debug.h>
+#include <sl3dge/types.h>
+#include <sl3dge/debug.h>
 
 #include "game.h"
 #include "vulkan.h"

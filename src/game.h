@@ -1,8 +1,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <sl_types.h>
-#include <sl_math.h>
+#include <sl3dge/types.h>
+#include <sl3dge/3d_math.h>
 
 typedef struct CameraMatrices {
 	alignas(16) Mat4 proj;

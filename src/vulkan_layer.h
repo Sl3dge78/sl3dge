@@ -3,7 +3,7 @@
 #ifndef VULKAN_LAYER_H
 #define VULKAN_LAYER_H
 
-#include <sl_math.h>
+#include <sl3dge/3d_math.h>
 
 #define DECL_FUNC(name) global PFN_##name pfn_##name
 #define LOAD_INSTANCE_FUNC(instance, name)                           \

@@ -3,9 +3,9 @@
 
 #include <SDL/SDL.h>
 
-#include <sl_debug.h>
-#include <sl_math.h>
-#include <sl_types.h>
+#include <sl3dge/debug.h>
+#include <sl3dge/3d_math.h>
+#include <sl3dge/types.h>
 
 #include "game.h"
 

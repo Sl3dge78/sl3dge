@@ -1,4 +1,4 @@
-#include <sl_debug.h>
+#include <sl3dge/debug.h>
 
 /*
  === TODO ===
