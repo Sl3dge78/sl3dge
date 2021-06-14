@@ -16,13 +16,5 @@
                 "isDefault": true
             }
         },
-        {
-            "label": "Shaders",
-            "command": "build_shaders.bat",
-        },
-        {
-            "label": "Echo",
-            "command": "echo ${env:VULKAN_SDK}",
-        },
     ]
 }

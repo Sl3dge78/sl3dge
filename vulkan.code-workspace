@@ -1,0 +1,22 @@
+{
+    "folders": [
+        {
+            "name": "sl3dge",
+            "path": "..\\_include\\sl3dge"
+        },
+        {
+            "name": "vulkan",
+            "path": "."
+        },
+        {
+            "path": "resources\\shaders"
+        }
+    ],
+    "settings": {
+        "files.associations": {
+            "*.rh": "cpp",
+            "system_error": "cpp",
+            "xlocale": "cpp"
+        }
+    }
+}
