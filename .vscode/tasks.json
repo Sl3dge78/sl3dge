@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "presentation": {
+        "reveal": "silent",
+        "clear": true
+    },
+    "tasks": [
+        {
+            "label": "Build",
+            "command": "build.bat",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Shaders",
+            "command": "build_shaders.bat",
+        },
+        {
+            "label": "Echo",
+            "command": "echo ${env:VULKAN_SDK}",
+        },
+    ]
+}
