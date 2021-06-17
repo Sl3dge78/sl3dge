@@ -143,13 +143,19 @@ internal void CreateRtxSbt(VulkanContext *context, VkPipeline pipeline, VulkanSh
 		UploadToBuffer(context->device, &sbt->rgen, data, handle_size_aligned);
 		UploadToBuffer(context->device, &sbt->rmiss, data + handle_size_aligned, handle_size_aligned * 2);
 		UploadToBuffer(context->device, &sbt->rchit, data + (3 * handle_size_aligned), handle_size_aligned);
-
+		
 		sbt->strides[0] = { sbt->rgen.address, handle_size_aligned, handle_size_aligned };
 		sbt->strides[1] = { sbt->rmiss.address, handle_size_aligned, handle_size_aligned };
 		sbt->strides[2] = { sbt->rchit.address, handle_size_aligned, handle_size_aligned };
 		sbt->strides[3] = { 0u, 0u, 0u };
 		free(data);
 	}
+}
+
+internal void DestroyRtxSbt(VulkanContext *context, VulkanShaderBindingTable *sbt) {
+	DestroyBuffer(context->device, &sbt->rgen);
+	DestroyBuffer(context->device, &sbt->rchit);
+	DestroyBuffer(context->device, &sbt->rmiss);
 }
 
 internal void CreateRtxDescriptorSet(VulkanContext *context, const VkAccelerationStructureKHR *TLAS, VkBuffer vtx_buffer, VkBuffer idx_buffer,

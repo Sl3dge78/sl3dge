@@ -530,6 +530,22 @@ DLL_EXPORT Scene *VulkanLoadScene(char *file, VulkanContext *context) {
 }
 
 DLL_EXPORT void VulkanFreeScene(VulkanContext *context, Scene *scene) {
+	DestroyRtxSbt(context, &scene->sbt);
+
+	for (u32 i = 0; i < scene->total_primitives_count; ++i) {
+		DestroyBuffer(context->device, &scene->BLAS_buffers[i]);
+		DestroyBuffer(context->device, &scene->instance_data_buffers[i]);
+		pfn_vkDestroyAccelerationStructureKHR(context->device, scene->BLAS[i], 0);
+	}
+
+	DestroyBuffer(context->device, &scene->TLAS_buffer);
+	pfn_vkDestroyAccelerationStructureKHR(context->device, scene->TLAS, 0);
+
+	free(scene->BLAS_buffers);
+	free(scene->instance_data_buffers);
+	free(scene->BLAS);
+	free(scene->rtx_geometries);
+
 	vkFreeDescriptorSets(context->device, context->descriptor_pool, scene->descriptor_set_count, scene->descriptor_sets);
 	free(scene->descriptor_sets);
 

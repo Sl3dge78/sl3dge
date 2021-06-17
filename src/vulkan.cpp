@@ -905,7 +905,7 @@ extern "C" __declspec(dllexport) VulkanContext *VulkanCreateContext(SDL_Window *
 		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100 },
 	};
 	const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
-	
+
 	VkDescriptorPoolCreateInfo pool_ci = {};
 	pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	pool_ci.pNext = NULL;
@@ -1036,6 +1036,8 @@ internal void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout
 
 extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *context) {
 	vkDeviceWaitIdle(context->device);
+
+	DestroyImage(context->device, &context->rtx_image);
 
 	// Shadowmap
 	DestroyImage(context->device, &context->shadowmap);
