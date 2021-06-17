@@ -1073,6 +1073,8 @@ extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *contex
 	vkDestroyInstance(context->instance, NULL);
 
 	free(context);
+
+	DBG_END();
 }
 
 extern "C" __declspec(dllexport) void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
