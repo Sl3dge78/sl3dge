@@ -8,10 +8,6 @@
             "type": "shell",
             "command": "../../build_shaders.bat",
             "problemMatcher": [],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
         }
     ]
 }

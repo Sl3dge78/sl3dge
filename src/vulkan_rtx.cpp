@@ -1,8 +1,6 @@
 #include <vulkan/vulkan.h>
 
 #include <sl3dge/types.h>
-#include "vulkan_types.cpp"
-#include "vulkan_layer.h"
 
 typedef struct VulkanRTXRenderer {
 	VkPipeline pipeline;
@@ -228,7 +226,6 @@ internal void CreateRTXPipelineLayout(const VkDevice device, const Image *result
 				NULL }
 	};
 	const u32 game_descriptor_count = sizeof(game_bindings) / sizeof(game_bindings[0]);
-	;
 
 	VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
 	game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -305,7 +302,7 @@ internal void CreateRTXPipelineLayout(const VkDevice device, const Image *result
 	AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, &pipeline->layout));
 }
 
-internal void CreateRtxPipeline(const VkDevice device, const VkPipelineLayout *layout, const VkPhysicalDeviceRayTracingPipelinePropertiesKHR *rtx_properties, VkPipeline *pipeline) {
+internal void CreateRtxPipeline(const VkDevice device, const VkPipelineLayout *layout, VkPipeline *pipeline) {
 	VkRayTracingPipelineCreateInfoKHR create_info = {};
 	create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
 	create_info.pNext = NULL;
@@ -368,7 +365,8 @@ internal void CreateRtxPipeline(const VkDevice device, const VkPipelineLayout *l
 	};
 	create_info.pGroups = groups;
 
-	create_info.maxPipelineRayRecursionDepth = rtx_properties->maxRayRecursionDepth;
+	//create_info.maxPipelineRayRecursionDepth = rtx_properties->maxRayRecursionDepth;
+	create_info.maxPipelineRayRecursionDepth = 0;
 	create_info.pLibraryInfo = NULL;
 	create_info.pLibraryInterface = NULL;
 	create_info.pDynamicState = NULL;

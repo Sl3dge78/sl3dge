@@ -1,6 +1,28 @@
+
+/*
+ === TODO ===
+ CRITICAL
+
+ MAJOR
+ - Séparer le remplissage des infos de layout du build. Pour pouvoir faire genre :
+   je mets les infos de la scène, je mets les infos du renderer (rtx ou raster), je build le layout
+ BACKLOG
+
+ IMPROVEMENTS
+
+*/
+
+#include <sl3dge/types.h>
+
+#include "vulkan_layer.h"
+
 typedef struct Scene {
 	VkPipeline pipeline;
-	VulkanLayout layout;
+
+	VkPipelineLayout layout;
+	u32 descriptor_set_count;
+	VkDescriptorSetLayout *set_layouts;
+	VkDescriptorSet *descriptor_sets;
 
 	Buffer vtx_buffer;
 	Buffer idx_buffer;
@@ -22,10 +44,7 @@ typedef struct Scene {
 
 } Scene;
 
-internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayout *layout) {
-	// Set Layout
-	layout->descriptor_set_count = 1;
-
+internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene, VkDescriptorSetLayout *set_layout, VkDescriptorSet *descriptor_set) {
 	const VkDescriptorSetLayoutBinding bindings[] = {
 		{ // CAMERA MATRICES
 				0,
@@ -60,33 +79,16 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
 	game_set_create_info.flags = 0;
 	game_set_create_info.bindingCount = descriptor_count;
 	game_set_create_info.pBindings = bindings;
-	AssertVkResult(vkCreateDescriptorSetLayout(context->device, &game_set_create_info, NULL, &layout->set_layout));
+	AssertVkResult(vkCreateDescriptorSetLayout(context->device, &game_set_create_info, NULL, set_layout));
 
 	// Descriptor Set
 	VkDescriptorSetAllocateInfo allocate_info = {};
 	allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocate_info.pNext = NULL;
 	allocate_info.descriptorPool = context->descriptor_pool;
-	allocate_info.descriptorSetCount = layout->descriptor_set_count;
-	allocate_info.pSetLayouts = &layout->set_layout;
-	AssertVkResult(vkAllocateDescriptorSets(context->device, &allocate_info, &layout->descriptor_set));
-
-	// Push constants
-	VkPushConstantRange push_constant_range = { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
-	const u32 push_constant_count = 1;
-	layout->push_constant_size = push_constant_range.size;
-
-	// Layout
-	VkPipelineLayoutCreateInfo create_info = {};
-	create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	create_info.pNext = NULL;
-	create_info.flags = 0;
-	create_info.setLayoutCount = layout->descriptor_set_count;
-	create_info.pSetLayouts = &layout->set_layout;
-	create_info.pushConstantRangeCount = push_constant_count;
-	create_info.pPushConstantRanges = &push_constant_range;
-
-	AssertVkResult(vkCreatePipelineLayout(context->device, &create_info, NULL, &layout->layout));
+	allocate_info.descriptorSetCount = 1;
+	allocate_info.pSetLayouts = set_layout;
+	AssertVkResult(vkAllocateDescriptorSets(context->device, &allocate_info, descriptor_set));
 
 	// Writes
 	const u32 static_writes_count = 3;
@@ -95,7 +97,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
 	VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0, VK_WHOLE_SIZE };
 	static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	static_writes[0].pNext = NULL;
-	static_writes[0].dstSet = layout->descriptor_set;
+	static_writes[0].dstSet = *descriptor_set;
 	static_writes[0].dstBinding = 0;
 	static_writes[0].dstArrayElement = 0;
 	static_writes[0].descriptorCount = 1;
@@ -107,7 +109,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
 	VkDescriptorBufferInfo materials = { scene->mat_buffer.buffer, 0, VK_WHOLE_SIZE };
 	static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	static_writes[1].pNext = NULL;
-	static_writes[1].dstSet = layout->descriptor_set;
+	static_writes[1].dstSet = *descriptor_set;
 	static_writes[1].dstBinding = 1;
 	static_writes[1].dstArrayElement = 0;
 	static_writes[1].descriptorCount = 1;
@@ -119,7 +121,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
 	VkDescriptorImageInfo shadowmap_info = { context->shadowmap_sampler, context->shadowmap.image_view, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };
 	static_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	static_writes[2].pNext = NULL;
-	static_writes[2].dstSet = layout->descriptor_set;
+	static_writes[2].dstSet = *descriptor_set;
 	static_writes[2].dstBinding = 3;
 	static_writes[2].dstArrayElement = 0;
 	static_writes[2].descriptorCount = 1;
@@ -149,7 +151,7 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
 		VkWriteDescriptorSet textures_buffer = {};
 		textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		textures_buffer.pNext = NULL;
-		textures_buffer.dstSet = layout->descriptor_set;
+		textures_buffer.dstSet = *descriptor_set;
 		textures_buffer.dstBinding = 2;
 		textures_buffer.dstArrayElement = 0;
 		textures_buffer.descriptorCount = nb_info;
@@ -161,6 +163,24 @@ internal void CreateSceneLayout(VulkanContext *context, Scene *scene, VulkanLayo
 		vkUpdateDescriptorSets(context->device, 1, &textures_buffer, 0, NULL);
 		free(images_info);
 	}
+}
+
+internal void BuildLayout(VkDevice device, const u32 set_layout_count, VkDescriptorSetLayout *set_layouts, VkPipelineLayout *layout) {
+	// Push constants
+	VkPushConstantRange push_constant_range = { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
+	const u32 push_constant_count = 1;
+
+	// Layout
+	VkPipelineLayoutCreateInfo create_info = {};
+	create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	create_info.pNext = NULL;
+	create_info.flags = 0;
+	create_info.setLayoutCount = set_layout_count;
+	create_info.pSetLayouts = set_layouts;
+	create_info.pushConstantRangeCount = push_constant_count;
+	create_info.pPushConstantRanges = &push_constant_range;
+
+	AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, layout));
 }
 
 internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkRenderPass render_pass, VkSampleCountFlagBits sample_count, VkPipeline *pipeline) {
@@ -484,8 +504,26 @@ DLL_EXPORT Scene *VulkanLoadScene(char *file, VulkanContext *context) {
 		free(image_buffers);
 	}
 
-	CreateSceneLayout(context, scene, &scene->layout);
-	CreateScenePipeline(context->device, scene->layout.layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
+	bool rtx = 0;
+
+	if (!rtx) {
+		scene->descriptor_set_count = 1;
+		scene->set_layouts = (VkDescriptorSetLayout *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSetLayout));
+		scene->descriptor_sets = (VkDescriptorSet *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSet));
+
+		CreateSceneDescriptorSet(context, scene, &scene->set_layouts[0], &scene->descriptor_sets[0]);
+
+		BuildLayout(context->device, scene->descriptor_set_count, scene->set_layouts, &scene->layout);
+		CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
+	} else {
+		scene->descriptor_set_count = 2;
+
+		CreateSceneDescriptorSet(context, scene, &scene->set_layouts[0], &scene->descriptor_sets[0]);
+		//CreateRtxDescriptorSet(context, scene, &scene->set_layouts[1], &scene->descriptor_sets[1]);
+
+		BuildLayout(context->device, scene->descriptor_set_count, scene->set_layouts, &scene->layout);
+		//CreateRtxPipeline(context->device, scene->layout.layout, &scene->pipeline);
+	}
 
 	cgltf_free(data);
 	free(directory);
@@ -497,7 +535,14 @@ DLL_EXPORT Scene *VulkanLoadScene(char *file, VulkanContext *context) {
 }
 
 DLL_EXPORT void VulkanFreeScene(VulkanContext *context, Scene *scene) {
-	DestroyLayout(context->device, context->descriptor_pool, &scene->layout);
+	vkFreeDescriptorSets(context->device, context->descriptor_pool, scene->descriptor_set_count, scene->descriptor_sets);
+	free(scene->descriptor_sets);
+
+	for (u32 i = 0; i < scene->descriptor_set_count; ++i) {
+		vkDestroyDescriptorSetLayout(context->device, scene->set_layouts[i], 0);
+	}
+	free(scene->set_layouts);
+	vkDestroyPipelineLayout(context->device, scene->layout, 0);
 
 	vkDestroyPipeline(context->device, scene->pipeline, NULL);
 

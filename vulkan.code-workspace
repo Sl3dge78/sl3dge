@@ -16,7 +16,8 @@
         "files.associations": {
             "*.rh": "cpp",
             "system_error": "cpp",
-            "xlocale": "cpp"
+            "xlocale": "cpp",
+            "type_traits": "cpp"
         }
     }
 }

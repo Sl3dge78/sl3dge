@@ -39,6 +39,7 @@
 
 #include "vulkan_layer.h"
 #include "vulkan_types.cpp"
+//#include "vulkan_rtx.cpp"
 #include "gltf.cpp"
 #include "vulkan_scene.cpp"
 
@@ -1043,7 +1044,7 @@ extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *contex
 
 extern "C" __declspec(dllexport) void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
 	vkDestroyPipeline(context->device, scene->pipeline, NULL);
-	CreateScenePipeline(context->device, scene->layout.layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
+	CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
 
 	vkDestroyPipeline(context->device, context->shadowmap_pipeline, NULL);
 	CreateShadowMapPipeline(context->device, &context->swapchain, context->shadowmap_layout.layout, context->shadowmap_render_pass, context->shadowmap_extent, &context->shadowmap_pipeline);
@@ -1098,7 +1099,7 @@ extern "C" __declspec(dllexport) void VulkanDrawFrame(VulkanContext *context, Sc
 		Primitive *prim = &scene->primitives[i];
 
 		PushConstant push = { scene->transforms[prim->node_id], prim->material_id };
-		vkCmdPushConstants(cmd, scene->layout.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
+		vkCmdPushConstants(cmd, scene->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
 		vkCmdDrawIndexed(cmd, prim->index_count, 1, prim->index_offset, prim->vertex_offset, 0);
 	}
 	vkCmdEndRenderPass(cmd);
@@ -1117,13 +1118,13 @@ extern "C" __declspec(dllexport) void VulkanDrawFrame(VulkanContext *context, Sc
 	vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE);
 
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->pipeline);
-	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->layout.layout, 0, 1, &scene->layout.descriptor_set, 0, NULL);
+	vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->layout, 0, scene->descriptor_set_count, scene->descriptor_sets, 0, NULL);
 
 	for (u32 i = 0; i < scene->total_primitives_count; i++) {
 		Primitive *prim = &scene->primitives[i];
 
 		PushConstant push = { scene->transforms[prim->node_id], prim->material_id };
-		vkCmdPushConstants(cmd, scene->layout.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
+		vkCmdPushConstants(cmd, scene->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant), &push);
 		vkCmdDrawIndexed(cmd, prim->index_count, 1, prim->index_offset, prim->vertex_offset, 0);
 	}
 
