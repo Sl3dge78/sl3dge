@@ -6,7 +6,7 @@
  - Materials
 
  MAJOR
-  - Multiple primitives
+- If we have multiple meshes that use the same primitve, we will just dupe it here
 
 BACKLOG
 
@@ -37,6 +37,7 @@ typedef struct Primitive {
 	u32 node_id;
 	u32 index_count;
 	u32 index_offset;
+	u32 vertex_count;
 	u32 vertex_offset;
 } Primitive;
 

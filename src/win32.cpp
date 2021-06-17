@@ -44,6 +44,7 @@ void VulkanLoadFunctions(Module *dll) {
 	pfn_VulkanDestroyContext = (fn_VulkanDestroyContext *)PlatformGetProcAddress(dll, "VulkanDestroyContext");
 	pfn_VulkanReloadShaders = (fn_VulkanReloadShaders *)PlatformGetProcAddress(dll, "VulkanReloadShaders");
 	pfn_VulkanDrawFrame = (fn_VulkanDrawFrame *)PlatformGetProcAddress(dll, "VulkanDrawFrame");
+	pfn_VulkanDrawRTXFrame = (fn_VulkanDrawRTXFrame *)PlatformGetProcAddress(dll, "VulkanDrawRTXFrame");
 	pfn_VulkanLoadScene = (fn_VulkanLoadScene *)PlatformGetProcAddress(dll, "VulkanLoadScene");
 	pfn_VulkanFreeScene = (fn_VulkanFreeScene *)PlatformGetProcAddress(dll, "VulkanFreeScene");
 }
@@ -55,19 +56,18 @@ void GameLoadFunctions(Module *dll) {
 
 internal void LogOutput(void *userdata, int category, SDL_LogPriority priority, const char *message) {
 	FILE *std_err = fopen("bin/log.txt", "a");
-	//fseek(std_err, 0, SEEK_END);
+	// fseek(std_err, 0, SEEK_END);
 	fprintf(std_err, "%s\n", message);
 	fclose(std_err);
 }
 
 internal int main(int argc, char *argv[]) {
 #if DEBUG
-	//AllocConsole();
+	// AllocConsole();
 #endif
 
 	SDL_Init(SDL_INIT_EVERYTHING);
-	SDL_Window *window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED,
-			SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
+	SDL_Window *window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
 	IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
 
 	// Clear the log file
@@ -75,7 +75,7 @@ internal int main(int argc, char *argv[]) {
 	fclose(std_err);
 
 	// Log to file
-	//SDL_LogSetOutputFunction(&LogOutput, NULL);
+	// SDL_LogSetOutputFunction(&LogOutput, NULL);
 
 	Module vulkan_module = {};
 	Win32LoadModule(&vulkan_module, "vulkan");
@@ -151,7 +151,8 @@ internal int main(int argc, char *argv[]) {
 			}
 		}
 		pfn_GameLoop(delta_time, &game_data);
-		pfn_VulkanDrawFrame(context, scene, &game_data);
+		// pfn_VulkanDrawFrame(context, scene, &game_data);
+		pfn_VulkanDrawRTXFrame(context, scene);
 	}
 
 	pfn_VulkanFreeScene(context, scene);

@@ -18,10 +18,13 @@ fn_VulkanReloadShaders *pfn_VulkanReloadShaders;
 typedef void fn_VulkanDrawFrame(VulkanContext *context, Scene *scene, GameData *game_data);
 fn_VulkanDrawFrame *pfn_VulkanDrawFrame;
 
+typedef void fn_VulkanDrawRTXFrame(VulkanContext *context, Scene *scene);
+fn_VulkanDrawRTXFrame *pfn_VulkanDrawRTXFrame;
+
 typedef Scene *fn_VulkanLoadScene(char *file, VulkanContext *context);
 fn_VulkanLoadScene *pfn_VulkanLoadScene;
 
 typedef void fn_VulkanFreeScene(VulkanContext *context, Scene *scene);
 fn_VulkanFreeScene *pfn_VulkanFreeScene;
 
-#endif //VULKAN_H
+#endif // VULKAN_H
