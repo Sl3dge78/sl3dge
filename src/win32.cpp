@@ -154,7 +154,7 @@ internal int main(int argc, char *argv[]) {
 		}
 		pfn_GameLoop(delta_time, &game_data);
 		// pfn_VulkanDrawFrame(context, scene, &game_data);
-		pfn_VulkanDrawRTXFrame(context, scene);
+		pfn_VulkanDrawRTXFrame(context, scene, &game_data);
 	}
 
 	pfn_VulkanFreeScene(context, scene);

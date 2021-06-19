@@ -78,13 +78,13 @@ global VkDebugUtilsMessengerEXT debug_messenger;
 VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 		const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData) {
 	if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-		SDL_LogInfo(0, pCallbackData->pMessage);
+		// SDL_LogInfo(0, pCallbackData->pMessage);
 	} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-		SDL_LogWarn(0, pCallbackData->pMessage);
+		// SDL_LogWarn(0, pCallbackData->pMessage);
 	} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
 		SDL_LogError(0, pCallbackData->pMessage);
+		KEEP_CONSOLE_OPEN(true);
 	}
-	KEEP_CONSOLE_OPEN(true);
 	return VK_FALSE;
 }
 
@@ -310,9 +310,8 @@ internal void CreateVkDevice(
 
 	// Extensions
 	const char *extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-		VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, VK_KHR_MAINTENANCE3_EXTENSION_NAME,
-		VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, VK_KHR_RAY_QUERY_EXTENSION_NAME,
-		VK_KHR_SHADER_CLOCK_EXTENSION_NAME };
+		VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+		VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, VK_KHR_RAY_QUERY_EXTENSION_NAME, VK_KHR_SHADER_CLOCK_EXTENSION_NAME };
 	const u32 extension_count = sizeof(extensions) / sizeof(extensions[0]);
 
 	VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_feature = {};
@@ -1079,7 +1078,8 @@ extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *contex
 
 extern "C" __declspec(dllexport) void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
 	vkDestroyPipeline(context->device, scene->pipeline, NULL);
-	CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
+	CreateRtxPipeline(context->device, &scene->layout, &scene->pipeline);
+	//CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
 
 	vkDestroyPipeline(context->device, context->shadowmap_pipeline, NULL);
 	CreateShadowMapPipeline(context->device, &context->swapchain, context->shadowmap_layout.layout, context->shadowmap_render_pass,

@@ -13,19 +13,21 @@
 */
 
 #include <sl3dge/types.h>
-
+#include <sl3dge/debug.h>
 #include "vulkan_layer.h"
 
 internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene, VkDescriptorSetLayout *set_layout, VkDescriptorSet *descriptor_set) {
-	const VkDescriptorSetLayoutBinding bindings[] = { { // CAMERA MATRICES
-															  0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
-															  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, NULL },
+	const VkDescriptorSetLayoutBinding bindings[] = {
+		{ // CAMERA MATRICES
+				0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+				NULL },
 		{ // MATERIALS
 				1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL },
 		{ // TEXTURES
 				2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, scene->textures_count, VK_SHADER_STAGE_FRAGMENT_BIT, NULL },
 		{ // SHADOWMAP READ
-				3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL } };
+				3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL }
+	};
 	const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
 
 	VkDescriptorSetLayoutCreateInfo game_set_create_info = {};

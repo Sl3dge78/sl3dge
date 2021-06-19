@@ -143,7 +143,7 @@ internal void CreateRtxSbt(VulkanContext *context, VkPipeline pipeline, VulkanSh
 		UploadToBuffer(context->device, &sbt->rgen, data, handle_size_aligned);
 		UploadToBuffer(context->device, &sbt->rmiss, data + handle_size_aligned, handle_size_aligned * 2);
 		UploadToBuffer(context->device, &sbt->rchit, data + (3 * handle_size_aligned), handle_size_aligned);
-		
+
 		sbt->strides[0] = { sbt->rgen.address, handle_size_aligned, handle_size_aligned };
 		sbt->strides[1] = { sbt->rmiss.address, handle_size_aligned, handle_size_aligned };
 		sbt->strides[2] = { sbt->rchit.address, handle_size_aligned, handle_size_aligned };
@@ -566,7 +566,9 @@ internal void CreateTLAS(VulkanContext *context, const u32 primitive_count, VkAc
 	DestroyBuffer(context->device, &scratch);
 }
 
-DLL_EXPORT void VulkanDrawRTXFrame(VulkanContext *context, Scene *scene) {
+DLL_EXPORT void VulkanDrawRTXFrame(VulkanContext *context, Scene *scene, GameData *game_data) {
+	UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
+
 	u32 image_id;
 	Swapchain *swapchain = &context->swapchain;
 

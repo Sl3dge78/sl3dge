@@ -3,8 +3,14 @@
 #extension GL_EXT_ray_tracing : require
 
 
-void main() {
+struct HitPayload {
+    vec3 direct_color;
+};
 
+layout(location = 0) rayPayloadInEXT HitPayload payload;
+
+void main() {
+    payload.direct_color = vec3(0.1, 0.1, 0.1);
 
 }
 

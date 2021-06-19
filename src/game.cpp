@@ -27,6 +27,7 @@
 extern "C" __declspec(dllexport) void GameStart(GameData *game_data) {
 	game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.01f, 100000.0f);
 	game_data->light_pos = { 0.0f, 0.0f, 0.0f };
+	game_data->position = { 0.0f, 50.0f, 0.0f };
 }
 
 extern "C" __declspec(dllexport) void GameLoop(float delta_time, GameData *game_data) {
@@ -83,7 +84,7 @@ extern "C" __declspec(dllexport) void GameLoop(float delta_time, GameData *game_
 
 	// Reset
 	if (keyboard[SDL_SCANCODE_SPACE]) {
-		//GameStart(game_data);
+		// GameStart(game_data);
 		game_data->cos = 0.0f;
 	}
 
@@ -108,6 +109,7 @@ extern "C" __declspec(dllexport) void GameLoop(float delta_time, GameData *game_
 	game_data->position = game_data->position + movement;
 	game_data->matrices.pos = game_data->position;
 	game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, Vec3{ 0.0f, 1.0f, 0.0f });
+	mat4_inverse(&game_data->matrices.view, &game_data->matrices.view_inverse);
 
 	Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 250.0f, -600.0f, 600.0f);
 	Mat4 b = mat4_look_at({ 0.0f, 0.0f, 0.0f }, game_data->light_pos, Vec3{ 0.0f, 1.0f, 0.0f });

@@ -7,6 +7,7 @@
 typedef struct CameraMatrices {
 	alignas(16) Mat4 proj;
 	alignas(16) Mat4 view;
+	alignas(16) Mat4 view_inverse;
 	alignas(16) Mat4 shadow_mvp;
 	alignas(16) Vec3 pos;
 	alignas(16) Vec3 light_dir;
@@ -26,4 +27,4 @@ fn_GameStart *pfn_GameStart;
 typedef void fn_GameLoop(float delta_time, GameData *game_data);
 fn_GameLoop *pfn_GameLoop;
 
-#endif //MAIN_H
+#endif // MAIN_H
