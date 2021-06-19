@@ -63,19 +63,21 @@ internal void LogOutput(void *userdata, int category, SDL_LogPriority priority, 
 
 internal int main(int argc, char *argv[]) {
 #if DEBUG
-	// AllocConsole();
+	AllocConsole();
 #endif
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 	SDL_Window *window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
 	IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
 
+	// Log to file
+#ifndef DEBUG
 	// Clear the log file
 	FILE *std_err = fopen("bin/log.txt", "w+");
 	fclose(std_err);
+	SDL_LogSetOutputFunction(&LogOutput, NULL);
 
-	// Log to file
-	// SDL_LogSetOutputFunction(&LogOutput, NULL);
+#endif
 
 	Module vulkan_module = {};
 	Win32LoadModule(&vulkan_module, "vulkan");

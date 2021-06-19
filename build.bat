@@ -1,6 +1,6 @@
 @echo off
 set project_name=win32
-set timestamp=%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%
+set timestamp=%TIME:~3,2%%TIME:~6,2%
 
 set args= -GR- -EHa -nologo -Zi -experimental:external -external:anglebrackets -DDEBUG -Fotmp/ -Fdtmp/
 set include_path=-external:I D:\Guigui\Work\Prog\_include\ -external:I %VULKAN_SDK%\include
