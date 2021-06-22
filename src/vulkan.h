@@ -21,7 +21,7 @@ fn_VulkanDrawFrame *pfn_VulkanDrawFrame;
 typedef void fn_VulkanDrawRTXFrame(VulkanContext *context, Scene *scene, GameData *game_data);
 fn_VulkanDrawRTXFrame *pfn_VulkanDrawRTXFrame;
 
-typedef Scene *fn_VulkanLoadScene(char *file, VulkanContext *context);
+typedef Scene *fn_VulkanLoadScene(const char *file, VulkanContext *context);
 fn_VulkanLoadScene *pfn_VulkanLoadScene;
 
 typedef void fn_VulkanFreeScene(VulkanContext *context, Scene *scene);

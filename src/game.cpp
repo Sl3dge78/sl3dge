@@ -17,6 +17,9 @@
  MAJOR
 
  BACKLOG
+- Moto movement
+- Moto cam
+- Generate roads
 
  IMPROVEMENTS
 
@@ -24,14 +27,14 @@
 
 */
 
-extern "C" __declspec(dllexport) void GameStart(GameData *game_data) {
+DLL_EXPORT void GameStart(GameData *game_data) {
 	game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.01f, 100000.0f);
 	game_data->light_pos = { 0.0f, 0.0f, 0.0f };
 	game_data->position = { 0.0f, 50.0f, 0.0f };
 }
 
-extern "C" __declspec(dllexport) void GameLoop(float delta_time, GameData *game_data) {
-	float speed = delta_time;
+DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
+	float speed = 0.01f;
 
 	i32 mouse_x;
 	i32 mouse_y;
@@ -39,10 +42,10 @@ extern "C" __declspec(dllexport) void GameLoop(float delta_time, GameData *game_
 
 	if (mouse_state == SDL_BUTTON(3)) {
 		if (mouse_x != 0) {
-			game_data->spherical_coordinates.x += speed * mouse_x * 2.5f;
+			game_data->spherical_coordinates.x += speed * mouse_x;
 		}
 		if (mouse_y != 0) {
-			float new_rot = game_data->spherical_coordinates.y + speed * mouse_y * 2.5f;
+			float new_rot = game_data->spherical_coordinates.y + speed * mouse_y;
 			if (new_rot > -PI / 2.0f && new_rot < PI / 2.0f) {
 				game_data->spherical_coordinates.y = new_rot;
 			}

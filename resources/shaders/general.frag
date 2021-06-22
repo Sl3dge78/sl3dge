@@ -25,6 +25,7 @@ layout(location = 5) in vec4 in_shadow_map_texcoord;
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
 	mat4 view;
+	mat4 view_inverse;
 	mat4 light_vp;
 	vec3 view_pos;
 	vec3 light_dir;
@@ -84,10 +85,10 @@ float get_shadow(float bias) {
     vec4 proj_coords = in_shadow_map_texcoord / in_shadow_map_texcoord.w;
     float current_depth = proj_coords.z;
     proj_coords = proj_coords * 0.5 + 0.5;
-    
+
     if(1 == 0) {
         float closest_depth = texture(shadow_map, proj_coords.xy).r;
-        shadow = closest_depth > current_depth - bias ? 1.0 : 0.1;        
+        shadow = closest_depth > current_depth - bias ? 1.0 : 0.1;
     } else {
         shadow = 0.0;
         vec2 tex_dim = 1.0 / textureSize(shadow_map, 0);
@@ -97,10 +98,10 @@ float get_shadow(float bias) {
 
         for(int x = -samples; x <= samples; ++x) {
             for(int y = -samples; y <= samples; ++y) {
-                float closest_depth = texture(shadow_map, proj_coords.xy + vec2(x, y) * tex_dim).r; 
-                shadow += closest_depth > current_depth - bias ? 1.0 : 0.0;        
+                float closest_depth = texture(shadow_map, proj_coords.xy + vec2(x, y) * tex_dim).r;
+                shadow += closest_depth > current_depth - bias ? 1.0 : 0.0;
                 count ++;
-            }    
+            }
         }
         shadow /= count;
     }
@@ -121,8 +122,8 @@ vec3 base_color(Material mat) {
     } else if(mat.emissive_texture < UINT_MAX) {
         diffuse = texture(textures[mat.emissive_texture], pos).rgb;
 
-    }   
-    
+    }
+
     return diffuse;
 }
 float Anisotropy = .4;
@@ -155,7 +156,7 @@ vec3 volumetric_fog(vec3 L) {
 
     vec3 accum = vec3(0.0);
     for (int i = 0; i < steps; i++) {
-        
+
         vec4 shadow_coords = cam.light_vp * vec4(current_position, 1.0);
         vec4 proj_coords = shadow_coords / shadow_coords.w;
         float current_depth = proj_coords.z;
@@ -163,7 +164,7 @@ vec3 volumetric_fog(vec3 L) {
         proj_coords = proj_coords * 0.5 + 0.5;
         float closest_depth = texture(shadow_map, proj_coords.xy).r;
         vol_abs *= step_abs;
-        if(closest_depth > current_depth){          
+        if(closest_depth > current_depth){
             accum += step_color * vol_abs;
         }
 
@@ -176,7 +177,7 @@ vec3 skycolor = vec3(0.53, 0.80, 0.92);
 float ambient_intensity = 0.25;
 
 void main() {
-	
+
     Material mat = materials.m[material_id];
 
     vec3 N = get_normal(mat);
@@ -184,19 +185,19 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
 
     vec3 base_color = base_color(mat);
-    
+
     vec3 diffuse = base_color;
 
     vec3 ambient = skycolor * ambient_intensity * base_color;
 
     float bias = ( 1 - NdotL) * 0.005;
     float shadow = get_shadow(bias);
-    
+
     float cam_distance = length(cam.view_pos - in_worldpos);
     float fog = pow(cam_distance / 20, 2);
 
     vec3 color = (ambient + shadow * diffuse);
     color += volumetric_fog(L);
-    
+
     out_color = vec4(color, 1.0);
 }

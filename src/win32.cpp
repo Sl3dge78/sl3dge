@@ -99,8 +99,8 @@ internal int main(int argc, char *argv[]) {
 	Scene *scene;
 
 	SDL_Log("Loading scene...");
-
-	scene = pfn_VulkanLoadScene("resources/3d/map2.gltf", context);
+	const char *scene_path = "resources/3d/map2.gltf";
+	scene = pfn_VulkanLoadScene(scene_path, context);
 
 	pfn_GameStart(&game_data);
 
@@ -114,6 +114,9 @@ internal int main(int argc, char *argv[]) {
 		int time = SDL_GetTicks();
 		delta_time = (float)(time - last_time) / 1000.f;
 		last_time = time;
+		char title[20];
+		snprintf(title, 20, "%.4fms %2.0ffps", delta_time, 1.0f / delta_time);
+		SDL_SetWindowTitle(window, title);
 
 		// Reload vulkan if necessary
 
@@ -125,7 +128,7 @@ internal int main(int argc, char *argv[]) {
 			Win32LoadModule(&vulkan_module, "vulkan");
 			VulkanLoadFunctions(&vulkan_module);
 			context = pfn_VulkanCreateContext(window);
-			scene = pfn_VulkanLoadScene("resources/3d/map2.gltf", context);
+			scene = pfn_VulkanLoadScene(scene_path, context);
 			SDL_Log("Vulkan reloaded");
 		}
 
@@ -153,8 +156,7 @@ internal int main(int argc, char *argv[]) {
 			}
 		}
 		pfn_GameLoop(delta_time, &game_data);
-		// pfn_VulkanDrawFrame(context, scene, &game_data);
-		pfn_VulkanDrawRTXFrame(context, scene, &game_data);
+		pfn_VulkanDrawFrame(context, scene, &game_data);
 	}
 
 	pfn_VulkanFreeScene(context, scene);

@@ -7,6 +7,7 @@ layout (location = 2) in vec2 in_texcoord;
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
 	mat4 view;
+    mat4 view_inverse;
     mat4 light_vp;
 	vec3 view_pos;
 	vec3 light_dir;

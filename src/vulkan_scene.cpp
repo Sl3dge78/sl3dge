@@ -311,15 +311,14 @@ internal void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_dat
 	UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 }
 
-DLL_EXPORT Scene *VulkanLoadScene(char *file, VulkanContext *context) {
+DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
 	double start = SDL_GetPerformanceCounter();
-	bool rtx = 1;
 
 	Scene *scene = (Scene *)malloc(sizeof(Scene));
 	*scene = {};
 
 	char *directory;
-	char *last_sep = strrchr(file, '/');
+	const char *last_sep = strrchr(file, '/');
 	u32 size = last_sep - file;
 	directory = (char *)calloc(size + 2, sizeof(char));
 	strncpy(directory, file, size);
@@ -476,51 +475,15 @@ DLL_EXPORT Scene *VulkanLoadScene(char *file, VulkanContext *context) {
 		free(image_buffers);
 	}
 
-	if (!rtx) {
-		SDL_Log("Creating Descriptors...");
-		scene->descriptor_set_count = 1;
-		scene->set_layouts = (VkDescriptorSetLayout *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSetLayout));
-		scene->descriptor_sets = (VkDescriptorSet *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSet));
+	SDL_Log("Creating Descriptors...");
+	scene->descriptor_set_count = 1;
+	scene->set_layouts = (VkDescriptorSetLayout *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSetLayout));
+	scene->descriptor_sets = (VkDescriptorSet *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSet));
 
-		CreateSceneDescriptorSet(context, scene, &scene->set_layouts[0], &scene->descriptor_sets[0]);
+	CreateSceneDescriptorSet(context, scene, &scene->set_layouts[0], &scene->descriptor_sets[0]);
 
-		BuildLayout(context->device, scene->descriptor_set_count, scene->set_layouts, &scene->layout);
-		CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
-	} else {
-		SDL_Log("Creating BLAS...");
-		// BLAS
-		scene->BLAS_buffers = (Buffer *)calloc(scene->total_primitives_count, sizeof(Buffer));
-		scene->instance_data_buffers = (Buffer *)calloc(scene->total_primitives_count, sizeof(Buffer));
-		scene->BLAS = (VkAccelerationStructureKHR *)calloc(scene->total_primitives_count, sizeof(VkAccelerationStructureKHR));
-		scene->rtx_geometries =
-				(VkAccelerationStructureGeometryKHR *)calloc(scene->total_primitives_count, sizeof(VkAccelerationStructureGeometryKHR));
-		const VkDeviceAddress vtx_add = scene->vtx_buffer.address;
-		const VkDeviceAddress idx_add = scene->idx_buffer.address;
-		for (u32 i = 0; i < scene->total_primitives_count; ++i) {
-			Primitive *p = &scene->primitives[i];
-			CreateBLAS(context, vtx_add + (p->vertex_offset * sizeof(Vertex)), p->vertex_count, idx_add + (p->index_offset * sizeof(u32)),
-					p->index_count / 3, &scene->BLAS_buffers[i], &scene->BLAS[i]);
-			CreateInstanceGeometry(
-					context, scene->transforms[p->node_id], scene->BLAS[i], &scene->instance_data_buffers[i], &scene->rtx_geometries[i]);
-		}
-		SDL_Log("Creating TLAS...");
-		// TLAS
-		CreateTLAS(context, scene->total_primitives_count, scene->rtx_geometries, &scene->TLAS_buffer, &scene->TLAS);
-
-		SDL_Log("Creating Descriptors...");
-		// Descriptors
-		scene->descriptor_set_count = 2;
-		scene->set_layouts = (VkDescriptorSetLayout *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSetLayout));
-		scene->descriptor_sets = (VkDescriptorSet *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSet));
-		CreateSceneDescriptorSet(context, scene, &scene->set_layouts[0], &scene->descriptor_sets[0]);
-		CreateRtxDescriptorSet(
-				context, &scene->TLAS, scene->vtx_buffer.buffer, scene->idx_buffer.buffer, &scene->set_layouts[1], &scene->descriptor_sets[1]);
-
-		BuildLayout(context->device, scene->descriptor_set_count, scene->set_layouts, &scene->layout);
-		CreateRtxPipeline(context->device, &scene->layout, &scene->pipeline);
-
-		CreateRtxSbt(context, scene->pipeline, &scene->sbt);
-	}
+	BuildLayout(context->device, scene->descriptor_set_count, scene->set_layouts, &scene->layout);
+	CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
 
 	cgltf_free(data);
 	free(directory);
@@ -532,22 +495,6 @@ DLL_EXPORT Scene *VulkanLoadScene(char *file, VulkanContext *context) {
 }
 
 DLL_EXPORT void VulkanFreeScene(VulkanContext *context, Scene *scene) {
-	DestroyRtxSbt(context, &scene->sbt);
-
-	for (u32 i = 0; i < scene->total_primitives_count; ++i) {
-		DestroyBuffer(context->device, &scene->BLAS_buffers[i]);
-		DestroyBuffer(context->device, &scene->instance_data_buffers[i]);
-		pfn_vkDestroyAccelerationStructureKHR(context->device, scene->BLAS[i], 0);
-	}
-
-	DestroyBuffer(context->device, &scene->TLAS_buffer);
-	pfn_vkDestroyAccelerationStructureKHR(context->device, scene->TLAS, 0);
-
-	free(scene->BLAS_buffers);
-	free(scene->instance_data_buffers);
-	free(scene->BLAS);
-	free(scene->rtx_geometries);
-
 	vkFreeDescriptorSets(context->device, context->descriptor_pool, scene->descriptor_set_count, scene->descriptor_sets);
 	free(scene->descriptor_sets);
 

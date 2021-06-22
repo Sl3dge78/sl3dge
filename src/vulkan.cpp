@@ -14,15 +14,14 @@
 > Will need the z-buffer and the shadowmap
 > What else? think about it. Currently in the shader it needs the world pos. How do i get it from the zbuffer? How do I get them along the ray? Should
 be fine
-
-- Can't create a scene without textures
 - Cleanup the pipelines creations. How do we group that?
 
  MAJOR
 - Descriptor set 0 > could be the same for all pipelines
+- Check the frame sync, we might not be at 60.
 
  BACKLOG
- - Check the frame sync, we might not be at 60.
+
 - Find a way to draw the sun even though no fragments are on the screen
 - Draw multiple gltf scenes
 - Window Resize > Pipline dynamic states ?
@@ -30,12 +29,14 @@ be fine
 - Volumetric clouds?
 
  IMPROVEMENTS
+- Can't create a scene without textures
 - Find the way to display the fps in the window tile, i used to have it
 - IBL?
 - Utiliser des Staging buffers
 - Handle pipeline caches
- - Pick the device according to our specs
+- Pick the device according to our specs
 - Pipeline dynamic state
+- Apparently we should allocate big stacks only
 */
 
 #include "gltf.cpp"
@@ -1078,8 +1079,8 @@ extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *contex
 
 extern "C" __declspec(dllexport) void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
 	vkDestroyPipeline(context->device, scene->pipeline, NULL);
-	CreateRtxPipeline(context->device, &scene->layout, &scene->pipeline);
-	//CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
+	// CreateRtxPipeline(context->device, &scene->layout, &scene->pipeline);
+	CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
 
 	vkDestroyPipeline(context->device, context->shadowmap_pipeline, NULL);
 	CreateShadowMapPipeline(context->device, &context->swapchain, context->shadowmap_layout.layout, context->shadowmap_render_pass,
