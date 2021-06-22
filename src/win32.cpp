@@ -100,6 +100,7 @@ internal int main(int argc, char *argv[]) {
 
 	SDL_Log("Loading scene...");
 	const char *scene_path = "resources/3d/map2.gltf";
+	// const char *scene_path = "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf";
 	scene = pfn_VulkanLoadScene(scene_path, context);
 
 	pfn_GameStart(&game_data);

@@ -28,7 +28,7 @@
 */
 
 DLL_EXPORT void GameStart(GameData *game_data) {
-	game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.01f, 100000.0f);
+	game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
 	game_data->light_pos = { 0.0f, 0.0f, 0.0f };
 	game_data->position = { 0.0f, 50.0f, 0.0f };
 }
