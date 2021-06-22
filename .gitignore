@@ -1,9 +1,7 @@
 include/
 resources/models
 resources/3d
-*.pdb
-*.ilk
-*.obj
 bin
 *.rdbg
 *.spv
+tmp/
