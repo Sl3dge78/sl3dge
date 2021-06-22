@@ -41,7 +41,6 @@ be fine
 
 #include "gltf.cpp"
 #include "vulkan_layer.h"
-#include "vulkan_rtx.cpp"
 #include "vulkan_scene.cpp"
 
 internal void AssertVkResult(VkResult result) {
@@ -191,11 +190,12 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
 	memcpy(all_extensions + sdl_count, sl3_extensions, sl3_count * sizeof(char *));
 
 	free(sdl_extensions);
-
+	/*
 	SDL_Log("Requested extensions");
 	for (int i = 0; i < total_count; i++) {
 		SDL_Log(all_extensions[i]);
 	}
+	*/
 
 	create_info.enabledExtensionCount = sdl_count + sl3_count;
 	create_info.ppEnabledExtensionNames = all_extensions;
@@ -953,8 +953,6 @@ extern "C" __declspec(dllexport) VulkanContext *VulkanCreateContext(SDL_Window *
 			{ context->swapchain.extent.width, context->swapchain.extent.height, 1 },
 			VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, context->msaa_level,
 			&context->msaa_image);
-	// RTX Render Image
-	CreateRtxRenderImage(context->device, &context->swapchain, &context->memory_properties, &context->rtx_image);
 
 	CreateRenderPass(context->device, &context->swapchain, context->msaa_level, &context->render_pass);
 
@@ -1036,8 +1034,6 @@ internal void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout
 
 extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *context) {
 	vkDeviceWaitIdle(context->device);
-
-	DestroyImage(context->device, &context->rtx_image);
 
 	// Shadowmap
 	DestroyImage(context->device, &context->shadowmap);

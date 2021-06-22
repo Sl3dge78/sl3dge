@@ -103,6 +103,15 @@ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
 
 
 Usage
+
+VulkanShaderBindingTable sbt;
+	Buffer *BLAS_buffers;
+	VkAccelerationStructureKHR *BLAS;
+	Buffer *instance_data_buffers;
+	VkAccelerationStructureGeometryKHR *rtx_geometries;
+	Buffer TLAS_buffer;
+	VkAccelerationStructureKHR TLAS;
+
 SDL_Log("Creating BLAS...");
 // BLAS
 scene->BLAS_buffers = (Buffer *)calloc(scene->total_primitives_count, sizeof(Buffer));
