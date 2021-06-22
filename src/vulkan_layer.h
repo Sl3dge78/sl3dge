@@ -99,7 +99,6 @@ typedef struct VulkanContext {
 
 	Image depth_image;
 	Image msaa_image;
-	Image rtx_image;
 
 	Buffer cam_buffer;
 
@@ -152,14 +151,6 @@ typedef struct Scene {
 
 	u32 textures_count;
 	Image *textures;
-
-	VulkanShaderBindingTable sbt;
-	Buffer *BLAS_buffers;
-	VkAccelerationStructureKHR *BLAS;
-	Buffer *instance_data_buffers;
-	VkAccelerationStructureGeometryKHR *rtx_geometries;
-	Buffer TLAS_buffer;
-	VkAccelerationStructureKHR TLAS;
 
 } Scene;
 
