@@ -1133,8 +1133,7 @@ extern "C" __declspec(dllexport) void VulkanDrawFrame(
 	vkCmdBindVertexBuffers(cmd, 0, 1, &scene->vtx_buffer.buffer, &offset);
 	vkCmdBindIndexBuffer(cmd, scene->idx_buffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	// Shadow
-	// map
+	// Shadow map
 	VkRenderPassBeginInfo renderpass_begin = {};
 	renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	renderpass_begin.pNext = 0;

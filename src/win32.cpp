@@ -40,11 +40,15 @@ internal inline void *PlatformGetProcAddress(Module *module, const char *fn) {
 }
 
 void VulkanLoadFunctions(Module *dll) {
-	pfn_VulkanCreateContext = (fn_VulkanCreateContext *)PlatformGetProcAddress(dll, "VulkanCreateContext");
-	pfn_VulkanDestroyContext = (fn_VulkanDestroyContext *)PlatformGetProcAddress(dll, "VulkanDestroyContext");
-	pfn_VulkanReloadShaders = (fn_VulkanReloadShaders *)PlatformGetProcAddress(dll, "VulkanReloadShaders");
+	pfn_VulkanCreateContext =
+			(fn_VulkanCreateContext *)PlatformGetProcAddress(dll, "VulkanCreateContext");
+	pfn_VulkanDestroyContext =
+			(fn_VulkanDestroyContext *)PlatformGetProcAddress(dll, "VulkanDestroyContext");
+	pfn_VulkanReloadShaders =
+			(fn_VulkanReloadShaders *)PlatformGetProcAddress(dll, "VulkanReloadShaders");
 	pfn_VulkanDrawFrame = (fn_VulkanDrawFrame *)PlatformGetProcAddress(dll, "VulkanDrawFrame");
-	pfn_VulkanDrawRTXFrame = (fn_VulkanDrawRTXFrame *)PlatformGetProcAddress(dll, "VulkanDrawRTXFrame");
+	pfn_VulkanDrawRTXFrame =
+			(fn_VulkanDrawRTXFrame *)PlatformGetProcAddress(dll, "VulkanDrawRTXFrame");
 	pfn_VulkanLoadScene = (fn_VulkanLoadScene *)PlatformGetProcAddress(dll, "VulkanLoadScene");
 	pfn_VulkanFreeScene = (fn_VulkanFreeScene *)PlatformGetProcAddress(dll, "VulkanFreeScene");
 }
@@ -54,7 +58,8 @@ void GameLoadFunctions(Module *dll) {
 	pfn_GameLoop = (fn_GameLoop *)PlatformGetProcAddress(dll, "GameLoop");
 }
 
-internal void LogOutput(void *userdata, int category, SDL_LogPriority priority, const char *message) {
+internal void LogOutput(
+		void *userdata, int category, SDL_LogPriority priority, const char *message) {
 	FILE *std_err = fopen("bin/log.txt", "a");
 	// fseek(std_err, 0, SEEK_END);
 	fprintf(std_err, "%s\n", message);
@@ -67,7 +72,8 @@ internal int main(int argc, char *argv[]) {
 #endif
 
 	SDL_Init(SDL_INIT_EVERYTHING);
-	SDL_Window *window = SDL_CreateWindow("Vulkan", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
+	SDL_Window *window = SDL_CreateWindow(
+			"Vulkan", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
 	IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
 
 	// Log to file
@@ -99,7 +105,7 @@ internal int main(int argc, char *argv[]) {
 	Scene *scene;
 
 	SDL_Log("Loading scene...");
-	const char *scene_path = "resources/3d/map2.gltf";
+	const char *scene_path = "resources/3d/Motorcycle/motorcycle.gltf";
 	// const char *scene_path = "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf";
 	scene = pfn_VulkanLoadScene(scene_path, context);
 
@@ -163,13 +169,15 @@ internal int main(int argc, char *argv[]) {
 			i32 now = SDL_GetTicks();
 			i32 frame_time_ms = now - frame_start;
 			char title[40];
-			snprintf(title, 40, "Frametime : %dms Idle: %2.f%%", frame_time_ms, frame_time_ms * 100.0 / (1000.0f / 60.0f));
+			f32 idle_percent = frame_time_ms / (1000.0f / 60.0f);
+			idle_percent = 1 - idle_percent;
+			idle_percent *= 100.0f;
+			snprintf(title, 40, "Frametime : %dms Idle: %2.f%%", frame_time_ms, idle_percent);
 			SDL_SetWindowTitle(window, title);
 
 			while (SDL_GetTicks() - frame_start < 1000.0f / 60.f) {
 				// SDL_Log("%.4f", (SDL_GetTicks() - frame_start) / 1000.f);
 			}
-			
 		}
 	}
 

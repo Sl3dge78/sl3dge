@@ -6,12 +6,12 @@
 #include <sl3dge/3d_math.h>
 
 #define DECL_FUNC(name) global PFN_##name pfn_##name
-#define LOAD_INSTANCE_FUNC(instance, name)                                                                                                           \
-	pfn_##name = (PFN_##name)vkGetInstanceProcAddr(instance, #name);                                                                                 \
-	ASSERT(pfn_##name)
-#define LOAD_DEVICE_FUNC(name)                                                                                                                       \
-	pfn_##name = (PFN_##name)vkGetDeviceProcAddr(device, #name);                                                                                     \
-	ASSERT(pfn_##name)
+#define LOAD_INSTANCE_FUNC(instance, name)                                                         \
+	pfn_##name = (PFN_##name)vkGetInstanceProcAddr(instance, #name);                               \
+	ASSERT(pfn_##name);
+#define LOAD_DEVICE_FUNC(name)                                                                     \
+	pfn_##name = (PFN_##name)vkGetDeviceProcAddr(device, #name);                                   \
+	ASSERT(pfn_##name);
 
 DECL_FUNC(vkCreateDebugUtilsMessengerEXT);
 DECL_FUNC(vkDestroyDebugUtilsMessengerEXT);
@@ -181,10 +181,12 @@ typedef struct Scene {
 } Scene;
 
 internal void AssertVkResult(VkResult result);
-internal void CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module);
+internal void CreateVkShaderModule(
+		const char *path, VkDevice device, VkShaderModule *shader_module);
 internal void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout *layout);
 
-internal void DEBUGNameObject(const VkDevice device, const u64 object, const VkObjectType type, const char *name) {
+internal void DEBUGNameObject(
+		const VkDevice device, const u64 object, const VkObjectType type, const char *name) {
 	VkDebugUtilsObjectNameInfoEXT name_info = {};
 	name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
 	name_info.pNext = NULL;
@@ -194,7 +196,8 @@ internal void DEBUGNameObject(const VkDevice device, const u64 object, const VkO
 	pfn_vkSetDebugUtilsObjectNameEXT(device, &name_info);
 }
 
-internal i32 FindMemoryType(const VkPhysicalDeviceMemoryProperties *memory_properties, const u32 type, const VkMemoryPropertyFlags flags) {
+internal i32 FindMemoryType(const VkPhysicalDeviceMemoryProperties *memory_properties,
+		const u32 type, const VkMemoryPropertyFlags flags) {
 	for (u32 i = 0; i < memory_properties->memoryTypeCount; i++) {
 		if (type & (1 << i)) {
 			if ((memory_properties->memoryTypes[i].propertyFlags & flags) == flags) {
@@ -212,8 +215,10 @@ internal void DEBUGNameBuffer(const VkDevice device, Buffer *buffer, const char 
 }
 
 // TODO(Guigui): Check to see if this really requires the entire context
-internal void CreateBuffer(const VkDevice device, VkPhysicalDeviceMemoryProperties *memory_properties, const VkDeviceSize size,
-		const VkBufferUsageFlags buffer_usage, const VkMemoryPropertyFlags memory_flags, Buffer *buffer) {
+internal void CreateBuffer(const VkDevice device,
+		VkPhysicalDeviceMemoryProperties *memory_properties, const VkDeviceSize size,
+		const VkBufferUsageFlags buffer_usage, const VkMemoryPropertyFlags memory_flags,
+		Buffer *buffer) {
 	*buffer = {};
 
 	buffer->size = size;
@@ -250,7 +255,8 @@ internal void CreateBuffer(const VkDevice device, VkPhysicalDeviceMemoryProperti
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		alloc_info.pNext = &flags_info;
 		alloc_info.allocationSize = requirements.size;
-		alloc_info.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
+		alloc_info.memoryTypeIndex =
+				FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
 		VkResult result = vkAllocateMemory(device, &alloc_info, NULL, &buffer->memory);
 		AssertVkResult(result);
 	}
@@ -260,12 +266,14 @@ internal void CreateBuffer(const VkDevice device, VkPhysicalDeviceMemoryProperti
 
 	if (buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR) {
 		// Get its address
-		VkBufferDeviceAddressInfo dai = { VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, NULL, buffer->buffer };
+		VkBufferDeviceAddressInfo dai = { VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, NULL,
+			buffer->buffer };
 		buffer->address = pfn_vkGetBufferDeviceAddressKHR(device, &dai);
 	}
 }
 
-internal inline void UploadToBuffer(const VkDevice device, Buffer *buffer, void *data, size_t size) {
+internal inline void UploadToBuffer(
+		const VkDevice device, Buffer *buffer, void *data, size_t size) {
 	void *dst;
 	VkResult result = vkMapMemory(device, buffer->memory, 0, buffer->size, 0, &dst);
 	AssertVkResult(result);
@@ -294,8 +302,10 @@ internal void DEBUGNameImage(const VkDevice device, Image *image, const char *na
 	DEBUGNameObject(device, (u64)image->image_view, VK_OBJECT_TYPE_IMAGE_VIEW, name);
 }
 
-internal void CreateImage(const VkDevice device, const VkPhysicalDeviceMemoryProperties *memory_properties, const VkFormat format,
-		const VkExtent2D extent, const VkImageUsageFlags usage, const VkMemoryPropertyFlags memory_flags, Image *image) {
+internal void CreateImage(const VkDevice device,
+		const VkPhysicalDeviceMemoryProperties *memory_properties, const VkFormat format,
+		const VkExtent2D extent, const VkImageUsageFlags usage,
+		const VkMemoryPropertyFlags memory_flags, Image *image) {
 	VkImageCreateInfo image_ci = {};
 	image_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	image_ci.pNext = NULL;
@@ -328,7 +338,8 @@ internal void CreateImage(const VkDevice device, const VkPhysicalDeviceMemoryPro
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = &flags_info;
 	alloc_info.allocationSize = requirements.size;
-	alloc_info.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
+	alloc_info.memoryTypeIndex =
+			FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
 	AssertVkResult(vkAllocateMemory(device, &alloc_info, NULL, &image->memory));
 
 	AssertVkResult(vkBindImageMemory(device, image->image, image->memory, 0));
@@ -340,8 +351,8 @@ internal void CreateImage(const VkDevice device, const VkPhysicalDeviceMemoryPro
 	image_view_ci.image = image->image;
 	image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	image_view_ci.format = format;
-	image_view_ci.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-		VK_COMPONENT_SWIZZLE_IDENTITY };
+	image_view_ci.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
 	if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
 		image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 	else
@@ -353,8 +364,10 @@ internal void CreateImage(const VkDevice device, const VkPhysicalDeviceMemoryPro
 	AssertVkResult(vkCreateImageView(device, &image_view_ci, NULL, &image->image_view));
 }
 
-internal void CreateMultiSampledImage(const VkDevice device, const VkPhysicalDeviceMemoryProperties *memory_properties, const VkFormat format,
-		const VkExtent3D extent, const VkImageUsageFlags usage, const VkMemoryPropertyFlags memory_flags, VkSampleCountFlagBits sample_count,
+internal void CreateMultiSampledImage(const VkDevice device,
+		const VkPhysicalDeviceMemoryProperties *memory_properties, const VkFormat format,
+		const VkExtent3D extent, const VkImageUsageFlags usage,
+		const VkMemoryPropertyFlags memory_flags, VkSampleCountFlagBits sample_count,
 		Image *image) {
 	VkImageCreateInfo image_ci = {};
 	image_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -388,7 +401,8 @@ internal void CreateMultiSampledImage(const VkDevice device, const VkPhysicalDev
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = &flags_info;
 	alloc_info.allocationSize = requirements.size;
-	alloc_info.memoryTypeIndex = FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
+	alloc_info.memoryTypeIndex =
+			FindMemoryType(memory_properties, requirements.memoryTypeBits, memory_flags);
 	AssertVkResult(vkAllocateMemory(device, &alloc_info, NULL, &image->memory));
 
 	AssertVkResult(vkBindImageMemory(device, image->image, image->memory, 0));
@@ -400,8 +414,8 @@ internal void CreateMultiSampledImage(const VkDevice device, const VkPhysicalDev
 	image_view_ci.image = image->image;
 	image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	image_view_ci.format = format;
-	image_view_ci.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-		VK_COMPONENT_SWIZZLE_IDENTITY };
+	image_view_ci.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
 	if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
 		image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 	else
@@ -413,7 +427,8 @@ internal void CreateMultiSampledImage(const VkDevice device, const VkPhysicalDev
 	AssertVkResult(vkCreateImageView(device, &image_view_ci, NULL, &image->image_view));
 }
 
-internal void CopyBufferToImage(VkCommandBuffer cmd, VkExtent2D extent, u32 pitch, Buffer *image_buffer, Image *image) {
+internal void CopyBufferToImage(
+		VkCommandBuffer cmd, VkExtent2D extent, u32 pitch, Buffer *image_buffer, Image *image) {
 	VkBufferImageCopy region = {};
 	region.bufferOffset = 0;
 	region.bufferRowLength = 0;
@@ -433,9 +448,11 @@ internal void CopyBufferToImage(VkCommandBuffer cmd, VkExtent2D extent, u32 pitc
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.image = image->image;
 	barrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+			0, NULL, 0, NULL, 1, &barrier);
 
-	vkCmdCopyBufferToImage(cmd, image_buffer->buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+	vkCmdCopyBufferToImage(cmd, image_buffer->buffer, image->image,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
 	VkImageMemoryBarrier barrier2 = {};
 	barrier2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -448,7 +465,8 @@ internal void CopyBufferToImage(VkCommandBuffer cmd, VkExtent2D extent, u32 pitc
 	barrier2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier2.image = image->image;
 	barrier2.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
+	vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0, 0, NULL, 0, NULL, 1, &barrier2);
 }
 
 internal void DestroyImage(const VkDevice device, Image *image) {
@@ -458,7 +476,8 @@ internal void DestroyImage(const VkDevice device, Image *image) {
 }
 
 // COMMAND BUFFERS
-internal void AllocateCommandBuffers(const VkDevice device, const VkCommandPool pool, const u32 count, VkCommandBuffer *command_buffers) {
+internal void AllocateCommandBuffers(const VkDevice device, const VkCommandPool pool,
+		const u32 count, VkCommandBuffer *command_buffers) {
 	VkCommandBufferAllocateInfo allocate_info = {};
 	allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocate_info.pNext = NULL;
@@ -468,7 +487,8 @@ internal void AllocateCommandBuffers(const VkDevice device, const VkCommandPool 
 	AssertVkResult(vkAllocateCommandBuffers(device, &allocate_info, command_buffers));
 }
 
-internal void BeginCommandBuffer(const VkDevice device, const VkCommandBuffer cmd, VkCommandBufferUsageFlags flags) {
+internal void BeginCommandBuffer(
+		const VkDevice device, const VkCommandBuffer cmd, VkCommandBufferUsageFlags flags) {
 	VkCommandBufferBeginInfo begin_info = {};
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	begin_info.pNext = NULL;
@@ -477,12 +497,14 @@ internal void BeginCommandBuffer(const VkDevice device, const VkCommandBuffer cm
 	AssertVkResult(vkBeginCommandBuffer(cmd, &begin_info));
 }
 
-internal void AllocateAndBeginCommandBuffer(const VkDevice device, const VkCommandPool pool, VkCommandBuffer *cmd) {
+internal void AllocateAndBeginCommandBuffer(
+		const VkDevice device, const VkCommandPool pool, VkCommandBuffer *cmd) {
 	AllocateCommandBuffers(device, pool, 1, cmd);
 	BeginCommandBuffer(device, *cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 }
 
-internal void EndAndExecuteCommandBuffer(const VkDevice device, const VkQueue queue, const VkCommandPool pool, VkCommandBuffer cmd) {
+internal void EndAndExecuteCommandBuffer(
+		const VkDevice device, const VkQueue queue, const VkCommandPool pool, VkCommandBuffer cmd) {
 	vkEndCommandBuffer(cmd);
 	VkSubmitInfo si = { VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmd, 0, NULL };
 	vkQueueSubmit(queue, 1, &si, VK_NULL_HANDLE);

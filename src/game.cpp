@@ -31,10 +31,12 @@ DLL_EXPORT void GameStart(GameData *game_data) {
 	game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
 	game_data->light_pos = { 0.0f, 0.0f, 0.0f };
 	game_data->position = { 0.0f, 50.0f, 0.0f };
+	game_data->moto = LoadGLTF("");
 }
 
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
-	float speed = 0.01f;
+	f32 move_speed = 1.0f;
+	f32 look_speed = 0.01f;
 
 	i32 mouse_x;
 	i32 mouse_y;
@@ -42,10 +44,10 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
 
 	if (mouse_state == SDL_BUTTON(3)) {
 		if (mouse_x != 0) {
-			game_data->spherical_coordinates.x += speed * mouse_x;
+			game_data->spherical_coordinates.x += look_speed * mouse_x;
 		}
 		if (mouse_y != 0) {
-			float new_rot = game_data->spherical_coordinates.y + speed * mouse_y;
+			float new_rot = game_data->spherical_coordinates.y + look_speed * mouse_y;
 			if (new_rot > -PI / 2.0f && new_rot < PI / 2.0f) {
 				game_data->spherical_coordinates.y = new_rot;
 			}
@@ -63,26 +65,26 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
 	const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
 
 	if (keyboard[SDL_SCANCODE_LSHIFT]) {
-		speed *= 100.0f;
+		move_speed *= 10.0f;
 	}
 
 	if (keyboard[SDL_SCANCODE_W]) {
-		movement = movement + vec3_fmul(forward, speed);
+		movement = movement + vec3_fmul(forward, move_speed);
 	}
 	if (keyboard[SDL_SCANCODE_S]) {
-		movement = movement + vec3_fmul(forward, -speed);
+		movement = movement + vec3_fmul(forward, -move_speed);
 	}
 	if (keyboard[SDL_SCANCODE_A]) {
-		movement = movement + vec3_fmul(right, -speed);
+		movement = movement + vec3_fmul(right, -move_speed);
 	}
 	if (keyboard[SDL_SCANCODE_D]) {
-		movement = movement + vec3_fmul(right, speed);
+		movement = movement + vec3_fmul(right, move_speed);
 	}
 	if (keyboard[SDL_SCANCODE_Q]) {
-		movement.y -= speed;
+		movement.y -= move_speed;
 	}
 	if (keyboard[SDL_SCANCODE_E]) {
-		movement.y += speed;
+		movement.y += move_speed;
 	}
 
 	// Reset
@@ -111,7 +113,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
 
 	game_data->position = game_data->position + movement;
 	game_data->matrices.pos = game_data->position;
-	game_data->matrices.view = mat4_look_at(game_data->position + forward, game_data->position, Vec3{ 0.0f, 1.0f, 0.0f });
+	game_data->matrices.view = mat4_look_at(
+			game_data->position + forward, game_data->position, Vec3{ 0.0f, 1.0f, 0.0f });
 	mat4_inverse(&game_data->matrices.view, &game_data->matrices.view_inverse);
 
 	Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 250.0f, -600.0f, 600.0f);

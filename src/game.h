@@ -18,7 +18,7 @@ typedef struct GameData {
 	Vec3 position;
 	Vec2f spherical_coordinates;
 	Vec3 light_pos;
-	float cos;
+	f32 cos;
 } GameData;
 
 typedef void fn_GameStart(GameData *game_data);

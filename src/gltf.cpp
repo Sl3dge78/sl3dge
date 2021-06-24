@@ -3,7 +3,7 @@
 /*
  === TODO ===
  CRITICAL
- - Materials
+ - Read embedded glb
 
  MAJOR
 - If we have multiple meshes that use the same primitve, we will just dupe it here
