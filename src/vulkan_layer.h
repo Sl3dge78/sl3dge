@@ -126,6 +126,32 @@ struct VulkanShaderBindingTable {
 	VkStridedDeviceAddressRegionKHR strides[4];
 };
 
+typedef struct Vertex {
+	Vec3 pos;
+	Vec3 normal;
+	Vec2 uv;
+} Vertex;
+
+typedef struct Material {
+	alignas(16) Vec3 base_color;
+	alignas(4) u32 base_color_texture;
+	alignas(4) u32 metallic_roughness_texture;
+	alignas(4) float metallic_factor;
+	alignas(4) float roughness_factor;
+	alignas(4) u32 normal_texture;
+	alignas(4) u32 ao_texture;
+	alignas(4) u32 emissive_texture;
+} Material;
+
+typedef struct Primitive {
+	u32 material_id;
+	u32 node_id;
+	u32 index_count;
+	u32 index_offset;
+	u32 vertex_count;
+	u32 vertex_offset;
+} Primitive;
+
 typedef struct Scene {
 	VkPipeline pipeline;
 

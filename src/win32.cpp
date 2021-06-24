@@ -107,20 +107,18 @@ internal int main(int argc, char *argv[]) {
 
 	bool running = true;
 	float delta_time = 0;
-	int last_time = SDL_GetTicks();
+	int frame_start = SDL_GetTicks();
 
 	SDL_Event event;
 	while (running) {
-		// Sync
-		int time = SDL_GetTicks();
-		delta_time = (float)(time - last_time) / 1000.f;
-		last_time = time;
-		char title[20];
-		snprintf(title, 20, "%.4fms %2.0ffps", delta_time, 1.0f / delta_time);
-		SDL_SetWindowTitle(window, title);
+		{
+			// Sync
+			int time = SDL_GetTicks();
+			delta_time = (float)(time - frame_start) / 1000.f;
+			frame_start = time;
+		}
 
 		// Reload vulkan if necessary
-
 		if (Win32ShouldReloadModule(&vulkan_module)) {
 			pfn_VulkanFreeScene(context, scene);
 			pfn_VulkanDestroyContext(context);
@@ -158,6 +156,21 @@ internal int main(int argc, char *argv[]) {
 		}
 		pfn_GameLoop(delta_time, &game_data);
 		pfn_VulkanDrawFrame(context, scene, &game_data);
+
+		{
+			// 60 fps cap
+
+			i32 now = SDL_GetTicks();
+			i32 frame_time_ms = now - frame_start;
+			char title[40];
+			snprintf(title, 40, "Frametime : %dms Idle: %2.f%%", frame_time_ms, frame_time_ms * 100.0 / (1000.0f / 60.0f));
+			SDL_SetWindowTitle(window, title);
+
+			while (SDL_GetTicks() - frame_start < 1000.0f / 60.f) {
+				// SDL_Log("%.4f", (SDL_GetTicks() - frame_start) / 1000.f);
+			}
+			
+		}
 	}
 
 	pfn_VulkanFreeScene(context, scene);

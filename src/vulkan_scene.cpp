@@ -1,12 +1,13 @@
 
 /*
- === TODO ===
+ === TODO
+ ===
  CRITICAL
 
  MAJOR
- - Séparer le remplissage des infos de layout du build. Pour pouvoir faire genre
- : je mets les infos de la scène, je mets les infos du renderer (rtx ou raster),
- je build le layout BACKLOG
+ - Séparer le remplissage des infos  de layout  du build. Pour pouvoir faire genre : je mets les
+ infos de la scène, je mets les infos du renderer (rtx ou raster), je build le layout
+ BACKLOG
 
  IMPROVEMENTS
 
@@ -15,18 +16,24 @@
 #include <sl3dge/types.h>
 #include <sl3dge/debug.h>
 #include "vulkan_layer.h"
+#include "vulkan_pipeline.cpp"
 
-internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene, VkDescriptorSetLayout *set_layout, VkDescriptorSet *descriptor_set) {
+internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene,
+		VkDescriptorSetLayout *set_layout, VkDescriptorSet *descriptor_set) {
 	const VkDescriptorSetLayoutBinding bindings[] = {
 		{ // CAMERA MATRICES
-				0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+				0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
+						VK_SHADER_STAGE_RAYGEN_BIT_KHR,
 				NULL },
 		{ // MATERIALS
 				1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL },
 		{ // TEXTURES
-				2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, scene->textures_count, VK_SHADER_STAGE_FRAGMENT_BIT, NULL },
+				2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, scene->textures_count,
+				VK_SHADER_STAGE_FRAGMENT_BIT, NULL },
 		{ // SHADOWMAP READ
-				3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL }
+				3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
+				NULL }
 	};
 	const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
 
@@ -36,7 +43,8 @@ internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene, VkD
 	game_set_create_info.flags = 0;
 	game_set_create_info.bindingCount = descriptor_count;
 	game_set_create_info.pBindings = bindings;
-	AssertVkResult(vkCreateDescriptorSetLayout(context->device, &game_set_create_info, NULL, set_layout));
+	AssertVkResult(
+			vkCreateDescriptorSetLayout(context->device, &game_set_create_info, NULL, set_layout));
 
 	// Descriptor Set
 	VkDescriptorSetAllocateInfo allocate_info = {};
@@ -75,8 +83,8 @@ internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene, VkD
 	static_writes[1].pBufferInfo = &materials;
 	static_writes[1].pTexelBufferView = NULL;
 
-	VkDescriptorImageInfo shadowmap_info = { context->shadowmap_sampler, context->shadowmap.image_view,
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };
+	VkDescriptorImageInfo shadowmap_info = { context->shadowmap_sampler,
+		context->shadowmap.image_view, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };
 	static_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	static_writes[2].pNext = NULL;
 	static_writes[2].dstSet = *descriptor_set;
@@ -94,7 +102,8 @@ internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene, VkD
 		const u32 nb_tex = scene->textures_count;
 		u32 nb_info = nb_tex > 0 ? nb_tex : 1;
 
-		VkDescriptorImageInfo *images_info = (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
+		VkDescriptorImageInfo *images_info =
+				(VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
 
 		for (u32 i = 0; i < nb_info; ++i) {
 			images_info[i].sampler = context->texture_sampler;
@@ -123,9 +132,12 @@ internal void CreateSceneDescriptorSet(VulkanContext *context, Scene *scene, VkD
 	}
 }
 
-internal void BuildLayout(VkDevice device, const u32 set_layout_count, VkDescriptorSetLayout *set_layouts, VkPipelineLayout *layout) {
-	// Push constants
-	VkPushConstantRange push_constant_range = { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant) };
+internal void BuildLayout(VkDevice device, const u32 set_layout_count,
+		VkDescriptorSetLayout *set_layouts, VkPipelineLayout *layout) {
+	// Push
+	// constants
+	VkPushConstantRange push_constant_range = { VK_SHADER_STAGE_VERTEX_BIT, 0,
+		sizeof(PushConstant) };
 	const u32 push_constant_count = 1;
 
 	// Layout
@@ -141,8 +153,9 @@ internal void BuildLayout(VkDevice device, const u32 set_layout_count, VkDescrip
 	AssertVkResult(vkCreatePipelineLayout(device, &create_info, NULL, layout));
 }
 
-internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout layout, Swapchain *swapchain, VkRenderPass render_pass,
-		VkSampleCountFlagBits sample_count, VkPipeline *pipeline) {
+internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout layout,
+		Swapchain *swapchain, VkRenderPass render_pass, VkSampleCountFlagBits sample_count,
+		VkPipeline *pipeline) {
 	VkGraphicsPipelineCreateInfo pipeline_ci = {};
 	pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipeline_ci.pNext = NULL;
@@ -179,7 +192,6 @@ internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout 
 	vtx_input_binding.stride = sizeof(Vertex);
 	vtx_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	vertex_input.pVertexBindingDescriptions = &vtx_input_binding;
-
 	vertex_input.vertexAttributeDescriptionCount = 3;
 	VkVertexInputAttributeDescription vtx_descriptions[] = {
 		{ 0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, pos) },
@@ -187,7 +199,6 @@ internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout 
 		{ 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv) },
 	};
 	vertex_input.pVertexAttributeDescriptions = vtx_descriptions;
-
 	pipeline_ci.pVertexInputState = &vertex_input;
 
 	VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {};
@@ -272,17 +283,9 @@ internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout 
 
 	VkPipelineColorBlendAttachmentState color_blend_attachement = {};
 	color_blend_attachement.blendEnable = VK_FALSE;
-	color_blend_attachement.colorWriteMask =
-			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	/*
-		VkBlendFactor            srcColorBlendFactor;
-		VkBlendFactor            dstColorBlendFactor;
-		VkBlendOp                colorBlendOp;
-		VkBlendFactor            srcAlphaBlendFactor;
-		VkBlendFactor            dstAlphaBlendFactor;
-		VkBlendOp                alphaBlendOp;
+	color_blend_attachement.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+											 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
-	*/
 	color_blend_state.attachmentCount = 1;
 	color_blend_state.pAttachments = &color_blend_attachement;
 	color_blend_state.blendConstants[0] = 0.0f;
@@ -300,7 +303,8 @@ internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout 
 	pipeline_ci.basePipelineIndex = 0;
 
 	// TODO: handle pipeline caching
-	AssertVkResult(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, pipeline));
+	AssertVkResult(
+			vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, pipeline));
 
 	vkDeviceWaitIdle(device);
 	vkDestroyShaderModule(device, pipeline_ci.pStages[0].module, NULL);
@@ -308,7 +312,8 @@ internal void CreateScenePipeline(const VkDevice device, const VkPipelineLayout 
 }
 
 internal void VulkanUpdateDescriptors(VulkanContext *context, GameData *game_data) {
-	UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
+	UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices,
+			sizeof(game_data->matrices));
 }
 
 DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
@@ -369,12 +374,18 @@ DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
 	}
 
 	// Vertex & Index Buffer
-	CreateBuffer(context->device, &context->memory_properties, scene->total_vertex_count * sizeof(Vertex),
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->vtx_buffer);
-	CreateBuffer(context->device, &context->memory_properties, scene->total_index_count * sizeof(u32),
-			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->idx_buffer);
+	CreateBuffer(context->device, &context->memory_properties,
+			scene->total_vertex_count * sizeof(Vertex),
+			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR |
+					VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&scene->vtx_buffer);
+	CreateBuffer(context->device, &context->memory_properties,
+			scene->total_index_count * sizeof(u32),
+			VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR |
+					VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&scene->idx_buffer);
 	DEBUGNameBuffer(context->device, &scene->vtx_buffer, "GLTF VTX");
 	DEBUGNameBuffer(context->device, &scene->idx_buffer, "GLTF IDX");
 	void *mapped_vtx_buffer;
@@ -385,7 +396,8 @@ DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
 	i = 0;
 	for (u32 m = 0; m < data->meshes_count; ++m) {
 		for (u32 p = 0; p < data->meshes[m].primitives_count; ++p) {
-			GLTFLoadVertexAndIndexBuffer(&data->meshes[m].primitives[p], &scene->primitives[i], mapped_vtx_buffer, mapped_idx_buffer);
+			GLTFLoadVertexAndIndexBuffer(&data->meshes[m].primitives[p], &scene->primitives[i],
+					mapped_vtx_buffer, mapped_idx_buffer);
 			++i;
 		}
 	}
@@ -394,8 +406,10 @@ DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
 
 	// Materials
 	scene->materials_count = data->materials_count;
-	CreateBuffer(context->device, &context->memory_properties, scene->materials_count * sizeof(Material), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &scene->mat_buffer);
+	CreateBuffer(context->device, &context->memory_properties,
+			scene->materials_count * sizeof(Material), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			&scene->mat_buffer);
 	DEBUGNameBuffer(context->device, &scene->mat_buffer, "GLTF MATS");
 	void *mapped_mat_buffer;
 	MapBuffer(context->device, &scene->mat_buffer, &mapped_mat_buffer);
@@ -408,11 +422,14 @@ DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
 	if (data->textures_count > 0) {
 		scene->textures = (Image *)calloc(data->textures_count, sizeof(Image));
 
-		SDL_Surface **surfaces = (SDL_Surface **)calloc(data->textures_count, sizeof(SDL_Surface *));
+		SDL_Surface **surfaces =
+				(SDL_Surface **)calloc(data->textures_count, sizeof(SDL_Surface *));
 		Buffer *image_buffers = (Buffer *)calloc(data->textures_count, sizeof(Buffer));
-		VkCommandBuffer *cmds = (VkCommandBuffer *)calloc(data->textures_count, sizeof(VkCommandBuffer));
+		VkCommandBuffer *cmds =
+				(VkCommandBuffer *)calloc(data->textures_count, sizeof(VkCommandBuffer));
 
-		AllocateCommandBuffers(context->device, context->graphics_command_pool, data->textures_count, cmds);
+		AllocateCommandBuffers(
+				context->device, context->graphics_command_pool, data->textures_count, cmds);
 
 		for (u32 i = 0; i < data->textures_count; ++i) {
 			char *image_path = data->textures[i].image->uri;
@@ -448,24 +465,31 @@ DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
 			if (data->textures[i].type == cgltf_texture_type_base_color)
 				format = VK_FORMAT_R8G8B8A8_SRGB;
 
-			CreateImage(context->device, &context->memory_properties, format, extent, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			CreateImage(context->device, &context->memory_properties, format, extent,
+					VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 					VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &scene->textures[i]);
 			DEBUGNameImage(context->device, &scene->textures[i], data->textures[i].image->uri);
-			CreateBuffer(context->device, &context->memory_properties, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &image_buffers[i]);
+			CreateBuffer(context->device, &context->memory_properties, image_size,
+					VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+					&image_buffers[i]);
 			SDL_LockSurface(surfaces[i]);
 			UploadToBuffer(context->device, &image_buffers[i], surfaces[i]->pixels, image_size);
 			SDL_UnlockSurface(surfaces[i]);
-			BeginCommandBuffer(context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-			CopyBufferToImage(cmds[i], extent, surfaces[i]->pitch, &image_buffers[i], &scene->textures[i]);
+			BeginCommandBuffer(
+					context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+			CopyBufferToImage(
+					cmds[i], extent, surfaces[i]->pitch, &image_buffers[i], &scene->textures[i]);
 			vkEndCommandBuffer(cmds[i]);
-			VkSubmitInfo si = { VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmds[i], 0, NULL };
+			VkSubmitInfo si = { VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmds[i], 0,
+				NULL };
 			vkQueueSubmit(context->graphics_queue, 1, &si, VK_NULL_HANDLE);
 		}
 
 		vkQueueWaitIdle(context->graphics_queue);
 
-		vkFreeCommandBuffers(context->device, context->graphics_command_pool, data->textures_count, cmds);
+		vkFreeCommandBuffers(
+				context->device, context->graphics_command_pool, data->textures_count, cmds);
 		free(cmds);
 		for (u32 i = 0; i < data->textures_count; ++i) {
 			SDL_FreeSurface(surfaces[i]);
@@ -477,25 +501,34 @@ DLL_EXPORT Scene *VulkanLoadScene(const char *file, VulkanContext *context) {
 
 	SDL_Log("Creating Descriptors...");
 	scene->descriptor_set_count = 1;
-	scene->set_layouts = (VkDescriptorSetLayout *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSetLayout));
-	scene->descriptor_sets = (VkDescriptorSet *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSet));
+	scene->set_layouts = (VkDescriptorSetLayout *)calloc(
+			scene->descriptor_set_count, sizeof(VkDescriptorSetLayout));
+	scene->descriptor_sets =
+			(VkDescriptorSet *)calloc(scene->descriptor_set_count, sizeof(VkDescriptorSet));
 
 	CreateSceneDescriptorSet(context, scene, &scene->set_layouts[0], &scene->descriptor_sets[0]);
 
 	BuildLayout(context->device, scene->descriptor_set_count, scene->set_layouts, &scene->layout);
-	CreateScenePipeline(context->device, scene->layout, &context->swapchain, context->render_pass, context->msaa_level, &scene->pipeline);
+
+	Pipeline::CreateDefault(context->device, "resources/shaders/general.vert.spv",
+			"resources/shaders/general.frag.spv", &context->swapchain.extent, context->msaa_level,
+			scene->layout, context->render_pass, &scene->pipeline);
+	// CreateScenePipeline(context->device, scene->layout, &context->swapchain,
+	// context->render_pass, context->msaa_level, &scene->pipeline);
 
 	cgltf_free(data);
 	free(directory);
 
 	double end = SDL_GetPerformanceCounter();
-	SDL_Log("Scene loaded in : %.2fms", (double)((end - start) * 1000) / SDL_GetPerformanceFrequency());
+	SDL_Log("Scene loaded in : %.2fms",
+			(double)((end - start) * 1000) / SDL_GetPerformanceFrequency());
 
 	return scene;
 }
 
 DLL_EXPORT void VulkanFreeScene(VulkanContext *context, Scene *scene) {
-	vkFreeDescriptorSets(context->device, context->descriptor_pool, scene->descriptor_set_count, scene->descriptor_sets);
+	vkFreeDescriptorSets(context->device, context->descriptor_pool, scene->descriptor_set_count,
+			scene->descriptor_sets);
 	free(scene->descriptor_sets);
 
 	for (u32 i = 0; i < scene->descriptor_set_count; ++i) {

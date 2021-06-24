@@ -1,5 +1,5 @@
 #include <sl3dge/debug.h>
-
+#include "vulkan_layer.h"
 /*
  === TODO ===
  CRITICAL
@@ -15,33 +15,8 @@ BACKLOG
 
 */
 
-typedef struct Vertex {
-	Vec3 pos;
-	Vec3 normal;
-	Vec2 uv;
-} Vertex;
-
-typedef struct Material {
-	alignas(16) Vec3 base_color;
-	alignas(4) u32 base_color_texture;
-	alignas(4) u32 metallic_roughness_texture;
-	alignas(4) float metallic_factor;
-	alignas(4) float roughness_factor;
-	alignas(4) u32 normal_texture;
-	alignas(4) u32 ao_texture;
-	alignas(4) u32 emissive_texture;
-} Material;
-
-typedef struct Primitive {
-	u32 material_id;
-	u32 node_id;
-	u32 index_count;
-	u32 index_offset;
-	u32 vertex_count;
-	u32 vertex_offset;
-} Primitive;
-
-internal void GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst_stride) {
+internal void GLTFCopyAccessor(
+		cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst_stride) {
 	const cgltf_buffer_view *view = acc->buffer_view;
 	char *buf = (char *)view->buffer->data + view->offset + acc->offset;
 	const u32 stride = acc->stride;
@@ -110,23 +85,27 @@ inline u32 GLTFGetTextureID(cgltf_texture *texture) {
 	return texture->id;
 }
 
-void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim, Primitive *primitive, void *vtx_buffer, void *idx_buffer) {
+void GLTFLoadVertexAndIndexBuffer(
+		cgltf_primitive *prim, Primitive *primitive, void *vtx_buffer, void *idx_buffer) {
 	GLTFCopyAccessor(prim->indices, idx_buffer, primitive->index_offset * sizeof(u32), sizeof(u32));
 
 	for (u32 a = 0; a < prim->attributes_count; ++a) {
 		switch (prim->attributes[a].type) {
 			case cgltf_attribute_type_position: {
 				GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
-						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, pos), sizeof(Vertex));
+						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, pos),
+						sizeof(Vertex));
 			} break;
 
 			case cgltf_attribute_type_normal: {
 				GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
-						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, normal), sizeof(Vertex));
+						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, normal),
+						sizeof(Vertex));
 			} break;
 			case cgltf_attribute_type_texcoord: {
 				GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
-						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, uv), sizeof(Vertex));
+						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, uv),
+						sizeof(Vertex));
 			} break;
 		}
 	}
@@ -149,14 +128,17 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
 			SDL_LogWarn(0, "Texture has transform, this isn't supported yet");
 		}
 		dst.base_color = { color[0], color[1], color[2] };
-		dst.base_color_texture = GLTFGetTextureID(mat->pbr_metallic_roughness.base_color_texture.texture);
-		dst.metallic_roughness_texture = GLTFGetTextureID(mat->pbr_metallic_roughness.metallic_roughness_texture.texture);
+		dst.base_color_texture =
+				GLTFGetTextureID(mat->pbr_metallic_roughness.base_color_texture.texture);
+		dst.metallic_roughness_texture =
+				GLTFGetTextureID(mat->pbr_metallic_roughness.metallic_roughness_texture.texture);
 		dst.metallic_factor = mat->pbr_metallic_roughness.metallic_factor;
 		dst.roughness_factor = mat->pbr_metallic_roughness.roughness_factor;
 		dst.normal_texture = GLTFGetTextureID(mat->normal_texture.texture);
 		dst.ao_texture = GLTFGetTextureID(mat->occlusion_texture.texture);
 		dst.emissive_texture = GLTFGetTextureID(mat->emissive_texture.texture);
-		//SDL_Log("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2], dst.metallic, dst.roughness);
+		// SDL_Log("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2],
+		// dst.metallic, dst.roughness);
 
 		memcpy(buffer, &dst, sizeof(Material));
 

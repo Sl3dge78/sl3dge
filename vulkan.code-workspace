@@ -17,7 +17,8 @@
             "*.rh": "cpp",
             "system_error": "cpp",
             "xlocale": "cpp",
-            "type_traits": "cpp"
+            "type_traits": "cpp",
+            "xiosbase": "cpp"
         }
     }
 }
