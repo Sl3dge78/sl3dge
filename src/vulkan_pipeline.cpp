@@ -5,8 +5,9 @@
 
 namespace Pipeline {
 
-inline VkPipelineVertexInputStateCreateInfo GetDefaultVertexInputState(const VkVertexInputBindingDescription *vtx_input_binding,
-		const u32 vtx_desc_count, const VkVertexInputAttributeDescription *vtx_descriptions) {
+inline VkPipelineVertexInputStateCreateInfo GetDefaultVertexInputState(
+		const VkVertexInputBindingDescription *vtx_input_binding, const u32 vtx_desc_count,
+		const VkVertexInputAttributeDescription *vtx_descriptions) {
 	VkPipelineVertexInputStateCreateInfo vertex_input = {};
 	vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertex_input.pNext = NULL;
@@ -31,8 +32,8 @@ inline VkPipelineInputAssemblyStateCreateInfo GetDefaultInputAssemblyState() {
 	return input_assembly_state;
 }
 
-inline VkPipelineViewportStateCreateInfo GetDefaultViewportState(
-		const u32 viewport_count, const VkViewport *viewport, const u32 scissor_count, const VkRect2D *scissor) {
+inline VkPipelineViewportStateCreateInfo GetDefaultViewportState(const u32 viewport_count,
+		const VkViewport *viewport, const u32 scissor_count, const VkRect2D *scissor) {
 	VkPipelineViewportStateCreateInfo viewport_state = {};
 	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewport_state.pNext = NULL;
@@ -62,7 +63,8 @@ inline VkPipelineRasterizationStateCreateInfo GetDefaultRasterizationState() {
 	return rasterization_state;
 }
 
-inline VkPipelineMultisampleStateCreateInfo GetDefaultMultisampleState(const VkSampleCountFlagBits sample_count) {
+inline VkPipelineMultisampleStateCreateInfo GetDefaultMultisampleState(
+		const VkSampleCountFlagBits sample_count) {
 	VkPipelineMultisampleStateCreateInfo multisample_state;
 	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisample_state.pNext = NULL;
@@ -110,8 +112,9 @@ inline VkPipelineColorBlendStateCreateInfo GetDefaultColorBlendState(
 	return color_blend_state;
 }
 
-void CreateDefault(VkDevice device, const char *vertex_shader, const char *fragment_shader, const VkExtent2D *extent,
-		const VkSampleCountFlagBits sample_count, const VkPipelineLayout layout, const VkRenderPass render_pass, VkPipeline *pipeline) {
+void CreateDefault(VkDevice device, const char *vertex_shader, const char *fragment_shader,
+		const VkExtent2D *extent, const VkSampleCountFlagBits sample_count,
+		const VkPipelineLayout layout, const VkRenderPass render_pass, VkPipeline *pipeline) {
 	VkGraphicsPipelineCreateInfo pipeline_ci;
 	pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipeline_ci.pNext = NULL;
@@ -146,7 +149,8 @@ void CreateDefault(VkDevice device, const char *vertex_shader, const char *fragm
 		{ 1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, normal) },
 		{ 2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv) },
 	};
-	VkPipelineVertexInputStateCreateInfo vertex_input = GetDefaultVertexInputState(&vtx_input_binding, 3, vtx_descriptions);
+	VkPipelineVertexInputStateCreateInfo vertex_input =
+			GetDefaultVertexInputState(&vtx_input_binding, 3, vtx_descriptions);
 	pipeline_ci.pVertexInputState = &vertex_input;
 
 	VkPipelineInputAssemblyStateCreateInfo input_assembly_state = GetDefaultInputAssemblyState();
@@ -163,13 +167,15 @@ void CreateDefault(VkDevice device, const char *vertex_shader, const char *fragm
 	VkRect2D scissor;
 	scissor.offset = { 0, 0 };
 	scissor.extent = *extent;
-	VkPipelineViewportStateCreateInfo viewport_state = GetDefaultViewportState(1, &viewport, 1, &scissor);
+	VkPipelineViewportStateCreateInfo viewport_state =
+			GetDefaultViewportState(1, &viewport, 1, &scissor);
 	pipeline_ci.pViewportState = &viewport_state;
 
 	VkPipelineRasterizationStateCreateInfo rasterization_state = GetDefaultRasterizationState();
 	pipeline_ci.pRasterizationState = &rasterization_state;
 
-	VkPipelineMultisampleStateCreateInfo multisample_state = GetDefaultMultisampleState(sample_count);
+	VkPipelineMultisampleStateCreateInfo multisample_state =
+			GetDefaultMultisampleState(sample_count);
 	pipeline_ci.pMultisampleState = &multisample_state;
 
 	VkPipelineDepthStencilStateCreateInfo stencil_state = GetDefaultDepthStencilState();
@@ -177,9 +183,10 @@ void CreateDefault(VkDevice device, const char *vertex_shader, const char *fragm
 
 	VkPipelineColorBlendAttachmentState color_blend_attachement = {};
 	color_blend_attachement.blendEnable = VK_FALSE;
-	color_blend_attachement.colorWriteMask =
-			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	VkPipelineColorBlendStateCreateInfo color_blend_state = GetDefaultColorBlendState(1, &color_blend_attachement);
+	color_blend_attachement.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+											 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	VkPipelineColorBlendStateCreateInfo color_blend_state =
+			GetDefaultColorBlendState(1, &color_blend_attachement);
 	pipeline_ci.pColorBlendState = &color_blend_state;
 
 	pipeline_ci.pDynamicState = NULL; // TODO(Guigui): look at this
@@ -191,7 +198,8 @@ void CreateDefault(VkDevice device, const char *vertex_shader, const char *fragm
 	pipeline_ci.basePipelineIndex = 0;
 
 	// TODO: handle pipeline caching
-	AssertVkResult(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, pipeline));
+	AssertVkResult(
+			vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, pipeline));
 
 	vkDeviceWaitIdle(device);
 	vkDestroyShaderModule(device, pipeline_ci.pStages[0].module, NULL);

@@ -1,23 +1,25 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set args= -GR- -EHa -nologo -Zi -experimental:external -external:anglebrackets -DDEBUG -Fotmp/ -Fdtmp/
-set include_path=-external:I D:\Guigui\Work\Prog\_include\ -external:I %VULKAN_SDK%\include
-set timestamp=%TIME:~3,2%%TIME:~6,2%
+CLS
 
-set linker_options=-link -SUBSYSTEM:WINDOWS -LIBPATH:D:\Guigui\Work\Prog\_lib -LIBPATH:%VULKAN_SDK%\lib -incremental:no
-set libs=SDL2main.lib SDL2.lib SDL2_image.lib Shell32.lib vulkan-1.lib
+SET timestamp=%TIME:~3,2%%TIME:~6,2%
+SET args=-g -DDEBUG
+SET include_path=-I D:\Guigui\Work\Prog\_include\ -I %VULKAN_SDK%\include
 
-pushd tmp
-del *.pdb > NUL 2> NUL
-popd
+SET linker_options=-L D:\Guigui\Work\Prog\_lib -L %VULKAN_SDK%\lib -Xlinker -incremental:no
+SET libs=-lSDL2main.lib -lSDL2.lib -lSDL2_image.lib -lShell32.lib -lvulkan-1.lib
 
-cl %args% -Fewin32 %include_path% %vulkan_include_path% src/win32.cpp %linker_options% -PDB:tmp/ -OUT:bin/win32.exe %libs%
+PUSHD tmp
+DEL *.pdb > NUL 2> NUL
+POPD
 
-for %%G in (game, vulkan) do (
-    cl %args% -Fe%%G %include_path% %vulkan_include_path% -LD src/%%G.cpp %linker_options% -PDB:tmp/%%G_%timestamp%.pdb -IMPLIB:tmp/%%G.lib -OUT:bin/%%G.dll %libs%
-    if !ERRORLEVEL! == 0 ( echo a > bin/%%G.meta )
+ECHO win32.cpp
+clang %args% %include_path% src/win32.cpp -o bin/win32.exe %linker_options% %libs% -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 
+FOR %%G IN (game, vulkan) do (
+    echo %%G.cpp
+    clang %args% %include_path% -shared src/%%G.cpp -o bin/%%G.dll %linker_options% %libs% -Xlinker -PDB:tmp/%%G_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%%G.lib
 )
 
-echo Done.
+ECHO Done
