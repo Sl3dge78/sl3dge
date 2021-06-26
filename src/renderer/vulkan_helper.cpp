@@ -20,6 +20,22 @@
 DECL_FUNC(vkSetDebugUtilsObjectNameEXT);
 DECL_FUNC(vkGetBufferDeviceAddressKHR);
 
+VKAPI_ATTR VkBool32 VKAPI_CALL
+DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+              const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+              void *pUserData) {
+    if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+        SDL_LogInfo(0, pCallbackData->pMessage);
+    } else if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        SDL_LogWarn(0, pCallbackData->pMessage);
+    } else if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        SDL_LogError(0, pCallbackData->pMessage);
+        KEEP_CONSOLE_OPEN(true);
+    }
+    return VK_FALSE;
+}
+
 internal void AssertVkResult(VkResult result) {
     if(result < 0) {
         switch(result) {
@@ -99,28 +115,6 @@ CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_m
     VkResult result = vkCreateShaderModule(device, &create_info, NULL, shader_module);
     free(code);
     AssertVkResult(result);
-}
-
-internal void DestroyLayout(VkDevice device, VkDescriptorPool pool, VulkanLayout *layout) {
-    vkFreeDescriptorSets(device, pool, layout->descriptor_set_count, &layout->descriptor_set);
-    vkDestroyDescriptorSetLayout(device, layout->set_layout, NULL);
-    vkDestroyPipelineLayout(device, layout->layout, NULL);
-}
-
-VKAPI_ATTR VkBool32 VKAPI_CALL
-DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-              const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-              void *pUserData) {
-    if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-        SDL_LogInfo(0, pCallbackData->pMessage);
-    } else if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        SDL_LogWarn(0, pCallbackData->pMessage);
-    } else if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        SDL_LogError(0, pCallbackData->pMessage);
-        KEEP_CONSOLE_OPEN(true);
-    }
-    return VK_FALSE;
 }
 
 internal void DEBUGPrintInstanceExtensions() {
@@ -500,6 +494,46 @@ internal void EndAndExecuteCommandBuffer(const VkDevice device,
     vkQueueSubmit(queue, 1, &si, VK_NULL_HANDLE);
     vkQueueWaitIdle(queue);
     vkFreeCommandBuffers(device, pool, 1, &cmd);
+}
+
+// TODO update only the new textures
+internal void VulkanUpdateTextureDescriptorSet(VkDevice device,
+                                               VkDescriptorSet set,
+                                               VkSampler sampler,
+                                               const u32 texture_count,
+                                               Image *textures) {
+    if(texture_count != 0) {
+        const u32 nb_tex = texture_count;
+        u32 nb_info = nb_tex > 0 ? nb_tex : 1;
+
+        VkDescriptorImageInfo *images_info =
+            (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
+
+        for(u32 i = 0; i < nb_info; ++i) {
+            images_info[i].sampler = sampler;
+            images_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            if(nb_tex == 0) {
+                images_info[i].imageView = VK_NULL_HANDLE;
+                break;
+            }
+            images_info[i].imageView = textures[i].image_view;
+        }
+
+        VkWriteDescriptorSet textures_buffer = {};
+        textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        textures_buffer.pNext = NULL;
+        textures_buffer.dstSet = set;
+        textures_buffer.dstBinding = 2;
+        textures_buffer.dstArrayElement = 0;
+        textures_buffer.descriptorCount = nb_info;
+        textures_buffer.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        textures_buffer.pImageInfo = images_info;
+        textures_buffer.pBufferInfo = NULL;
+        textures_buffer.pTexelBufferView = NULL;
+
+        vkUpdateDescriptorSets(device, 1, &textures_buffer, 0, NULL);
+        free(images_info);
+    }
 }
 
 #endif // VULKAN_HELPER_CPP

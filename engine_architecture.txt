@@ -1,4 +1,4 @@
-
+// TODO this is out of date
 
       ========  ==========            ========
       | GAME |  | VULKAN | --Calls--> | GLTF |
@@ -8,11 +8,11 @@
         Calls      Calls
           |        |   |
           |        |   v
-      ==================              
+      ==================
       |     WIN 32     |
       ==================
 
-==================              
+==================
 |     WIN 32     |
 ==================
 
@@ -22,9 +22,9 @@ Win32AllocateAndLoadBinary
 || GAME ||
 ==========
 
-GameStart 	
-GameGetScene  
-GameLoop      
+GameStart
+GameGetScene
+GameLoop
 
 ============
 || VULKAN ||

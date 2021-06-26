@@ -164,7 +164,7 @@ DestroyRtxSbt(context, &scene->sbt);
 
 */
 
-internal void CreateRtxSbt(VulkanContext *context, VkPipeline pipeline, VulkanShaderBindingTable *sbt) {
+internal void CreateRtxSbt(Renderer *context, VkPipeline pipeline, VulkanShaderBindingTable *sbt) {
 	{
 		VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtx_properties = {};
 		rtx_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
@@ -212,13 +212,13 @@ internal void CreateRtxSbt(VulkanContext *context, VkPipeline pipeline, VulkanSh
 	}
 }
 
-internal void DestroyRtxSbt(VulkanContext *context, VulkanShaderBindingTable *sbt) {
+internal void DestroyRtxSbt(Renderer *context, VulkanShaderBindingTable *sbt) {
 	DestroyBuffer(context->device, &sbt->rgen);
 	DestroyBuffer(context->device, &sbt->rchit);
 	DestroyBuffer(context->device, &sbt->rmiss);
 }
 
-internal void CreateRtxDescriptorSet(VulkanContext *context, const VkAccelerationStructureKHR *TLAS, VkBuffer vtx_buffer, VkBuffer idx_buffer,
+internal void CreateRtxDescriptorSet(Renderer *context, const VkAccelerationStructureKHR *TLAS, VkBuffer vtx_buffer, VkBuffer idx_buffer,
 		VkDescriptorSetLayout *set_layout, VkDescriptorSet *descriptor_set) {
 	const VkDescriptorSetLayoutBinding bindings[] = {
 		// FINAL IMAGE
@@ -439,7 +439,7 @@ internal void CreateRtxPipeline(const VkDevice device, const VkPipelineLayout *l
 //
 // =========================
 
-internal void CreateBLAS(VulkanContext *context, VkDeviceAddress vtx_address, const u32 vtx_count, VkDeviceAddress idx_address,
+internal void CreateBLAS(Renderer *context, VkDeviceAddress vtx_address, const u32 vtx_count, VkDeviceAddress idx_address,
 		const u32 triangle_count, Buffer *buffer, VkAccelerationStructureKHR *BLAS) {
 	VkAccelerationStructureGeometryKHR geometry = {};
 	geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -522,7 +522,7 @@ internal void CreateBLAS(VulkanContext *context, VkDeviceAddress vtx_address, co
 }
 
 internal void CreateInstanceGeometry(
-		VulkanContext *context, Mat4 mat, VkAccelerationStructureKHR BLAS, Buffer *instance_data, VkAccelerationStructureGeometryKHR *geometry) {
+		Renderer *context, Mat4 mat, VkAccelerationStructureKHR BLAS, Buffer *instance_data, VkAccelerationStructureGeometryKHR *geometry) {
 	mat4_transpose(&mat);
 	VkTransformMatrixKHR xform = {};
 	memcpy(&xform, &mat, sizeof(xform));
@@ -557,7 +557,7 @@ internal void CreateInstanceGeometry(
 	geometry->flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 }
 
-internal void CreateTLAS(VulkanContext *context, const u32 primitive_count, VkAccelerationStructureGeometryKHR *geometries, Buffer *TLAS_buffer,
+internal void CreateTLAS(Renderer *context, const u32 primitive_count, VkAccelerationStructureGeometryKHR *geometries, Buffer *TLAS_buffer,
 		VkAccelerationStructureKHR *TLAS) {
 	VkAccelerationStructureBuildGeometryInfoKHR build_info = {};
 	build_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
@@ -626,7 +626,7 @@ internal void CreateTLAS(VulkanContext *context, const u32 primitive_count, VkAc
 	DestroyBuffer(context->device, &scratch);
 }
 
-DLL_EXPORT void VulkanDrawRTXFrame(VulkanContext *context, Scene *scene, GameData *game_data) {
+DLL_EXPORT void VulkanDrawRTXFrame(Renderer *context, Scene *scene, GameData *game_data) {
 	UploadToBuffer(context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 
 	u32 image_id;
@@ -748,7 +748,7 @@ DLL_EXPORT void VulkanDrawRTXFrame(VulkanContext *context, Scene *scene, GameDat
 /*
 
 
-internal void CreateTLAS(VulkanContext *context, const u32 primitive_count, Primitive *primitives, Buffer *instance_data, Buffer *TLAS_buffer,
+internal void CreateTLAS(Renderer *context, const u32 primitive_count, Primitive *primitives, Buffer *instance_data, Buffer *TLAS_buffer,
 		VkAccelerationStructureKHR *TLAS) {
 	Mat4 mat = {};
 	mat = mat4_identity();
@@ -852,14 +852,14 @@ internal void CreateTLAS(VulkanContext *context, const u32 primitive_count, Prim
 	DestroyBuffer(context->device, &scratch);
 }
 
-void VulkanReloadRTXShaders(VulkanContext *context, VulkanRTXRenderer *renderer)
+void VulkanReloadRTXShaders(Renderer *context, VulkanRTXRenderer *renderer)
 { vkDestroyPipeline(context->device, renderer->pipeline, NULL);
 	CreateRtxPipeline(context->device, &renderer->layout,
 &context->rtx_properties, &renderer->pipeline);
 }
 internal void WriteRTXDescriptorSets(const VkDevice device, const
 VkDescriptorSet *descriptor_set, const VulkanRTXRenderer *pipeline, const
-VulkanContext *context) { VkDescriptorImageInfo img_info = { VK_NULL_HANDLE,
+Renderer *context) { VkDescriptorImageInfo img_info = { VK_NULL_HANDLE,
 pipeline->render_image.image_view, VK_IMAGE_LAYOUT_GENERAL
 	};
 
@@ -1032,7 +1032,7 @@ sizeof(PushConstant) }; const u32 push_constant_count = 1;
 &pipeline->layout));
 }
 
-internal void CreateBLASGLTF(VulkanContext *context, cgltf_mesh *mesh, Buffer
+internal void CreateBLASGLTF(Renderer *context, cgltf_mesh *mesh, Buffer
 *buffer, Buffer *BLAS_buffer, VkAccelerationStructureKHR *BLAS) { if
 (mesh->primitives_count > 1) { SDL_LogError(0, "Multiple primitives, not
 supported... yet"); ASSERT(0);
@@ -1164,7 +1164,7 @@ VK_NULL_HANDLE); vkQueueWaitIdle(context->graphics_queue);
 &cmd_buffer); DestroyBuffer(context->device, &scratch);
 }
 
-VulkanRTXRenderer *VulkanCreateRTXRenderer(VulkanContext *context, GameCode
+VulkanRTXRenderer *VulkanCreateRTXRenderer(Renderer *context, GameCode
 *game) { VulkanRTXRenderer *renderer = (VulkanRTXRenderer
 *)malloc(sizeof(VulkanRTXRenderer));
 
@@ -1289,7 +1289,7 @@ context);
 	return renderer;
 }
 
-void VulkanDestroyRTXRenderer(VulkanContext *context, VulkanRTXRenderer
+void VulkanDestroyRTXRenderer(Renderer *context, VulkanRTXRenderer
 *renderer) { DestroyBuffer(context->device, &renderer->gltf_buffer);
 
 	DestroyBuffer(context->device, &renderer->TLAS_buffer);

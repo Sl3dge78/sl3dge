@@ -8,7 +8,8 @@
 #include <sl3dge/types.h>
 
 #include "game.h"
-
+#include "renderer/mesh.h"
+#include "renderer/renderer.h"
 /*
 === TODO ===
 
@@ -27,13 +28,20 @@
 
 */
 
-DLL_EXPORT void GameStart(GameData *game_data) {
+internal void Instantiate(Mesh *mesh) {
+    mesh->instance_count++;
+    mesh->instance_transforms[0] = mat4_identity();
+}
+
+DLL_EXPORT void GameStart(GameData *game_data, Renderer *renderer) {
     game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
     game_data->light_pos = {0.0f, 0.0f, 0.0f};
     game_data->position = {0.0f, 50.0f, 0.0f};
+
+    Instantiate(renderer->meshes[0]);
 }
 
-DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
+DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Renderer *renderer) {
     f32 move_speed = 1.0f;
     f32 look_speed = 0.01f;
 
@@ -121,4 +129,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
 
     game_data->matrices.shadow_mvp = mat4_mul(&a, &b);
     game_data->matrices.light_dir = vec3_normalize(game_data->light_pos * -1.0);
+
+    //RendererDrawMesh(renderer, game_data->mesh);
 }

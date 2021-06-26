@@ -20,10 +20,10 @@ typedef struct Image {
 typedef struct VulkanLayout {
     VkPipelineLayout layout;
 
-    VkDescriptorSetLayout set_layout;
+    VkDescriptorSetLayout *set_layout;
 
     u32 descriptor_set_count;
-    VkDescriptorSet descriptor_set;
+    VkDescriptorSet *descriptor_set;
 
     u32 push_constant_size;
 
@@ -47,7 +47,19 @@ typedef struct Swapchain {
 
 } Swapchain;
 
-typedef struct VulkanContext {
+struct RenderGroup {
+    VkRenderPass render_pass;
+    VkPipelineLayout layout;
+    u32 descriptor_set_count;
+    VkDescriptorSetLayout *set_layouts;
+    VkDescriptorSet *descriptor_sets;
+    VkPipeline pipeline;
+
+    u32 clear_values_count;
+    VkClearValue *clear_values;
+};
+
+typedef struct Renderer {
     VkInstance instance;
     VkPhysicalDevice physical_device;
     VkSurfaceKHR surface;
@@ -70,7 +82,6 @@ typedef struct VulkanContext {
 
     Swapchain swapchain;
 
-    VkRenderPass render_pass;
     VkSampler texture_sampler;
     VkFramebuffer *framebuffers;
 
@@ -82,12 +93,27 @@ typedef struct VulkanContext {
     Image shadowmap;
     VkExtent2D shadowmap_extent;
     VkSampler shadowmap_sampler;
-    VkRenderPass shadowmap_render_pass;
-    VulkanLayout shadowmap_layout;
-    VkPipeline shadowmap_pipeline;
     VkFramebuffer shadowmap_framebuffer;
+    RenderGroup shadowmap_render_group;
 
-} VulkanContext;
+    // TODO: move that in to a rendergroup
+    RenderGroup main_render_group;
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+    u32 descriptor_set_count;
+    VkDescriptorSetLayout *set_layouts;
+    VkDescriptorSet *descriptor_sets;
+
+    u32 materials_count;
+    Buffer mat_buffer;
+
+    u32 textures_count;
+    Image *textures;
+
+    u32 mesh_count;
+    Mesh **meshes;
+
+} Renderer;
 
 typedef struct Primitive {
     u32 material_id;
@@ -97,22 +123,6 @@ typedef struct Primitive {
     u32 vertex_count;
     u32 vertex_offset;
 } Primitive;
-
-struct Mesh {
-    Buffer buffer;
-    u32 all_index_offset; // Indices start at this offset in the buffer
-
-    u32 total_vertex_count;
-    u32 total_index_count;
-    u32 total_primitives_count;
-    Primitive *primitives;
-
-    u32 primitive_nodes_count;
-    Mat4 *primitive_transforms;
-
-    u32 instance_count;
-    Mat4 *instance_transforms;
-};
 
 typedef struct PushConstant {
     alignas(16) Mat4 transform;
@@ -136,23 +146,9 @@ typedef struct Material {
     alignas(4) u32 emissive_texture;
 } Material;
 
-typedef struct Scene {
-    VkPipeline pipeline;
-
+struct Frame {
+    VkCommandBuffer cmd;
     VkPipelineLayout layout;
-    u32 descriptor_set_count;
-    VkDescriptorSetLayout *set_layouts;
-    VkDescriptorSet *descriptor_sets;
-
-    u32 materials_count;
-    Buffer mat_buffer;
-
-    u32 textures_count;
-    Image *textures;
-
-    u32 mesh_count;
-    Mesh **meshes;
-
-} Scene;
+};
 
 #endif

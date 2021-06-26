@@ -9,9 +9,7 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 
-#include <sl3dge/types.h>
-#include <sl3dge/debug.h>
-#include <sl3dge/module.h>
+#include <sl3dge/sl3dge.h>
 
 internal inline FARPROC PlatformGetProcAddress(Module *module, const char *fn) {
     return GetProcAddress(module->dll, fn);
@@ -43,6 +41,31 @@ typedef struct ShaderCode {
 void GameLoadFunctions(Module *dll) {
     pfn_GameStart = (fn_GameStart *)PlatformGetProcAddress(dll, "GameStart");
     pfn_GameLoop = (fn_GameLoop *)PlatformGetProcAddress(dll, "GameLoop");
+}
+
+void RendererLoadFunctions(Module *dll) {
+    pfn_CreateRenderer = (fn_CreateRenderer *)PlatformGetProcAddress(dll, "VulkanCreateContext");
+    ASSERT(pfn_CreateRenderer);
+    pfn_DestroyRenderer = (fn_DestroyRenderer *)PlatformGetProcAddress(dll, "VulkanDestroyContext");
+    ASSERT(pfn_DestroyRenderer);
+    pfn_ReloadShaders =
+        (fn_RendererReloadShaders *)PlatformGetProcAddress(dll, "VulkanReloadShaders");
+    ASSERT(pfn_ReloadShaders);
+    pfn_DrawFrame = (fn_DrawFrame *)PlatformGetProcAddress(dll, "VulkanDrawFrame");
+    ASSERT(pfn_DrawFrame);
+    /*
+    pfn_BeginFrame = (fn_BeginFrame *)PlatformGetProcAddress(dll, "VulkanBeginFrame");
+    ASSERT(pfn_BeginFrame);
+    pfn_EndFrame = (fn_EndFrame *)PlatformGetProcAddress(dll, "VulkanEndFrame");
+    ASSERT(pfn_EndFrame);
+    */
+    /*
+
+    pfn_CreateScene = (fn_CreateScene *)PlatformGetProcAddress(dll, "VulkanCreateScene");
+    ASSERT(pfn_CreateScene);
+    pfn_DestroyScene = (fn_DestroyScene *)PlatformGetProcAddress(dll, "VulkanFreeScene");
+    ASSERT(pfn_DestroyScene);
+    */
 }
 
 internal void
@@ -89,9 +112,8 @@ internal int main(int argc, char *argv[]) {
     shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
 
     GameData game_data = {};
-    Scene *scene = pfn_CreateScene(renderer);
 
-    pfn_GameStart(&game_data);
+    pfn_GameStart(&game_data, renderer);
 
     bool running = true;
     float delta_time = 0;
@@ -108,14 +130,13 @@ internal int main(int argc, char *argv[]) {
 
         // Reload vulkan if necessary
         if(Win32ShouldReloadModule(&renderer_module)) {
-            pfn_DestroyScene(renderer, scene);
             pfn_DestroyRenderer(renderer);
             Win32CloseModule(&renderer_module);
 
             Win32LoadModule(&renderer_module, "vulkan");
             RendererLoadFunctions(&renderer_module);
             renderer = pfn_CreateRenderer(window);
-            scene = pfn_CreateScene(renderer);
+
             SDL_Log("Vulkan reloaded");
         }
 
@@ -131,7 +152,7 @@ internal int main(int argc, char *argv[]) {
         FILETIME shader_time = Win32GetLastWriteTime(shader_code.spv_path);
         if(CompareFileTime(&shader_code.last_write_time, &shader_time)) {
             shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
-            pfn_ReloadShaders(renderer, scene);
+            pfn_ReloadShaders(renderer);
             SDL_Log("Shaders reloaded");
         }
 
@@ -142,8 +163,9 @@ internal int main(int argc, char *argv[]) {
                 running = false;
             }
         }
-        pfn_GameLoop(delta_time, &game_data);
-        pfn_DrawFrame(renderer, scene, &game_data);
+
+        pfn_GameLoop(delta_time, &game_data, renderer);
+        pfn_DrawFrame(renderer, &game_data);
 
         {
             // 60 fps cap
@@ -156,12 +178,12 @@ internal int main(int argc, char *argv[]) {
             idle_percent *= 100.0f;
             snprintf(title, 40, "Frametime : %dms Idle: %2.f%%", frame_time_ms, idle_percent);
             SDL_SetWindowTitle(window, title);
-
-            Sleep(1000.0f / 60.0f - frame_time_ms);
+            if(frame_time_ms < 1.0f / 0.06) {
+                Sleep(16.6 - frame_time_ms);
+            }
         }
     }
 
-    pfn_DestroyScene(renderer, scene);
     pfn_DestroyRenderer(renderer);
 
     Win32CloseModule(&game_module);

@@ -3,6 +3,9 @@
 
 #include <sl3dge/sl3dge.h>
 
+struct Renderer;
+struct Mesh;
+
 typedef struct CameraMatrices {
     alignas(16) Mat4 proj;
     alignas(16) Mat4 view;
@@ -20,12 +23,10 @@ typedef struct GameData {
     f32 cos;
 } GameData;
 
-typedef void fn_GameStart(GameData *game_data);
+typedef void fn_GameStart(GameData *game_data, Renderer *renderer);
 fn_GameStart *pfn_GameStart;
 
-typedef void fn_GameLoop(float delta_time, GameData *game_data);
+typedef void fn_GameLoop(float delta_time, GameData *game_data, Renderer *renderer);
 fn_GameLoop *pfn_GameLoop;
-
-
 
 #endif // MAIN_H

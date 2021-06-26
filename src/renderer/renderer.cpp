@@ -8,13 +8,8 @@
 #include "gltf.cpp"
 #include "vulkan_helper.cpp"
 
-// TODO TEMPORARY
-internal void SceneLoadMaterialsAndTextures(VulkanContext *context,
-                                            Scene *scene,
-                                            cgltf_data *data,
-                                            const char *directory);
 #include "mesh.cpp"
-#include "vulkan_scene.cpp"
+#include "renderer/vulkan_pipeline.cpp"
 
 /*
  === TODO ===
@@ -181,7 +176,7 @@ internal void LoadDeviceFuncPointers(VkDevice device) {
     LOAD_DEVICE_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
 }
 
-internal void GetQueuesId(VulkanContext *context) {
+internal void GetQueuesId(Renderer *context) {
     // Get queue info
     u32 queue_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(context->physical_device, &queue_count, NULL);
@@ -316,8 +311,7 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
     AssertVkResult(result);
 }
 
-internal void
-CreateSwapchain(const VulkanContext *context, SDL_Window *window, Swapchain *swapchain) {
+internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapchain *swapchain) {
     VkSwapchainCreateInfoKHR create_info = {};
 
     create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -493,7 +487,7 @@ CreateSwapchain(const VulkanContext *context, SDL_Window *window, Swapchain *swa
     SDL_Log("Swapchain created with %d images", swapchain->image_count);
 }
 
-internal void DestroySwapchain(const VulkanContext *context, Swapchain *swapchain) {
+internal void DestroySwapchain(const Renderer *context, Swapchain *swapchain) {
     vkFreeCommandBuffers(context->device,
                          context->graphics_command_pool,
                          swapchain->image_count,
@@ -585,9 +579,56 @@ internal void CreateRenderPass(const VkDevice device,
     AssertVkResult(vkCreateRenderPass(device, &render_pass_ci, NULL, render_pass));
 }
 
-internal void CreateShadowMapRenderPass(const VkDevice device,
-                                        const Swapchain *swapchain,
-                                        VkRenderPass *render_pass) {
+internal void BeginRenderGroup(VkCommandBuffer cmd,
+                               const RenderGroup *render_group,
+                               VkFramebuffer target,
+                               const VkExtent2D extent) {
+    VkRenderPassBeginInfo renderpass_begin = {};
+    renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderpass_begin.pNext = 0;
+    renderpass_begin.renderPass = render_group->render_pass;
+    renderpass_begin.framebuffer = target;
+    renderpass_begin.renderArea = {{0, 0}, extent};
+
+    renderpass_begin.clearValueCount = render_group->clear_values_count;
+    renderpass_begin.pClearValues = render_group->clear_values;
+    vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, render_group->pipeline);
+    vkCmdBindDescriptorSets(cmd,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            render_group->layout,
+                            0,
+                            render_group->descriptor_set_count,
+                            render_group->descriptor_sets,
+                            0,
+                            NULL);
+}
+
+internal void EndRenderGroup(VkCommandBuffer cmd) {
+    vkCmdEndRenderPass(cmd);
+}
+
+internal void DestroyRenderGroup(Renderer *context, RenderGroup *render_group) {
+    vkFreeDescriptorSets(context->device,
+                         context->descriptor_pool,
+                         render_group->descriptor_set_count,
+                         render_group->descriptor_sets);
+    free(render_group->descriptor_sets);
+    for(u32 i = 0; i < render_group->descriptor_set_count; ++i) {
+        vkDestroyDescriptorSetLayout(context->device, render_group->set_layouts[i], 0);
+    }
+    free(render_group->set_layouts);
+
+    vkDestroyPipelineLayout(context->device, render_group->layout, 0);
+
+    vkDestroyPipeline(context->device, render_group->pipeline, NULL);
+
+    vkDestroyRenderPass(context->device, render_group->render_pass, 0);
+
+    free(render_group->clear_values);
+}
+
+internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_group) {
     VkRenderPassCreateInfo render_pass_ci = {};
     render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_ci.pNext = NULL;
@@ -643,13 +684,15 @@ internal void CreateShadowMapRenderPass(const VkDevice device,
     render_pass_ci.dependencyCount = 2;
     render_pass_ci.pDependencies = dependencies;
 
-    AssertVkResult(vkCreateRenderPass(device, &render_pass_ci, NULL, render_pass));
-}
+    AssertVkResult(
+        vkCreateRenderPass(context->device, &render_pass_ci, NULL, &render_group->render_pass));
 
-internal void CreateShadowMapLayout(VulkanContext *context, VulkanLayout *layout) {
     // Set Layout
-    layout->descriptor_set_count = 1;
-
+    render_group->descriptor_set_count = 1;
+    render_group->set_layouts = (VkDescriptorSetLayout *)calloc(render_group->descriptor_set_count,
+                                                                sizeof(VkDescriptorSetLayout));
+    render_group->descriptor_sets =
+        (VkDescriptorSet *)calloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
     const VkDescriptorSetLayoutBinding bindings[] = {{// CAMERA MATRICES
                                                       0,
                                                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -665,34 +708,35 @@ internal void CreateShadowMapLayout(VulkanContext *context, VulkanLayout *layout
     game_set_create_info.bindingCount = descriptor_count;
     game_set_create_info.pBindings = bindings;
     AssertVkResult(vkCreateDescriptorSetLayout(
-        context->device, &game_set_create_info, NULL, &layout->set_layout));
+        context->device, &game_set_create_info, NULL, render_group->set_layouts));
 
     // Descriptor Set
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
     allocate_info.descriptorPool = context->descriptor_pool;
-    allocate_info.descriptorSetCount = layout->descriptor_set_count;
-    allocate_info.pSetLayouts = &layout->set_layout;
+    allocate_info.descriptorSetCount = render_group->descriptor_set_count;
+    allocate_info.pSetLayouts = render_group->set_layouts;
     AssertVkResult(
-        vkAllocateDescriptorSets(context->device, &allocate_info, &layout->descriptor_set));
+        vkAllocateDescriptorSets(context->device, &allocate_info, render_group->descriptor_sets));
 
     // Push constants
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant)};
     const u32 push_constant_count = 1;
-    layout->push_constant_size = push_constant_range.size;
+    //render_group->push_constant_size = push_constant_range.size;
 
     // Layout
     VkPipelineLayoutCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.flags = 0;
-    create_info.setLayoutCount = layout->descriptor_set_count;
-    create_info.pSetLayouts = &layout->set_layout;
+    create_info.setLayoutCount = render_group->descriptor_set_count;
+    create_info.pSetLayouts = render_group->set_layouts;
     create_info.pushConstantRangeCount = push_constant_count;
     create_info.pPushConstantRanges = &push_constant_range;
 
-    AssertVkResult(vkCreatePipelineLayout(context->device, &create_info, NULL, &layout->layout));
+    AssertVkResult(
+        vkCreatePipelineLayout(context->device, &create_info, NULL, &render_group->layout));
 
     // Writes
     const u32 static_writes_count = 1;
@@ -701,7 +745,7 @@ internal void CreateShadowMapLayout(VulkanContext *context, VulkanLayout *layout
     VkDescriptorBufferInfo bi_cam = {context->cam_buffer.buffer, 0, VK_WHOLE_SIZE};
     static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[0].pNext = NULL;
-    static_writes[0].dstSet = layout->descriptor_set;
+    static_writes[0].dstSet = render_group->descriptor_sets[0];
     static_writes[0].dstBinding = 0;
     static_writes[0].dstArrayElement = 0;
     static_writes[0].descriptorCount = 1;
@@ -711,13 +755,7 @@ internal void CreateShadowMapLayout(VulkanContext *context, VulkanLayout *layout
     static_writes[0].pTexelBufferView = NULL;
 
     vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
-}
 
-internal void CreateShadowMapPipeline(const VkDevice device,
-                                      const VkPipelineLayout layout,
-                                      const VkRenderPass render_pass,
-                                      const VkExtent2D extent,
-                                      VkPipeline *pipeline) {
     VkGraphicsPipelineCreateInfo pipeline_ci = {};
     pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline_ci.pNext = NULL;
@@ -728,7 +766,8 @@ internal void CreateShadowMapPipeline(const VkDevice device,
     stages_ci.pNext = NULL;
     stages_ci.flags = 0;
     stages_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    CreateVkShaderModule("resources/shaders/shadowmap.vert.spv", device, &stages_ci.module);
+    CreateVkShaderModule(
+        "resources/shaders/shadowmap.vert.spv", context->device, &stages_ci.module);
     stages_ci.pName = "main";
     stages_ci.pSpecializationInfo = NULL;
 
@@ -743,52 +782,203 @@ internal void CreateShadowMapPipeline(const VkDevice device,
         {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)},
     };
     VkPipelineVertexInputStateCreateInfo vertex_input =
-        Pipeline::GetDefaultVertexInputState(&vtx_input_binding, 3, vtx_descriptions);
+        PipelineGetDefaultVertexInputState(&vtx_input_binding, 3, vtx_descriptions);
     pipeline_ci.pVertexInputState = &vertex_input;
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state =
-        Pipeline::GetDefaultInputAssemblyState();
+        PipelineGetDefaultInputAssemblyState();
     pipeline_ci.pInputAssemblyState = &input_assembly_state;
 
     pipeline_ci.pTessellationState = NULL;
 
-    VkViewport viewport = {0.f, 0.f, (f32)extent.width, (f32)extent.height, 0.f, 1.f};
-    VkRect2D scissor = {{0, 0}, extent};
+    VkViewport viewport = {0.f,
+                           0.f,
+                           (f32)context->shadowmap_extent.width,
+                           (f32)context->shadowmap_extent.height,
+                           0.f,
+                           1.f};
+    VkRect2D scissor = {{0, 0}, context->shadowmap_extent};
     VkPipelineViewportStateCreateInfo viewport_state =
-        Pipeline::GetDefaultViewportState(1, &viewport, 1, &scissor);
+        PipelineGetDefaultViewportState(1, &viewport, 1, &scissor);
     pipeline_ci.pViewportState = &viewport_state;
 
     VkPipelineRasterizationStateCreateInfo rasterization_state =
-        Pipeline::GetDefaultRasterizationState();
+        PipelineGetDefaultRasterizationState();
     pipeline_ci.pRasterizationState = &rasterization_state;
 
     VkPipelineMultisampleStateCreateInfo multisample_state =
-        Pipeline::GetDefaultMultisampleState(VK_SAMPLE_COUNT_1_BIT);
+        PipelineGetDefaultMultisampleState(VK_SAMPLE_COUNT_1_BIT);
     pipeline_ci.pMultisampleState = &multisample_state;
 
-    VkPipelineDepthStencilStateCreateInfo stencil_state = Pipeline::GetDefaultDepthStencilState();
+    VkPipelineDepthStencilStateCreateInfo stencil_state = PipelineGetDefaultDepthStencilState();
     // stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     pipeline_ci.pDepthStencilState = &stencil_state;
 
     pipeline_ci.pColorBlendState = NULL;
 
     pipeline_ci.pDynamicState = NULL;
-    pipeline_ci.layout = layout;
+    pipeline_ci.layout = render_group->layout;
 
-    pipeline_ci.renderPass = render_pass;
+    pipeline_ci.renderPass = render_group->render_pass;
     pipeline_ci.subpass = 0;
     pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_ci.basePipelineIndex = 0;
 
-    AssertVkResult(
-        vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, pipeline));
+    AssertVkResult(vkCreateGraphicsPipelines(
+        context->device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, &render_group->pipeline));
 
-    vkDeviceWaitIdle(device);
-    vkDestroyShaderModule(device, pipeline_ci.pStages[0].module, NULL);
+    vkDeviceWaitIdle(context->device);
+    vkDestroyShaderModule(context->device, pipeline_ci.pStages[0].module, NULL);
+
+    render_group->clear_values_count = 1;
+    render_group->clear_values =
+        (VkClearValue *)calloc(render_group->clear_values_count, sizeof(VkClearValue));
+
+    render_group->clear_values[0].depthStencil = {1.0f, 0};
 }
 
-extern "C" __declspec(dllexport) VulkanContext *VulkanCreateContext(SDL_Window *window) {
-    VulkanContext *context = (VulkanContext *)malloc(sizeof(VulkanContext));
+internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group) {
+    // TODO : Séparer ca en 2. un avec la texture. et un avec le reste. Bind la texture pour chaque primitive si necessaire
+
+    render_group->descriptor_set_count = 1;
+    render_group->set_layouts = (VkDescriptorSetLayout *)calloc(render_group->descriptor_set_count,
+                                                                sizeof(VkDescriptorSetLayout));
+    render_group->descriptor_sets =
+        (VkDescriptorSet *)calloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
+
+    const VkDescriptorSetLayoutBinding bindings[] = {
+        {// CAMERA MATRICES
+         0,
+         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+         1,
+         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+         NULL},
+        {// MATERIALS
+         1,
+         VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         1,
+         VK_SHADER_STAGE_FRAGMENT_BIT,
+         NULL},
+        {// TEXTURES
+         2,
+         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+         //context->textures_count,
+         // TEMP:
+         1,
+         VK_SHADER_STAGE_FRAGMENT_BIT,
+         NULL},
+        {// SHADOWMAP READ
+         3,
+         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+         1,
+         VK_SHADER_STAGE_FRAGMENT_BIT,
+         NULL}};
+    const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
+
+    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+    game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    game_set_create_info.pNext = NULL;
+    game_set_create_info.flags = 0;
+    game_set_create_info.bindingCount = descriptor_count;
+    game_set_create_info.pBindings = bindings;
+    AssertVkResult(vkCreateDescriptorSetLayout(
+        context->device, &game_set_create_info, NULL, &render_group->set_layouts[0]));
+
+    // Descriptor Set
+    VkDescriptorSetAllocateInfo allocate_info = {};
+    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocate_info.pNext = NULL;
+    allocate_info.descriptorPool = context->descriptor_pool;
+    allocate_info.descriptorSetCount = render_group->descriptor_set_count;
+    allocate_info.pSetLayouts = render_group->set_layouts;
+    AssertVkResult(
+        vkAllocateDescriptorSets(context->device, &allocate_info, render_group->descriptor_sets));
+
+    // Writes
+    const u32 static_writes_count = 3;
+    VkWriteDescriptorSet static_writes[static_writes_count];
+
+    VkDescriptorBufferInfo bi_cam = {context->cam_buffer.buffer, 0, VK_WHOLE_SIZE};
+    static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    static_writes[0].pNext = NULL;
+    static_writes[0].dstSet = render_group->descriptor_sets[0];
+    static_writes[0].dstBinding = 0;
+    static_writes[0].dstArrayElement = 0;
+    static_writes[0].descriptorCount = 1;
+    static_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    static_writes[0].pImageInfo = NULL;
+    static_writes[0].pBufferInfo = &bi_cam;
+    static_writes[0].pTexelBufferView = NULL;
+
+    VkDescriptorBufferInfo materials = {context->mat_buffer.buffer, 0, VK_WHOLE_SIZE};
+    static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    static_writes[1].pNext = NULL;
+    static_writes[1].dstSet = render_group->descriptor_sets[0];
+    static_writes[1].dstBinding = 1;
+    static_writes[1].dstArrayElement = 0;
+    static_writes[1].descriptorCount = 1;
+    static_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    static_writes[1].pImageInfo = NULL;
+    static_writes[1].pBufferInfo = &materials;
+    static_writes[1].pTexelBufferView = NULL;
+
+    VkDescriptorImageInfo image_info = {context->shadowmap_sampler,
+                                        context->shadowmap.image_view,
+                                        VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+    static_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    static_writes[2].pNext = NULL;
+    static_writes[2].dstSet = render_group->descriptor_sets[0];
+    static_writes[2].dstBinding = 3;
+    static_writes[2].dstArrayElement = 0;
+    static_writes[2].descriptorCount = 1;
+    static_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    static_writes[2].pImageInfo = &image_info;
+    static_writes[2].pBufferInfo = NULL;
+    static_writes[2].pTexelBufferView = NULL;
+
+    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
+
+    CreateRenderPass(
+        context->device, &context->swapchain, context->msaa_level, &render_group->render_pass);
+
+    { // Build layout
+        // Push constants
+        VkPushConstantRange push_constant_range = {
+            VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant)};
+        const u32 push_constant_count = 1;
+
+        // Layout
+        VkPipelineLayoutCreateInfo create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        create_info.pNext = NULL;
+        create_info.flags = 0;
+        create_info.setLayoutCount = render_group->descriptor_set_count;
+        create_info.pSetLayouts = render_group->set_layouts;
+        create_info.pushConstantRangeCount = push_constant_count;
+        create_info.pPushConstantRanges = &push_constant_range;
+
+        AssertVkResult(
+            vkCreatePipelineLayout(context->device, &create_info, NULL, &render_group->layout));
+    }
+    PipelineCreateDefault(context->device,
+                          "resources/shaders/general.vert.spv",
+                          "resources/shaders/general.frag.spv",
+                          &context->swapchain.extent,
+                          context->msaa_level,
+                          render_group->layout,
+                          render_group->render_pass,
+                          &render_group->pipeline);
+
+    render_group->clear_values_count = 2;
+    render_group->clear_values =
+        (VkClearValue *)calloc(render_group->clear_values_count, sizeof(VkClearValue));
+
+    render_group->clear_values[0].color = {0.53f, 0.80f, 0.92f, 0.0f};
+    render_group->clear_values[1].depthStencil = {1.0f, 0};
+}
+
+extern "C" __declspec(dllexport) Renderer *VulkanCreateContext(SDL_Window *window) {
+    Renderer *context = (Renderer *)malloc(sizeof(Renderer));
     CreateVkInstance(window, &context->instance);
     SDL_Vulkan_CreateSurface(window, context->instance, &context->surface);
     CreateVkPhysicalDevice(context->instance, &context->physical_device);
@@ -911,44 +1101,9 @@ extern "C" __declspec(dllexport) VulkanContext *VulkanCreateContext(SDL_Window *
                             context->msaa_level,
                             &context->msaa_image);
 
-    CreateRenderPass(
-        context->device, &context->swapchain, context->msaa_level, &context->render_pass);
-
-    // Framebuffers
-    context->framebuffers =
-        (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
-        VkFramebufferCreateInfo create_info = {};
-        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        create_info.pNext = NULL;
-        create_info.flags = 0;
-        create_info.renderPass = context->render_pass;
-        create_info.attachmentCount = 3;
-
-        VkImageView attachments[] = {
-            context->msaa_image.image_view,
-            context->depth_image.image_view,
-            context->swapchain.image_views[i],
-        };
-
-        create_info.pAttachments = attachments;
-        create_info.width = context->swapchain.extent.width;
-        create_info.height = context->swapchain.extent.height;
-        create_info.layers = 1;
-        AssertVkResult(
-            vkCreateFramebuffer(context->device, &create_info, NULL, &context->framebuffers[i]));
-    }
-
     // ShadowMap pipe
     context->shadowmap_extent = {4096, 4096};
-    CreateShadowMapRenderPass(
-        context->device, &context->swapchain, &context->shadowmap_render_pass);
-    CreateShadowMapLayout(context, &context->shadowmap_layout);
-    CreateShadowMapPipeline(context->device,
-                            context->shadowmap_layout.layout,
-                            context->shadowmap_render_pass,
-                            context->shadowmap_extent,
-                            &context->shadowmap_pipeline);
+    CreateShadowMapRenderGroup(context, &context->shadowmap_render_group);
 
     CreateImage(context->device,
                 &context->memory_properties,
@@ -963,7 +1118,7 @@ extern "C" __declspec(dllexport) VulkanContext *VulkanCreateContext(SDL_Window *
     framebuffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebuffer_create_info.pNext = NULL;
     framebuffer_create_info.flags = 0;
-    framebuffer_create_info.renderPass = context->shadowmap_render_pass;
+    framebuffer_create_info.renderPass = context->shadowmap_render_group.render_pass;
     framebuffer_create_info.attachmentCount = 1;
     framebuffer_create_info.pAttachments = &context->shadowmap.image_view;
     framebuffer_create_info.width = context->shadowmap_extent.width;
@@ -994,19 +1149,81 @@ extern "C" __declspec(dllexport) VulkanContext *VulkanCreateContext(SDL_Window *
     AssertVkResult(
         vkCreateSampler(context->device, &sampler_ci, NULL, &context->shadowmap_sampler));
 
+    // Init scene info
+    CreateBuffer(context->device,
+                 &context->memory_properties,
+                 128 * sizeof(Material),
+                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 &context->mat_buffer);
+    DEBUGNameBuffer(context->device, &context->mat_buffer, "SCENE MATS");
+
+    // TEMP:
+    context->textures = (Image *)calloc(1, sizeof(Image));
+    context->textures_count = 0;
+    context->meshes = (Mesh **)calloc(1, sizeof(Mesh *));
+    context->mesh_count = 0;
+    CreateMainRenderGroup(context, &context->main_render_group);
+
+    // TEMP:
+    context->mesh_count++;
+    context->meshes[0] = LoadMesh("resources/3d/Motorcycle/motorcycle.gltf", context);
+
+    // Framebuffers
+    context->framebuffers =
+        (VkFramebuffer *)calloc(context->swapchain.image_count, sizeof(VkFramebuffer));
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+        VkFramebufferCreateInfo create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        create_info.pNext = NULL;
+        create_info.flags = 0;
+        create_info.renderPass = context->main_render_group.render_pass;
+        create_info.attachmentCount = 3;
+
+        VkImageView attachments[] = {
+            context->msaa_image.image_view,
+            context->depth_image.image_view,
+            context->swapchain.image_views[i],
+        };
+
+        create_info.pAttachments = attachments;
+        create_info.width = context->swapchain.extent.width;
+        create_info.height = context->swapchain.extent.height;
+        create_info.layers = 1;
+        AssertVkResult(
+            vkCreateFramebuffer(context->device, &create_info, NULL, &context->framebuffers[i]));
+    }
+
     return context;
 }
 
-extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *context) {
+extern "C" __declspec(dllexport) void VulkanDestroyContext(Renderer *context) {
     vkDeviceWaitIdle(context->device);
+
+    DestroyRenderGroup(context, &context->main_render_group);
+
+    for(u32 i = 0; i < context->textures_count; ++i) {
+        DestroyImage(context->device, &context->textures[i]);
+    }
+    free(context->textures);
+
+    DestroyBuffer(context->device, &context->mat_buffer);
+
+    for(u32 i = 0; i < context->mesh_count; ++i) {
+        DestroyMesh(context, context->meshes[i]);
+    }
+    free(context->meshes);
 
     // Shadowmap
     DestroyImage(context->device, &context->shadowmap);
     vkDestroySampler(context->device, context->shadowmap_sampler, NULL);
+    vkDestroyFramebuffer(context->device, context->shadowmap_framebuffer, NULL);
+    DestroyRenderGroup(context, &context->shadowmap_render_group);
+    /*
     vkDestroyRenderPass(context->device, context->shadowmap_render_pass, NULL);
     DestroyLayout(context->device, context->descriptor_pool, &context->shadowmap_layout);
     vkDestroyPipeline(context->device, context->shadowmap_pipeline, NULL);
-    vkDestroyFramebuffer(context->device, context->shadowmap_framebuffer, NULL);
+    */
 
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         vkDestroyFramebuffer(context->device, context->framebuffers[i], NULL);
@@ -1015,8 +1232,6 @@ extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *contex
 
     DestroyImage(context->device, &context->depth_image);
     DestroyImage(context->device, &context->msaa_image);
-
-    vkDestroyRenderPass(context->device, context->render_pass, NULL);
 
     vkDestroySampler(context->device, context->texture_sampler, NULL);
 
@@ -1038,27 +1253,26 @@ extern "C" __declspec(dllexport) void VulkanDestroyContext(VulkanContext *contex
     DBG_END();
 }
 
-extern "C" __declspec(dllexport) void VulkanReloadShaders(VulkanContext *context, Scene *scene) {
-    vkDestroyPipeline(context->device, scene->pipeline, NULL);
-    // CreateRtxPipeline(context->device, &scene->layout, &scene->pipeline);
+extern "C" __declspec(dllexport) void VulkanReloadShaders(Renderer *renderer) {
+    vkDestroyPipeline(renderer->device, renderer->main_render_group.pipeline, NULL);
 
-    // CreateScenePipeline(context->device, scene->layout, &context->swapchain,
-    // context->render_pass,		context->msaa_level, &scene->pipeline);
-    Pipeline::CreateDefault(context->device,
-                            "",
-                            "",
-                            &context->swapchain.extent,
-                            context->msaa_level,
-                            scene->layout,
-                            context->render_pass,
-                            &scene->pipeline);
+    PipelineCreateDefault(renderer->device,
+                          "resources/shaders/general.vert.spv",
+                          "resources/shaders/general.frag.spv",
+                          &renderer->swapchain.extent,
+                          renderer->msaa_level,
+                          renderer->main_render_group.layout,
+                          renderer->main_render_group.render_pass,
+                          &renderer->main_render_group.pipeline);
 
-    vkDestroyPipeline(context->device, context->shadowmap_pipeline, NULL);
-    CreateShadowMapPipeline(context->device,
-                            context->shadowmap_layout.layout,
-                            context->shadowmap_render_pass,
-                            context->shadowmap_extent,
-                            &context->shadowmap_pipeline);
+    /* TODO
+    vkDestroyPipeline(renderer->device, renderer->shadowmap_pipeline, NULL);
+    CreateShadowMapPipeline(renderer->device,
+                            renderer->shadowmap_layout.layout,
+                            renderer->shadowmap_render_pass,
+                            renderer->shadowmap_extent,
+                            &renderer->shadowmap_pipeline);
+                            */
 }
 
 // ================
@@ -1067,10 +1281,9 @@ extern "C" __declspec(dllexport) void VulkanReloadShaders(VulkanContext *context
 //
 // ================
 
-extern "C" __declspec(dllexport) void VulkanDrawFrame(VulkanContext *context,
-                                                      Scene *scene,
-                                                      GameData *game_data) {
-    VulkanUpdateDescriptors(context, game_data);
+extern "C" __declspec(dllexport) void VulkanDrawFrame(Renderer *context, GameData *game_data) {
+    UploadToBuffer(
+        context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
 
     u32 image_id;
     Swapchain *swapchain = &context->swapchain;
@@ -1097,59 +1310,27 @@ extern "C" __declspec(dllexport) void VulkanDrawFrame(VulkanContext *context,
     AssertVkResult(vkBeginCommandBuffer(cmd, &begin_info));
 
     // Shadow map
-    VkRenderPassBeginInfo renderpass_begin = {};
-    renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderpass_begin.pNext = 0;
-    renderpass_begin.renderPass = context->shadowmap_render_pass;
-    renderpass_begin.framebuffer = context->shadowmap_framebuffer;
-    renderpass_begin.renderArea = {{0, 0}, context->shadowmap_extent};
-    VkClearValue clear_value = {};
-    clear_value.depthStencil = {1.0f, 0};
-    renderpass_begin.clearValueCount = 1;
-    renderpass_begin.pClearValues = &clear_value;
-    vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, context->shadowmap_pipeline);
-    vkCmdBindDescriptorSets(cmd,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            context->shadowmap_layout.layout,
-                            0,
-                            context->shadowmap_layout.descriptor_set_count,
-                            &context->shadowmap_layout.descriptor_set,
-                            0,
-                            NULL);
-    for(u32 i = 0; i < scene->mesh_count; ++i) {
-        MeshDraw(cmd, context->shadowmap_layout.layout, scene->meshes[i]);
+    {
+        BeginRenderGroup(cmd,
+                         &context->shadowmap_render_group,
+                         context->shadowmap_framebuffer,
+                         context->shadowmap_extent);
+        Frame frame = {cmd, context->shadowmap_render_group.layout};
+        for(u32 i = 0; i < context->mesh_count; ++i) {
+            DrawMesh(&frame, context->meshes[i]);
+        }
+        EndRenderGroup(cmd);
     }
-
-    vkCmdEndRenderPass(cmd);
-
     // Color
-    renderpass_begin.renderPass = context->render_pass;
-    renderpass_begin.framebuffer = context->framebuffers[image_id];
-    renderpass_begin.renderArea = {{0, 0}, swapchain->extent};
-
-    VkClearValue clear_values[2] = {};
-    clear_values[0].color = {0.53f, 0.80f, 0.92f, 0.0f};
-    clear_values[1].depthStencil = {1.0f, 0};
-    renderpass_begin.clearValueCount = 2;
-    renderpass_begin.pClearValues = clear_values;
-
-    vkCmdBeginRenderPass(cmd, &renderpass_begin, VK_SUBPASS_CONTENTS_INLINE);
-
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->pipeline);
-    vkCmdBindDescriptorSets(cmd,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            scene->layout,
-                            0,
-                            scene->descriptor_set_count,
-                            scene->descriptor_sets,
-                            0,
-                            NULL);
-    for(u32 i = 0; i < scene->mesh_count; ++i) {
-        MeshDraw(cmd, scene->layout, scene->meshes[i]);
+    {
+        BeginRenderGroup(
+            cmd, &context->main_render_group, context->framebuffers[image_id], swapchain->extent);
+        Frame frame = {cmd, context->main_render_group.layout};
+        for(u32 i = 0; i < context->mesh_count; ++i) {
+            DrawMesh(&frame, context->meshes[i]);
+        }
+        EndRenderGroup(cmd);
     }
-
-    vkCmdEndRenderPass(cmd);
     AssertVkResult(vkEndCommandBuffer(cmd));
 
     const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
