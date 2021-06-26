@@ -1,5 +1,5 @@
 #include <sl3dge/debug.h>
-#include "vulkan_layer.h"
+#include "vulkan_types.h"
 /*
  === TODO ===
  CRITICAL
@@ -86,27 +86,31 @@ inline u32 GLTFGetTextureID(cgltf_texture *texture) {
 }
 
 void GLTFLoadVertexAndIndexBuffer(
-		cgltf_primitive *prim, Primitive *primitive, void *vtx_buffer, void *idx_buffer) {
-	GLTFCopyAccessor(prim->indices, idx_buffer, primitive->index_offset * sizeof(u32), sizeof(u32));
+		cgltf_primitive *prim, Primitive *primitive, const u32 offset, void *buffer) {
+	GLTFCopyAccessor(
+			prim->indices, buffer, offset + primitive->index_offset * sizeof(u32), sizeof(u32));
 
 	for (u32 a = 0; a < prim->attributes_count; ++a) {
 		switch (prim->attributes[a].type) {
 			case cgltf_attribute_type_position: {
-				GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+				GLTFCopyAccessor(prim->attributes[a].data, buffer,
 						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, pos),
 						sizeof(Vertex));
 			} break;
 
 			case cgltf_attribute_type_normal: {
-				GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+				GLTFCopyAccessor(prim->attributes[a].data, buffer,
 						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, normal),
 						sizeof(Vertex));
 			} break;
 			case cgltf_attribute_type_texcoord: {
-				GLTFCopyAccessor(prim->attributes[a].data, vtx_buffer,
+				GLTFCopyAccessor(prim->attributes[a].data, buffer,
 						primitive->vertex_offset * sizeof(Vertex) + offsetof(Vertex, uv),
 						sizeof(Vertex));
 			} break;
+			default: {
+				continue;
+			}
 		}
 	}
 }

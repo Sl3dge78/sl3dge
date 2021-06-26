@@ -1,7 +1,7 @@
 #include <vulkan/vulkan.h>
 
-#include <sl3dge/debug.h>
-#include "vulkan_layer.h"
+#include <sl3dge/sl3dge.h>
+#include "vulkan_types.h"
 
 namespace Pipeline {
 
