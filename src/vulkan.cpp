@@ -19,6 +19,7 @@ internal void SceneLoadMaterialsAndTextures(VulkanContext *context,
 /*
  === TODO ===
  CRITICAL
+ - Refactor the whole vulkan part, includes are a mess
 - Draw multiple gltf scenes
 > Model
 
