@@ -1,8 +1,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <sl3dge/types.h>
-#include <sl3dge/3d_math.h>
+#include <sl3dge/sl3dge.h>
 
 typedef struct CameraMatrices {
     alignas(16) Mat4 proj;
@@ -26,5 +25,7 @@ fn_GameStart *pfn_GameStart;
 
 typedef void fn_GameLoop(float delta_time, GameData *game_data);
 fn_GameLoop *pfn_GameLoop;
+
+
 
 #endif // MAIN_H
