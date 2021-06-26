@@ -4,6 +4,8 @@
 #include <vulkan/vulkan.h>
 #include <sl3dge/sl3dge.h>
 
+#include "platform/platform.h"
+
 typedef struct Buffer {
     VkBuffer buffer;
     VkDeviceMemory memory;
@@ -60,6 +62,8 @@ struct RenderGroup {
 };
 
 typedef struct Renderer {
+    PlatformAPI *platform;
+
     VkInstance instance;
     VkPhysicalDevice physical_device;
     VkSurfaceKHR surface;
@@ -98,11 +102,6 @@ typedef struct Renderer {
 
     // TODO: move that in to a rendergroup
     RenderGroup main_render_group;
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
-    u32 descriptor_set_count;
-    VkDescriptorSetLayout *set_layouts;
-    VkDescriptorSet *descriptor_sets;
 
     u32 materials_count;
     Buffer mat_buffer;

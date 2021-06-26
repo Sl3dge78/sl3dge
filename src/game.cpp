@@ -3,9 +3,7 @@
 
 #include <SDL/SDL.h>
 
-#include <sl3dge/debug.h>
-#include <sl3dge/3d_math.h>
-#include <sl3dge/types.h>
+#include <sl3dge/sl3dge.h>
 
 #include "game.h"
 #include "renderer/mesh.h"

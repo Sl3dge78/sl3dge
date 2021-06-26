@@ -11,9 +11,7 @@
 
 #include <sl3dge/sl3dge.h>
 
-internal inline FARPROC PlatformGetProcAddress(Module *module, const char *fn) {
-    return GetProcAddress(module->dll, fn);
-}
+#include "platform.h"
 
 #include "game.h"
 #include "renderer/renderer.h"
@@ -39,19 +37,18 @@ typedef struct ShaderCode {
 } ShaderCode;
 
 void GameLoadFunctions(Module *dll) {
-    pfn_GameStart = (fn_GameStart *)PlatformGetProcAddress(dll, "GameStart");
-    pfn_GameLoop = (fn_GameLoop *)PlatformGetProcAddress(dll, "GameLoop");
+    pfn_GameStart = (GameStart_t *)GetProcAddress(dll->dll, "GameStart");
+    pfn_GameLoop = (GameLoop_t *)GetProcAddress(dll->dll, "GameLoop");
 }
 
 void RendererLoadFunctions(Module *dll) {
-    pfn_CreateRenderer = (fn_CreateRenderer *)PlatformGetProcAddress(dll, "VulkanCreateContext");
+    pfn_CreateRenderer = (fn_CreateRenderer *)GetProcAddress(dll->dll, "VulkanCreateContext");
     ASSERT(pfn_CreateRenderer);
-    pfn_DestroyRenderer = (fn_DestroyRenderer *)PlatformGetProcAddress(dll, "VulkanDestroyContext");
+    pfn_DestroyRenderer = (fn_DestroyRenderer *)GetProcAddress(dll->dll, "VulkanDestroyContext");
     ASSERT(pfn_DestroyRenderer);
-    pfn_ReloadShaders =
-        (fn_RendererReloadShaders *)PlatformGetProcAddress(dll, "VulkanReloadShaders");
+    pfn_ReloadShaders = (fn_RendererReloadShaders *)GetProcAddress(dll->dll, "VulkanReloadShaders");
     ASSERT(pfn_ReloadShaders);
-    pfn_DrawFrame = (fn_DrawFrame *)PlatformGetProcAddress(dll, "VulkanDrawFrame");
+    pfn_DrawFrame = (fn_DrawFrame *)GetProcAddress(dll->dll, "VulkanDrawFrame");
     ASSERT(pfn_DrawFrame);
     /*
     pfn_BeginFrame = (fn_BeginFrame *)PlatformGetProcAddress(dll, "VulkanBeginFrame");
@@ -77,6 +74,30 @@ LogOutput(void *userdata, int category, SDL_LogPriority priority, const char *me
     fclose(std_err);
 }
 
+// if result is NULL, function will query the file size for allocation in file_size.
+void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
+
+    FILE *file;
+    fopen_s(&file, path, "rb");
+    if(!file) {
+        SDL_LogError(0, "Unable to open file");
+        SDL_LogError(0, path);
+    }
+    // Get the size
+    fseek(file, 0, SEEK_END);
+    *file_size = ftell(file);
+    if(!result) { // result if null, we're in query mode
+        fclose(file);
+        return;
+    }
+    rewind(file);
+    // Copy into result
+
+    fread(result, 1, *file_size, file);
+
+    fclose(file);
+}
+
 internal int main(int argc, char *argv[]) {
 #if DEBUG
     AllocConsole();
@@ -95,11 +116,14 @@ internal int main(int argc, char *argv[]) {
     SDL_LogSetOutputFunction(&LogOutput, NULL);
 #endif
 
+    PlatformAPI platform_api = {};
+    platform_api.ReadBinary = &PlatformReadBinary;
+
     Module renderer_module = {};
     Win32LoadModule(&renderer_module, "renderer");
     RendererLoadFunctions(&renderer_module);
 
-    Renderer *renderer = pfn_CreateRenderer(window);
+    Renderer *renderer = pfn_CreateRenderer(window, &platform_api);
 
     Module game_module = {};
     Win32LoadModule(&game_module, "game");
@@ -135,7 +159,7 @@ internal int main(int argc, char *argv[]) {
 
             Win32LoadModule(&renderer_module, "vulkan");
             RendererLoadFunctions(&renderer_module);
-            renderer = pfn_CreateRenderer(window);
+            renderer = pfn_CreateRenderer(window, &platform_api);
 
             SDL_Log("Vulkan reloaded");
         }

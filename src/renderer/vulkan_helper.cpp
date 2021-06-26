@@ -7,18 +7,19 @@
 #include <SDL/SDL.h>
 #include <sl3dge/sl3dge.h>
 
+#include "platform/platform.h"
 #include "vulkan_types.h"
 
-#define DECL_FUNC(name) static PFN_##name pfn_##name
-#define LOAD_INSTANCE_FUNC(instance, name)                                                         \
+#define VK_DECL_FUNC(name) static PFN_##name pfn_##name
+#define VK_LOAD_INSTANCE_FUNC(instance, name)                                                      \
     pfn_##name = (PFN_##name)vkGetInstanceProcAddr(instance, #name);                               \
     ASSERT(pfn_##name);
-#define LOAD_DEVICE_FUNC(name)                                                                     \
+#define VK_LOAD_DEVICE_FUNC(name)                                                                  \
     pfn_##name = (PFN_##name)vkGetDeviceProcAddr(device, #name);                                   \
     ASSERT(pfn_##name);
 
-DECL_FUNC(vkSetDebugUtilsObjectNameEXT);
-DECL_FUNC(vkGetBufferDeviceAddressKHR);
+VK_DECL_FUNC(vkSetDebugUtilsObjectNameEXT);
+VK_DECL_FUNC(vkGetBufferDeviceAddressKHR);
 
 VKAPI_ATTR VkBool32 VKAPI_CALL
 DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -79,31 +80,14 @@ internal void AssertVkResult(VkResult result) {
     }
 }
 
-// This allocates memory, free it!
-internal u32 *AllocateAndLoadBinary(const char *path, i64 *file_size) {
-    FILE *file;
-    fopen_s(&file, path, "rb");
-    if(!file) {
-        SDL_LogError(0, "Unable to open file");
-        SDL_LogError(0, path);
-    }
-    // Get the size
-    fseek(file, 0, SEEK_END);
-    *file_size = ftell(file);
-    rewind(file);
-
-    // Copy into result
-    u32 *result = (u32 *)malloc(*file_size);
-    fread(result, 1, *file_size, file);
-
-    fclose(file);
-    return result;
-}
-
-internal void
-CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_module) {
+internal void CreateVkShaderModule(const char *path,
+                                   VkDevice device,
+                                   PlatformAPI *platform,
+                                   VkShaderModule *shader_module) {
     i64 size = 0;
-    u32 *code = AllocateAndLoadBinary(path, &size);
+    platform->ReadBinary(path, &size, NULL);
+    u32 *code = (u32 *)malloc(size);
+    platform->ReadBinary(path, &size, code);
 
     VkShaderModuleCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -112,9 +96,8 @@ CreateVkShaderModule(const char *path, VkDevice device, VkShaderModule *shader_m
     create_info.codeSize = size;
     create_info.pCode = code;
 
-    VkResult result = vkCreateShaderModule(device, &create_info, NULL, shader_module);
+    AssertVkResult(vkCreateShaderModule(device, &create_info, NULL, shader_module));
     free(code);
-    AssertVkResult(result);
 }
 
 internal void DEBUGPrintInstanceExtensions() {

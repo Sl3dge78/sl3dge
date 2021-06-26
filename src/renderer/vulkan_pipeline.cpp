@@ -115,6 +115,7 @@ PipelineGetDefaultColorBlendState(const u32 attachement_cout,
 }
 
 void PipelineCreateDefault(VkDevice device,
+                           PlatformAPI *platform,
                            const char *vertex_shader,
                            const char *fragment_shader,
                            const VkExtent2D *extent,
@@ -132,7 +133,7 @@ void PipelineCreateDefault(VkDevice device,
     stages_ci[0].pNext = NULL;
     stages_ci[0].flags = 0;
     stages_ci[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    CreateVkShaderModule(vertex_shader, device, &stages_ci[0].module);
+    CreateVkShaderModule(vertex_shader, device, platform, &stages_ci[0].module);
     stages_ci[0].pName = "main";
     stages_ci[0].pSpecializationInfo = NULL;
 
@@ -140,7 +141,7 @@ void PipelineCreateDefault(VkDevice device,
     stages_ci[1].pNext = NULL;
     stages_ci[1].flags = 0;
     stages_ci[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    CreateVkShaderModule(fragment_shader, device, &stages_ci[1].module);
+    CreateVkShaderModule(fragment_shader, device, platform, &stages_ci[1].module);
     stages_ci[1].pName = "main";
     stages_ci[1].pSpecializationInfo = NULL;
     pipeline_ci.stageCount = 2;

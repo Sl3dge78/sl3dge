@@ -8,7 +8,7 @@ struct Scene;
 struct GameData;
 struct RenderCommands;
 
-typedef Renderer *fn_CreateRenderer(SDL_Window *window);
+typedef Renderer *fn_CreateRenderer(SDL_Window *window, PlatformAPI *platform_api);
 fn_CreateRenderer *pfn_CreateRenderer;
 
 typedef void fn_DestroyRenderer(Renderer *renderer);

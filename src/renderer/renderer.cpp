@@ -46,25 +46,21 @@ BACKLOG
 - Pipeline dynamic state
 
 - Apparently we should only allocate big stacks of memory
-> Be like this :   Memory
-				   |    |
-			 Buffer1    Buffer2
-> An easy place to start is with models and their vtx/idx buffers
 */
 
 global VkDebugUtilsMessengerEXT debug_messenger;
 
-DECL_FUNC(vkCreateDebugUtilsMessengerEXT);
-DECL_FUNC(vkDestroyDebugUtilsMessengerEXT);
+VK_DECL_FUNC(vkCreateDebugUtilsMessengerEXT);
+VK_DECL_FUNC(vkDestroyDebugUtilsMessengerEXT);
 
-DECL_FUNC(vkCreateRayTracingPipelinesKHR);
-DECL_FUNC(vkCmdTraceRaysKHR);
-DECL_FUNC(vkGetRayTracingShaderGroupHandlesKHR);
-DECL_FUNC(vkCreateAccelerationStructureKHR);
-DECL_FUNC(vkGetAccelerationStructureBuildSizesKHR);
-DECL_FUNC(vkCmdBuildAccelerationStructuresKHR);
-DECL_FUNC(vkDestroyAccelerationStructureKHR);
-DECL_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
+VK_DECL_FUNC(vkCreateRayTracingPipelinesKHR);
+VK_DECL_FUNC(vkCmdTraceRaysKHR);
+VK_DECL_FUNC(vkGetRayTracingShaderGroupHandlesKHR);
+VK_DECL_FUNC(vkCreateAccelerationStructureKHR);
+VK_DECL_FUNC(vkGetAccelerationStructureBuildSizesKHR);
+VK_DECL_FUNC(vkCmdBuildAccelerationStructuresKHR);
+VK_DECL_FUNC(vkDestroyAccelerationStructureKHR);
+VK_DECL_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
 
 // ========================
 //
@@ -127,9 +123,9 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
         // TODO : Do that only if we're in debug mode
 
         // Get the functions
-        LOAD_INSTANCE_FUNC(*instance, vkCreateDebugUtilsMessengerEXT);
-        LOAD_INSTANCE_FUNC(*instance, vkDestroyDebugUtilsMessengerEXT);
-        LOAD_INSTANCE_FUNC(*instance, vkSetDebugUtilsObjectNameEXT);
+        VK_LOAD_INSTANCE_FUNC(*instance, vkCreateDebugUtilsMessengerEXT);
+        VK_LOAD_INSTANCE_FUNC(*instance, vkDestroyDebugUtilsMessengerEXT);
+        VK_LOAD_INSTANCE_FUNC(*instance, vkSetDebugUtilsObjectNameEXT);
 
         // Create the messenger
         VkDebugUtilsMessengerCreateInfoEXT debug_create_info = {};
@@ -165,15 +161,15 @@ internal void CreateVkPhysicalDevice(VkInstance instance, VkPhysicalDevice *phys
 }
 
 internal void LoadDeviceFuncPointers(VkDevice device) {
-    LOAD_DEVICE_FUNC(vkCreateRayTracingPipelinesKHR);
-    LOAD_DEVICE_FUNC(vkCmdTraceRaysKHR);
-    LOAD_DEVICE_FUNC(vkGetRayTracingShaderGroupHandlesKHR);
-    LOAD_DEVICE_FUNC(vkGetBufferDeviceAddressKHR);
-    LOAD_DEVICE_FUNC(vkCreateAccelerationStructureKHR);
-    LOAD_DEVICE_FUNC(vkGetAccelerationStructureBuildSizesKHR);
-    LOAD_DEVICE_FUNC(vkCmdBuildAccelerationStructuresKHR);
-    LOAD_DEVICE_FUNC(vkDestroyAccelerationStructureKHR);
-    LOAD_DEVICE_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
+    VK_LOAD_DEVICE_FUNC(vkCreateRayTracingPipelinesKHR);
+    VK_LOAD_DEVICE_FUNC(vkCmdTraceRaysKHR);
+    VK_LOAD_DEVICE_FUNC(vkGetRayTracingShaderGroupHandlesKHR);
+    VK_LOAD_DEVICE_FUNC(vkGetBufferDeviceAddressKHR);
+    VK_LOAD_DEVICE_FUNC(vkCreateAccelerationStructureKHR);
+    VK_LOAD_DEVICE_FUNC(vkGetAccelerationStructureBuildSizesKHR);
+    VK_LOAD_DEVICE_FUNC(vkCmdBuildAccelerationStructuresKHR);
+    VK_LOAD_DEVICE_FUNC(vkDestroyAccelerationStructureKHR);
+    VK_LOAD_DEVICE_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
 }
 
 internal void GetQueuesId(Renderer *context) {
@@ -766,8 +762,10 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     stages_ci.pNext = NULL;
     stages_ci.flags = 0;
     stages_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    CreateVkShaderModule(
-        "resources/shaders/shadowmap.vert.spv", context->device, &stages_ci.module);
+    CreateVkShaderModule("resources/shaders/shadowmap.vert.spv",
+                         context->device,
+                         context->platform,
+                         &stages_ci.module);
     stages_ci.pName = "main";
     stages_ci.pSpecializationInfo = NULL;
 
@@ -961,6 +959,7 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
             vkCreatePipelineLayout(context->device, &create_info, NULL, &render_group->layout));
     }
     PipelineCreateDefault(context->device,
+                          context->platform,
                           "resources/shaders/general.vert.spv",
                           "resources/shaders/general.frag.spv",
                           &context->swapchain.extent,
@@ -977,8 +976,12 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
     render_group->clear_values[1].depthStencil = {1.0f, 0};
 }
 
-extern "C" __declspec(dllexport) Renderer *VulkanCreateContext(SDL_Window *window) {
+extern "C" __declspec(dllexport) Renderer *VulkanCreateContext(SDL_Window *window,
+                                                               PlatformAPI *platform_api) {
     Renderer *context = (Renderer *)malloc(sizeof(Renderer));
+
+    context->platform = platform_api;
+
     CreateVkInstance(window, &context->instance);
     SDL_Vulkan_CreateSurface(window, context->instance, &context->surface);
     CreateVkPhysicalDevice(context->instance, &context->physical_device);
@@ -1257,6 +1260,7 @@ extern "C" __declspec(dllexport) void VulkanReloadShaders(Renderer *renderer) {
     vkDestroyPipeline(renderer->device, renderer->main_render_group.pipeline, NULL);
 
     PipelineCreateDefault(renderer->device,
+                          renderer->platform,
                           "resources/shaders/general.vert.spv",
                           "resources/shaders/general.frag.spv",
                           &renderer->swapchain.extent,

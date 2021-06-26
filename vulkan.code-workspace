@@ -11,5 +11,11 @@
         {
             "path": "resources\\shaders"
         }
-    ]
+    ],
+    "settings": {
+        "files.associations": {
+            "system_error": "cpp",
+            "xlocale": "cpp"
+        }
+    }
 }
