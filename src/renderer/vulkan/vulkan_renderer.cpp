@@ -11,42 +11,6 @@
 #include "renderer/vulkan/vulkan_helper.cpp"
 #include "renderer/vulkan/vulkan_pipeline.cpp"
 
-/*
- === TODO ===
- CRITICAL
-- Refactor the whole vulkan part, includes are a mess WIP
-- Dyn array of meshes
-
- MAJOR
-- Find a way to draw the sun even though no fragments are on the screen
-> Skybox, same render pass, different pipeline
-
-- Descriptor set 0 > could be the same for all pipelines
-- Check the frame sync, we might not be at 60.
-- Optimize volumetric fog
-	> Move it to a new renderpass.
-	> Will need the z-buffer and the shadowmap
-	> What else? think about it. Currently in the shader it needs the world pos. How do i get it
-from the zbuffer? How do I get them along the ray? Should be fine
-
-
-BACKLOG
-
-- Window Resize > Pipline dynamic states ?
-- Mipmaps
-- Volumetric clouds?
-
- IMPROVEMENTS
-- Can't create a scene without textures
-- IBL?
-- Utiliser des Staging buffers
-- Handle pipeline caches
-- Pick the device according to our specs
-- Pipeline dynamic state
-
-- Apparently we should only allocate big stacks of memory
-*/
-
 global VkDebugUtilsMessengerEXT debug_messenger;
 
 // ========================
@@ -175,14 +139,14 @@ internal void GetQueuesId(Renderer *context) {
         if(!(set_flags & 1) && queue_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             context->graphics_queue_id = i;
             set_flags |= 1;
-            // graphics_queue.count = queue_properties[i].queueCount; // TODO ??
+            // graphics_queue.count = queue_properties[i].queueCount; // TODO : ??
         }
 
         if(!(set_flags & 2) && queue_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT &&
            !(queue_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
             context->transfer_queue_id = i;
             set_flags |= 2;
-            // transfer_queue.count = queue_properties[i].queueCount; // TODO ??
+            // transfer_queue.count = queue_properties[i].queueCount; // TODO : ??
         }
 
         if(!(set_flags & 4)) {
@@ -1252,7 +1216,7 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
                           renderer->main_render_group.render_pass,
                           &renderer->main_render_group.pipeline);
 
-    /* TODO
+    /* TODO :
     vkDestroyPipeline(renderer->device, renderer->shadowmap_pipeline, NULL);
     CreateShadowMapPipeline(renderer->device,
                             renderer->shadowmap_layout.layout,
@@ -1284,7 +1248,7 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
                                    swapchain->image_acquired_semaphore[swapchain->semaphore_id],
                                    VK_NULL_HANDLE,
                                    &image_id);
-    AssertVkResult(result); // TODO(Guigui): Recreate swapchain if Suboptimal or outofdate;
+    AssertVkResult(result); // TODO : Recreate swapchain if Suboptimal or outofdate;
 
     // If the frame hasn't finished rendering wait for it to finish
     AssertVkResult(
@@ -1348,7 +1312,7 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
     present_info.pResults = NULL;
     result = vkQueuePresentKHR(context->present_queue, &present_info);
     AssertVkResult(result);
-    // TODO(Guigui): Recreate Swapchain if necessary
+    // TODO : Recreate Swapchain if necessary
 
     swapchain->semaphore_id = (swapchain->semaphore_id + 1) % swapchain->image_count;
 

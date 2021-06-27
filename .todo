@@ -1,0 +1,63 @@
+
+GAME:
+    CRITICAL:
+
+    MAJOR:
+
+    BACKLOG:
+        - Moto movement
+        - Moto cam
+        - Generate roads
+
+    IMPROVEMENTS:
+
+    IDEAS:
+
+RENDERER:
+    CRITICAL:
+        - Dyn array of meshes
+        - Resize the texture array, rebuild the pipeline?
+        - Make sure that we can load different gltf, i think the mat id and tex id ar hardcoded
+
+    MAJOR:
+        - Find a way to draw the sun even though no fragments are on the screen
+            > Skybox, same render pass, different pipeline
+            > Or switching the volumetric fog to a new pass should fix it
+        - Descriptor set 0 > could be the same for all pipelines
+        - Optimize volumetric fog
+            > Move it to a new renderpass.
+            > Will need the z-buffer and the shadowmap
+            > What else? think about it. Currently in the shader it needs the world pos. How do i get it from the zbuffer? How do I get them along the ray? Should be fine
+
+    BACKLOG:
+        - Window Resize > Pipline dynamic states ?
+        - Mipmaps
+        - Volumetric clouds?
+        - Have a look at vkCmdDrawIndirect
+        - Maybe use indirect raytracing for shadows?
+
+    IMPROVEMENTS:
+        - Can't create a scene without textures
+        - IBL?
+        - Utiliser des Staging buffers
+        - Pipeline caches
+        - Pick the device according to our specs
+        - Pipeline dynamic state
+        - Apparently we should only allocate big stacks of memory
+
+GLTF:
+    CRITICAL:
+    MAJOR:
+        - If we have multiple meshes that use the same primitve, we will just dupe it here
+        - Read embedded glb
+    BACKLOG:
+    IMPROVEMENTS:
+    IDEAS:
+
+WIN32 :
+    CRITICAL:
+    MAJOR:
+    BACKLOG:
+    IMPROVEMENTS:
+    IDEAS :
+        - In game console

@@ -198,7 +198,7 @@ void PipelineCreateDefault(VkDevice device,
         PipelineGetDefaultColorBlendState(1, &color_blend_attachement);
     pipeline_ci.pColorBlendState = &color_blend_state;
 
-    pipeline_ci.pDynamicState = NULL; // TODO(Guigui): look at this
+    pipeline_ci.pDynamicState = NULL; // TODO: look at this
     pipeline_ci.layout = layout;
 
     pipeline_ci.renderPass = render_pass;

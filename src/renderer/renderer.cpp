@@ -199,6 +199,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
         // Materials
         RendererLoadMaterialsAndTextures(renderer, data, directory);
     }
+    mesh->instance_capacity = 1;
     mesh->instance_transforms = (Mat4 *)scalloc(1, sizeof(Mat4));
 
     cgltf_free(data);
@@ -249,9 +250,22 @@ void RendererDrawMesh(Frame *frame, Mesh *mesh) {
     }
 }
 
-void RendererInstantiateMesh(Renderer *renderer, u32 id) {
-    renderer->meshes[id]->instance_count++;
-    renderer->meshes[id]->instance_transforms[0] = mat4_identity();
+u32 RendererInstantiateMesh(Renderer *renderer, u32 id) {
+    Mesh *mesh = renderer->meshes[id];
+    if(mesh->instance_count == mesh->instance_capacity) {
+        // Resize the buffer
+        u32 new_capacity = mesh->instance_capacity * 2;
+        SDL_Log("Resizing mesh buffer from %d to %d", mesh->instance_capacity, new_capacity);
+        Mat4 *new_buffer = (Mat4 *)srealloc(mesh->instance_transforms, new_capacity * sizeof(Mat4));
+        ASSERT_MSG(new_buffer, "Unable to size up the instance buffer");
+        mesh->instance_transforms = new_buffer;
+        mesh->instance_capacity = new_capacity;
+    }
+    u32 instance_id = mesh->instance_count++;
+    mesh->instance_transforms[instance_id] = mat4_identity();
+    mat4_translate(&mesh->instance_transforms[instance_id],
+                   Vec3{(f32)instance_id * 20.f, 0.f, 0.f});
+    return mesh->instance_count;
 }
 
 void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {

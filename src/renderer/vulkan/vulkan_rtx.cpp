@@ -7,9 +7,6 @@
  CRITICAL
  - Allow creation of blas in series (input a cmd buffer)
 
- MAJOR
-- If we have multiple meshes that use the same primitve, we will just dupe it
-here
 
 BACKLOG
 

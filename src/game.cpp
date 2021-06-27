@@ -7,23 +7,6 @@
 
 #include "game.h"
 #include "renderer/renderer.h"
-/*
-=== TODO ===
-
- CRITICAL
-
- MAJOR
-
- BACKLOG
-- Moto movement
-- Moto cam
-- Generate roads
-
- IMPROVEMENTS
-
- IDEAS
-
-*/
 
 DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->light_pos = {0.0f, 0.0f, 0.0f};
@@ -109,6 +92,10 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
         if(game_data->cos < 0.0f) {
             game_data->cos = PI;
         }
+    }
+
+    if(keyboard[SDL_SCANCODE_M]) {
+        game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
     }
 
     game_data->position = game_data->position + movement;

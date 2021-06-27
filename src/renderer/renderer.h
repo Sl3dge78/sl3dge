@@ -36,6 +36,7 @@ struct Mesh {
     Mat4 *primitive_transforms;
 
     u32 instance_count;
+    u32 instance_capacity;
     Mat4 *instance_transforms;
 };
 
@@ -99,7 +100,7 @@ DLL_EXPORT LoadMesh_t RendererLoadMesh;
 typedef void DestroyMesh_t(Renderer *renderer, u32 mesh);
 DLL_EXPORT DestroyMesh_t RendererDestroyMesh;
 
-typedef void InstantiateMesh_t(Renderer *renderer, u32 mesh);
+typedef u32 InstantiateMesh_t(Renderer *renderer, u32 mesh);
 DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
 
 typedef void

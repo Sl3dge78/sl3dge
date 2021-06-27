@@ -91,9 +91,9 @@ typedef struct Renderer {
     VkDescriptorPool descriptor_pool;
 
     Swapchain swapchain;
+    VkFramebuffer *framebuffers;
 
     VkSampler texture_sampler;
-    VkFramebuffer *framebuffers;
 
     Image depth_image;
     Image msaa_image;

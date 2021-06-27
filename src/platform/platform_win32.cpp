@@ -16,21 +16,6 @@
 #include "game.h"
 #include "renderer/renderer.h"
 
-/*
-=== TODO ===
-
- CRITICAL
-
- MAJOR
-
- BACKLOG
-
- IMPROVEMENTS
-
- IDEAS
- - In game console
-*/
-
 typedef struct ShaderCode {
     const char *spv_path;
     FILETIME last_write_time;

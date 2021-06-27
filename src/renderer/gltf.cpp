@@ -1,21 +1,6 @@
 #include <sl3dge/debug.h>
 #include "renderer/renderer.h"
 
-/*
- === TODO ===
- CRITICAL
- - Read embedded glb
-
- MAJOR
-- If we have multiple meshes that use the same primitve, we will just dupe it here
-
-BACKLOG
-
-
- IMPROVEMENTS
-
-*/
-
 internal void
 GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst_stride) {
     const cgltf_buffer_view *view = acc->buffer_view;
@@ -114,7 +99,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         Material dst = {};
 
         if(!mat->has_pbr_metallic_roughness) {
-            // TODO(Guigui)
+            // TODO Handle metallic roughness
             SDL_LogError(0, "Only metallic_roughness is supported");
             ASSERT(0);
         }

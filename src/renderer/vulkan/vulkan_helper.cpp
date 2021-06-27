@@ -129,7 +129,7 @@ internal i32 FindMemoryType(const VkPhysicalDeviceMemoryProperties *memory_prope
             }
         }
     }
-    ASSERT(0); // TODO(Guigui): Handle this more cleanly
+    ASSERT(0); // TODO: Handle this more cleanly
     return -1;
 }
 
