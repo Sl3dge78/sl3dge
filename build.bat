@@ -14,7 +14,6 @@ MKDIR tmp > NUL 2> NUL
 ECHO Building win32.exe
 clang %args% %include_path% src/platform/platform_win32.cpp -o bin/win32.exe %linker_options% %libs% -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 
-
 SET module_name=renderer
 ECHO Building %module_name% module
 clang %args% %include_path% -shared src/%module_name%/%module_name%.cpp -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib

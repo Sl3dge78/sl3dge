@@ -204,7 +204,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
 
     cgltf_free(data);
 
-    // TEMP:
+    // TEMP: hardcoded mesh id
     renderer->meshes[0] = mesh;
     return 0;
 }

@@ -6,8 +6,12 @@ GAME:
 
     BACKLOG:
         - Moto movement
+            > Need to be able to move meshes
         - Moto cam
+            > We can do it
         - Generate roads
+            > Need to be able to create quads and push them
+            > Vertex color could be good here
 
     IMPROVEMENTS:
 
@@ -15,10 +19,21 @@ GAME:
 
 RENDERER:
     CRITICAL:
-        - Reloading the renderer doesn't reload the meshes and stuff
-        - Dyn array of meshes
         - Resize the texture array, rebuild the pipeline?
-        - Make sure that we can load different gltf, i think the mat id and tex id ar hardcoded
+        - Reloading the renderer doesn't reload the meshes and stuff
+            ? Should we kill renderer hot reloading?
+            - Mesh data (buffers, textures) prevents us from hot reloading
+                ? Game could store all the loaded meshes and their instance data and send it back to the renderer on reload.
+                ? Spliting the renderer in two (backend/frontend) could make it possible to reload the backend only.
+                    > Frontend has mesh data and all and sends it to the backend on reload
+                    > Backend is the current stuff
+        - Dynamic array of meshes
+            - Take a decisions on frontend/backend first
+        ? Split the way we store render data
+            > Renderer has list of meshes
+            > Game has pointer to these meshes and their xform info
+                > To render, pack this all up and send it to the renderer
+        - Make sure that we can load different GLTF, I think the mat id and tex id are hardcoded
 
     MAJOR:
         - Find a way to draw the sun even though no fragments are on the screen
@@ -35,7 +50,7 @@ RENDERER:
         - Mipmaps
         - Volumetric clouds?
         - Have a look at vkCmdDrawIndirect
-        - Maybe use indirect raytracing for shadows?
+        - Maybe use rayquery for shadows?
 
     IMPROVEMENTS:
         - Can't create a scene without textures

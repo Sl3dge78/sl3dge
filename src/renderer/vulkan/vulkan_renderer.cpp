@@ -1217,15 +1217,6 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
 
     DestroyRenderGroup(renderer, &renderer->shadowmap_render_group);
     CreateShadowMapRenderGroup(renderer, &renderer->shadowmap_render_group);
-
-    /* TODO :
-    vkDestroyPipeline(renderer->device, renderer->shadowmap_pipeline, NULL);
-    CreateShadowMapPipeline(renderer->device,
-                            renderer->shadowmap_layout.layout,
-                            renderer->shadowmap_render_pass,
-                            renderer->shadowmap_extent,
-                            &renderer->shadowmap_pipeline);
-                            */
 }
 
 // ================
