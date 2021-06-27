@@ -8,15 +8,7 @@
 #include <sl3dge/sl3dge.h>
 
 #include "platform/platform.h"
-#include "vulkan_types.h"
 
-#define VK_DECL_FUNC(name) static PFN_##name pfn_##name
-#define VK_LOAD_INSTANCE_FUNC(instance, name)                                                      \
-    pfn_##name = (PFN_##name)vkGetInstanceProcAddr(instance, #name);                               \
-    ASSERT(pfn_##name);
-#define VK_LOAD_DEVICE_FUNC(name)                                                                  \
-    pfn_##name = (PFN_##name)vkGetDeviceProcAddr(device, #name);                                   \
-    ASSERT(pfn_##name);
 
 VK_DECL_FUNC(vkSetDebugUtilsObjectNameEXT);
 VK_DECL_FUNC(vkGetBufferDeviceAddressKHR);
@@ -86,7 +78,7 @@ internal void CreateVkShaderModule(const char *path,
                                    VkShaderModule *shader_module) {
     i64 size = 0;
     platform->ReadBinary(path, &size, NULL);
-    u32 *code = (u32 *)malloc(size);
+    u32 *code = (u32 *)smalloc(size);
     platform->ReadBinary(path, &size, code);
 
     VkShaderModuleCreateInfo create_info = {};
@@ -97,7 +89,7 @@ internal void CreateVkShaderModule(const char *path,
     create_info.pCode = code;
 
     AssertVkResult(vkCreateShaderModule(device, &create_info, NULL, shader_module));
-    free(code);
+    sfree(code);
 }
 
 internal void DEBUGPrintInstanceExtensions() {
@@ -105,7 +97,7 @@ internal void DEBUGPrintInstanceExtensions() {
     vkEnumerateInstanceExtensionProperties(NULL, &property_count, NULL);
 
     VkExtensionProperties *extensions =
-        (VkExtensionProperties *)calloc(property_count, sizeof(VkExtensionProperties));
+        (VkExtensionProperties *)scalloc(property_count, sizeof(VkExtensionProperties));
     vkEnumerateInstanceExtensionProperties(NULL, &property_count, extensions);
 
     SDL_Log("Available extensions :");
@@ -490,7 +482,7 @@ internal void VulkanUpdateTextureDescriptorSet(VkDevice device,
         u32 nb_info = nb_tex > 0 ? nb_tex : 1;
 
         VkDescriptorImageInfo *images_info =
-            (VkDescriptorImageInfo *)calloc(nb_info, sizeof(VkDescriptorImageInfo));
+            (VkDescriptorImageInfo *)scalloc(nb_info, sizeof(VkDescriptorImageInfo));
 
         for(u32 i = 0; i < nb_info; ++i) {
             images_info[i].sampler = sampler;
@@ -515,7 +507,7 @@ internal void VulkanUpdateTextureDescriptorSet(VkDevice device,
         textures_buffer.pTexelBufferView = NULL;
 
         vkUpdateDescriptorSets(device, 1, &textures_buffer, 0, NULL);
-        free(images_info);
+        sfree(images_info);
     }
 }
 

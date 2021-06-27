@@ -3,8 +3,7 @@
 
 #include <sl3dge/sl3dge.h>
 
-struct Renderer;
-struct Mesh;
+#include "renderer/renderer.h"
 
 typedef struct CameraMatrices {
     alignas(16) Mat4 proj;
@@ -16,6 +15,8 @@ typedef struct CameraMatrices {
 } CameraMatrices;
 
 typedef struct GameData {
+    Renderer *renderer;
+    RendererGameAPI renderer_api;
     CameraMatrices matrices;
     Vec3 position;
     Vec2f spherical_coordinates;

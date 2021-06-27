@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 SET timestamp=%TIME:~3,2%%TIME:~6,2%
-SET args=-g -DDEBUG
+SET args=-g -DDEBUG -D_DEBUG -DRENDERER_VULKAN
 SET include_path=-I D:\Guigui\Work\Prog\_include\ -I %VULKAN_SDK%\include -I src/
 
 SET linker_options=-L D:\Guigui\Work\Prog\_lib -L %VULKAN_SDK%\lib -Xlinker -incremental:no

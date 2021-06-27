@@ -15,7 +15,20 @@
     "settings": {
         "files.associations": {
             "system_error": "cpp",
-            "xlocale": "cpp"
+            "xlocale": "cpp",
+            "atomic": "cpp",
+            "map": "cpp",
+            "set": "cpp",
+            "cstdlib": "cpp",
+            "list": "cpp",
+            "memory": "cpp",
+            "vector": "cpp",
+            "xlocinfo": "cpp",
+            "xlocnum": "cpp",
+            "xmemory": "cpp",
+            "xtree": "cpp",
+            "algorithm": "cpp",
+            "new": "cpp"
         }
     }
 }

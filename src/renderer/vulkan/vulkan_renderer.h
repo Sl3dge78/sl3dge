@@ -1,10 +1,28 @@
-#ifndef VULKAN_TYPES_H
-#define VULKAN_TYPES_H
+#ifndef VULKAN_RENDER_H
+#define VULKAN_RENDER_H
 
 #include <vulkan/vulkan.h>
 #include <sl3dge/sl3dge.h>
 
-#include "platform/platform.h"
+#define VK_DECL_FUNC(name) static PFN_##name pfn_##name
+#define VK_LOAD_INSTANCE_FUNC(instance, name)                                                      \
+    pfn_##name = (PFN_##name)vkGetInstanceProcAddr(instance, #name);                               \
+    ASSERT(pfn_##name);
+#define VK_LOAD_DEVICE_FUNC(name)                                                                  \
+    pfn_##name = (PFN_##name)vkGetDeviceProcAddr(device, #name);                                   \
+    ASSERT(pfn_##name);
+
+VK_DECL_FUNC(vkCreateDebugUtilsMessengerEXT);
+VK_DECL_FUNC(vkDestroyDebugUtilsMessengerEXT);
+
+VK_DECL_FUNC(vkCreateRayTracingPipelinesKHR);
+VK_DECL_FUNC(vkCmdTraceRaysKHR);
+VK_DECL_FUNC(vkGetRayTracingShaderGroupHandlesKHR);
+VK_DECL_FUNC(vkCreateAccelerationStructureKHR);
+VK_DECL_FUNC(vkGetAccelerationStructureBuildSizesKHR);
+VK_DECL_FUNC(vkCmdBuildAccelerationStructuresKHR);
+VK_DECL_FUNC(vkDestroyAccelerationStructureKHR);
+VK_DECL_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
 
 typedef struct Buffer {
     VkBuffer buffer;
@@ -18,18 +36,6 @@ typedef struct Image {
     VkDeviceMemory memory;
     VkImageView image_view;
 } Image;
-
-typedef struct VulkanLayout {
-    VkPipelineLayout layout;
-
-    VkDescriptorSetLayout *set_layout;
-
-    u32 descriptor_set_count;
-    VkDescriptorSet *descriptor_set;
-
-    u32 push_constant_size;
-
-} VulkanLayout;
 
 typedef struct Swapchain {
     VkSwapchainKHR swapchain;
@@ -100,7 +106,6 @@ typedef struct Renderer {
     VkFramebuffer shadowmap_framebuffer;
     RenderGroup shadowmap_render_group;
 
-    // TODO: move that in to a rendergroup
     RenderGroup main_render_group;
 
     u32 materials_count;
@@ -109,41 +114,11 @@ typedef struct Renderer {
     u32 textures_count;
     Image *textures;
 
+    u32 mesh_capacity;
     u32 mesh_count;
     Mesh **meshes;
 
 } Renderer;
-
-typedef struct Primitive {
-    u32 material_id;
-    u32 node_id;
-    u32 index_count;
-    u32 index_offset;
-    u32 vertex_count;
-    u32 vertex_offset;
-} Primitive;
-
-typedef struct PushConstant {
-    alignas(16) Mat4 transform;
-    alignas(4) u32 material;
-} PushConstant;
-
-typedef struct Vertex {
-    Vec3 pos;
-    Vec3 normal;
-    Vec2 uv;
-} Vertex;
-
-typedef struct Material {
-    alignas(16) Vec3 base_color;
-    alignas(4) u32 base_color_texture;
-    alignas(4) u32 metallic_roughness_texture;
-    alignas(4) float metallic_factor;
-    alignas(4) float roughness_factor;
-    alignas(4) u32 normal_texture;
-    alignas(4) u32 ao_texture;
-    alignas(4) u32 emissive_texture;
-} Material;
 
 struct Frame {
     VkCommandBuffer cmd;

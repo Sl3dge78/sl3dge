@@ -42,27 +42,14 @@ void GameLoadFunctions(Module *dll) {
 }
 
 void RendererLoadFunctions(Module *dll) {
-    pfn_CreateRenderer = (fn_CreateRenderer *)GetProcAddress(dll->dll, "VulkanCreateContext");
+    pfn_CreateRenderer = (CreateRenderer_t *)GetProcAddress(dll->dll, "VulkanCreateRenderer");
     ASSERT(pfn_CreateRenderer);
-    pfn_DestroyRenderer = (fn_DestroyRenderer *)GetProcAddress(dll->dll, "VulkanDestroyContext");
+    pfn_DestroyRenderer = (DestroyRenderer_t *)GetProcAddress(dll->dll, "VulkanDestroyRenderer");
     ASSERT(pfn_DestroyRenderer);
-    pfn_ReloadShaders = (fn_RendererReloadShaders *)GetProcAddress(dll->dll, "VulkanReloadShaders");
+    pfn_ReloadShaders = (RendererReloadShaders_t *)GetProcAddress(dll->dll, "VulkanReloadShaders");
     ASSERT(pfn_ReloadShaders);
-    pfn_DrawFrame = (fn_DrawFrame *)GetProcAddress(dll->dll, "VulkanDrawFrame");
+    pfn_DrawFrame = (DrawFrame_t *)GetProcAddress(dll->dll, "VulkanDrawFrame");
     ASSERT(pfn_DrawFrame);
-    /*
-    pfn_BeginFrame = (fn_BeginFrame *)PlatformGetProcAddress(dll, "VulkanBeginFrame");
-    ASSERT(pfn_BeginFrame);
-    pfn_EndFrame = (fn_EndFrame *)PlatformGetProcAddress(dll, "VulkanEndFrame");
-    ASSERT(pfn_EndFrame);
-    */
-    /*
-
-    pfn_CreateScene = (fn_CreateScene *)PlatformGetProcAddress(dll, "VulkanCreateScene");
-    ASSERT(pfn_CreateScene);
-    pfn_DestroyScene = (fn_DestroyScene *)PlatformGetProcAddress(dll, "VulkanFreeScene");
-    ASSERT(pfn_DestroyScene);
-    */
 }
 
 internal void
@@ -76,7 +63,6 @@ LogOutput(void *userdata, int category, SDL_LogPriority priority, const char *me
 
 // if result is NULL, function will query the file size for allocation in file_size.
 void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
-
     FILE *file;
     fopen_s(&file, path, "rb");
     if(!file) {
@@ -136,6 +122,20 @@ internal int main(int argc, char *argv[]) {
     shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
 
     GameData game_data = {};
+
+    // Load Game API functions
+    {
+        game_data.renderer = renderer;
+        game_data.renderer_api.LoadMesh =
+            (LoadMesh_t *)GetProcAddress(renderer_module.dll, "RendererLoadMesh");
+        ASSERT(game_data.renderer_api.LoadMesh);
+        game_data.renderer_api.DestroyMesh =
+            (DestroyMesh_t *)GetProcAddress(renderer_module.dll, "RendererDestroyMesh");
+        ASSERT(game_data.renderer_api.DestroyMesh);
+        game_data.renderer_api.InstantiateMesh =
+            (InstantiateMesh_t *)GetProcAddress(renderer_module.dll, "RendererInstantiateMesh");
+        ASSERT(game_data.renderer_api.InstantiateMesh);
+    }
 
     pfn_GameStart(&game_data, renderer);
 

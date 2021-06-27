@@ -6,7 +6,6 @@
 #include <sl3dge/sl3dge.h>
 
 #include "game.h"
-#include "renderer/mesh.h"
 #include "renderer/renderer.h"
 /*
 === TODO ===
@@ -26,20 +25,17 @@
 
 */
 
-internal void Instantiate(Mesh *mesh) {
-    mesh->instance_count++;
-    mesh->instance_transforms[0] = mat4_identity();
-}
-
-DLL_EXPORT void GameStart(GameData *game_data, Renderer *renderer) {
+DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
     game_data->light_pos = {0.0f, 0.0f, 0.0f};
     game_data->position = {0.0f, 50.0f, 0.0f};
 
-    Instantiate(renderer->meshes[0]);
+    game_data->renderer_api.LoadMesh(game_data->renderer,
+                                     "resources/3d/Motorcycle/motorcycle.gltf");
+    game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
 }
 
-DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Renderer *renderer) {
+DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     f32 move_speed = 1.0f;
     f32 look_speed = 0.01f;
 
