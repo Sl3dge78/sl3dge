@@ -253,3 +253,17 @@ void RendererInstantiateMesh(Renderer *renderer, u32 id) {
     renderer->meshes[id]->instance_count++;
     renderer->meshes[id]->instance_transforms[0] = mat4_identity();
 }
+
+void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {
+    renderer->camera_info.pos = position;
+    renderer->camera_info.view = mat4_look_at(position + forward, position, up);
+    mat4_inverse(&renderer->camera_info.view, &renderer->camera_info.view_inverse);
+}
+
+void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
+    const Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 250.0f, -600.0f, 600.0f);
+    Mat4 b = mat4_look_at({0.0f, 0.0f, 0.0f}, direction * -1.0f, Vec3{0.0f, 1.0f, 0.0f});
+
+    renderer->camera_info.shadow_mvp = mat4_mul(&a, &b);
+    renderer->camera_info.light_dir = direction;
+}

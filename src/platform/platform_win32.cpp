@@ -135,9 +135,15 @@ internal int main(int argc, char *argv[]) {
         game_data.renderer_api.InstantiateMesh =
             (InstantiateMesh_t *)GetProcAddress(renderer_module.dll, "RendererInstantiateMesh");
         ASSERT(game_data.renderer_api.InstantiateMesh);
+        game_data.renderer_api.SetCamera =
+            (SetCamera_t *)GetProcAddress(renderer_module.dll, "RendererSetCamera");
+        ASSERT(game_data.renderer_api.SetCamera);
+        game_data.renderer_api.SetSunDirection =
+            (SetSunDirection_t *)GetProcAddress(renderer_module.dll, "RendererSetSunDirection");
+        ASSERT(game_data.renderer_api.SetSunDirection);
     }
 
-    pfn_GameStart(&game_data, renderer);
+    pfn_GameStart(&game_data);
 
     bool running = true;
     float delta_time = 0;
@@ -188,8 +194,8 @@ internal int main(int argc, char *argv[]) {
             }
         }
 
-        pfn_GameLoop(delta_time, &game_data, renderer);
-        pfn_DrawFrame(renderer, &game_data);
+        pfn_GameLoop(delta_time, &game_data);
+        pfn_DrawFrame(renderer);
 
         {
             // 60 fps cap

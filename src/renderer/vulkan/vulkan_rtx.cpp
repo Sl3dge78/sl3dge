@@ -726,8 +726,10 @@ internal void CreateTLAS(VulkanRenderer *context,
 }
 
 DLL_EXPORT void VulkanDrawRTXFrame(VulkanRenderer *context, Scene *scene, GameData *game_data) {
-    UploadToBuffer(
-        context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
+    UploadToBuffer(context->device,
+                   &context->camera_info_buffer,
+                   &game_data->matrices,
+                   sizeof(game_data->matrices));
 
     u32 image_id;
     Swapchain *swapchain = &context->swapchain;
@@ -1056,7 +1058,7 @@ pipeline->render_image.image_view, VK_IMAGE_LAYOUT_GENERAL
 	vkUpdateDescriptorSets(device, 2, app_writes, 0, NULL);
 
 	u32 game_writes_count = 1;
-	VkDescriptorBufferInfo bi_cam = { context->cam_buffer.buffer, 0,
+	VkDescriptorBufferInfo bi_cam = { context->camera_info_buffer.buffer, 0,
 VK_WHOLE_SIZE }; VkWriteDescriptorSet game_writes[1]; game_writes[0] = {
 VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, descriptor_set[1], 0, 0, 1,
 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, NULL, &bi_cam, NULL };

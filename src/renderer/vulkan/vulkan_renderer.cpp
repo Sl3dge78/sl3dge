@@ -726,7 +726,7 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     const u32 static_writes_count = 1;
     VkWriteDescriptorSet static_writes[static_writes_count];
 
-    VkDescriptorBufferInfo bi_cam = {context->cam_buffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo bi_cam = {context->camera_info_buffer.buffer, 0, VK_WHOLE_SIZE};
     static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[0].pNext = NULL;
     static_writes[0].dstSet = render_group->descriptor_sets[0];
@@ -884,7 +884,7 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
     const u32 static_writes_count = 3;
     VkWriteDescriptorSet static_writes[static_writes_count];
 
-    VkDescriptorBufferInfo bi_cam = {context->cam_buffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo bi_cam = {context->camera_info_buffer.buffer, 0, VK_WHOLE_SIZE};
     static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[0].pNext = NULL;
     static_writes[0].dstSet = render_group->descriptor_sets[0];
@@ -1023,7 +1023,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
-        {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 100},
+        //{VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 100},
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
     };
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
@@ -1038,18 +1038,11 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     AssertVkResult(
         vkCreateDescriptorPool(context->device, &pool_ci, NULL, &context->descriptor_pool));
 
+    // Swapchain
     context->swapchain.swapchain = VK_NULL_HANDLE;
     CreateSwapchain(context, window, &context->swapchain);
 
-    CreateBuffer(context->device,
-                 &context->memory_properties,
-                 sizeof(CameraMatrices),
-                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-                 &context->cam_buffer);
-    DEBUGNameBuffer(context->device, &context->cam_buffer, "Camera Info");
-
-    // Sampler
+    // Texture Sampler
     VkSamplerCreateInfo sampler_ci = {};
     sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     sampler_ci.pNext = NULL;
@@ -1091,7 +1084,17 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
                             context->msaa_level,
                             &context->msaa_image);
 
-    // ShadowMap pipe
+    // Camera info
+    CreateBuffer(context->device,
+                 &context->memory_properties,
+                 sizeof(CameraMatrices),
+                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                 &context->camera_info_buffer);
+    DEBUGNameBuffer(context->device, &context->camera_info_buffer, "Camera Info");
+    context->camera_info.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
+
+    // ShadowMap group
     context->shadowmap_extent = {4096, 4096};
     CreateShadowMapRenderGroup(context, &context->shadowmap_render_group);
 
@@ -1139,7 +1142,8 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     AssertVkResult(
         vkCreateSampler(context->device, &sampler_ci, NULL, &context->shadowmap_sampler));
 
-    // Init scene info
+    // Scene info
+    // Materials
     CreateBuffer(context->device,
                  &context->memory_properties,
                  128 * sizeof(Material),
@@ -1148,19 +1152,14 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
                  &context->mat_buffer);
     DEBUGNameBuffer(context->device, &context->mat_buffer, "SCENE MATS");
 
-    // TEMP:
+    // TEMP: switch to dyn arrays
+    // Textures
     context->textures = (Image *)scalloc(1, sizeof(Image));
     context->textures_count = 0;
     context->meshes = (Mesh **)scalloc(1, sizeof(Mesh *));
     context->mesh_count = 0;
+
     CreateMainRenderGroup(context, &context->main_render_group);
-
-    /*
-    // TEMP:
-    context->mesh_count++;
-    context->meshes[0] = LoadMesh("resources/3d/Motorcycle/motorcycle.gltf", context);
-    */
-
     // Framebuffers
     context->framebuffers =
         (VkFramebuffer *)scalloc(context->swapchain.image_count, sizeof(VkFramebuffer));
@@ -1192,8 +1191,6 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
 DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
     vkDeviceWaitIdle(context->device);
 
-    DestroyRenderGroup(context, &context->main_render_group);
-
     for(u32 i = 0; i < context->textures_count; ++i) {
         DestroyImage(context->device, &context->textures[i]);
     }
@@ -1206,17 +1203,14 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
     }
     sfree(context->meshes);
 
-    // Shadowmap
+    // Shadowmap render group
     DestroyImage(context->device, &context->shadowmap);
     vkDestroySampler(context->device, context->shadowmap_sampler, NULL);
     vkDestroyFramebuffer(context->device, context->shadowmap_framebuffer, NULL);
     DestroyRenderGroup(context, &context->shadowmap_render_group);
-    /*
-    vkDestroyRenderPass(context->device, context->shadowmap_render_pass, NULL);
-    DestroyLayout(context->device, context->descriptor_pool, &context->shadowmap_layout);
-    vkDestroyPipeline(context->device, context->shadowmap_pipeline, NULL);
-    */
 
+    // Main render group
+    DestroyRenderGroup(context, &context->main_render_group);
     for(u32 i = 0; i < context->swapchain.image_count; ++i) {
         vkDestroyFramebuffer(context->device, context->framebuffers[i], NULL);
     }
@@ -1227,7 +1221,7 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
 
     vkDestroySampler(context->device, context->texture_sampler, NULL);
 
-    DestroyBuffer(context->device, &context->cam_buffer);
+    DestroyBuffer(context->device, &context->camera_info_buffer);
 
     DestroySwapchain(context, &context->swapchain);
     vkDestroySwapchainKHR(context->device, context->swapchain.swapchain, NULL);
@@ -1274,9 +1268,11 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
 //
 // ================
 
-DLL_EXPORT void VulkanDrawFrame(Renderer *context, GameData *game_data) {
-    UploadToBuffer(
-        context->device, &context->cam_buffer, &game_data->matrices, sizeof(game_data->matrices));
+DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
+    UploadToBuffer(context->device,
+                   &context->camera_info_buffer,
+                   &context->camera_info,
+                   sizeof(context->camera_info));
 
     u32 image_id;
     Swapchain *swapchain = &context->swapchain;

@@ -10,7 +10,7 @@ layout (binding = 0) uniform CameraMatrices {
 	mat4 view_inverse;
 	mat4 light_vp;
 	vec3 view_pos;
-	vec3 light_pos;
+	vec3 light_dir;
 } cam;
 
 layout(location = 0) out vec3 worldpos;
@@ -35,7 +35,6 @@ void main() {
 	vec4 pos = constants.transform * vec4(in_position, 1.0);
 
 	gl_Position = cam.proj * cam.view * pos;
-	//gl_Position = cam.light_vp * constants.transform * vec4(in_position, 1.0);
 	worldpos = pos.xyz;
 	normal = normalize(transpose(inverse(mat3(constants.transform))) * in_normal);
 	texcoord = in_texcoord;

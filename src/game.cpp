@@ -26,7 +26,6 @@
 */
 
 DLL_EXPORT void GameStart(GameData *game_data) {
-    game_data->matrices.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
     game_data->light_pos = {0.0f, 0.0f, 0.0f};
     game_data->position = {0.0f, 50.0f, 0.0f};
 
@@ -113,16 +112,9 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     }
 
     game_data->position = game_data->position + movement;
-    game_data->matrices.pos = game_data->position;
-    game_data->matrices.view =
-        mat4_look_at(game_data->position + forward, game_data->position, Vec3{0.0f, 1.0f, 0.0f});
-    mat4_inverse(&game_data->matrices.view, &game_data->matrices.view_inverse);
+    game_data->renderer_api.SetCamera(
+        game_data->renderer, game_data->position, forward, Vec3{0.0f, 1.0f, 0.0f});
 
-    Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 250.0f, -600.0f, 600.0f);
-    Mat4 b = mat4_look_at({0.0f, 0.0f, 0.0f}, game_data->light_pos, Vec3{0.0f, 1.0f, 0.0f});
-
-    game_data->matrices.shadow_mvp = mat4_mul(&a, &b);
-    game_data->matrices.light_dir = vec3_normalize(game_data->light_pos * -1.0);
-
-    //RendererDrawMesh(renderer, game_data->mesh);
+    game_data->renderer_api.SetSunDirection(game_data->renderer,
+                                            vec3_normalize(game_data->light_pos * -1.0));
 }

@@ -11,49 +11,8 @@ struct Renderer;
 struct GameData;
 struct Frame;
 struct Buffer;
-struct Mesh;
 
-// Platform level functions
-
-typedef Renderer *CreateRenderer_t(SDL_Window *window, PlatformAPI *platform_api);
-CreateRenderer_t *pfn_CreateRenderer;
-
-typedef void DestroyRenderer_t(Renderer *renderer);
-DestroyRenderer_t *pfn_DestroyRenderer;
-
-typedef void RendererReloadShaders_t(Renderer *renderer);
-RendererReloadShaders_t *pfn_ReloadShaders;
-
-typedef void DrawFrame_t(Renderer *renderer, GameData *game_data);
-DrawFrame_t *pfn_DrawFrame;
-
-struct RendererPlatformAPI {
-    CreateRenderer_t *CreateRenderer;
-    DestroyRenderer_t *DestroyRenderer;
-    RendererReloadShaders_t *ReloadShaders;
-    DrawFrame_t *DrawFrame;
-};
-
-// Game functions
-typedef u32 LoadMesh_t(Renderer *renderer, const char *path);
-DLL_EXPORT LoadMesh_t RendererLoadMesh;
-
-typedef void DestroyMesh_t(Renderer *renderer, u32 mesh);
-DLL_EXPORT DestroyMesh_t RendererDestroyMesh;
-
-typedef void DrawMesh_t(Frame *frame, Mesh *mesh);
-DrawMesh_t RendererDrawMesh;
-
-typedef void InstantiateMesh_t(Renderer *renderer, u32 mesh);
-DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
-
-struct RendererGameAPI {
-    LoadMesh_t *LoadMesh;
-    DestroyMesh_t *DestroyMesh;
-    InstantiateMesh_t *InstantiateMesh;
-};
-
-// Declarations
+// Structures
 
 typedef struct Primitive {
     u32 material_id;
@@ -101,5 +60,65 @@ typedef struct Material {
     alignas(4) u32 ao_texture;
     alignas(4) u32 emissive_texture;
 } Material;
+
+typedef struct CameraMatrices {
+    alignas(16) Mat4 proj;
+    alignas(16) Mat4 view;
+    alignas(16) Mat4 view_inverse;
+    alignas(16) Mat4 shadow_mvp;
+    alignas(16) Vec3 pos;
+    alignas(16) Vec3 light_dir;
+} CameraMatrices;
+
+// Platform level functions
+
+typedef Renderer *CreateRenderer_t(SDL_Window *window, PlatformAPI *platform_api);
+CreateRenderer_t *pfn_CreateRenderer;
+
+typedef void DestroyRenderer_t(Renderer *renderer);
+DestroyRenderer_t *pfn_DestroyRenderer;
+
+typedef void RendererReloadShaders_t(Renderer *renderer);
+RendererReloadShaders_t *pfn_ReloadShaders;
+
+typedef void DrawFrame_t(Renderer *renderer);
+DrawFrame_t *pfn_DrawFrame;
+
+struct RendererPlatformAPI {
+    CreateRenderer_t *CreateRenderer;
+    DestroyRenderer_t *DestroyRenderer;
+    RendererReloadShaders_t *ReloadShaders;
+    DrawFrame_t *DrawFrame;
+};
+
+// Game functions
+
+typedef u32 LoadMesh_t(Renderer *renderer, const char *path);
+DLL_EXPORT LoadMesh_t RendererLoadMesh;
+
+typedef void DestroyMesh_t(Renderer *renderer, u32 mesh);
+DLL_EXPORT DestroyMesh_t RendererDestroyMesh;
+
+typedef void InstantiateMesh_t(Renderer *renderer, u32 mesh);
+DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
+
+typedef void
+SetCamera_t(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up);
+DLL_EXPORT SetCamera_t RendererSetCamera;
+
+typedef void SetSunDirection_t(Renderer *renderer, const Vec3 direction);
+DLL_EXPORT SetSunDirection_t RendererSetSunDirection;
+
+struct RendererGameAPI {
+    LoadMesh_t *LoadMesh;
+    DestroyMesh_t *DestroyMesh;
+    InstantiateMesh_t *InstantiateMesh;
+    SetCamera_t *SetCamera;
+    SetSunDirection_t *SetSunDirection;
+};
+
+// Other functions
+
+void RendererDrawMesh(Frame *frame, Mesh *mesh);
 
 #endif

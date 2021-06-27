@@ -98,7 +98,8 @@ typedef struct Renderer {
     Image depth_image;
     Image msaa_image;
 
-    Buffer cam_buffer;
+    Buffer camera_info_buffer;
+    CameraMatrices camera_info;
 
     Image shadowmap;
     VkExtent2D shadowmap_extent;
