@@ -26,6 +26,25 @@ void GameLoadFunctions(Module *dll) {
     pfn_GameLoop = (GameLoop_t *)GetProcAddress(dll->dll, "GameLoop");
 }
 
+void GameLoadRendererAPI(Renderer *renderer, Module *renderer_module, GameData *game_data) {
+    game_data->renderer = renderer;
+    game_data->renderer_api.LoadMesh =
+        (LoadMesh_t *)GetProcAddress(renderer_module->dll, "RendererLoadMesh");
+    ASSERT(game_data->renderer_api.LoadMesh);
+    game_data->renderer_api.DestroyMesh =
+        (DestroyMesh_t *)GetProcAddress(renderer_module->dll, "RendererDestroyMesh");
+    ASSERT(game_data->renderer_api.DestroyMesh);
+    game_data->renderer_api.InstantiateMesh =
+        (InstantiateMesh_t *)GetProcAddress(renderer_module->dll, "RendererInstantiateMesh");
+    ASSERT(game_data->renderer_api.InstantiateMesh);
+    game_data->renderer_api.SetCamera =
+        (SetCamera_t *)GetProcAddress(renderer_module->dll, "RendererSetCamera");
+    ASSERT(game_data->renderer_api.SetCamera);
+    game_data->renderer_api.SetSunDirection =
+        (SetSunDirection_t *)GetProcAddress(renderer_module->dll, "RendererSetSunDirection");
+    ASSERT(game_data->renderer_api.SetSunDirection);
+}
+
 void RendererLoadFunctions(Module *dll) {
     pfn_CreateRenderer = (CreateRenderer_t *)GetProcAddress(dll->dll, "VulkanCreateRenderer");
     ASSERT(pfn_CreateRenderer);
@@ -109,25 +128,7 @@ internal int main(int argc, char *argv[]) {
     GameData game_data = {};
 
     // Load Game API functions
-    {
-        game_data.renderer = renderer;
-        game_data.renderer_api.LoadMesh =
-            (LoadMesh_t *)GetProcAddress(renderer_module.dll, "RendererLoadMesh");
-        ASSERT(game_data.renderer_api.LoadMesh);
-        game_data.renderer_api.DestroyMesh =
-            (DestroyMesh_t *)GetProcAddress(renderer_module.dll, "RendererDestroyMesh");
-        ASSERT(game_data.renderer_api.DestroyMesh);
-        game_data.renderer_api.InstantiateMesh =
-            (InstantiateMesh_t *)GetProcAddress(renderer_module.dll, "RendererInstantiateMesh");
-        ASSERT(game_data.renderer_api.InstantiateMesh);
-        game_data.renderer_api.SetCamera =
-            (SetCamera_t *)GetProcAddress(renderer_module.dll, "RendererSetCamera");
-        ASSERT(game_data.renderer_api.SetCamera);
-        game_data.renderer_api.SetSunDirection =
-            (SetSunDirection_t *)GetProcAddress(renderer_module.dll, "RendererSetSunDirection");
-        ASSERT(game_data.renderer_api.SetSunDirection);
-    }
-
+    GameLoadRendererAPI(renderer, &renderer_module, &game_data);
     pfn_GameStart(&game_data);
 
     bool running = true;
@@ -148,9 +149,10 @@ internal int main(int argc, char *argv[]) {
             pfn_DestroyRenderer(renderer);
             Win32CloseModule(&renderer_module);
 
-            Win32LoadModule(&renderer_module, "vulkan");
+            Win32LoadModule(&renderer_module, "renderer");
             RendererLoadFunctions(&renderer_module);
             renderer = pfn_CreateRenderer(window, &platform_api);
+            GameLoadRendererAPI(renderer, &renderer_module, &game_data);
 
             SDL_Log("Vulkan reloaded");
         }

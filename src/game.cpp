@@ -9,7 +9,7 @@
 #include "renderer/renderer.h"
 
 DLL_EXPORT void GameStart(GameData *game_data) {
-    game_data->light_pos = {0.0f, 0.0f, 0.0f};
+    game_data->light_pos = {1.0f, 1.0f, 0.0f};
     game_data->position = {0.0f, 50.0f, 0.0f};
 
     game_data->renderer_api.LoadMesh(game_data->renderer,
@@ -73,7 +73,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     // Reset
     if(keyboard[SDL_SCANCODE_SPACE]) {
         // GameStart(game_data);
-        game_data->cos = 0.0f;
+        game_data->position = Vec3{50.0f, 0, 0};
     }
 
     if(keyboard[SDL_SCANCODE_P]) {
@@ -84,6 +84,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
         if(game_data->cos > PI) {
             game_data->cos = 0.0f;
         }
+        game_data->renderer_api.SetSunDirection(game_data->renderer,
+                                                vec3_normalize(game_data->light_pos * -1.0));
     }
     if(keyboard[SDL_SCANCODE_O]) {
         game_data->cos -= delta_time;
@@ -92,6 +94,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
         if(game_data->cos < 0.0f) {
             game_data->cos = PI;
         }
+        game_data->renderer_api.SetSunDirection(game_data->renderer,
+                                                vec3_normalize(game_data->light_pos * -1.0));
     }
 
     if(keyboard[SDL_SCANCODE_M]) {
@@ -101,7 +105,4 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     game_data->position = game_data->position + movement;
     game_data->renderer_api.SetCamera(
         game_data->renderer, game_data->position, forward, Vec3{0.0f, 1.0f, 0.0f});
-
-    game_data->renderer_api.SetSunDirection(game_data->renderer,
-                                            vec3_normalize(game_data->light_pos * -1.0));
 }

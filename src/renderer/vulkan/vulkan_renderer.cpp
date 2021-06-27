@@ -576,7 +576,7 @@ internal void DestroyRenderGroup(Renderer *context, RenderGroup *render_group) {
     sfree(render_group->clear_values);
 }
 
-internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_group) {
+internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render_group) {
     VkRenderPassCreateInfo render_pass_ci = {};
     render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_ci.pNext = NULL;
@@ -633,7 +633,7 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     render_pass_ci.pDependencies = dependencies;
 
     AssertVkResult(
-        vkCreateRenderPass(context->device, &render_pass_ci, NULL, &render_group->render_pass));
+        vkCreateRenderPass(renderer->device, &render_pass_ci, NULL, &render_group->render_pass));
 
     // Set Layout
     render_group->descriptor_set_count = 1;
@@ -656,17 +656,17 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     game_set_create_info.bindingCount = descriptor_count;
     game_set_create_info.pBindings = bindings;
     AssertVkResult(vkCreateDescriptorSetLayout(
-        context->device, &game_set_create_info, NULL, render_group->set_layouts));
+        renderer->device, &game_set_create_info, NULL, render_group->set_layouts));
 
     // Descriptor Set
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
-    allocate_info.descriptorPool = context->descriptor_pool;
+    allocate_info.descriptorPool = renderer->descriptor_pool;
     allocate_info.descriptorSetCount = render_group->descriptor_set_count;
     allocate_info.pSetLayouts = render_group->set_layouts;
     AssertVkResult(
-        vkAllocateDescriptorSets(context->device, &allocate_info, render_group->descriptor_sets));
+        vkAllocateDescriptorSets(renderer->device, &allocate_info, render_group->descriptor_sets));
 
     // Push constants
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant)};
@@ -684,13 +684,13 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     create_info.pPushConstantRanges = &push_constant_range;
 
     AssertVkResult(
-        vkCreatePipelineLayout(context->device, &create_info, NULL, &render_group->layout));
+        vkCreatePipelineLayout(renderer->device, &create_info, NULL, &render_group->layout));
 
     // Writes
     const u32 static_writes_count = 1;
     VkWriteDescriptorSet static_writes[static_writes_count];
 
-    VkDescriptorBufferInfo bi_cam = {context->camera_info_buffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo bi_cam = {renderer->camera_info_buffer.buffer, 0, VK_WHOLE_SIZE};
     static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[0].pNext = NULL;
     static_writes[0].dstSet = render_group->descriptor_sets[0];
@@ -702,7 +702,7 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     static_writes[0].pBufferInfo = &bi_cam;
     static_writes[0].pTexelBufferView = NULL;
 
-    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
+    vkUpdateDescriptorSets(renderer->device, static_writes_count, static_writes, 0, NULL);
 
     VkGraphicsPipelineCreateInfo pipeline_ci = {};
     pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -715,8 +715,8 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     stages_ci.flags = 0;
     stages_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
     CreateVkShaderModule("resources/shaders/shadowmap.vert.spv",
-                         context->device,
-                         context->platform,
+                         renderer->device,
+                         renderer->platform,
                          &stages_ci.module);
     stages_ci.pName = "main";
     stages_ci.pSpecializationInfo = NULL;
@@ -743,11 +743,11 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
 
     VkViewport viewport = {0.f,
                            0.f,
-                           (f32)context->shadowmap_extent.width,
-                           (f32)context->shadowmap_extent.height,
+                           (f32)renderer->shadowmap_extent.width,
+                           (f32)renderer->shadowmap_extent.height,
                            0.f,
                            1.f};
-    VkRect2D scissor = {{0, 0}, context->shadowmap_extent};
+    VkRect2D scissor = {{0, 0}, renderer->shadowmap_extent};
     VkPipelineViewportStateCreateInfo viewport_state =
         PipelineGetDefaultViewportState(1, &viewport, 1, &scissor);
     pipeline_ci.pViewportState = &viewport_state;
@@ -761,7 +761,6 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     pipeline_ci.pMultisampleState = &multisample_state;
 
     VkPipelineDepthStencilStateCreateInfo stencil_state = PipelineGetDefaultDepthStencilState();
-    // stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     pipeline_ci.pDepthStencilState = &stencil_state;
 
     pipeline_ci.pColorBlendState = NULL;
@@ -775,10 +774,10 @@ internal void CreateShadowMapRenderGroup(Renderer *context, RenderGroup *render_
     pipeline_ci.basePipelineIndex = 0;
 
     AssertVkResult(vkCreateGraphicsPipelines(
-        context->device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, &render_group->pipeline));
+        renderer->device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, &render_group->pipeline));
 
-    vkDeviceWaitIdle(context->device);
-    vkDestroyShaderModule(context->device, pipeline_ci.pStages[0].module, NULL);
+    vkDeviceWaitIdle(renderer->device);
+    vkDestroyShaderModule(renderer->device, pipeline_ci.pStages[0].module, NULL);
 
     render_group->clear_values_count = 1;
     render_group->clear_values =
@@ -1215,6 +1214,9 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
                           renderer->main_render_group.layout,
                           renderer->main_render_group.render_pass,
                           &renderer->main_render_group.pipeline);
+
+    DestroyRenderGroup(renderer, &renderer->shadowmap_render_group);
+    CreateShadowMapRenderGroup(renderer, &renderer->shadowmap_render_group);
 
     /* TODO :
     vkDestroyPipeline(renderer->device, renderer->shadowmap_pipeline, NULL);

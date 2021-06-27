@@ -15,6 +15,7 @@ GAME:
 
 RENDERER:
     CRITICAL:
+        - Reloading the renderer doesn't reload the meshes and stuff
         - Dyn array of meshes
         - Resize the texture array, rebuild the pipeline?
         - Make sure that we can load different gltf, i think the mat id and tex id ar hardcoded
