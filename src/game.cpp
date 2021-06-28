@@ -13,7 +13,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->position = {0.0f, 0.0f, 0.0f};
 
     game_data->renderer_api.LoadMesh(game_data->renderer,
-                                     "resources/3d/Motorcycle/motorcycle.gltf");
+                                     "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
     game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
 }
 
@@ -104,7 +104,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     }
 
     game_data->position = game_data->position + movement;
-
+#if 0
     mat4_rotate_euler(game_data->moto.transform, Vec3{0, game_data->spherical_coordinates.x, 0});
     mat4_set_position(game_data->moto.transform, game_data->position);
     Vec3 flat_forward = {forward.x, 0, forward.z};
@@ -115,4 +115,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
 
     game_data->renderer_api.SetCamera(
         game_data->renderer, game_data->position + offset, forward, Vec3{0.0f, 1.0f, 0.0f});
+#endif
+    game_data->renderer_api.SetCamera(
+        game_data->renderer, game_data->position, forward, Vec3{0.0f, 1.0f, 0.0f});
 }

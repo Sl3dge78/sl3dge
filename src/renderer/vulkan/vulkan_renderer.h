@@ -95,6 +95,8 @@ typedef struct Renderer {
 
     VkSampler texture_sampler;
 
+    //TODO:
+    VkSampler depth_sampler;
     Image depth_image;
     Image msaa_image;
 
@@ -109,9 +111,12 @@ typedef struct Renderer {
 
     RenderGroup main_render_group;
 
+    RenderGroup volumetric_render_group;
+
     u32 materials_count;
     Buffer mat_buffer;
 
+    u32 textures_capacity;
     u32 textures_count;
     Image *textures;
 

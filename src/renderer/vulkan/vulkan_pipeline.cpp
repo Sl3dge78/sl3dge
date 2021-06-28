@@ -13,9 +13,7 @@ PipelineGetDefaultVertexInputState(const VkVertexInputBindingDescription *vtx_in
 
     vertex_input.vertexBindingDescriptionCount = 1;
     vertex_input.pVertexBindingDescriptions = vtx_input_binding;
-
     vertex_input.vertexAttributeDescriptionCount = 3;
-
     vertex_input.pVertexAttributeDescriptions = vtx_descriptions;
     return vertex_input;
 }

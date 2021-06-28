@@ -19,8 +19,17 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
     context->materials_count += data->materials_count;
 
     SDL_Log("Loading textures...");
+    u32 texture_start = context->textures_count;
     context->textures_count += data->textures_count;
+    // BUG : Sometimes we get an exception here
     if(data->textures_count > 0) {
+        // TODO : move that elsewhere, and recreate the pipeline because we have more textures now
+        if(context->textures_count > context->textures_capacity) {
+            Image *new_buffer =
+                (Image *)srealloc(context->textures, context->textures_count * sizeof(Image));
+            ASSERT(new_buffer);
+            context->textures = new_buffer;
+        }
         SDL_Surface **surfaces =
             (SDL_Surface **)scalloc(data->textures_count, sizeof(SDL_Surface *));
         Buffer *image_buffers = (Buffer *)scalloc(data->textures_count, sizeof(Buffer));
@@ -58,6 +67,8 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
         }
 
         for(u32 i = 0; i < data->textures_count; ++i) {
+            u32 j = texture_start + i;
+
             VkDeviceSize image_size = surfaces[i]->h * surfaces[i]->pitch;
             VkExtent2D extent = {(u32)surfaces[i]->h, (u32)surfaces[i]->w};
 
@@ -71,16 +82,19 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
                         extent,
                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                        &context->textures[i]);
-            DEBUGNameImage(context->device, &context->textures[i], data->textures[i].image->uri);
+                        &context->textures[j]);
+            DEBUGNameImage(context->device, &context->textures[j], data->textures[i].image->uri);
             CreateBuffer(context->device,
                          &context->memory_properties,
                          image_size,
                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                          &image_buffers[i]);
+
+            if(SDL_MUSTLOCK(surfaces[i]))
             SDL_LockSurface(surfaces[i]);
             UploadToBuffer(context->device, &image_buffers[i], surfaces[i]->pixels, image_size);
+            if(SDL_MUSTLOCK(surfaces[i]))
             SDL_UnlockSurface(surfaces[i]);
             BeginCommandBuffer(
                 context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
@@ -92,6 +106,9 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             vkQueueSubmit(context->graphics_queue, 1, &si, VK_NULL_HANDLE);
         }
         vkQueueWaitIdle(context->graphics_queue);
+
+        DestroyRenderGroup(context, &context->main_render_group);
+        CreateMainRenderGroup(context, &context->main_render_group);
         VulkanUpdateTextureDescriptorSet(context->device,
                                          context->main_render_group.descriptor_sets[0],
                                          context->texture_sampler,

@@ -56,9 +56,9 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
     sfree(sdl_extensions);
 
 #if defined(_DEBUG)
-    SDL_Log("Requested 	extensions : ");
+    SDL_Log("Requested extensions :");
     for(int i = 0; i < total_count; i++) {
-        SDL_Log(all_extensions[i]);
+        SDL_Log("   %s", all_extensions[i]);
     }
 #endif
 
@@ -552,10 +552,6 @@ internal void BeginRenderGroup(VkCommandBuffer cmd,
                             NULL);
 }
 
-internal void EndRenderGroup(VkCommandBuffer cmd) {
-    vkCmdEndRenderPass(cmd);
-}
-
 internal void DestroyRenderGroup(Renderer *context, RenderGroup *render_group) {
     vkFreeDescriptorSets(context->device,
                          context->descriptor_pool,
@@ -811,9 +807,7 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
         {// TEXTURES
          2,
          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-         //context->textures_count,
-         // TEMP:
-         1,
+         context->textures_count > 0 ? context->textures_count : 1, // HACK
          VK_SHADER_STAGE_FRAGMENT_BIT,
          NULL},
         {// SHADOWMAP READ
@@ -822,6 +816,7 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
          1,
          VK_SHADER_STAGE_FRAGMENT_BIT,
          NULL}};
+
     const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
 
     VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
@@ -927,58 +922,317 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
     render_group->clear_values[1].depthStencil = {1.0f, 0};
 }
 
+internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *render_group) {
+    { // Descriptors
+        render_group->descriptor_set_count = 1;
+        render_group->set_layouts = (VkDescriptorSetLayout *)scalloc(
+            render_group->descriptor_set_count, sizeof(VkDescriptorSetLayout));
+        render_group->descriptor_sets =
+            (VkDescriptorSet *)scalloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
+
+        const VkDescriptorSetLayoutBinding bindings[] = {{// CAMERA MATRICES
+                                                          0,
+                                                          VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                                          1,
+                                                          VK_SHADER_STAGE_FRAGMENT_BIT,
+                                                          NULL},
+                                                         {// DEPTH TEXTURE
+                                                          1,
+                                                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                          1,
+                                                          VK_SHADER_STAGE_FRAGMENT_BIT,
+                                                          NULL},
+                                                         {// SHADOWMAP READ
+                                                          2,
+                                                          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                          1,
+                                                          VK_SHADER_STAGE_FRAGMENT_BIT,
+                                                          NULL}};
+        const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
+
+        VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+        game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        game_set_create_info.pNext = NULL;
+        game_set_create_info.flags = 0;
+        game_set_create_info.bindingCount = descriptor_count;
+        game_set_create_info.pBindings = bindings;
+        AssertVkResult(vkCreateDescriptorSetLayout(
+            renderer->device, &game_set_create_info, NULL, &render_group->set_layouts[0]));
+
+        // Descriptor Set
+        VkDescriptorSetAllocateInfo allocate_info = {};
+        allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocate_info.pNext = NULL;
+        allocate_info.descriptorPool = renderer->descriptor_pool;
+        allocate_info.descriptorSetCount = render_group->descriptor_set_count;
+        allocate_info.pSetLayouts = render_group->set_layouts;
+        AssertVkResult(vkAllocateDescriptorSets(
+            renderer->device, &allocate_info, render_group->descriptor_sets));
+    }
+    { // Writes
+        const u32 static_writes_count = 3;
+        VkWriteDescriptorSet static_writes[static_writes_count];
+
+        VkDescriptorBufferInfo bi_cam = {renderer->camera_info_buffer.buffer, 0, VK_WHOLE_SIZE};
+        static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        static_writes[0].pNext = NULL;
+        static_writes[0].dstSet = render_group->descriptor_sets[0];
+        static_writes[0].dstBinding = 0;
+        static_writes[0].dstArrayElement = 0;
+        static_writes[0].descriptorCount = 1;
+        static_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        static_writes[0].pImageInfo = NULL;
+        static_writes[0].pBufferInfo = &bi_cam;
+        static_writes[0].pTexelBufferView = NULL;
+
+        VkDescriptorImageInfo depth_image_info = {renderer->depth_sampler,
+                                                  renderer->depth_image.image_view,
+                                                  VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+        static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        static_writes[1].pNext = NULL;
+        static_writes[1].dstSet = render_group->descriptor_sets[0];
+        static_writes[1].dstBinding = 1;
+        static_writes[1].dstArrayElement = 0;
+        static_writes[1].descriptorCount = 1;
+        static_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        static_writes[1].pImageInfo = &depth_image_info;
+        static_writes[1].pBufferInfo = NULL;
+        static_writes[1].pTexelBufferView = NULL;
+
+        VkDescriptorImageInfo image_info = {renderer->shadowmap_sampler,
+                                            renderer->shadowmap.image_view,
+                                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+        static_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        static_writes[2].pNext = NULL;
+        static_writes[2].dstSet = render_group->descriptor_sets[0];
+        static_writes[2].dstBinding = 2;
+        static_writes[2].dstArrayElement = 0;
+        static_writes[2].descriptorCount = 1;
+        static_writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        static_writes[2].pImageInfo = &image_info;
+        static_writes[2].pBufferInfo = NULL;
+        static_writes[2].pTexelBufferView = NULL;
+
+        vkUpdateDescriptorSets(renderer->device, static_writes_count, static_writes, 0, NULL);
+    }
+    { // Render pass
+        VkRenderPassCreateInfo render_pass_ci = {};
+        render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        render_pass_ci.pNext = NULL;
+        render_pass_ci.flags = 0;
+
+        VkAttachmentDescription color_attachment = {};
+        color_attachment.flags = 0;
+        color_attachment.format = renderer->swapchain.format;
+        color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        color_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentDescription attachments[] = {color_attachment};
+
+        render_pass_ci.attachmentCount = 1;
+        render_pass_ci.pAttachments = attachments;
+
+        VkSubpassDescription subpass_desc = {};
+        subpass_desc.flags = 0;
+        subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass_desc.inputAttachmentCount = 0;
+        subpass_desc.pInputAttachments = NULL;
+
+        VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+        subpass_desc.colorAttachmentCount = 1;
+        subpass_desc.pColorAttachments = &color_ref;
+        subpass_desc.pResolveAttachments = NULL;
+        subpass_desc.pDepthStencilAttachment = NULL;
+        subpass_desc.preserveAttachmentCount = 0;
+        subpass_desc.pPreserveAttachments = NULL;
+
+        render_pass_ci.subpassCount = 1;
+        render_pass_ci.pSubpasses = &subpass_desc;
+        render_pass_ci.dependencyCount = 0;
+        render_pass_ci.pDependencies = NULL;
+
+        AssertVkResult(vkCreateRenderPass(
+            renderer->device, &render_pass_ci, NULL, &render_group->render_pass));
+    }
+    { // Pipeline layout
+        VkPipelineLayoutCreateInfo create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        create_info.pNext = NULL;
+        create_info.flags = 0;
+        create_info.setLayoutCount = render_group->descriptor_set_count;
+        create_info.pSetLayouts = render_group->set_layouts;
+        create_info.pushConstantRangeCount = 0;
+        create_info.pPushConstantRanges = NULL;
+
+        AssertVkResult(
+            vkCreatePipelineLayout(renderer->device, &create_info, NULL, &render_group->layout));
+    }
+    { // Pipeline
+
+        VkGraphicsPipelineCreateInfo pipeline_ci;
+        pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeline_ci.pNext = NULL;
+        pipeline_ci.flags = 0;
+
+        VkPipelineShaderStageCreateInfo stages_ci[2];
+        stages_ci[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages_ci[0].pNext = NULL;
+        stages_ci[0].flags = 0;
+        stages_ci[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        CreateVkShaderModule("resources/shaders/volumetric.vert.spv",
+                             renderer->device,
+                             renderer->platform,
+                             &stages_ci[0].module);
+        stages_ci[0].pName = "main";
+        stages_ci[0].pSpecializationInfo = NULL;
+
+        stages_ci[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages_ci[1].pNext = NULL;
+        stages_ci[1].flags = 0;
+        stages_ci[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        CreateVkShaderModule("resources/shaders/volumetric.frag.spv",
+                             renderer->device,
+                             renderer->platform,
+                             &stages_ci[1].module);
+        stages_ci[1].pName = "main";
+        stages_ci[1].pSpecializationInfo = NULL;
+        pipeline_ci.stageCount = 2;
+
+        pipeline_ci.pStages = stages_ci;
+
+        VkPipelineVertexInputStateCreateInfo vertex_input =
+            PipelineGetDefaultVertexInputState(NULL, 0, NULL);
+        vertex_input.vertexBindingDescriptionCount = 0;
+        vertex_input.vertexAttributeDescriptionCount = 0;
+        pipeline_ci.pVertexInputState = &vertex_input;
+
+        VkPipelineInputAssemblyStateCreateInfo input_assembly_state =
+            PipelineGetDefaultInputAssemblyState();
+        pipeline_ci.pInputAssemblyState = &input_assembly_state;
+
+        VkViewport viewport;
+        viewport.x = 0.f;
+        viewport.y = 0.f;
+        viewport.width = renderer->swapchain.extent.width;
+        viewport.height = renderer->swapchain.extent.height;
+        viewport.minDepth = 0.f;
+        viewport.maxDepth = 1.f;
+
+        VkRect2D scissor;
+        scissor.offset = {0, 0};
+        scissor.extent = renderer->swapchain.extent;
+        VkPipelineViewportStateCreateInfo viewport_state =
+            PipelineGetDefaultViewportState(1, &viewport, 1, &scissor);
+        pipeline_ci.pViewportState = &viewport_state;
+
+        VkPipelineRasterizationStateCreateInfo rasterization_state =
+            PipelineGetDefaultRasterizationState();
+        pipeline_ci.pRasterizationState = &rasterization_state;
+
+        VkPipelineMultisampleStateCreateInfo multisample_state =
+            PipelineGetDefaultMultisampleState(renderer->msaa_level);
+        pipeline_ci.pMultisampleState = &multisample_state;
+
+        VkPipelineDepthStencilStateCreateInfo depth_state = PipelineGetDefaultDepthStencilState();
+        depth_state.depthWriteEnable = VK_FALSE;
+        depth_state.depthTestEnable = VK_FALSE;
+        pipeline_ci.pDepthStencilState = &depth_state;
+
+        VkPipelineColorBlendAttachmentState color_blend_attachement = {};
+        color_blend_attachement.blendEnable = VK_TRUE;
+        color_blend_attachement.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        color_blend_attachement.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        color_blend_attachement.colorBlendOp = VK_BLEND_OP_ADD;
+        color_blend_attachement.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        color_blend_attachement.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        color_blend_attachement.alphaBlendOp = VK_BLEND_OP_ADD;
+        color_blend_attachement.colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+            VK_COLOR_COMPONENT_A_BIT;
+        VkPipelineColorBlendStateCreateInfo color_blend_state =
+            PipelineGetDefaultColorBlendState(1, &color_blend_attachement);
+        pipeline_ci.pColorBlendState = &color_blend_state;
+
+        pipeline_ci.pDynamicState = NULL; // TODO: look at this
+        pipeline_ci.layout = render_group->layout;
+
+        pipeline_ci.renderPass = renderer->main_render_group.render_pass;
+        pipeline_ci.subpass = 0;
+        pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
+        pipeline_ci.basePipelineIndex = 0;
+
+        // TODO: handle pipeline caching
+        AssertVkResult(vkCreateGraphicsPipelines(
+            renderer->device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, &render_group->pipeline));
+
+        vkDeviceWaitIdle(renderer->device);
+        vkDestroyShaderModule(renderer->device, pipeline_ci.pStages[0].module, NULL);
+        vkDestroyShaderModule(renderer->device, pipeline_ci.pStages[1].module, NULL);
+    }
+    render_group->clear_values_count = 1;
+    render_group->clear_values =
+        (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
+
+    render_group->clear_values[0].color = {0.f, 0.0f, 0.0f, 0.0f};
+}
+
 DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platform_api) {
-    Renderer *context = (Renderer *)smalloc(sizeof(Renderer));
+    Renderer *renderer = (Renderer *)smalloc(sizeof(Renderer));
 
-    context->platform = platform_api;
+    renderer->platform = platform_api;
 
-    CreateVkInstance(window, &context->instance);
-    SDL_Vulkan_CreateSurface(window, context->instance, &context->surface);
-    CreateVkPhysicalDevice(context->instance, &context->physical_device);
+    CreateVkInstance(window, &renderer->instance);
+    SDL_Vulkan_CreateSurface(window, renderer->instance, &renderer->surface);
+    CreateVkPhysicalDevice(renderer->instance, &renderer->physical_device);
 
     // Get device properties
-    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &context->memory_properties);
-    vkGetPhysicalDeviceProperties(context->physical_device, &context->physical_device_properties);
+    vkGetPhysicalDeviceMemoryProperties(renderer->physical_device, &renderer->memory_properties);
+    vkGetPhysicalDeviceProperties(renderer->physical_device, &renderer->physical_device_properties);
 
     // MSAA
     VkSampleCountFlags msaa_levels =
-        context->physical_device_properties.limits.framebufferColorSampleCounts &
-        context->physical_device_properties.limits.framebufferDepthSampleCounts;
+        renderer->physical_device_properties.limits.framebufferColorSampleCounts &
+        renderer->physical_device_properties.limits.framebufferDepthSampleCounts;
     if(msaa_levels & VK_SAMPLE_COUNT_8_BIT) {
-        context->msaa_level = VK_SAMPLE_COUNT_8_BIT;
+        renderer->msaa_level = VK_SAMPLE_COUNT_8_BIT;
         SDL_Log("VK_SAMPLE_COUNT_8_BIT");
     } else if(msaa_levels & VK_SAMPLE_COUNT_4_BIT) {
-        context->msaa_level = VK_SAMPLE_COUNT_4_BIT;
+        renderer->msaa_level = VK_SAMPLE_COUNT_4_BIT;
         SDL_Log("VK_SAMPLE_COUNT_4_BIT");
     } else if(msaa_levels & VK_SAMPLE_COUNT_2_BIT) {
-        context->msaa_level = VK_SAMPLE_COUNT_2_BIT;
+        renderer->msaa_level = VK_SAMPLE_COUNT_2_BIT;
         SDL_Log("VK_SAMPLE_COUNT_2_BIT");
     } else {
-        context->msaa_level = VK_SAMPLE_COUNT_1_BIT;
+        renderer->msaa_level = VK_SAMPLE_COUNT_1_BIT;
         SDL_Log("VK_SAMPLE_COUNT_1_BIT");
     }
 
-    GetQueuesId(context);
-    CreateVkDevice(context->physical_device,
-                   context->graphics_queue_id,
-                   context->transfer_queue_id,
-                   context->present_queue_id,
-                   &context->device);
+    GetQueuesId(renderer);
+    CreateVkDevice(renderer->physical_device,
+                   renderer->graphics_queue_id,
+                   renderer->transfer_queue_id,
+                   renderer->present_queue_id,
+                   &renderer->device);
 
-    LoadDeviceFuncPointers(context->device);
+    LoadDeviceFuncPointers(renderer->device);
 
-    vkGetDeviceQueue(context->device, context->graphics_queue_id, 0, &context->graphics_queue);
-    vkGetDeviceQueue(context->device, context->present_queue_id, 0, &context->present_queue);
-    vkGetDeviceQueue(context->device, context->transfer_queue_id, 0, &context->transfer_queue);
+    vkGetDeviceQueue(renderer->device, renderer->graphics_queue_id, 0, &renderer->graphics_queue);
+    vkGetDeviceQueue(renderer->device, renderer->present_queue_id, 0, &renderer->present_queue);
+    vkGetDeviceQueue(renderer->device, renderer->transfer_queue_id, 0, &renderer->transfer_queue);
 
     // Graphics Command Pool
     VkCommandPoolCreateInfo pool_create_info = {};
     pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pool_create_info.pNext = NULL;
     pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_create_info.queueFamilyIndex = context->graphics_queue_id;
+    pool_create_info.queueFamilyIndex = renderer->graphics_queue_id;
     VkResult result = vkCreateCommandPool(
-        context->device, &pool_create_info, NULL, &context->graphics_command_pool);
+        renderer->device, &pool_create_info, NULL, &renderer->graphics_command_pool);
     AssertVkResult(result);
 
     // Descriptor Pool
@@ -999,156 +1253,188 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     pool_ci.poolSizeCount = pool_sizes_count;
     pool_ci.pPoolSizes = pool_sizes;
     AssertVkResult(
-        vkCreateDescriptorPool(context->device, &pool_ci, NULL, &context->descriptor_pool));
+        vkCreateDescriptorPool(renderer->device, &pool_ci, NULL, &renderer->descriptor_pool));
 
     // Swapchain
-    context->swapchain.swapchain = VK_NULL_HANDLE;
-    CreateSwapchain(context, window, &context->swapchain);
+    renderer->swapchain.swapchain = VK_NULL_HANDLE;
+    CreateSwapchain(renderer, window, &renderer->swapchain);
 
     // Texture Sampler
-    VkSamplerCreateInfo sampler_ci = {};
-    sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_ci.pNext = NULL;
-    sampler_ci.flags = 0;
-    sampler_ci.magFilter = VK_FILTER_NEAREST;
-    sampler_ci.minFilter = VK_FILTER_NEAREST;
-    sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_ci.mipLodBias = 0.0f;
-    sampler_ci.anisotropyEnable = VK_TRUE;
-    sampler_ci.maxAnisotropy = context->physical_device_properties.limits.maxSamplerAnisotropy;
-    sampler_ci.compareEnable = VK_FALSE;
-    sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
-    sampler_ci.minLod = 0.0f;
-    sampler_ci.maxLod = 0.0f;
-    sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    sampler_ci.unnormalizedCoordinates = VK_FALSE;
-    AssertVkResult(vkCreateSampler(context->device, &sampler_ci, NULL, &context->texture_sampler));
+    {
+        VkSamplerCreateInfo sampler_ci = {};
+        sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        sampler_ci.pNext = NULL;
+        sampler_ci.flags = 0;
+        sampler_ci.magFilter = VK_FILTER_NEAREST;
+        sampler_ci.minFilter = VK_FILTER_NEAREST;
+        sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_ci.mipLodBias = 0.0f;
+        sampler_ci.anisotropyEnable = VK_TRUE;
+        sampler_ci.maxAnisotropy = renderer->physical_device_properties.limits.maxSamplerAnisotropy;
+        sampler_ci.compareEnable = VK_FALSE;
+        sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
+        sampler_ci.minLod = 0.0f;
+        sampler_ci.maxLod = 0.0f;
+        sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        sampler_ci.unnormalizedCoordinates = VK_FALSE;
+        AssertVkResult(
+            vkCreateSampler(renderer->device, &sampler_ci, NULL, &renderer->texture_sampler));
+    }
 
-    // Depth image
-    CreateMultiSampledImage(context->device,
-                            &context->memory_properties,
-                            VK_FORMAT_D32_SFLOAT,
-                            {context->swapchain.extent.width, context->swapchain.extent.height, 1},
-                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            context->msaa_level,
-                            &context->depth_image);
+    { // Depth image
+        CreateMultiSampledImage(
+            renderer->device,
+            &renderer->memory_properties,
+            VK_FORMAT_D32_SFLOAT,
+            {renderer->swapchain.extent.width, renderer->swapchain.extent.height, 1},
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            renderer->msaa_level,
+            &renderer->depth_image);
+        VkSamplerCreateInfo sampler_ci = {};
+        sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        sampler_ci.pNext = NULL;
+        sampler_ci.flags = 0;
+        sampler_ci.magFilter = VK_FILTER_LINEAR;
+        sampler_ci.minFilter = VK_FILTER_LINEAR;
+        sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        sampler_ci.mipLodBias = 0.0f;
+        sampler_ci.anisotropyEnable = VK_TRUE;
+        sampler_ci.maxAnisotropy = renderer->physical_device_properties.limits.maxSamplerAnisotropy;
+        sampler_ci.compareEnable = VK_FALSE;
+        sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
+        sampler_ci.minLod = 0.0f;
+        sampler_ci.maxLod = 0.0f;
+        sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        sampler_ci.unnormalizedCoordinates = VK_FALSE;
+        AssertVkResult(
+            vkCreateSampler(renderer->device, &sampler_ci, NULL, &renderer->depth_sampler));
+    }
     // MSAA Image
-    CreateMultiSampledImage(context->device,
-                            &context->memory_properties,
-                            context->swapchain.format,
-                            {context->swapchain.extent.width, context->swapchain.extent.height, 1},
-                            VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                            context->msaa_level,
-                            &context->msaa_image);
+    CreateMultiSampledImage(
+        renderer->device,
+        &renderer->memory_properties,
+        renderer->swapchain.format,
+        {renderer->swapchain.extent.width, renderer->swapchain.extent.height, 1},
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        renderer->msaa_level,
+        &renderer->msaa_image);
 
     // Camera info
-    CreateBuffer(context->device,
-                 &context->memory_properties,
+    CreateBuffer(renderer->device,
+                 &renderer->memory_properties,
                  sizeof(CameraMatrices),
                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-                 &context->camera_info_buffer);
-    DEBUGNameBuffer(context->device, &context->camera_info_buffer, "Camera Info");
-    context->camera_info.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
+                 &renderer->camera_info_buffer);
+    DEBUGNameBuffer(renderer->device, &renderer->camera_info_buffer, "Camera Info");
+    renderer->camera_info.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
 
-    // ShadowMap group
-    context->shadowmap_extent = {4096, 4096};
-    CreateShadowMapRenderGroup(context, &context->shadowmap_render_group);
+    { // ShadowMap group
+        renderer->shadowmap_extent = {4096, 4096};
+        CreateShadowMapRenderGroup(renderer, &renderer->shadowmap_render_group);
 
-    CreateImage(context->device,
-                &context->memory_properties,
-                VK_FORMAT_D32_SFLOAT,
-                context->shadowmap_extent,
-                VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                &context->shadowmap);
-    DEBUGNameImage(context->device, &context->shadowmap, "SHADOW MAP");
+        CreateImage(renderer->device,
+                    &renderer->memory_properties,
+                    VK_FORMAT_D32_SFLOAT,
+                    renderer->shadowmap_extent,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    &renderer->shadowmap);
+        DEBUGNameImage(renderer->device, &renderer->shadowmap, "SHADOW MAP");
 
-    VkFramebufferCreateInfo framebuffer_create_info = {};
-    framebuffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebuffer_create_info.pNext = NULL;
-    framebuffer_create_info.flags = 0;
-    framebuffer_create_info.renderPass = context->shadowmap_render_group.render_pass;
-    framebuffer_create_info.attachmentCount = 1;
-    framebuffer_create_info.pAttachments = &context->shadowmap.image_view;
-    framebuffer_create_info.width = context->shadowmap_extent.width;
-    framebuffer_create_info.height = context->shadowmap_extent.height;
-    framebuffer_create_info.layers = 1;
-    AssertVkResult(vkCreateFramebuffer(
-        context->device, &framebuffer_create_info, NULL, &context->shadowmap_framebuffer));
+        VkFramebufferCreateInfo framebuffer_create_info = {};
+        framebuffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_create_info.pNext = NULL;
+        framebuffer_create_info.flags = 0;
+        framebuffer_create_info.renderPass = renderer->shadowmap_render_group.render_pass;
+        framebuffer_create_info.attachmentCount = 1;
+        framebuffer_create_info.pAttachments = &renderer->shadowmap.image_view;
+        framebuffer_create_info.width = renderer->shadowmap_extent.width;
+        framebuffer_create_info.height = renderer->shadowmap_extent.height;
+        framebuffer_create_info.layers = 1;
+        AssertVkResult(vkCreateFramebuffer(
+            renderer->device, &framebuffer_create_info, NULL, &renderer->shadowmap_framebuffer));
 
-    VkSamplerCreateInfo shdw_sampler_ci = {};
-    shdw_sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    shdw_sampler_ci.pNext = NULL;
-    shdw_sampler_ci.flags = 0;
-    shdw_sampler_ci.magFilter = VK_FILTER_NEAREST;
-    shdw_sampler_ci.minFilter = VK_FILTER_NEAREST;
-    shdw_sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    shdw_sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    shdw_sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    shdw_sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    shdw_sampler_ci.mipLodBias = 0.0f;
-    shdw_sampler_ci.anisotropyEnable = VK_FALSE;
-    shdw_sampler_ci.maxAnisotropy = 1.0f;
-    shdw_sampler_ci.compareEnable = VK_FALSE;
-    shdw_sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
-    shdw_sampler_ci.minLod = 0.0f;
-    shdw_sampler_ci.maxLod = 0.0f;
-    shdw_sampler_ci.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-    shdw_sampler_ci.unnormalizedCoordinates = VK_FALSE;
-    AssertVkResult(
-        vkCreateSampler(context->device, &sampler_ci, NULL, &context->shadowmap_sampler));
+        VkSamplerCreateInfo shdw_sampler_ci = {};
+        shdw_sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        shdw_sampler_ci.pNext = NULL;
+        shdw_sampler_ci.flags = 0;
+        shdw_sampler_ci.magFilter = VK_FILTER_NEAREST;
+        shdw_sampler_ci.minFilter = VK_FILTER_NEAREST;
+        shdw_sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        shdw_sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        shdw_sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        shdw_sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        shdw_sampler_ci.mipLodBias = 0.0f;
+        shdw_sampler_ci.anisotropyEnable = VK_FALSE;
+        shdw_sampler_ci.maxAnisotropy = 1.0f;
+        shdw_sampler_ci.compareEnable = VK_FALSE;
+        shdw_sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
+        shdw_sampler_ci.minLod = 0.0f;
+        shdw_sampler_ci.maxLod = 0.0f;
+        shdw_sampler_ci.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+        shdw_sampler_ci.unnormalizedCoordinates = VK_FALSE;
+        AssertVkResult(vkCreateSampler(
+            renderer->device, &shdw_sampler_ci, NULL, &renderer->shadowmap_sampler));
+    }
 
     // Scene info
     // Materials
-    CreateBuffer(context->device,
-                 &context->memory_properties,
+    renderer->materials_count = 0;
+    CreateBuffer(renderer->device,
+                 &renderer->memory_properties,
                  128 * sizeof(Material),
                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 &context->mat_buffer);
-    DEBUGNameBuffer(context->device, &context->mat_buffer, "SCENE MATS");
+                 &renderer->mat_buffer);
+    DEBUGNameBuffer(renderer->device, &renderer->mat_buffer, "SCENE MATS");
 
     // TEMP: switch to dyn arrays
     // Textures
-    context->textures = (Image *)scalloc(1, sizeof(Image));
-    context->textures_count = 0;
-    context->meshes = (Mesh **)scalloc(1, sizeof(Mesh *));
-    context->mesh_count = 0;
+    renderer->textures_capacity = 1;
+    renderer->textures = (Image *)scalloc(renderer->textures_capacity, sizeof(Image));
+    renderer->textures_count = 0;
 
-    CreateMainRenderGroup(context, &context->main_render_group);
+    renderer->meshes = (Mesh **)scalloc(1, sizeof(Mesh *));
+    renderer->mesh_count = 0;
+
+    CreateMainRenderGroup(renderer, &renderer->main_render_group);
+    CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
+
     // Framebuffers
-    context->framebuffers =
-        (VkFramebuffer *)scalloc(context->swapchain.image_count, sizeof(VkFramebuffer));
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+    renderer->framebuffers =
+        (VkFramebuffer *)scalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
+    for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
         VkFramebufferCreateInfo create_info = {};
         create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         create_info.pNext = NULL;
         create_info.flags = 0;
-        create_info.renderPass = context->main_render_group.render_pass;
+        create_info.renderPass = renderer->main_render_group.render_pass;
         create_info.attachmentCount = 3;
 
         VkImageView attachments[] = {
-            context->msaa_image.image_view,
-            context->depth_image.image_view,
-            context->swapchain.image_views[i],
+            renderer->msaa_image.image_view,
+            renderer->depth_image.image_view,
+            renderer->swapchain.image_views[i],
         };
 
         create_info.pAttachments = attachments;
-        create_info.width = context->swapchain.extent.width;
-        create_info.height = context->swapchain.extent.height;
+        create_info.width = renderer->swapchain.extent.width;
+        create_info.height = renderer->swapchain.extent.height;
         create_info.layers = 1;
         AssertVkResult(
-            vkCreateFramebuffer(context->device, &create_info, NULL, &context->framebuffers[i]));
+            vkCreateFramebuffer(renderer->device, &create_info, NULL, &renderer->framebuffers[i]));
     }
 
-    return context;
+    return renderer;
 }
 
 DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
@@ -1165,6 +1451,9 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
         RendererDestroyMesh(context, i);
     }
     sfree(context->meshes);
+
+    // Volumetric render group
+    DestroyRenderGroup(context, &context->volumetric_render_group);
 
     // Shadowmap render group
     DestroyImage(context->device, &context->shadowmap);
@@ -1183,6 +1472,7 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
     DestroyImage(context->device, &context->msaa_image);
 
     vkDestroySampler(context->device, context->texture_sampler, NULL);
+    vkDestroySampler(context->device, context->depth_sampler, NULL);
 
     DestroyBuffer(context->device, &context->camera_info_buffer);
 
@@ -1217,6 +1507,9 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
 
     DestroyRenderGroup(renderer, &renderer->shadowmap_render_group);
     CreateShadowMapRenderGroup(renderer, &renderer->shadowmap_render_group);
+
+    DestroyRenderGroup(renderer, &renderer->volumetric_render_group);
+    CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
 }
 
 // ================
@@ -1225,17 +1518,17 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
 //
 // ================
 
-DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
-    UploadToBuffer(context->device,
-                   &context->camera_info_buffer,
-                   &context->camera_info,
-                   sizeof(context->camera_info));
+DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
+    UploadToBuffer(renderer->device,
+                   &renderer->camera_info_buffer,
+                   &renderer->camera_info,
+                   sizeof(renderer->camera_info));
 
     u32 image_id;
-    Swapchain *swapchain = &context->swapchain;
+    Swapchain *swapchain = &renderer->swapchain;
 
     VkResult result;
-    result = vkAcquireNextImageKHR(context->device,
+    result = vkAcquireNextImageKHR(renderer->device,
                                    swapchain->swapchain,
                                    UINT64_MAX,
                                    swapchain->image_acquired_semaphore[swapchain->semaphore_id],
@@ -1245,9 +1538,9 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
 
     // If the frame hasn't finished rendering wait for it to finish
     AssertVkResult(
-        vkWaitForFences(context->device, 1, &swapchain->fences[image_id], VK_TRUE, UINT64_MAX));
+        vkWaitForFences(renderer->device, 1, &swapchain->fences[image_id], VK_TRUE, UINT64_MAX));
 
-    vkResetFences(context->device, 1, &swapchain->fences[image_id]);
+    vkResetFences(renderer->device, 1, &swapchain->fences[image_id]);
 
     VkCommandBuffer cmd = swapchain->command_buffers[image_id];
 
@@ -1258,27 +1551,42 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
     // Shadow map
     {
         BeginRenderGroup(cmd,
-                         &context->shadowmap_render_group,
-                         context->shadowmap_framebuffer,
-                         context->shadowmap_extent);
-        Frame frame = {cmd, context->shadowmap_render_group.layout};
-        for(u32 i = 0; i < context->mesh_count; ++i) {
-            Mesh *mesh = context->meshes[i];
+                         &renderer->shadowmap_render_group,
+                         renderer->shadowmap_framebuffer,
+                         renderer->shadowmap_extent);
+        Frame frame = {cmd, renderer->shadowmap_render_group.layout};
+        for(u32 i = 0; i < renderer->mesh_count; ++i) {
+            Mesh *mesh = renderer->meshes[i];
             RendererDrawMesh(&frame, mesh, mesh->instance_count, mesh->instance_transforms);
         }
-        EndRenderGroup(cmd);
+        vkCmdEndRenderPass(cmd);
     }
     // Color
+    BeginRenderGroup(
+        cmd, &renderer->main_render_group, renderer->framebuffers[image_id], swapchain->extent);
     {
-        BeginRenderGroup(
-            cmd, &context->main_render_group, context->framebuffers[image_id], swapchain->extent);
-        Frame frame = {cmd, context->main_render_group.layout};
-        for(u32 i = 0; i < context->mesh_count; ++i) {
-            Mesh *mesh = context->meshes[i];
+        Frame frame = {cmd, renderer->main_render_group.layout};
+        for(u32 i = 0; i < renderer->mesh_count; ++i) {
+            Mesh *mesh = renderer->meshes[i];
             RendererDrawMesh(&frame, mesh, mesh->instance_count, mesh->instance_transforms);
         }
-        EndRenderGroup(cmd);
     }
+    // Volumetric fog
+    {
+        vkCmdBindPipeline(
+            cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->volumetric_render_group.pipeline);
+        vkCmdBindDescriptorSets(cmd,
+                                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                renderer->volumetric_render_group.layout,
+                                0,
+                                renderer->volumetric_render_group.descriptor_set_count,
+                                renderer->volumetric_render_group.descriptor_sets,
+                                0,
+                                NULL);
+
+        vkCmdDraw(cmd, 6, 1, 0, 0);
+    }
+    vkCmdEndRenderPass(cmd);
     AssertVkResult(vkEndCommandBuffer(cmd));
 
     const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -1292,7 +1600,7 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
     submit_info.pCommandBuffers = &cmd;
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = &swapchain->render_complete_semaphore[swapchain->semaphore_id];
-    result = vkQueueSubmit(context->graphics_queue, 1, &submit_info, swapchain->fences[image_id]);
+    result = vkQueueSubmit(renderer->graphics_queue, 1, &submit_info, swapchain->fences[image_id]);
     AssertVkResult(result);
 
     // Present
@@ -1305,11 +1613,11 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
     present_info.pSwapchains = &swapchain->swapchain;
     present_info.pImageIndices = &image_id;
     present_info.pResults = NULL;
-    result = vkQueuePresentKHR(context->present_queue, &present_info);
+    result = vkQueuePresentKHR(renderer->present_queue, &present_info);
     AssertVkResult(result);
     // TODO : Recreate Swapchain if necessary
 
     swapchain->semaphore_id = (swapchain->semaphore_id + 1) % swapchain->image_count;
 
-    vkDeviceWaitIdle(context->device);
+    vkDeviceWaitIdle(renderer->device);
 }

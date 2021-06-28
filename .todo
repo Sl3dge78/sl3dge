@@ -40,6 +40,7 @@ RENDERER:
             > Skybox, same render pass, different pipeline
             > Or switching the volumetric fog to a new pass should fix it
         - Descriptor set 0 > could be the same for all pipelines
+            > Could have the camera matrices and the shadowmap sampler
         - Optimize volumetric fog
             > Move it to a new renderpass.
             > Will need the z-buffer and the shadowmap
