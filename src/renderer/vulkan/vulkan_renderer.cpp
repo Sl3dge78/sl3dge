@@ -1601,7 +1601,9 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
 
     // Volumetric render group
     DestroyRenderGroup(context, &context->volumetric_render_group);
-
+    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
+        vkDestroyFramebuffer(context->device, context->framebuffers[i], NULL);
+    }
     // Shadowmap render group
     DestroyImage(context->device, &context->shadowmap);
     vkDestroySampler(context->device, context->shadowmap_sampler, NULL);
@@ -1610,11 +1612,12 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
 
     // Main render group
     DestroyRenderGroup(context, &context->main_render_group);
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
-        vkDestroyFramebuffer(context->device, context->framebuffers[i], NULL);
-    }
+    vkDestroyFramebuffer(context->device, context->color_pass_framebuffer, NULL);
+
     sfree(context->framebuffers);
 
+    DestroyImage(context->device, &context->resolved_depth_image);
+    DestroyImage(context->device, &context->color_pass_image);
     DestroyImage(context->device, &context->depth_image);
     DestroyImage(context->device, &context->msaa_image);
 
