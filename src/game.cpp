@@ -18,7 +18,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
 }
 
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
-    f32 move_speed = 1.0f;
+    f32 move_speed = 0.1f;
     f32 look_speed = 0.01f;
 
     i32 mouse_x;

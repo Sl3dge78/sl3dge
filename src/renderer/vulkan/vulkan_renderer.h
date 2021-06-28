@@ -91,13 +91,15 @@ typedef struct Renderer {
     VkDescriptorPool descriptor_pool;
 
     Swapchain swapchain;
-    VkFramebuffer *framebuffers;
+    VkFormat depth_format;
 
     VkSampler texture_sampler;
 
-    //TODO:
-    VkSampler depth_sampler;
     Image depth_image;
+
+    VkSampler depth_sampler;
+    Image resolved_depth_image;
+
     Image msaa_image;
 
     Buffer camera_info_buffer;
@@ -110,8 +112,12 @@ typedef struct Renderer {
     RenderGroup shadowmap_render_group;
 
     RenderGroup main_render_group;
+    // Do we need three of these ?
+    VkFramebuffer color_pass_framebuffer;
+    Image color_pass_image;
 
     RenderGroup volumetric_render_group;
+    VkFramebuffer *framebuffers;
 
     u32 materials_count;
     Buffer mat_buffer;

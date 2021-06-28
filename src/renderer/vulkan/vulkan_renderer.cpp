@@ -78,6 +78,8 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
         VK_LOAD_INSTANCE_FUNC(*instance, vkCreateDebugUtilsMessengerEXT);
         VK_LOAD_INSTANCE_FUNC(*instance, vkDestroyDebugUtilsMessengerEXT);
         VK_LOAD_INSTANCE_FUNC(*instance, vkSetDebugUtilsObjectNameEXT);
+        VK_LOAD_INSTANCE_FUNC(*instance, vkCmdBeginDebugUtilsLabelEXT);
+        VK_LOAD_INSTANCE_FUNC(*instance, vkCmdEndDebugUtilsLabelEXT);
 
         // Create the messenger
         VkDebugUtilsMessengerCreateInfoEXT debug_create_info = {};
@@ -460,71 +462,6 @@ internal void CreateRenderPass(const VkDevice device,
                                const Swapchain *swapchain,
                                VkSampleCountFlagBits sample_count,
                                VkRenderPass *render_pass) {
-    VkRenderPassCreateInfo render_pass_ci = {};
-    render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    render_pass_ci.pNext = NULL;
-    render_pass_ci.flags = 0;
-
-    VkAttachmentDescription color_attachment = {};
-    color_attachment.flags = 0;
-    color_attachment.format = swapchain->format;
-    color_attachment.samples = sample_count;
-    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentDescription depth_attachment = {};
-    depth_attachment.flags = 0;
-    depth_attachment.format = VK_FORMAT_D32_SFLOAT;
-    depth_attachment.samples = sample_count;
-    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentDescription msaa_attachment = {};
-    msaa_attachment.flags = 0;
-    msaa_attachment.format = swapchain->format;
-    msaa_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    msaa_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    msaa_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    msaa_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    msaa_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    msaa_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    msaa_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentDescription attachments[] = {color_attachment, depth_attachment, msaa_attachment};
-
-    render_pass_ci.attachmentCount = 3;
-    render_pass_ci.pAttachments = attachments;
-
-    VkSubpassDescription subpass_desc = {};
-    subpass_desc.flags = 0;
-    subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass_desc.inputAttachmentCount = 0;
-    subpass_desc.pInputAttachments = NULL;
-
-    VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-    VkAttachmentReference depth_ref = {1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-    VkAttachmentReference resolve_ref = {2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-    subpass_desc.colorAttachmentCount = 1;
-    subpass_desc.pColorAttachments = &color_ref;
-    subpass_desc.pResolveAttachments = &resolve_ref;
-    subpass_desc.pDepthStencilAttachment = &depth_ref;
-    subpass_desc.preserveAttachmentCount = 0;
-    subpass_desc.pPreserveAttachments = NULL;
-
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass_desc;
-    render_pass_ci.dependencyCount = 0;
-    render_pass_ci.pDependencies = NULL;
-
-    AssertVkResult(vkCreateRenderPass(device, &render_pass_ci, NULL, render_pass));
 }
 
 internal void BeginRenderGroup(VkCommandBuffer cmd,
@@ -580,7 +517,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
 
     VkAttachmentDescription depth_attachment = {};
     depth_attachment.flags = 0;
-    depth_attachment.format = VK_FORMAT_D32_SFLOAT;
+    depth_attachment.format = renderer->depth_format;
     depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -782,7 +719,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
     render_group->clear_values[0].depthStencil = {1.0f, 0};
 }
 
-internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group) {
+internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_group) {
     // TODO : Séparer ca en 2. un avec la texture. et un avec le reste. Bind la texture pour chaque primitive si necessaire
 
     render_group->descriptor_set_count = 1;
@@ -807,7 +744,7 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
         {// TEXTURES
          2,
          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-         context->textures_count > 0 ? context->textures_count : 1, // HACK
+         renderer->textures_count > 0 ? renderer->textures_count : 1, // HACK
          VK_SHADER_STAGE_FRAGMENT_BIT,
          NULL},
         {// SHADOWMAP READ
@@ -826,23 +763,23 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
     game_set_create_info.bindingCount = descriptor_count;
     game_set_create_info.pBindings = bindings;
     AssertVkResult(vkCreateDescriptorSetLayout(
-        context->device, &game_set_create_info, NULL, &render_group->set_layouts[0]));
+        renderer->device, &game_set_create_info, NULL, &render_group->set_layouts[0]));
 
     // Descriptor Set
     VkDescriptorSetAllocateInfo allocate_info = {};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
-    allocate_info.descriptorPool = context->descriptor_pool;
+    allocate_info.descriptorPool = renderer->descriptor_pool;
     allocate_info.descriptorSetCount = render_group->descriptor_set_count;
     allocate_info.pSetLayouts = render_group->set_layouts;
     AssertVkResult(
-        vkAllocateDescriptorSets(context->device, &allocate_info, render_group->descriptor_sets));
+        vkAllocateDescriptorSets(renderer->device, &allocate_info, render_group->descriptor_sets));
 
     // Writes
     const u32 static_writes_count = 3;
     VkWriteDescriptorSet static_writes[static_writes_count];
 
-    VkDescriptorBufferInfo bi_cam = {context->camera_info_buffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo bi_cam = {renderer->camera_info_buffer.buffer, 0, VK_WHOLE_SIZE};
     static_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[0].pNext = NULL;
     static_writes[0].dstSet = render_group->descriptor_sets[0];
@@ -854,7 +791,7 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
     static_writes[0].pBufferInfo = &bi_cam;
     static_writes[0].pTexelBufferView = NULL;
 
-    VkDescriptorBufferInfo materials = {context->mat_buffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo materials = {renderer->mat_buffer.buffer, 0, VK_WHOLE_SIZE};
     static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[1].pNext = NULL;
     static_writes[1].dstSet = render_group->descriptor_sets[0];
@@ -866,8 +803,8 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
     static_writes[1].pBufferInfo = &materials;
     static_writes[1].pTexelBufferView = NULL;
 
-    VkDescriptorImageInfo image_info = {context->shadowmap_sampler,
-                                        context->shadowmap.image_view,
+    VkDescriptorImageInfo image_info = {renderer->shadowmap_sampler,
+                                        renderer->shadowmap.image_view,
                                         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
     static_writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     static_writes[2].pNext = NULL;
@@ -880,11 +817,155 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
     static_writes[2].pBufferInfo = NULL;
     static_writes[2].pTexelBufferView = NULL;
 
-    vkUpdateDescriptorSets(context->device, static_writes_count, static_writes, 0, NULL);
+    vkUpdateDescriptorSets(renderer->device, static_writes_count, static_writes, 0, NULL);
 
-    CreateRenderPass(
-        context->device, &context->swapchain, context->msaa_level, &render_group->render_pass);
+    { // Render pass
+        /*
+        VkRenderPassCreateInfo render_pass_ci = {};
+        render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        render_pass_ci.pNext = NULL;
+        render_pass_ci.flags = 0;
 
+        VkAttachmentDescription color_attachment = {};
+        color_attachment.flags = 0;
+        color_attachment.format = renderer->swapchain.format;
+        color_attachment.samples = renderer->msaa_level;
+        color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentDescription depth_attachment = {};
+        depth_attachment.flags = 0;
+        depth_attachment.format = VK_FORMAT_D32_SFLOAT;
+        depth_attachment.samples = renderer->msaa_level;
+        depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depth_attachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+        VkAttachmentDescription attachments[] = {color_attachment, depth_attachment};
+
+        render_pass_ci.attachmentCount = sizeof(attachments) / sizeof(attachments[0]);
+        render_pass_ci.pAttachments = attachments;
+
+        VkSubpassDescription subpass_desc = {};
+        subpass_desc.flags = 0;
+        subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass_desc.inputAttachmentCount = 0;
+        subpass_desc.pInputAttachments = NULL;
+
+        VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+        VkAttachmentReference depth_ref = {1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+
+        subpass_desc.colorAttachmentCount = 1;
+        subpass_desc.pColorAttachments = &color_ref;
+        subpass_desc.pResolveAttachments = NULL;
+        subpass_desc.pDepthStencilAttachment = &depth_ref;
+        subpass_desc.preserveAttachmentCount = 0;
+        subpass_desc.pPreserveAttachments = NULL;
+
+        render_pass_ci.subpassCount = 1;
+        render_pass_ci.pSubpasses = &subpass_desc;
+        render_pass_ci.dependencyCount = 0;
+        render_pass_ci.pDependencies = NULL;
+*/
+        VkAttachmentDescription2 color_attachment = {VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2};
+        color_attachment.pNext = NULL;
+        color_attachment.flags = 0;
+        color_attachment.format = renderer->swapchain.format;
+        color_attachment.samples = renderer->msaa_level;
+        color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentDescription2 depth_attachment = {VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2};
+        depth_attachment.pNext = NULL;
+        depth_attachment.flags = 0;
+        depth_attachment.format = renderer->depth_format;
+        depth_attachment.samples = renderer->msaa_level;
+        depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentDescription2 depth_resolve_attachment = {
+            VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2};
+        depth_resolve_attachment.pNext = NULL;
+        depth_resolve_attachment.flags = 0;
+        depth_resolve_attachment.format = renderer->depth_format;
+        depth_resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depth_resolve_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depth_resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        depth_resolve_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depth_resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depth_resolve_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depth_resolve_attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentDescription2 attachments[] = {
+            color_attachment, depth_attachment, depth_resolve_attachment};
+
+        VkAttachmentReference2 color_attachement_ref = {VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+        color_attachement_ref.attachment = 0;
+        color_attachement_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        color_attachement_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+        VkAttachmentReference2 depth_attachement_ref = {VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+        depth_attachement_ref.attachment = 1;
+        depth_attachement_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depth_attachement_ref.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        VkAttachmentReference2 depth_resolve_attachement_ref = {
+            VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+        depth_resolve_attachement_ref.attachment = 2;
+        depth_resolve_attachement_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depth_resolve_attachement_ref.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        VkSubpassDescriptionDepthStencilResolve depth_resolve = {
+            VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE};
+        depth_resolve.pNext = NULL;
+        depth_resolve.depthResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+        depth_resolve.stencilResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+        depth_resolve.pDepthStencilResolveAttachment = &depth_resolve_attachement_ref;
+
+        VkSubpassDescription2 subpasses = {VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2};
+        subpasses.pNext = &depth_resolve;
+        subpasses.flags = 0;
+        subpasses.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpasses.viewMask = 0;
+        subpasses.inputAttachmentCount = 0;
+        subpasses.pInputAttachments = NULL;
+        subpasses.colorAttachmentCount = 1;
+        subpasses.pColorAttachments = &color_attachement_ref;
+        subpasses.pResolveAttachments = NULL;
+        subpasses.pDepthStencilAttachment = &depth_attachement_ref;
+        subpasses.preserveAttachmentCount = 0;
+        subpasses.pPreserveAttachments = NULL;
+
+        VkRenderPassCreateInfo2 renderpass_ci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2};
+        renderpass_ci.pNext = NULL;
+        renderpass_ci.flags = 0;
+        renderpass_ci.attachmentCount = ARRAY_SIZE(attachments);
+        renderpass_ci.pAttachments = attachments;
+        renderpass_ci.subpassCount = 1;
+        renderpass_ci.pSubpasses = &subpasses;
+        renderpass_ci.dependencyCount = 0;
+        renderpass_ci.pDependencies = NULL;
+        renderpass_ci.correlatedViewMaskCount = 0;
+        renderpass_ci.pCorrelatedViewMasks = NULL;
+
+        AssertVkResult(
+            vkCreateRenderPass2(renderer->device, &renderpass_ci, 0, &render_group->render_pass));
+    }
     { // Build layout
         // Push constants
         VkPushConstantRange push_constant_range = {
@@ -902,14 +983,14 @@ internal void CreateMainRenderGroup(Renderer *context, RenderGroup *render_group
         create_info.pPushConstantRanges = &push_constant_range;
 
         AssertVkResult(
-            vkCreatePipelineLayout(context->device, &create_info, NULL, &render_group->layout));
+            vkCreatePipelineLayout(renderer->device, &create_info, NULL, &render_group->layout));
     }
-    PipelineCreateDefault(context->device,
-                          context->platform,
+    PipelineCreateDefault(renderer->device,
+                          renderer->platform,
                           "resources/shaders/general.vert.spv",
                           "resources/shaders/general.frag.spv",
-                          &context->swapchain.extent,
-                          context->msaa_level,
+                          &renderer->swapchain.extent,
+                          renderer->msaa_level,
                           render_group->layout,
                           render_group->render_pass,
                           &render_group->pipeline);
@@ -958,6 +1039,10 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         game_set_create_info.pBindings = bindings;
         AssertVkResult(vkCreateDescriptorSetLayout(
             renderer->device, &game_set_create_info, NULL, &render_group->set_layouts[0]));
+        DEBUGNameObject(renderer->device,
+                        (u64)render_group->set_layouts[0],
+                        VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+                        "Volumetric descriptor set layout");
 
         // Descriptor Set
         VkDescriptorSetAllocateInfo allocate_info = {};
@@ -968,6 +1053,12 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         allocate_info.pSetLayouts = render_group->set_layouts;
         AssertVkResult(vkAllocateDescriptorSets(
             renderer->device, &allocate_info, render_group->descriptor_sets));
+        for(u32 i = 0; i < render_group->descriptor_set_count; ++i) {
+            DEBUGNameObject(renderer->device,
+                            (u64)render_group->descriptor_sets[i],
+                            VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                            "Volumetric descriptor set");
+        }
     }
     { // Writes
         const u32 static_writes_count = 3;
@@ -986,8 +1077,8 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         static_writes[0].pTexelBufferView = NULL;
 
         VkDescriptorImageInfo depth_image_info = {renderer->depth_sampler,
-                                                  renderer->depth_image.image_view,
-                                                  VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+                                                  renderer->resolved_depth_image.image_view,
+                                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         static_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         static_writes[1].pNext = NULL;
         static_writes[1].dstSet = render_group->descriptor_sets[0];
@@ -1016,41 +1107,55 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         vkUpdateDescriptorSets(renderer->device, static_writes_count, static_writes, 0, NULL);
     }
     { // Render pass
-        VkRenderPassCreateInfo render_pass_ci = {};
-        render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        render_pass_ci.pNext = NULL;
-        render_pass_ci.flags = 0;
 
-        VkAttachmentDescription color_attachment = {};
-        color_attachment.flags = 0;
-        color_attachment.format = renderer->swapchain.format;
-        color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-        color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        color_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        VkAttachmentDescription previous_attachment = {};
+        previous_attachment.flags = 0;
+        previous_attachment.format = renderer->swapchain.format;
+        previous_attachment.samples = renderer->msaa_level;
+        previous_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        previous_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        previous_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        previous_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        previous_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        previous_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-        VkAttachmentDescription attachments[] = {color_attachment};
+        VkAttachmentDescription resolve_attachment = {};
+        resolve_attachment.flags = 0;
+        resolve_attachment.format = renderer->swapchain.format;
+        resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        resolve_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        resolve_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+        resolve_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        resolve_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-        render_pass_ci.attachmentCount = 1;
-        render_pass_ci.pAttachments = attachments;
+        VkAttachmentDescription attachments[] = {previous_attachment, resolve_attachment};
+
+        VkAttachmentReference color_ref[] = {
+            {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        };
+
+        VkAttachmentReference resolve_ref = {1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
 
         VkSubpassDescription subpass_desc = {};
         subpass_desc.flags = 0;
         subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass_desc.inputAttachmentCount = 0;
         subpass_desc.pInputAttachments = NULL;
-
-        VkAttachmentReference color_ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-        subpass_desc.colorAttachmentCount = 1;
-        subpass_desc.pColorAttachments = &color_ref;
-        subpass_desc.pResolveAttachments = NULL;
+        subpass_desc.colorAttachmentCount = ARRAY_SIZE(color_ref);
+        subpass_desc.pColorAttachments = color_ref;
+        subpass_desc.pResolveAttachments = &resolve_ref;
         subpass_desc.pDepthStencilAttachment = NULL;
         subpass_desc.preserveAttachmentCount = 0;
         subpass_desc.pPreserveAttachments = NULL;
 
+        VkRenderPassCreateInfo render_pass_ci = {};
+        render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        render_pass_ci.pNext = NULL;
+        render_pass_ci.flags = 0;
+        render_pass_ci.attachmentCount = ARRAY_SIZE(attachments);
+        render_pass_ci.pAttachments = attachments;
         render_pass_ci.subpassCount = 1;
         render_pass_ci.pSubpasses = &subpass_desc;
         render_pass_ci.dependencyCount = 0;
@@ -1161,7 +1266,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         pipeline_ci.pDynamicState = NULL; // TODO: look at this
         pipeline_ci.layout = render_group->layout;
 
-        pipeline_ci.renderPass = renderer->main_render_group.render_pass;
+        pipeline_ci.renderPass = render_group->render_pass;
         pipeline_ci.subpass = 0;
         pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
         pipeline_ci.basePipelineIndex = 0;
@@ -1259,6 +1364,9 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     renderer->swapchain.swapchain = VK_NULL_HANDLE;
     CreateSwapchain(renderer, window, &renderer->swapchain);
 
+    // TODO : pick that don't hard code it
+    renderer->depth_format = VK_FORMAT_D32_SFLOAT;
+
     // Texture Sampler
     {
         VkSamplerCreateInfo sampler_ci = {};
@@ -1285,15 +1393,27 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     }
 
     { // Depth image
-        CreateMultiSampledImage(
-            renderer->device,
-            &renderer->memory_properties,
-            VK_FORMAT_D32_SFLOAT,
-            {renderer->swapchain.extent.width, renderer->swapchain.extent.height, 1},
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            renderer->msaa_level,
-            &renderer->depth_image);
+        CreateMultiSampledImage(renderer->device,
+                                &renderer->memory_properties,
+                                renderer->depth_format,
+                                renderer->swapchain.extent,
+                                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                renderer->msaa_level,
+                                &renderer->depth_image);
+        DEBUGNameImage(renderer->device, &renderer->depth_image, "DEPTH IMAGE");
+
+        CreateImage(renderer->device,
+                    &renderer->memory_properties,
+                    renderer->depth_format,
+                    renderer->swapchain.extent,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    &renderer->resolved_depth_image);
+        DEBUGNameImage(renderer->device, &renderer->resolved_depth_image, "RESOLVED DEPTH IMAGE");
+
         VkSamplerCreateInfo sampler_ci = {};
         sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         sampler_ci.pNext = NULL;
@@ -1315,35 +1435,57 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
         sampler_ci.unnormalizedCoordinates = VK_FALSE;
         AssertVkResult(
             vkCreateSampler(renderer->device, &sampler_ci, NULL, &renderer->depth_sampler));
+        // MSAA Image
+        CreateMultiSampledImage(renderer->device,
+                                &renderer->memory_properties,
+                                renderer->swapchain.format,
+                                renderer->swapchain.extent,
+                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                renderer->msaa_level,
+                                &renderer->msaa_image);
+        DEBUGNameImage(renderer->device, &renderer->msaa_image, "MSAA RENDER TGT");
     }
-    // MSAA Image
-    CreateMultiSampledImage(
-        renderer->device,
-        &renderer->memory_properties,
-        renderer->swapchain.format,
-        {renderer->swapchain.extent.width, renderer->swapchain.extent.height, 1},
-        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        renderer->msaa_level,
-        &renderer->msaa_image);
+    {
+        // Camera info
+        CreateBuffer(renderer->device,
+                     &renderer->memory_properties,
+                     sizeof(CameraMatrices),
+                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                     &renderer->camera_info_buffer);
+        DEBUGNameBuffer(renderer->device, &renderer->camera_info_buffer, "Camera Info");
+        renderer->camera_info.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
+        mat4_inverse(&renderer->camera_info.proj, &renderer->camera_info.proj_inverse);
 
-    // Camera info
-    CreateBuffer(renderer->device,
-                 &renderer->memory_properties,
-                 sizeof(CameraMatrices),
-                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-                 &renderer->camera_info_buffer);
-    DEBUGNameBuffer(renderer->device, &renderer->camera_info_buffer, "Camera Info");
-    renderer->camera_info.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
+        // Scene info
+        // Materials
+        renderer->materials_count = 0;
+        CreateBuffer(renderer->device,
+                     &renderer->memory_properties,
+                     128 * sizeof(Material),
+                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     &renderer->mat_buffer);
+        DEBUGNameBuffer(renderer->device, &renderer->mat_buffer, "SCENE MATS");
 
+        // TEMP: switch to dyn arrays
+        // Textures
+        renderer->textures_capacity = 1;
+        renderer->textures = (Image *)scalloc(renderer->textures_capacity, sizeof(Image));
+        renderer->textures_count = 0;
+
+        renderer->meshes = (Mesh **)scalloc(1, sizeof(Mesh *));
+        renderer->mesh_count = 0;
+    }
     { // ShadowMap group
         renderer->shadowmap_extent = {4096, 4096};
         CreateShadowMapRenderGroup(renderer, &renderer->shadowmap_render_group);
 
         CreateImage(renderer->device,
                     &renderer->memory_properties,
-                    VK_FORMAT_D32_SFLOAT,
+                    renderer->depth_format,
                     renderer->shadowmap_extent,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -1386,52 +1528,57 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
             renderer->device, &shdw_sampler_ci, NULL, &renderer->shadowmap_sampler));
     }
 
-    // Scene info
-    // Materials
-    renderer->materials_count = 0;
-    CreateBuffer(renderer->device,
-                 &renderer->memory_properties,
-                 128 * sizeof(Material),
-                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 &renderer->mat_buffer);
-    DEBUGNameBuffer(renderer->device, &renderer->mat_buffer, "SCENE MATS");
+    { // Main
+        CreateMainRenderGroup(renderer, &renderer->main_render_group);
+        CreateMultiSampledImage(renderer->device,
+                                &renderer->memory_properties,
+                                renderer->swapchain.format,
+                                renderer->swapchain.extent,
+                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                renderer->msaa_level,
+                                &renderer->color_pass_image);
+        VkFramebufferCreateInfo ci = {};
+        ci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        ci.pNext = NULL;
+        ci.flags = 0;
+        ci.renderPass = renderer->main_render_group.render_pass;
 
-    // TEMP: switch to dyn arrays
-    // Textures
-    renderer->textures_capacity = 1;
-    renderer->textures = (Image *)scalloc(renderer->textures_capacity, sizeof(Image));
-    renderer->textures_count = 0;
+        VkImageView attachments[] = {renderer->color_pass_image.image_view,
+                                     renderer->depth_image.image_view,
+                                     renderer->resolved_depth_image.image_view};
 
-    renderer->meshes = (Mesh **)scalloc(1, sizeof(Mesh *));
-    renderer->mesh_count = 0;
-
-    CreateMainRenderGroup(renderer, &renderer->main_render_group);
-    CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
-
-    // Framebuffers
-    renderer->framebuffers =
-        (VkFramebuffer *)scalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
-    for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
-        VkFramebufferCreateInfo create_info = {};
-        create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        create_info.pNext = NULL;
-        create_info.flags = 0;
-        create_info.renderPass = renderer->main_render_group.render_pass;
-        create_info.attachmentCount = 3;
-
-        VkImageView attachments[] = {
-            renderer->msaa_image.image_view,
-            renderer->depth_image.image_view,
-            renderer->swapchain.image_views[i],
-        };
-
-        create_info.pAttachments = attachments;
-        create_info.width = renderer->swapchain.extent.width;
-        create_info.height = renderer->swapchain.extent.height;
-        create_info.layers = 1;
+        ci.attachmentCount = ARRAY_SIZE(attachments);
+        ci.pAttachments = attachments;
+        ci.width = renderer->swapchain.extent.width;
+        ci.height = renderer->swapchain.extent.height;
+        ci.layers = 1;
         AssertVkResult(
-            vkCreateFramebuffer(renderer->device, &create_info, NULL, &renderer->framebuffers[i]));
+            vkCreateFramebuffer(renderer->device, &ci, NULL, &renderer->color_pass_framebuffer));
+    }
+    {
+        CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
+        renderer->framebuffers =
+            (VkFramebuffer *)scalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
+
+        for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
+            VkFramebufferCreateInfo create_info = {};
+            create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            create_info.pNext = NULL;
+            create_info.flags = 0;
+            create_info.renderPass = renderer->volumetric_render_group.render_pass;
+
+            VkImageView attachments[] = {renderer->color_pass_image.image_view,
+                                         renderer->swapchain.image_views[i]};
+
+            create_info.attachmentCount = ARRAY_SIZE(attachments);
+            create_info.pAttachments = attachments;
+            create_info.width = renderer->swapchain.extent.width;
+            create_info.height = renderer->swapchain.extent.height;
+            create_info.layers = 1;
+            AssertVkResult(vkCreateFramebuffer(
+                renderer->device, &create_info, NULL, &renderer->framebuffers[i]));
+        }
     }
 
     return renderer;
@@ -1548,8 +1695,10 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL, 0, NULL};
     AssertVkResult(vkBeginCommandBuffer(cmd, &begin_info));
 
-    // Shadow map
-    {
+    { // Shadow map
+        VkDebugUtilsLabelEXT marker = {
+            VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "SHADOW MAP", {0.0, 0.0, 0.0, 0.0}};
+        pfn_vkCmdBeginDebugUtilsLabelEXT(cmd, &marker);
         BeginRenderGroup(cmd,
                          &renderer->shadowmap_render_group,
                          renderer->shadowmap_framebuffer,
@@ -1560,33 +1709,38 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
             RendererDrawMesh(&frame, mesh, mesh->instance_count, mesh->instance_transforms);
         }
         vkCmdEndRenderPass(cmd);
+        pfn_vkCmdEndDebugUtilsLabelEXT(cmd);
     }
-    // Color
-    BeginRenderGroup(
-        cmd, &renderer->main_render_group, renderer->framebuffers[image_id], swapchain->extent);
-    {
+
+    { // Color
+        VkDebugUtilsLabelEXT marker = {
+            VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "COLOR", {0.0, 0.0, 0.0, 0.0}};
+        pfn_vkCmdBeginDebugUtilsLabelEXT(cmd, &marker);
+        BeginRenderGroup(
+            cmd, &renderer->main_render_group, renderer->color_pass_framebuffer, swapchain->extent);
         Frame frame = {cmd, renderer->main_render_group.layout};
         for(u32 i = 0; i < renderer->mesh_count; ++i) {
             Mesh *mesh = renderer->meshes[i];
             RendererDrawMesh(&frame, mesh, mesh->instance_count, mesh->instance_transforms);
         }
+        vkCmdEndRenderPass(cmd);
+        pfn_vkCmdEndDebugUtilsLabelEXT(cmd);
     }
-    // Volumetric fog
-    {
-        vkCmdBindPipeline(
-            cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderer->volumetric_render_group.pipeline);
-        vkCmdBindDescriptorSets(cmd,
-                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                renderer->volumetric_render_group.layout,
-                                0,
-                                renderer->volumetric_render_group.descriptor_set_count,
-                                renderer->volumetric_render_group.descriptor_sets,
-                                0,
-                                NULL);
 
+    { // Fog
+        // TODO: maybe this doesnt need to be in a separate render group
+        VkDebugUtilsLabelEXT marker = {
+            VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "FOG", {0.0, 0.0, 0.0, 0.0}};
+        pfn_vkCmdBeginDebugUtilsLabelEXT(cmd, &marker);
+        BeginRenderGroup(cmd,
+                         &renderer->volumetric_render_group,
+                         renderer->framebuffers[image_id],
+                         swapchain->extent);
         vkCmdDraw(cmd, 6, 1, 0, 0);
+        vkCmdEndRenderPass(cmd);
+        pfn_vkCmdEndDebugUtilsLabelEXT(cmd);
     }
-    vkCmdEndRenderPass(cmd);
+
     AssertVkResult(vkEndCommandBuffer(cmd));
 
     const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

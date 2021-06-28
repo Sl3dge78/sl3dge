@@ -24,6 +24,7 @@ layout(location = 5) in vec4 in_shadow_map_texcoord;
 
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
+
 	mat4 view;
 	mat4 view_inverse;
 	mat4 light_vp;
@@ -128,7 +129,7 @@ void main() {
     float fog = pow(cam_distance / 20, 2);
 
     vec3 color = (ambient + shadow * diffuse);
-    //color += volumetric_fog(L);
 
     out_color = vec4(color, 1.0);
+    //out_color = vec4(in_worldpos, 1.0);
 }

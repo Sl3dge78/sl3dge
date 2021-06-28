@@ -68,6 +68,7 @@ typedef struct Material {
 
 typedef struct CameraMatrices {
     alignas(16) Mat4 proj;
+    alignas(16) Mat4 proj_inverse;
     alignas(16) Mat4 view;
     alignas(16) Mat4 view_inverse;
     alignas(16) Mat4 shadow_mvp;

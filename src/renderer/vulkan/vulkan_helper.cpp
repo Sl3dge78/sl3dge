@@ -9,8 +9,9 @@
 
 #include "platform/platform.h"
 
-
 VK_DECL_FUNC(vkSetDebugUtilsObjectNameEXT);
+VK_DECL_FUNC(vkCmdBeginDebugUtilsLabelEXT);
+VK_DECL_FUNC(vkCmdEndDebugUtilsLabelEXT);
 VK_DECL_FUNC(vkGetBufferDeviceAddressKHR);
 
 VKAPI_ATTR VkBool32 VKAPI_CALL
@@ -282,6 +283,7 @@ internal void CreateImage(const VkDevice device,
                                 VK_COMPONENT_SWIZZLE_IDENTITY,
                                 VK_COMPONENT_SWIZZLE_IDENTITY,
                                 VK_COMPONENT_SWIZZLE_IDENTITY};
+    // TODO : This is annoying
     if(usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
         image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     else
@@ -296,7 +298,7 @@ internal void CreateImage(const VkDevice device,
 internal void CreateMultiSampledImage(const VkDevice device,
                                       const VkPhysicalDeviceMemoryProperties *memory_properties,
                                       const VkFormat format,
-                                      const VkExtent3D extent,
+                                      const VkExtent2D extent,
                                       const VkImageUsageFlags usage,
                                       const VkMemoryPropertyFlags memory_flags,
                                       VkSampleCountFlagBits sample_count,
@@ -307,7 +309,7 @@ internal void CreateMultiSampledImage(const VkDevice device,
     image_ci.flags = 0;
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format;
-    image_ci.extent = extent;
+    image_ci.extent = {extent.width, extent.height, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = sample_count;

@@ -6,6 +6,7 @@
 
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
+    mat4 proj_inverse;
 	mat4 view;
 	mat4 view_inverse;
 	mat4 light_vp;
@@ -51,8 +52,11 @@ float henyey_greenstein(vec3 diri, vec3 diro) {
 }
 
 vec3 calculate_world_position(vec2 uv, float depth) {
-    vec3 world_position = vec3(0.0);
-    return world_position;
+    vec3 fragment_view_pos = vec3(uv, depth);
+    vec4 view_space_pos = cam.proj_inverse * vec4(fragment_view_pos, 1.0);
+    view_space_pos /= view_space_pos.w;
+    vec4 world_space_pos = cam.view_inverse * view_space_pos;
+    return world_space_pos.xyz;
 }
 
 vec3 volumetric_fog(vec3 L, vec3 frag_worldpos) {
@@ -97,9 +101,11 @@ vec3 volumetric_fog(vec3 L, vec3 frag_worldpos) {
 
 void main() {
 
-
-    vec3 frag_worldpos = calculate_world_position(uv, 1.0);
+    float depth = texture(depth_map, uv).x;
+    vec3 frag_worldpos = calculate_world_position(uv, depth);
 
     //out_color = vec4(volumetric_fog(cam.light_dir, frag_worldpos), 0);
-    out_color = vec4(0.0, 0.0, 0.0, 1.0);
+
+    out_color = vec4(frag_worldpos,1);
+    //out_color = vec4(0, 0, 0, 0);
 }
