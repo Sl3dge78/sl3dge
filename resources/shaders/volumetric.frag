@@ -20,8 +20,8 @@ layout(location = 0) in vec2 uv;
 
 layout(location = 0) out vec4 out_color;
 
-float Anisotropy = .4;
-vec3 Density = vec3(.005, .005, .004);
+float Anisotropy = .3;
+vec3 Density = vec3(.005, .005, .003);
 
 // RNG
 uint tea(uint val0, uint val1) {
@@ -66,6 +66,7 @@ vec3 volumetric_fog(vec3 L, vec3 frag_worldpos) {
 
     vec3 dir = normalize(frag_worldpos - cam.view_pos);
     float frag_distance = length(frag_worldpos - cam.view_pos);
+
     float total_dist = min(frag_distance, 5.0);
 
     vec3 ray_step = dir * (total_dist) / steps;
@@ -101,11 +102,9 @@ vec3 volumetric_fog(vec3 L, vec3 frag_worldpos) {
 
 void main() {
 
-    float depth = texture(depth_map, uv).x;
+    float depth = texture(depth_map, (uv + vec2(1.0)) / 2.0).x;
     vec3 frag_worldpos = calculate_world_position(uv, depth);
 
-    //out_color = vec4(volumetric_fog(cam.light_dir, frag_worldpos), 0);
+    out_color = vec4(volumetric_fog(cam.light_dir, frag_worldpos), 1.0);
 
-    out_color = vec4(frag_worldpos,1);
-    //out_color = vec4(0, 0, 0, 0);
 }

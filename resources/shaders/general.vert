@@ -36,6 +36,7 @@ void main() {
 	vec4 pos = constants.transform * vec4(in_position, 1.0);
 
 	gl_Position = cam.proj * cam.view * pos;
+    //gl_Position = cam.light_vp * pos;
 	worldpos = pos.xyz;
 	normal = normalize(transpose(inverse(mat3(constants.transform))) * in_normal);
 	texcoord = in_texcoord;

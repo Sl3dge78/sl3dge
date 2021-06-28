@@ -92,10 +92,10 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
                          &image_buffers[i]);
 
             if(SDL_MUSTLOCK(surfaces[i]))
-            SDL_LockSurface(surfaces[i]);
+                SDL_LockSurface(surfaces[i]);
             UploadToBuffer(context->device, &image_buffers[i], surfaces[i]->pixels, image_size);
             if(SDL_MUSTLOCK(surfaces[i]))
-            SDL_UnlockSurface(surfaces[i]);
+                SDL_UnlockSurface(surfaces[i]);
             BeginCommandBuffer(
                 context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
             CopyBufferToImage(
@@ -298,7 +298,7 @@ void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forwa
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
-    const Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 250.0f, -600.0f, 600.0f);
+    const Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 20.0f, -600.0f, 600.0f);
     Mat4 b = mat4_look_at({0.0f, 0.0f, 0.0f}, direction * -1.0f, Vec3{0.0f, 1.0f, 0.0f});
 
     renderer->camera_info.shadow_mvp = mat4_mul(&a, &b);

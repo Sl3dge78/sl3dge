@@ -103,8 +103,6 @@ vec3 base_color(Material mat) {
     return diffuse;
 }
 
-
-
 vec3 skycolor = vec3(0.53, 0.80, 0.92);
 float ambient_intensity = 0.25;
 
@@ -122,7 +120,7 @@ void main() {
 
     vec3 ambient = skycolor * ambient_intensity * base_color;
 
-    float bias = ( 1 - NdotL) * 0.005;
+    float bias = ( 1 - NdotL) * 0.0001;
     float shadow = get_shadow(bias);
 
     float cam_distance = length(cam.view_pos - in_worldpos);
