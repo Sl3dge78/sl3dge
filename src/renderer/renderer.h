@@ -40,6 +40,10 @@ struct Mesh {
     Mat4 *instance_transforms;
 };
 
+struct MeshInstance {
+    Mat4 *transform;
+};
+
 typedef struct PushConstant {
     alignas(16) Mat4 transform;
     alignas(4) u32 material;
@@ -100,7 +104,7 @@ DLL_EXPORT LoadMesh_t RendererLoadMesh;
 typedef void DestroyMesh_t(Renderer *renderer, u32 mesh);
 DLL_EXPORT DestroyMesh_t RendererDestroyMesh;
 
-typedef u32 InstantiateMesh_t(Renderer *renderer, u32 mesh);
+typedef MeshInstance InstantiateMesh_t(Renderer *renderer, u32 mesh_id);
 DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
 
 typedef void
@@ -120,6 +124,9 @@ struct RendererGameAPI {
 
 // Other functions
 
-void RendererDrawMesh(Frame *frame, Mesh *mesh);
+void RendererDrawMesh(Frame *frame,
+                      Mesh *mesh,
+                      const u32 instance_count,
+                      const Mat4 *instance_transforms);
 
 #endif

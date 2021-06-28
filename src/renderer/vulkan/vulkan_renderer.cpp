@@ -1263,7 +1263,8 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
                          context->shadowmap_extent);
         Frame frame = {cmd, context->shadowmap_render_group.layout};
         for(u32 i = 0; i < context->mesh_count; ++i) {
-            RendererDrawMesh(&frame, context->meshes[i]);
+            Mesh *mesh = context->meshes[i];
+            RendererDrawMesh(&frame, mesh, mesh->instance_count, mesh->instance_transforms);
         }
         EndRenderGroup(cmd);
     }
@@ -1273,7 +1274,8 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *context) {
             cmd, &context->main_render_group, context->framebuffers[image_id], swapchain->extent);
         Frame frame = {cmd, context->main_render_group.layout};
         for(u32 i = 0; i < context->mesh_count; ++i) {
-            RendererDrawMesh(&frame, context->meshes[i]);
+            Mesh *mesh = context->meshes[i];
+            RendererDrawMesh(&frame, mesh, mesh->instance_count, mesh->instance_transforms);
         }
         EndRenderGroup(cmd);
     }

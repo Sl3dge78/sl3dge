@@ -10,11 +10,11 @@
 
 DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->light_pos = {1.0f, 1.0f, 0.0f};
-    game_data->position = {0.0f, 50.0f, 0.0f};
+    game_data->position = {0.0f, 0.0f, 0.0f};
 
     game_data->renderer_api.LoadMesh(game_data->renderer,
                                      "resources/3d/Motorcycle/motorcycle.gltf");
-    game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
+    game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
 }
 
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
@@ -73,7 +73,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     // Reset
     if(keyboard[SDL_SCANCODE_SPACE]) {
         // GameStart(game_data);
-        game_data->position = Vec3{50.0f, 0, 0};
+        game_data->position = Vec3{0.0f, 0, 0};
+        *game_data->moto.transform = mat4_identity();
     }
 
     if(keyboard[SDL_SCANCODE_P]) {
@@ -103,6 +104,15 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     }
 
     game_data->position = game_data->position + movement;
+
+    mat4_rotate_euler(game_data->moto.transform, Vec3{0, game_data->spherical_coordinates.x, 0});
+    mat4_set_position(game_data->moto.transform, game_data->position);
+    Vec3 flat_forward = {forward.x, 0, forward.z};
+    flat_forward = vec3_normalize(flat_forward);
+    Vec3 offset_z = flat_forward * -10.f;
+    Vec3 offset_y = {0.0f, 40.f, 0.f};
+    Vec3 offset = offset_z + offset_y;
+
     game_data->renderer_api.SetCamera(
-        game_data->renderer, game_data->position, forward, Vec3{0.0f, 1.0f, 0.0f});
+        game_data->renderer, game_data->position + offset, forward, Vec3{0.0f, 1.0f, 0.0f});
 }

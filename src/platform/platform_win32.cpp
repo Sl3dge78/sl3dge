@@ -143,7 +143,7 @@ internal int main(int argc, char *argv[]) {
             delta_time = (float)(time - frame_start) / 1000.f;
             frame_start = time;
         }
-
+        /*
         // Reload vulkan if necessary
         if(Win32ShouldReloadModule(&renderer_module)) {
             pfn_DestroyRenderer(renderer);
@@ -156,6 +156,7 @@ internal int main(int argc, char *argv[]) {
 
             SDL_Log("Vulkan reloaded");
         }
+        */
 
         // Reload gamecode if necessary
         if(Win32ShouldReloadModule(&game_module)) {

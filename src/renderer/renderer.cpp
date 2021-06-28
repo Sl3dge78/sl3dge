@@ -223,7 +223,10 @@ void RendererDestroyMesh(Renderer *renderer, u32 id) {
     sfree(mesh);
 }
 
-void RendererDrawMesh(Frame *frame, Mesh *mesh) {
+void RendererDrawMesh(Frame *frame,
+                      Mesh *mesh,
+                      const u32 instance_count,
+                      const Mat4 *instance_transforms) {
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(frame->cmd, 0, 1, &mesh->buffer->buffer, &offset);
     vkCmdBindIndexBuffer(
@@ -231,12 +234,12 @@ void RendererDrawMesh(Frame *frame, Mesh *mesh) {
 
     u32 primitive_count = mesh->total_primitives_count;
 
-    for(u32 i = 0; i < mesh->instance_count; i++) {
+    for(u32 i = 0; i < instance_count; i++) {
         for(u32 p = 0; p < primitive_count; p++) {
             const Primitive *prim = &mesh->primitives[p];
 
             Mat4 mat =
-                mat4_mul(&mesh->instance_transforms[i], &mesh->primitive_transforms[prim->node_id]);
+                mat4_mul(&instance_transforms[i], &mesh->primitive_transforms[prim->node_id]);
             PushConstant push = {mat, prim->material_id};
             vkCmdPushConstants(frame->cmd,
                                frame->layout,
@@ -250,8 +253,10 @@ void RendererDrawMesh(Frame *frame, Mesh *mesh) {
     }
 }
 
-u32 RendererInstantiateMesh(Renderer *renderer, u32 id) {
-    Mesh *mesh = renderer->meshes[id];
+MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
+    MeshInstance result = {};
+
+    Mesh *mesh = renderer->meshes[mesh_id];
     if(mesh->instance_count == mesh->instance_capacity) {
         // Resize the buffer
         u32 new_capacity = mesh->instance_capacity * 2;
@@ -263,9 +268,10 @@ u32 RendererInstantiateMesh(Renderer *renderer, u32 id) {
     }
     u32 instance_id = mesh->instance_count++;
     mesh->instance_transforms[instance_id] = mat4_identity();
+    result.transform = &mesh->instance_transforms[instance_id];
     mat4_translate(&mesh->instance_transforms[instance_id],
                    Vec3{(f32)instance_id * 20.f, 0.f, 0.f});
-    return mesh->instance_count;
+    return result;
 }
 
 void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {

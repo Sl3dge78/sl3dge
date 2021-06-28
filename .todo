@@ -28,7 +28,7 @@ RENDERER:
                     > Frontend has mesh data and all and sends it to the backend on reload
                     > Backend is the current stuff
         - Dynamic array of meshes
-            - Take a decisions on frontend/backend first
+            - Take a decision on frontend/backend first
         ? Split the way we store render data
             > Renderer has list of meshes
             > Game has pointer to these meshes and their xform info
@@ -64,7 +64,7 @@ RENDERER:
 GLTF:
     CRITICAL:
     MAJOR:
-        - If we have multiple meshes that use the same primitve, we will just dupe it here
+        - If we have multiple meshes that use the same primitve, right now we just duplicate it
         - Read embedded glb
     BACKLOG:
     IMPROVEMENTS:
@@ -74,6 +74,9 @@ WIN32 :
     CRITICAL:
     MAJOR:
     BACKLOG:
+        - Should I make my own memory allocator?
+        - My own logger
+        - Remove SDL?
     IMPROVEMENTS:
     IDEAS :
         - In game console
