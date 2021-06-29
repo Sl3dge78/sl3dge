@@ -6,7 +6,7 @@
 #include <cgltf/cgltf.h>
 
 #include "game.h"
-#include "renderer/gltf.cpp"
+#include "renderer/gltf.c"
 #include "renderer/vulkan/vulkan_renderer.h"
 #include "renderer/vulkan/vulkan_helper.c"
 #include "renderer/vulkan/vulkan_pipeline.c"
