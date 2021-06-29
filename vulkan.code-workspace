@@ -28,7 +28,9 @@
             "xmemory": "cpp",
             "xtree": "cpp",
             "algorithm": "cpp",
-            "new": "cpp"
+            "new": "cpp",
+            "vulkan_renderer.h": "c",
+            "gltf.cpp": "c"
         }
     }
 }

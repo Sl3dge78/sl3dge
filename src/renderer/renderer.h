@@ -7,10 +7,10 @@
 
 // Forward declarations
 
-struct Renderer;
-struct GameData;
-struct Frame;
-struct Buffer;
+typedef struct Renderer Renderer;
+typedef struct GameData GameData;
+typedef struct Frame Frame;
+typedef struct Buffer Buffer;
 
 // Structures
 
@@ -23,7 +23,7 @@ typedef struct Primitive {
     u32 vertex_offset;
 } Primitive;
 
-struct Mesh {
+typedef struct Mesh {
     Buffer *buffer;       // idx & vtx buffer
     u32 all_index_offset; // Indices start at this offset in the buffer
 
@@ -38,11 +38,11 @@ struct Mesh {
     u32 instance_count;
     u32 instance_capacity;
     Mat4 *instance_transforms;
-};
+} Mesh;
 
-struct MeshInstance {
+typedef struct MeshInstance {
     Mat4 *transform;
-};
+} MeshInstance;
 
 typedef struct PushConstant {
     alignas(16) Mat4 transform;
@@ -90,12 +90,12 @@ RendererReloadShaders_t *pfn_ReloadShaders;
 typedef void DrawFrame_t(Renderer *renderer);
 DrawFrame_t *pfn_DrawFrame;
 
-struct RendererPlatformAPI {
+typedef struct RendererPlatformAPI {
     CreateRenderer_t *CreateRenderer;
     DestroyRenderer_t *DestroyRenderer;
     RendererReloadShaders_t *ReloadShaders;
     DrawFrame_t *DrawFrame;
-};
+} RendererPlatformAPI;
 
 // Game functions
 
@@ -115,13 +115,13 @@ DLL_EXPORT SetCamera_t RendererSetCamera;
 typedef void SetSunDirection_t(Renderer *renderer, const Vec3 direction);
 DLL_EXPORT SetSunDirection_t RendererSetSunDirection;
 
-struct RendererGameAPI {
+typedef struct RendererGameAPI {
     LoadMesh_t *LoadMesh;
     DestroyMesh_t *DestroyMesh;
     InstantiateMesh_t *InstantiateMesh;
     SetCamera_t *SetCamera;
     SetSunDirection_t *SetSunDirection;
-};
+} RendererGameAPI;
 
 // Other functions
 

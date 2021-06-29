@@ -1,5 +1,5 @@
-#ifndef VULKAN_RENDER_H
-#define VULKAN_RENDER_H
+#ifndef VULKAN_RENDERER_H
+#define VULKAN_RENDERER_H
 
 #include <vulkan/vulkan.h>
 #include <sl3dge/sl3dge.h>
@@ -55,7 +55,7 @@ typedef struct Swapchain {
 
 } Swapchain;
 
-struct RenderGroup {
+typedef struct RenderGroup {
     VkRenderPass render_pass;
     VkPipelineLayout layout;
     u32 descriptor_set_count;
@@ -65,7 +65,7 @@ struct RenderGroup {
 
     u32 clear_values_count;
     VkClearValue *clear_values;
-};
+} RenderGroup;
 
 typedef struct Renderer {
     PlatformAPI *platform;

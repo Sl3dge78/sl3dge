@@ -9,8 +9,8 @@
 #include "renderer/renderer.h"
 
 DLL_EXPORT void GameStart(GameData *game_data) {
-    game_data->light_pos = {1.0f, 1.0f, 0.0f};
-    game_data->position = {0.0f, 0.0f, 0.0f};
+    game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
+    game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
 
     game_data->renderer_api.LoadMesh(game_data->renderer,
                                      "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
@@ -41,7 +41,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     }
 
     Vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
-    Vec3 right = vec3_cross(forward, Vec3{0.0f, 1.0f, 0.0f});
+    Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
     Vec3 up = vec3_cross(right, forward);
 
     Vec3 movement = {};
@@ -52,16 +52,16 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     }
 
     if(keyboard[SDL_SCANCODE_W]) {
-        movement = movement + vec3_fmul(forward, move_speed);
+        movement = vec3_add(movement, vec3_fmul(forward, move_speed));
     }
     if(keyboard[SDL_SCANCODE_S]) {
-        movement = movement + vec3_fmul(forward, -move_speed);
+        movement = vec3_add(movement, vec3_fmul(forward, -move_speed));
     }
     if(keyboard[SDL_SCANCODE_A]) {
-        movement = movement + vec3_fmul(right, -move_speed);
+        movement = vec3_add(movement, vec3_fmul(right, -move_speed));
     }
     if(keyboard[SDL_SCANCODE_D]) {
-        movement = movement + vec3_fmul(right, move_speed);
+        movement = vec3_add(movement, vec3_fmul(right, move_speed));
     }
     if(keyboard[SDL_SCANCODE_Q]) {
         movement.y -= move_speed;
@@ -73,7 +73,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
     // Reset
     if(keyboard[SDL_SCANCODE_SPACE]) {
         // GameStart(game_data);
-        game_data->position = Vec3{0.0f, 0, 0};
+        game_data->position = (Vec3){0.0f, 0, 0};
         *game_data->moto.transform = mat4_identity();
     }
 
@@ -85,8 +85,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
         if(game_data->cos > PI) {
             game_data->cos = 0.0f;
         }
-        game_data->renderer_api.SetSunDirection(game_data->renderer,
-                                                vec3_normalize(game_data->light_pos * -1.0));
+        game_data->renderer_api.SetSunDirection(
+            game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
     if(keyboard[SDL_SCANCODE_O]) {
         game_data->cos -= delta_time;
@@ -95,15 +95,15 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
         if(game_data->cos < 0.0f) {
             game_data->cos = PI;
         }
-        game_data->renderer_api.SetSunDirection(game_data->renderer,
-                                                vec3_normalize(game_data->light_pos * -1.0));
+        game_data->renderer_api.SetSunDirection(
+            game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
 
     if(keyboard[SDL_SCANCODE_M]) {
         game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
     }
 
-    game_data->position = game_data->position + movement;
+    game_data->position = vec3_add(game_data->position, movement);
 #if 0
     mat4_rotate_euler(game_data->moto.transform, Vec3{0, game_data->spherical_coordinates.x, 0});
     mat4_set_position(game_data->moto.transform, game_data->position);
@@ -117,5 +117,5 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
         game_data->renderer, game_data->position + offset, forward, Vec3{0.0f, 1.0f, 0.0f});
 #endif
     game_data->renderer_api.SetCamera(
-        game_data->renderer, game_data->position, forward, Vec3{0.0f, 1.0f, 0.0f});
+        game_data->renderer, game_data->position, forward, (Vec3){0.0f, 1.0f, 0.0f});
 }

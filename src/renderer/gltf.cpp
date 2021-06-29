@@ -109,7 +109,8 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         if(mat->pbr_metallic_roughness.base_color_texture.has_transform) {
             SDL_LogWarn(0, "Texture has transform, this isn't supported yet");
         }
-        dst.base_color = {color[0], color[1], color[2]};
+        Vec3 base_color = {color[0], color[1], color[2]};
+        dst.base_color = base_color;
         dst.base_color_texture =
             GLTFGetTextureID(mat->pbr_metallic_roughness.base_color_texture.texture);
         dst.metallic_roughness_texture =

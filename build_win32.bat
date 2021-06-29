@@ -13,5 +13,5 @@ DEL /Q win32_*.pdb 2> NUL
 POPD
 
 ECHO Building win32.exe
-clang %args% %include_path% src/platform/platform_win32.cpp -o bin/win32.exe %linker_options% %libs% -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
+clang %args% %include_path% src/platform/platform_win32.c -o bin/win32.exe %linker_options% %libs% -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 ECHO Ok

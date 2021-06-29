@@ -86,8 +86,8 @@ inline VkPipelineDepthStencilStateCreateInfo PipelineGetDefaultDepthStencilState
     stencil_state.depthCompareOp = VK_COMPARE_OP_LESS;
     stencil_state.depthBoundsTestEnable = VK_FALSE;
     stencil_state.stencilTestEnable = VK_FALSE;
-    stencil_state.front = {};
-    stencil_state.back = {};
+    stencil_state.front = (VkStencilOpState){};
+    stencil_state.back = (VkStencilOpState){};
     stencil_state.minDepthBounds = 0.0f;
     stencil_state.maxDepthBounds = 1.0f;
     return stencil_state;
@@ -171,7 +171,7 @@ void PipelineCreateDefault(VkDevice device,
     viewport.maxDepth = 1.f;
 
     VkRect2D scissor;
-    scissor.offset = {0, 0};
+    scissor.offset = (VkOffset2D){0, 0};
     scissor.extent = *extent;
     VkPipelineViewportStateCreateInfo viewport_state =
         PipelineGetDefaultViewportState(1, &viewport, 1, &scissor);

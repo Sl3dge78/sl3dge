@@ -6,8 +6,8 @@
 typedef void PlatformReadBinary_t(const char *path, i64 *file_size, u32 *content);
 DLL_EXPORT PlatformReadBinary_t PlatformReadBinary;
 
-struct PlatformAPI {
+typedef struct PlatformAPI {
     PlatformReadBinary_t *ReadBinary;
-};
+} PlatformAPI;
 
 #endif

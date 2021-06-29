@@ -4,7 +4,7 @@
 #include "renderer/renderer.h"
 
 //#if defined(RENDERER_VULKAN)
-#include "renderer/vulkan/vulkan_renderer.cpp"
+#include "renderer/vulkan/vulkan_renderer.c"
 
 //#endif
 
@@ -129,13 +129,13 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
 
 u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     Mesh *mesh = (Mesh *)smalloc(sizeof(Mesh));
-    *mesh = {};
+    *mesh = (Mesh){};
     renderer->mesh_count++;
 
     char directory[64] = {};
     const char *last_sep = strrchr(path, '/');
     u32 size = last_sep - path;
-    strncpy_s(directory, path, size);
+    strncpy_s(directory, ARRAY_SIZE(directory), path, size);
     directory[size] = '/';
     directory[size + 1] = '\0';
 
@@ -287,19 +287,20 @@ MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
     mesh->instance_transforms[instance_id] = mat4_identity();
     result.transform = &mesh->instance_transforms[instance_id];
     mat4_translate(&mesh->instance_transforms[instance_id],
-                   Vec3{(f32)instance_id * 20.f, 0.f, 0.f});
+                   (Vec3){(f32)instance_id * 20.f, 0.f, 0.f});
     return result;
 }
 
 void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {
     renderer->camera_info.pos = position;
-    renderer->camera_info.view = mat4_look_at(position + forward, position, up);
+    renderer->camera_info.view = mat4_look_at(vec3_add(position, forward), position, up);
     mat4_inverse(&renderer->camera_info.view, &renderer->camera_info.view_inverse);
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     const Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 20.0f, -600.0f, 600.0f);
-    Mat4 b = mat4_look_at({0.0f, 0.0f, 0.0f}, direction * -1.0f, Vec3{0.0f, 1.0f, 0.0f});
+    Mat4 b = mat4_look_at(
+        (Vec3){0.0f, 0.0f, 0.0f}, vec3_fmul(direction, -1.0f), (Vec3){0.0f, 1.0f, 0.0f});
 
     renderer->camera_info.shadow_mvp = mat4_mul(&a, &b);
     renderer->camera_info.light_dir = direction;

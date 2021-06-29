@@ -8,8 +8,8 @@
 #include "game.h"
 #include "renderer/gltf.cpp"
 #include "renderer/vulkan/vulkan_renderer.h"
-#include "renderer/vulkan/vulkan_helper.cpp"
-#include "renderer/vulkan/vulkan_pipeline.cpp"
+#include "renderer/vulkan/vulkan_helper.c"
+#include "renderer/vulkan/vulkan_pipeline.c"
 
 global VkDebugUtilsMessengerEXT debug_messenger;
 
@@ -174,7 +174,6 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
 
     float queue_priority = 1.0f;
 
-    queues_ci[0] = {};
     queues_ci[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queues_ci[0].pNext = NULL;
     queues_ci[0].flags = 0;
@@ -182,7 +181,6 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
     queues_ci[0].queueCount = 1;
     queues_ci[0].pQueuePriorities = &queue_priority;
 
-    queues_ci[1] = {};
     queues_ci[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queues_ci[1].pNext = NULL;
     queues_ci[1].flags = 0;
@@ -190,7 +188,6 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
     queues_ci[1].queueCount = 1;
     queues_ci[1].pQueuePriorities = &queue_priority;
 
-    queues_ci[2] = {};
     queues_ci[2].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queues_ci[2].pNext = NULL;
     queues_ci[2].flags = 0;
@@ -241,7 +238,7 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
     VkPhysicalDeviceFeatures2 features2 = {};
     features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     features2.pNext = &descriptor_indexing;
-    features2.features = {};
+    //features2.features = 0;
     features2.features.samplerAnisotropy = VK_TRUE;
     features2.features.shaderInt64 = VK_TRUE;
 
@@ -387,11 +384,12 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
         image_view_ci.image = swapchain->images[i];
         image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
         image_view_ci.format = swapchain->format;
-        image_view_ci.components = {VK_COMPONENT_SWIZZLE_IDENTITY,
-                                    VK_COMPONENT_SWIZZLE_IDENTITY,
-                                    VK_COMPONENT_SWIZZLE_IDENTITY,
-                                    VK_COMPONENT_SWIZZLE_IDENTITY};
-        image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        image_view_ci.components = (VkComponentMapping){VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                        VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                        VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                        VK_COMPONENT_SWIZZLE_IDENTITY};
+        image_view_ci.subresourceRange =
+            (VkImageSubresourceRange){VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
         AssertVkResult(
             vkCreateImageView(context->device, &image_view_ci, NULL, &swapchain->image_views[i]));
@@ -473,7 +471,7 @@ internal void BeginRenderGroup(VkCommandBuffer cmd,
     renderpass_begin.pNext = 0;
     renderpass_begin.renderPass = render_group->render_pass;
     renderpass_begin.framebuffer = target;
-    renderpass_begin.renderArea = {{0, 0}, extent};
+    renderpass_begin.renderArea = (VkRect2D){{0, 0}, extent};
 
     renderpass_begin.clearValueCount = render_group->clear_values_count;
     renderpass_begin.pClearValues = render_group->clear_values;
@@ -716,7 +714,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
     render_group->clear_values =
         (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
-    render_group->clear_values[0].depthStencil = {1.0f, 0};
+    render_group->clear_values[0].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 }
 
 internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_group) {
@@ -999,8 +997,8 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
     render_group->clear_values =
         (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
-    render_group->clear_values[0].color = {0.53f, 0.80f, 0.92f, 0.0f};
-    render_group->clear_values[1].depthStencil = {1.0f, 0};
+    render_group->clear_values[0].color = (VkClearColorValue){0.53f, 0.80f, 0.92f, 0.0f};
+    render_group->clear_values[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 }
 
 internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *render_group) {
@@ -1229,7 +1227,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         viewport.maxDepth = 1.f;
 
         VkRect2D scissor;
-        scissor.offset = {0, 0};
+        scissor.offset = (VkOffset2D){0, 0};
         scissor.extent = renderer->swapchain.extent;
         VkPipelineViewportStateCreateInfo viewport_state =
             PipelineGetDefaultViewportState(1, &viewport, 1, &scissor);
@@ -1283,7 +1281,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
     render_group->clear_values =
         (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
-    render_group->clear_values[0].color = {0.f, 0.0f, 0.0f, 0.0f};
+    render_group->clear_values[0].color = (VkClearColorValue){0.f, 0.0f, 0.0f, 0.0f};
 }
 
 DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platform_api) {
@@ -1480,7 +1478,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
         renderer->mesh_count = 0;
     }
     { // ShadowMap group
-        renderer->shadowmap_extent = {4096, 4096};
+        renderer->shadowmap_extent = (VkExtent2D){4096, 4096};
         CreateShadowMapRenderGroup(renderer, &renderer->shadowmap_render_group);
 
         CreateImage(renderer->device,
@@ -1556,7 +1554,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
         AssertVkResult(
             vkCreateFramebuffer(renderer->device, &ci, NULL, &renderer->color_pass_framebuffer));
     }
-    {
+    { // Volumetric
         CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
         renderer->framebuffers =
             (VkFramebuffer *)scalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
@@ -1694,7 +1692,7 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
 
     VkCommandBuffer cmd = swapchain->command_buffers[image_id];
 
-    const VkCommandBufferBeginInfo begin_info{
+    const VkCommandBufferBeginInfo begin_info = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, NULL, 0, NULL};
     AssertVkResult(vkBeginCommandBuffer(cmd, &begin_info));
 

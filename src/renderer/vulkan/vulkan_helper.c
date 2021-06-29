@@ -145,7 +145,7 @@ internal void CreateBuffer(const VkDevice device,
                            const VkBufferUsageFlags buffer_usage,
                            const VkMemoryPropertyFlags memory_flags,
                            Buffer *buffer) {
-    *buffer = {};
+    *buffer = (Buffer){0};
 
     buffer->size = size;
 
@@ -218,7 +218,7 @@ internal void UnmapBuffer(const VkDevice device, Buffer *buffer) {
 internal void DestroyBuffer(const VkDevice device, Buffer *buffer) {
     vkFreeMemory(device, buffer->memory, NULL);
     vkDestroyBuffer(device, buffer->buffer, NULL);
-    buffer = {};
+    buffer = 0;
 }
 
 internal void DEBUGNameImage(const VkDevice device, Image *image, const char *name) {
@@ -240,7 +240,7 @@ internal void CreateImage(const VkDevice device,
     image_ci.flags = 0;
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format;
-    image_ci.extent = {extent.width, extent.height, 1};
+    image_ci.extent = (VkExtent3D){extent.width, extent.height, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -279,10 +279,10 @@ internal void CreateImage(const VkDevice device,
     image_view_ci.image = image->image;
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_ci.format = format;
-    image_view_ci.components = {VK_COMPONENT_SWIZZLE_IDENTITY,
-                                VK_COMPONENT_SWIZZLE_IDENTITY,
-                                VK_COMPONENT_SWIZZLE_IDENTITY,
-                                VK_COMPONENT_SWIZZLE_IDENTITY};
+    image_view_ci.components = (VkComponentMapping){VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY};
     // TODO : This is annoying
     if(usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
         image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -309,7 +309,7 @@ internal void CreateMultiSampledImage(const VkDevice device,
     image_ci.flags = 0;
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format;
-    image_ci.extent = {extent.width, extent.height, 1};
+    image_ci.extent = (VkExtent3D){extent.width, extent.height, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = sample_count;
@@ -348,10 +348,10 @@ internal void CreateMultiSampledImage(const VkDevice device,
     image_view_ci.image = image->image;
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_ci.format = format;
-    image_view_ci.components = {VK_COMPONENT_SWIZZLE_IDENTITY,
-                                VK_COMPONENT_SWIZZLE_IDENTITY,
-                                VK_COMPONENT_SWIZZLE_IDENTITY,
-                                VK_COMPONENT_SWIZZLE_IDENTITY};
+    image_view_ci.components = (VkComponentMapping){VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                    VK_COMPONENT_SWIZZLE_IDENTITY};
     if(usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
         image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     else
@@ -372,9 +372,9 @@ internal void CopyBufferToImage(VkCommandBuffer cmd,
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
-    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {extent.width, extent.height, 1};
+    region.imageSubresource = (VkImageSubresourceLayers){VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageOffset = (VkOffset3D){0, 0, 0};
+    region.imageExtent = (VkExtent3D){extent.width, extent.height, 1};
 
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -386,7 +386,7 @@ internal void CopyBufferToImage(VkCommandBuffer cmd,
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image->image;
-    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier.subresourceRange = (VkImageSubresourceRange){VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -411,7 +411,7 @@ internal void CopyBufferToImage(VkCommandBuffer cmd,
     barrier2.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier2.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier2.image = image->image;
-    barrier2.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    barrier2.subresourceRange = (VkImageSubresourceRange){VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vkCmdPipelineBarrier(cmd,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
