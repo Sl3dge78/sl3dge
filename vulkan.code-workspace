@@ -2,7 +2,7 @@
     "folders": [
         {
             "name": "sl3dge",
-            "path": "..\\_include\\sl3dge"
+            "path": "..\\_include\\sl3dge-utils"
         },
         {
             "name": "vulkan",

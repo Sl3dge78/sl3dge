@@ -16,6 +16,9 @@ POPD
 
 ECHO Building %module_name% module
 clang %args% %include_path% -shared src/game.c -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib
-if !ERRORLEVEL! == 0 ( echo a > bin/%module_name%.meta )
+IF !ERRORLEVEL! == 0 (
+    ECHO a > bin/%module_name%.meta
+    ECHO Ok!
+)
 
-ECHO Ok
+ECHO Done!
