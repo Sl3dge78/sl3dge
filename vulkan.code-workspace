@@ -30,7 +30,10 @@
             "algorithm": "cpp",
             "new": "cpp",
             "vulkan_renderer.h": "c",
-            "gltf.cpp": "c"
+            "gltf.cpp": "c",
+            "renderer.h": "c",
+            "sl3dge.h": "c",
+            "game.h": "c"
         }
     }
 }

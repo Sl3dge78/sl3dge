@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.h>
 #include <SDL/SDL.h>
-#include <sl3dge/sl3dge.h>
+#include <sl3dge-utils/sl3dge.h>
 
 #include "platform/platform.h"
 

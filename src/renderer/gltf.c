@@ -1,4 +1,4 @@
-#include <sl3dge/debug.h>
+#include <sl3dge-utils/sl3dge.h>
 #include "renderer/renderer.h"
 
 internal void

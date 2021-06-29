@@ -1,6 +1,6 @@
 #include <vulkan/vulkan.h>
 
-#include <sl3dge/sl3dge.h>
+#include <sl3dge-utils/sl3dge.h>
 
 inline VkPipelineVertexInputStateCreateInfo
 PipelineGetDefaultVertexInputState(const VkVertexInputBindingDescription *vtx_input_binding,

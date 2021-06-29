@@ -2,7 +2,7 @@
 #define VULKAN_RENDERER_H
 
 #include <vulkan/vulkan.h>
-#include <sl3dge/sl3dge.h>
+#include <sl3dge-utils/sl3dge.h>
 
 #define VK_DECL_FUNC(name) static PFN_##name pfn_##name
 #define VK_LOAD_INSTANCE_FUNC(instance, name)                                                      \

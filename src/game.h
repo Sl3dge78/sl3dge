@@ -1,7 +1,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <sl3dge/sl3dge.h>
+#include <sl3dge-utils/sl3dge.h>
 
 #include "renderer/renderer.h"
 

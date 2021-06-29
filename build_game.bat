@@ -20,5 +20,3 @@ IF !ERRORLEVEL! == 0 (
     ECHO a > bin/%module_name%.meta
     ECHO Ok!
 )
-
-ECHO Done!

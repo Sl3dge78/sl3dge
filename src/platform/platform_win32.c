@@ -9,7 +9,7 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 
-#include <sl3dge/sl3dge.h>
+#include <sl3dge-utils/sl3dge.h>
 
 #include "platform.h"
 
