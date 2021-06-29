@@ -14,7 +14,7 @@ GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst
     case cgltf_component_type_r_32f: size = sizeof(float); break;
     case cgltf_component_type_r_8u: size = sizeof(u8); break;
     default:
-        SDL_LogError(0, "Unsupported component type : %d", acc->component_type);
+        sError("Unsupported component type : %d", acc->component_type);
         ASSERT(0);
         break;
     };
@@ -23,7 +23,7 @@ GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst
     case cgltf_type_vec3: size *= 3; break;
     case cgltf_type_vec2: size *= 2; break;
     default:
-        SDL_LogError(0, "Unsupported type : %d", acc->type);
+        sError("Unsupported type : %d", acc->type);
         ASSERT(0);
         break;
     };
@@ -100,14 +100,14 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
 
         if(!mat->has_pbr_metallic_roughness) {
             // TODO Handle metallic roughness
-            SDL_LogError(0, "Only metallic_roughness is supported");
+            sError("Only metallic_roughness is supported");
             ASSERT(0);
         }
 
         float *color = mat->pbr_metallic_roughness.base_color_factor;
 
         if(mat->pbr_metallic_roughness.base_color_texture.has_transform) {
-            SDL_LogWarn(0, "Texture has transform, this isn't supported yet");
+            sWarn("Texture has transform, this isn't supported yet");
         }
         Vec3 base_color = {color[0], color[1], color[2]};
         dst.base_color = base_color;
@@ -120,7 +120,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         dst.normal_texture = GLTFGetTextureID(mat->normal_texture.texture);
         dst.ao_texture = GLTFGetTextureID(mat->occlusion_texture.texture);
         dst.emissive_texture = GLTFGetTextureID(mat->emissive_texture.texture);
-        // SDL_Log("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2],
+        // sLog("%f, %f, %f, metallic : %f, roughness : %f", color[0], color[1],color[2],
         // dst.metallic, dst.roughness);
 
         memcpy(buffer, &dst, sizeof(Material));

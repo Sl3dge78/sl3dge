@@ -64,8 +64,8 @@ void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     FILE *file;
     fopen_s(&file, path, "rb");
     if(!file) {
-        SDL_LogError(0, "Unable to open file");
-        SDL_LogError(0, path);
+        sError(0, "Unable to open file");
+        sError(0, path);
     }
     // Get the size
     fseek(file, 0, SEEK_END);
@@ -82,11 +82,16 @@ void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     fclose(file);
 }
 
-void Win32Log(const char *message) {
+// TODO : Handle UTF8
+void Win32Log(const char *message, u8 level) {
     unsigned long charsWritten;
 
-    WriteConsole(stderrHandle, message, lstrlen(message), &charsWritten, NULL);
-    OutputDebugString(message);
+    static u8 levels[] = {8, 7, 6, 4};
+
+    SetConsoleTextAttribute(stderrHandle, levels[level]);
+    WriteConsoleA(stderrHandle, message, lstrlen(message), &charsWritten, NULL);
+
+    OutputDebugStringA(message);
 }
 
 internal int main(int argc, char *argv[]) {
@@ -97,7 +102,6 @@ internal int main(int argc, char *argv[]) {
 #endif
 
     sLogSetCallback(&Win32Log);
-    sLog("Hi");
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow(
@@ -152,7 +156,7 @@ internal int main(int argc, char *argv[]) {
             renderer = pfn_CreateRenderer(window, &platform_api);
             GameLoadRendererAPI(renderer, &renderer_module, &game_data);
 
-            SDL_Log("Vulkan reloaded");
+            sLog("Vulkan reloaded");
         }
         */
 

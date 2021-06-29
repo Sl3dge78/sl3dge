@@ -20,11 +20,11 @@ DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
               const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
               void *pUserData) {
     if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-        SDL_LogInfo(0, pCallbackData->pMessage);
+        sTrace(pCallbackData->pMessage);
     } else if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        SDL_LogWarn(0, pCallbackData->pMessage);
+        sWarn(pCallbackData->pMessage);
     } else if(messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        SDL_LogError(0, pCallbackData->pMessage);
+        sError(pCallbackData->pMessage);
         KEEP_CONSOLE_OPEN(true);
     }
     return VK_FALSE;
@@ -34,38 +34,32 @@ internal void AssertVkResult(VkResult result) {
     if(result < 0) {
         switch(result) {
         case VK_ERROR_EXTENSION_NOT_PRESENT:
-            SDL_LogError(0,
-                         "VK_ERROR_EXTENSION_"
-                         "NOT_PRESENT");
+            sError("VK_ERROR_EXTENSION_"
+                   "NOT_PRESENT");
             break;
         case VK_ERROR_LAYER_NOT_PRESENT:
-            SDL_LogError(0,
-                         "VK_ERROR_LAYER_"
-                         "NOT_PRESENT");
+            sError("VK_ERROR_LAYER_"
+                   "NOT_PRESENT");
             break;
         case VK_ERROR_DEVICE_LOST: {
-            SDL_LogError(0, "VK_ERROR_DEVICE_LOST");
+            sError("VK_ERROR_DEVICE_LOST");
         } break;
         case VK_ERROR_OUT_OF_POOL_MEMORY: {
-            SDL_LogError(0,
-                         "VK_ERROR_OUT_OF_"
-                         "POOL_MEMORY");
+            sError("VK_ERROR_OUT_OF_"
+                   "POOL_MEMORY");
         } break;
         case VK_ERROR_INITIALIZATION_FAILED: {
-            SDL_LogError(0,
-                         "VK_ERROR_INITIALIZATION_"
-                         "FAILED");
+            sError("VK_ERROR_INITIALIZATION_"
+                   "FAILED");
         } break;
         case VK_ERROR_OUT_OF_DATE_KHR: {
-            SDL_LogError(0,
-                         "VK_ERROR_OUT_OF_"
-                         "DATE_KHR");
+            sError("VK_ERROR_OUT_OF_"
+                   "DATE_KHR");
         } break;
         default:
-            SDL_LogError(0,
-                         "Unhandled Vulkan error "
-                         ": %d",
-                         result);
+            sError("Unhandled Vulkan error "
+                   ": %d",
+                   result);
             break;
         }
         ASSERT(false);
@@ -101,9 +95,9 @@ internal void DEBUGPrintInstanceExtensions() {
         (VkExtensionProperties *)scalloc(property_count, sizeof(VkExtensionProperties));
     vkEnumerateInstanceExtensionProperties(NULL, &property_count, extensions);
 
-    SDL_Log("Available extensions :");
+    sLog("Available extensions :");
     for(u32 i = 0; i < property_count; i++) {
-        SDL_Log("%s", extensions[i].extensionName);
+        sLog("%s", extensions[i].extensionName);
     }
 }
 

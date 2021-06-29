@@ -18,7 +18,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
 
     context->materials_count += data->materials_count;
 
-    SDL_Log("Loading textures...");
+    sLog("Loading textures...");
     u32 texture_start = context->textures_count;
     context->textures_count += data->textures_count;
 
@@ -51,13 +51,13 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
 
             SDL_Surface *temp_surf = IMG_Load(full_image_path);
             if(!temp_surf) {
-                SDL_LogError(0, IMG_GetError());
+                sError(IMG_GetError());
             }
 
             if(temp_surf->format->format != SDL_PIXELFORMAT_ABGR8888) {
                 surfaces[i] = SDL_ConvertSurfaceFormat(temp_surf, SDL_PIXELFORMAT_ABGR8888, 0);
                 if(!surfaces[i]) {
-                    SDL_LogError(0, SDL_GetError());
+                    sError(SDL_GetError());
                 }
                 SDL_FreeSurface(temp_surf);
             } else {
@@ -143,7 +143,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     cgltf_options options = {};
     cgltf_result result = cgltf_parse_file(&options, path, &data);
     if(result != cgltf_result_success) {
-        SDL_LogError(0, "Error reading mesh");
+        sError("Error reading mesh");
         ASSERT(0);
     }
 
@@ -277,7 +277,7 @@ MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
     if(mesh->instance_count == mesh->instance_capacity) {
         // Resize the buffer
         u32 new_capacity = mesh->instance_capacity * 2;
-        SDL_Log("Resizing mesh buffer from %d to %d", mesh->instance_capacity, new_capacity);
+        sLog("Resizing mesh buffer from %d to %d", mesh->instance_capacity, new_capacity);
         Mat4 *new_buffer = (Mat4 *)srealloc(mesh->instance_transforms, new_capacity * sizeof(Mat4));
         ASSERT_MSG(new_buffer, "Unable to size up the instance buffer");
         mesh->instance_transforms = new_buffer;

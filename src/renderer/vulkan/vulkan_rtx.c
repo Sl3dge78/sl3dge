@@ -109,7 +109,7 @@ VulkanShaderBindingTable sbt;
 	Buffer TLAS_buffer;
 	VkAccelerationStructureKHR TLAS;
 
-SDL_Log("Creating BLAS...");
+sLog("Creating BLAS...");
 // BLAS
 scene->BLAS_buffers = (Buffer *)scalloc(scene->total_primitives_count, sizeof(Buffer));
 scene->instance_data_buffers = (Buffer *)scalloc(scene->total_primitives_count, sizeof(Buffer));
@@ -125,11 +125,11 @@ for (u32 i = 0; i < scene->total_primitives_count; ++i) {
 	CreateInstanceGeometry(
 			context, scene->transforms[p->node_id], scene->BLAS[i], &scene->instance_data_buffers[i], &scene->rtx_geometries[i]);
 }
-SDL_Log("Creating TLAS...");
+sLog("Creating TLAS...");
 // TLAS
 CreateTLAS(context, scene->total_primitives_count, scene->rtx_geometries, &scene->TLAS_buffer, &scene->TLAS);
 
-SDL_Log("Creating Descriptors...");
+sLog("Creating Descriptors...");
 // Descriptors
 scene->descriptor_set_count = 2;
 scene->set_layouts = (VkDescriptorSetLayout *)scalloc(scene->descriptor_set_count, sizeof(VkDescriptorSetLayout));
@@ -1201,7 +1201,7 @@ sizeof(PushConstant) }; const u32 push_constant_count = 1;
 
 internal void CreateBLASGLTF(VulkanRenderer *context, cgltf_mesh *mesh, Buffer
 *buffer, Buffer *BLAS_buffer, VkAccelerationStructureKHR *BLAS) { if
-(mesh->primitives_count > 1) { SDL_LogError(0, "Multiple primitives, not
+(mesh->primitives_count > 1) { sError("Multiple primitives, not
 supported... yet"); ASSERT(0);
 	}
 	cgltf_primitive *primitive = &mesh->primitives[0];
@@ -1243,7 +1243,7 @@ buffer->address + position_data->offset + position_data->buffer_view->offset;
 		}
 		triangle_count = indices->count / 3;
 		geometry.geometry.triangles.indexData.deviceAddress = buffer->address +
-primitive->indices->buffer_view->offset; } else { SDL_LogError(0, "Unindexed
+primitive->indices->buffer_view->offset; } else { sError("Unindexed
 meshed are not supported ??, ... yet"); ASSERT(0);
 	}
 
@@ -1426,7 +1426,7 @@ VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 	const char *file = "resources/models/box/Box.gltf";
 	cgltf_result result = cgltf_parse_file(&options, file, &data);
 	if (result != cgltf_result_success) {
-		SDL_LogError(0, "Error reading scene");
+		sError("Error reading scene");
 		ASSERT(0);
 	}
 	cgltf_load_buffers(&options, data, file);
@@ -1440,7 +1440,7 @@ VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 &renderer->gltf_buffer, data->buffers[0].data, data->buffers[0].size);
 
 	if (data->meshes_count > 1) {
-		SDL_LogError(0, "Multiple meshes not supported, yet");
+		sError("Multiple meshes not supported, yet");
 		ASSERT(0);
 	}
 	CreateBLASGLTF(context, &data->meshes[0], &renderer->gltf_buffer,

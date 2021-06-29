@@ -56,9 +56,9 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
     sfree(sdl_extensions);
 
 #if defined(_DEBUG)
-    SDL_Log("Requested extensions :");
+    sLog("Requested extensions :");
     for(int i = 0; i < total_count; i++) {
-        SDL_Log("   %s", all_extensions[i]);
+        sLog("   %s", all_extensions[i]);
     }
 #endif
 
@@ -307,7 +307,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
         // if (formats[i].format == VK_FORMAT_B8G8R8A8_SRGB && formats[i].colorSpace ==
         // VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
         //	picked_format = formats[i];
-        //	SDL_Log("Swapchain format: VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR");
+        //	sLog("Swapchain format: VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR");
         //	break;
         //}
     }
@@ -432,7 +432,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     }
     swapchain->semaphore_id = 0;
 
-    SDL_Log("Swapchain created with %d images", swapchain->image_count);
+    sLog("Swapchain created with %d images", swapchain->image_count);
 }
 
 internal void DestroySwapchain(const Renderer *context, Swapchain *swapchain) {
@@ -1303,16 +1303,16 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
         renderer->physical_device_properties.limits.framebufferDepthSampleCounts;
     if(msaa_levels & VK_SAMPLE_COUNT_8_BIT) {
         renderer->msaa_level = VK_SAMPLE_COUNT_8_BIT;
-        SDL_Log("VK_SAMPLE_COUNT_8_BIT");
+        sLog("VK_SAMPLE_COUNT_8_BIT");
     } else if(msaa_levels & VK_SAMPLE_COUNT_4_BIT) {
         renderer->msaa_level = VK_SAMPLE_COUNT_4_BIT;
-        SDL_Log("VK_SAMPLE_COUNT_4_BIT");
+        sLog("VK_SAMPLE_COUNT_4_BIT");
     } else if(msaa_levels & VK_SAMPLE_COUNT_2_BIT) {
         renderer->msaa_level = VK_SAMPLE_COUNT_2_BIT;
-        SDL_Log("VK_SAMPLE_COUNT_2_BIT");
+        sLog("VK_SAMPLE_COUNT_2_BIT");
     } else {
         renderer->msaa_level = VK_SAMPLE_COUNT_1_BIT;
-        SDL_Log("VK_SAMPLE_COUNT_1_BIT");
+        sLog("VK_SAMPLE_COUNT_1_BIT");
     }
 
     GetQueuesId(renderer);
