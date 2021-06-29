@@ -5,3 +5,4 @@ bin
 *.rdbg
 *.spv
 tmp/
+.4coder
