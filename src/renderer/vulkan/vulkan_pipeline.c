@@ -2,6 +2,8 @@
 
 #include <sl3dge-utils/sl3dge.h>
 
+#include "renderer/renderer.h"
+
 inline VkPipelineVertexInputStateCreateInfo
 PipelineGetDefaultVertexInputState(const VkVertexInputBindingDescription *vtx_input_binding,
                                    const u32 vtx_desc_count,

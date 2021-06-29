@@ -36,15 +36,8 @@ RENDERER:
         - Make sure that we can load different GLTF, I think the mat id and tex id are hardcoded
 
     MAJOR:
-        - Find a way to draw the sun even though no fragments are on the screen
-            > Skybox, same render pass, different pipeline
-            > Or switching the volumetric fog to a new pass should fix it
         - Descriptor set 0 > could be the same for all pipelines
             > Could have the camera matrices and the shadowmap sampler
-        - Optimize volumetric fog
-            > Move it to a new renderpass.
-            > Will need the z-buffer and the shadowmap
-            > What else? think about it. Currently in the shader it needs the world pos. How do i get it from the zbuffer? How do I get them along the ray? Should be fine
 
     BACKLOG:
         - Window Resize > Pipline dynamic states ?
@@ -76,8 +69,10 @@ WIN32 :
     MAJOR:
     BACKLOG:
         - Should I make my own memory allocator?
-        - My own logger
         - Remove SDL?
+            > We need it for input
+            > Image loading
+            > Window creating
     IMPROVEMENTS:
-    IDEAS :
+    IDEAS:
         - In game console

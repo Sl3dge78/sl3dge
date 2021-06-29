@@ -15,7 +15,6 @@ POPD
 ECHO Building test.exe
 clang %args% %include_path% src/tests/unit_test.c -o tmp/test.exe %linker_options% %libs% -Xlinker -SUBSYSTEM:CONSOLE
 IF !ERRORLEVEL! == 0 (
-    ECHO Ok
+    ECHO BUILD OK
+    .\tmp\test.exe
 )
-
-.\tmp\test.exe

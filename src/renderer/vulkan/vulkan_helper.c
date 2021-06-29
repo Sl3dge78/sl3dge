@@ -8,6 +8,7 @@
 #include <sl3dge-utils/sl3dge.h>
 
 #include "platform/platform.h"
+#include "renderer/vulkan/vulkan_renderer.h"
 
 VK_DECL_FUNC(vkSetDebugUtilsObjectNameEXT);
 VK_DECL_FUNC(vkCmdBeginDebugUtilsLabelEXT);
