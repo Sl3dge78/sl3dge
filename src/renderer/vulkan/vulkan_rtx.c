@@ -1,6 +1,7 @@
 #include <vulkan/vulkan.h>
-#include <sl3dge/types.h>
-#include "vulkan_layer.h"
+#include <sl3dge-utils/sl3dge.h>
+
+#include "renderer/renderer.h"
 
 /*
  === TODO ===

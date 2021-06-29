@@ -29,21 +29,28 @@
             "command": "build_game.bat",
             "problemMatcher": [
                 "$msCompile"
-            ],
+            ]
         },
         {
             "label": "Build Renderer",
             "command": "build_renderer.bat",
             "problemMatcher": [
                 "$msCompile"
-            ],
+            ]
         },
         {
             "label": "Build Win32",
             "command": "build_win32.bat",
             "problemMatcher": [
                 "$msCompile"
-            ],
+            ]
         },
+        {
+            "label": "Perform tests",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "command": "run_tests.bat",
+        }
     ]
 }

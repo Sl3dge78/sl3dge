@@ -1,6 +1,7 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
+#include <SDL/SDL.h>
 #include <sl3dge-utils/sl3dge.h>
 
 #include "platform/platform.h"
