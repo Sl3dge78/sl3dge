@@ -21,7 +21,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
     SDL_Log("Loading textures...");
     u32 texture_start = context->textures_count;
     context->textures_count += data->textures_count;
-    // BUG : Sometimes we get an exception here
+
     if(data->textures_count > 0) {
         // TODO : move that elsewhere, and recreate the pipeline because we have more textures now
         if(context->textures_count > context->textures_capacity) {
