@@ -997,7 +997,7 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
     render_group->clear_values =
         (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
-    render_group->clear_values[0].color = (VkClearColorValue){0.53f, 0.80f, 0.92f, 0.0f};
+    render_group->clear_values[0].color = (VkClearColorValue){0.43f, 0.77f, 0.91f, 0.0f};
     render_group->clear_values[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 }
 

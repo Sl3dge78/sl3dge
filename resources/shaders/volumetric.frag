@@ -20,8 +20,8 @@ layout(location = 0) in vec2 uv;
 
 layout(location = 0) out vec4 out_color;
 
-float Anisotropy = .3;
-vec3 Density = vec3(.005, .005, .003);
+float Anisotropy = .4;
+vec3 Density = vec3(.005, .005, .004);
 
 // RNG
 uint tea(uint val0, uint val1) {
@@ -46,9 +46,12 @@ float rnd(inout uint prev) {
   return (float(lcg(prev)) / float(0x01000000));
 }
 
+float factor = 2;
+float div = 3.0/2.0;
+
 float henyey_greenstein(vec3 diri, vec3 diro) {
     float cos_theta = dot(diri, diro);
-    return M_PI/4.0 * (1.0-Anisotropy*Anisotropy) / pow(1.0 + Anisotropy*Anisotropy - 2.0*Anisotropy*cos_theta, 3.0/2.0);
+    return M_PI/4.0 * (1.0-Anisotropy*Anisotropy) / pow(1.0 + Anisotropy*Anisotropy - factor*Anisotropy*cos_theta, div);
 }
 
 vec3 calculate_world_position(vec2 uv, float depth) {
@@ -59,19 +62,25 @@ vec3 calculate_world_position(vec2 uv, float depth) {
     return world_space_pos.xyz;
 }
 
+vec3 light_color = vec3(0.99, .72, 0.07);
+float light_intensity = 5.0f;
+
 vec3 volumetric_fog(vec3 L, vec3 frag_worldpos) {
 
-    int steps = 16;
+    //int steps = 32;
     vec3 start = cam.view_pos;
 
     vec3 dir = normalize(frag_worldpos - cam.view_pos);
     float frag_distance = length(frag_worldpos - cam.view_pos);
 
-    float total_dist = min(frag_distance, 5.0);
+    float max_step_length = 0.5;
+    float total_dist = min(frag_distance, 500);
 
-    vec3 ray_step = dir * (total_dist) / steps;
+    float step_length = .5;
+    int step_amount = int(total_dist / step_length);
+    vec3 ray_step = dir * step_length;
 
-    vec3 step_abs = exp(-Density * total_dist);
+    vec3 step_abs = exp(-Density * step_length);
     vec3 step_color = (vec3(1.0) - step_abs) * henyey_greenstein(-L, dir);
     vec3 vol_abs = vec3(1.0);
 
@@ -82,7 +91,7 @@ vec3 volumetric_fog(vec3 L, vec3 frag_worldpos) {
     vec3 current_position = start + (ray_step * rnd(seed));
 
     vec3 accum = vec3(0.0);
-    for (int i = 0; i < steps; i++) {
+    for (int i = 0; i < step_amount; i++) {
 
         vec4 shadow_coords = cam.light_vp * vec4(current_position, 1.0);
         vec4 proj_coords = shadow_coords / shadow_coords.w;
@@ -91,13 +100,15 @@ vec3 volumetric_fog(vec3 L, vec3 frag_worldpos) {
         proj_coords = proj_coords * 0.5 + 0.5;
         float closest_depth = texture(shadow_map, proj_coords.xy).r;
         vol_abs *= step_abs;
-        if(closest_depth > current_depth){
-            accum += step_color * vol_abs;
+        if(closest_depth > current_depth){ // ! shadow
+            accum += step_color * vol_abs * light_intensity * light_color;
+        } else { // shadow
+            accum += step_color * vol_abs * .1;
         }
 
         current_position += ray_step;
     }
-    return accum;
+    return accum * vol_abs;
 }
 
 void main() {
