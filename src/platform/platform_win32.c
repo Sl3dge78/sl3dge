@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <windows.h>
 
@@ -15,6 +16,8 @@
 
 #include "game.h"
 #include "renderer/renderer.h"
+
+global HANDLE stderrHandle;
 
 typedef struct ShaderCode {
     const char *spv_path;
@@ -56,15 +59,6 @@ void RendererLoadFunctions(Module *dll) {
     ASSERT(pfn_DrawFrame);
 }
 
-internal void
-LogOutput(void *userdata, int category, SDL_LogPriority priority, const char *message) {
-    FILE *std_err;
-    fopen_s(&std_err, "bin/log.txt", "a");
-    // fseek(std_err, 0, SEEK_END);
-    fprintf(std_err, "%s\n", message);
-    fclose(std_err);
-}
-
 // if result is NULL, function will query the file size for allocation in file_size.
 void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     FILE *file;
@@ -88,23 +82,27 @@ void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     fclose(file);
 }
 
+void Win32Log(const char *message) {
+    unsigned long charsWritten;
+
+    WriteConsole(stderrHandle, message, lstrlen(message), &charsWritten, NULL);
+    OutputDebugString(message);
+}
+
 internal int main(int argc, char *argv[]) {
 #if DEBUG
-    AllocConsole();
+    //AllocConsole(); // This might be needed
+    AttachConsole(ATTACH_PARENT_PROCESS);
+    stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
 #endif
+
+    sLogSetCallback(&Win32Log);
+    sLog("Hi");
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow(
         "Vulkan", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
     IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-
-    // Log to file
-#ifndef DEBUG
-    // Clear the log file
-    FILE *std_err = fopen("bin/log.txt", "w+");
-    fclose(std_err);
-    SDL_LogSetOutputFunction(&LogOutput, NULL);
-#endif
 
     PlatformAPI platform_api = {};
     platform_api.ReadBinary = &PlatformReadBinary;
@@ -163,7 +161,7 @@ internal int main(int argc, char *argv[]) {
             Win32CloseModule(&game_module);
             Win32LoadModule(&game_module, "game");
             GameLoadFunctions(&game_module);
-            SDL_Log("Game code reloaded");
+            sLog("Game code reloaded");
         }
 
         // Reload shaders if necessary
@@ -171,12 +169,12 @@ internal int main(int argc, char *argv[]) {
         if(CompareFileTime(&shader_code.last_write_time, &shader_time)) {
             shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
             pfn_ReloadShaders(renderer);
-            SDL_Log("Shaders reloaded");
+            sLog("Shaders reloaded");
         }
 
         while(SDL_PollEvent(&event)) {
             if(event.type == SDL_QUIT) {
-                SDL_Log("Quit!");
+                sLog("Quit!");
                 SDL_HideWindow(window);
                 running = false;
             }
