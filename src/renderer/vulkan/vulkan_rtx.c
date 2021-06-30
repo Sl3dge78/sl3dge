@@ -211,7 +211,7 @@ CreateRtxSbt(VulkanRenderer *context, VkPipeline pipeline, VulkanShaderBindingTa
                      &sbt->rchit);
         DEBUGNameBuffer(context->device, &sbt->rchit, "RCHIT SBT");
 
-        u8 *data = (u8 *)smalloc(sbt_size);
+        u8 *data = (u8 *)sMalloc(sbt_size);
 
         VkResult result = pfn_vkGetRayTracingShaderGroupHandlesKHR(
             context->device, pipeline, 0, group_count, sbt_size, data);
@@ -1334,7 +1334,7 @@ VK_NULL_HANDLE); vkQueueWaitIdle(context->graphics_queue);
 
 VulkanRTXRenderer *VulkanCreateRTXRenderer(VulkanRenderer *context, GameCode
 *game) { VulkanRTXRenderer *renderer = (VulkanRTXRenderer
-*)smalloc(sizeof(VulkanRTXRenderer));
+*)sMalloc(sizeof(VulkanRTXRenderer));
 
 	CreateRtxRenderImage(context->device, &context->swapchain,
 &context->memory_properties, &renderer->render_image);
@@ -1372,7 +1372,7 @@ VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 &renderer->rchit_sbt); DEBUGNameBuffer(context->device, &renderer->rchit_sbt,
 "RCHIT SBT");
 
-		u8 *data = (u8 *)smalloc(sbt_size);
+		u8 *data = (u8 *)sMalloc(sbt_size);
 
 		VkResult result =
 pfn_vkGetRayTracingShaderGroupHandlesKHR(context->device, renderer->pipeline, 0,

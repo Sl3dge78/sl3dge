@@ -33,7 +33,15 @@
             "gltf.cpp": "c",
             "renderer.h": "c",
             "sl3dge.h": "c",
-            "game.h": "c"
+            "game.h": "c",
+            "array": "cpp",
+            "utility": "cpp",
+            "xutility": "cpp",
+            "compare": "cpp",
+            "functional": "cpp",
+            "tuple": "cpp",
+            "type_traits": "cpp",
+            "xtr1common": "cpp"
         }
     }
 }

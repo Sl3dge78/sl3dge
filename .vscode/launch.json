@@ -13,6 +13,25 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
+            "console": "integratedTerminal",
+            "logging": {
+                "engineLogging": false,
+                "exceptions": true,
+                "moduleLoad": false,
+                "processExit": false,
+                "programOutput": true,
+                "threadExit": false
+            }
+        },
+        {
+            "name": "Test",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tmp/test.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
             "console": "integratedTerminal"
         }
     ]

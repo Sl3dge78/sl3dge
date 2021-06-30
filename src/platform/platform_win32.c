@@ -90,8 +90,11 @@ void Win32Log(const char *message, u8 level) {
 
     SetConsoleTextAttribute(stderrHandle, levels[level]);
     WriteConsoleA(stderrHandle, message, lstrlen(message), &charsWritten, NULL);
-
     OutputDebugStringA(message);
+    SetConsoleTextAttribute(stderrHandle, levels[1]);
+}
+
+internal void RunGame() {
 }
 
 internal int main(int argc, char *argv[]) {
@@ -102,6 +105,10 @@ internal int main(int argc, char *argv[]) {
 #endif
 
     sLogSetCallback(&Win32Log);
+    PNG_Image image;
+    sLoadImage("resources/1.png", &image);
+
+    return (0);
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow(
@@ -215,5 +222,6 @@ internal int main(int argc, char *argv[]) {
     SDL_Quit();
 
     DBG_END();
+
     return (0);
 }

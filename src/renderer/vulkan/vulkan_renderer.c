@@ -44,16 +44,16 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
     // Get SDL extensions
     u32 sdl_count = 0;
     SDL_Vulkan_GetInstanceExtensions(window, &sdl_count, NULL);
-    const char **sdl_extensions = (const char **)scalloc(sdl_count, sizeof(char *));
+    const char **sdl_extensions = (const char **)sCalloc(sdl_count, sizeof(char *));
     SDL_Vulkan_GetInstanceExtensions(window, &sdl_count, sdl_extensions);
 
     u32 total_count = sdl_count + sl3_count;
 
-    const char **all_extensions = (const char **)scalloc(total_count, sizeof(char *));
+    const char **all_extensions = (const char **)sCalloc(total_count, sizeof(char *));
     memcpy(all_extensions, sdl_extensions, sdl_count * sizeof(char *));
     memcpy(all_extensions + sdl_count, sl3_extensions, sl3_count * sizeof(char *));
 
-    sfree(sdl_extensions);
+    sFree(sdl_extensions);
 
 #if defined(_DEBUG)
     sLog("Requested extensions :");
@@ -69,7 +69,7 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
 
     AssertVkResult(result);
 
-    sfree(all_extensions);
+    sFree(all_extensions);
 
     { // Create debug messenger
         // TODO : Do that only if we're in debug mode
@@ -102,7 +102,7 @@ internal void CreateVkPhysicalDevice(VkInstance instance, VkPhysicalDevice *phys
     u32 device_count = 0;
     vkEnumeratePhysicalDevices(instance, &device_count, NULL);
     VkPhysicalDevice *physical_devices =
-        (VkPhysicalDevice *)scalloc(device_count, sizeof(VkPhysicalDevice));
+        (VkPhysicalDevice *)sCalloc(device_count, sizeof(VkPhysicalDevice));
     vkEnumeratePhysicalDevices(instance, &device_count, physical_devices);
 
     for(int i = 0; i < device_count; i++) {
@@ -111,7 +111,7 @@ internal void CreateVkPhysicalDevice(VkInstance instance, VkPhysicalDevice *phys
     }
     // TODO : Pick the device according to our specs
     *physical_device = physical_devices[0];
-    sfree(physical_devices);
+    sFree(physical_devices);
 }
 
 internal void LoadDeviceFuncPointers(VkDevice device) {
@@ -131,7 +131,7 @@ internal void GetQueuesId(Renderer *context) {
     u32 queue_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(context->physical_device, &queue_count, NULL);
     VkQueueFamilyProperties *queue_properties =
-        (VkQueueFamilyProperties *)scalloc(queue_count, sizeof(VkQueueFamilyProperties));
+        (VkQueueFamilyProperties *)sCalloc(queue_count, sizeof(VkQueueFamilyProperties));
     vkGetPhysicalDeviceQueueFamilyProperties(
         context->physical_device, &queue_count, queue_properties);
 
@@ -161,7 +161,7 @@ internal void GetQueuesId(Renderer *context) {
             }
         }
     }
-    sfree(queue_properties);
+    sFree(queue_properties);
 }
 
 internal void CreateVkDevice(VkPhysicalDevice physical_device,
@@ -285,7 +285,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     vkGetPhysicalDeviceSurfaceFormatsKHR(
         context->physical_device, context->surface, &format_count, NULL);
     VkSurfaceFormatKHR *formats =
-        (VkSurfaceFormatKHR *)scalloc(format_count, sizeof(VkSurfaceFormatKHR));
+        (VkSurfaceFormatKHR *)sCalloc(format_count, sizeof(VkSurfaceFormatKHR));
     vkGetPhysicalDeviceSurfaceFormatsKHR(
         context->physical_device, context->surface, &format_count, formats);
     VkSurfaceFormatKHR picked_format = formats[0];
@@ -314,7 +314,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     create_info.imageFormat = picked_format.format;
     create_info.imageColorSpace = picked_format.colorSpace;
     swapchain->format = picked_format.format;
-    sfree(formats);
+    sFree(formats);
 
     // Extent
     VkExtent2D extent = {};
@@ -345,7 +345,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     vkGetPhysicalDeviceSurfacePresentModesKHR(
         context->physical_device, context->surface, &present_mode_count, NULL);
     VkPresentModeKHR *present_modes =
-        (VkPresentModeKHR *)scalloc(present_mode_count, sizeof(VkPresentModeKHR));
+        (VkPresentModeKHR *)sCalloc(present_mode_count, sizeof(VkPresentModeKHR));
     vkGetPhysicalDeviceSurfacePresentModesKHR(
         context->physical_device, context->surface, &present_mode_count, present_modes);
     for(u32 i = 0; i < present_mode_count; i++) {
@@ -354,7 +354,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
             break;
         }
     }
-    sfree(present_modes);
+    sFree(present_modes);
 
     create_info.presentMode = present_mode;
 
@@ -367,11 +367,11 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
 
     // Image views
     vkGetSwapchainImagesKHR(context->device, swapchain->swapchain, &swapchain->image_count, NULL);
-    swapchain->images = (VkImage *)scalloc(swapchain->image_count, sizeof(VkImage));
+    swapchain->images = (VkImage *)sCalloc(swapchain->image_count, sizeof(VkImage));
     vkGetSwapchainImagesKHR(
         context->device, swapchain->swapchain, &swapchain->image_count, swapchain->images);
 
-    swapchain->image_views = (VkImageView *)scalloc(swapchain->image_count, sizeof(VkImageView));
+    swapchain->image_views = (VkImageView *)sCalloc(swapchain->image_count, sizeof(VkImageView));
 
     for(u32 i = 0; i < swapchain->image_count; i++) {
         DEBUGNameObject(
@@ -397,7 +397,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
 
     // Command buffers
     swapchain->command_buffers =
-        (VkCommandBuffer *)scalloc(swapchain->image_count, sizeof(VkCommandBuffer));
+        (VkCommandBuffer *)sCalloc(swapchain->image_count, sizeof(VkCommandBuffer));
     VkCommandBufferAllocateInfo cmd_buf_ai = {};
     cmd_buf_ai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmd_buf_ai.pNext = NULL;
@@ -408,7 +408,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     AssertVkResult(result);
 
     // Fences
-    swapchain->fences = (VkFence *)scalloc(swapchain->image_count, sizeof(VkFence));
+    swapchain->fences = (VkFence *)sCalloc(swapchain->image_count, sizeof(VkFence));
     VkFenceCreateInfo ci = {
         VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, NULL, VK_FENCE_CREATE_SIGNALED_BIT};
 
@@ -419,9 +419,9 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
 
     // Semaphores
     swapchain->image_acquired_semaphore =
-        (VkSemaphore *)scalloc(swapchain->image_count, sizeof(VkSemaphore));
+        (VkSemaphore *)sCalloc(swapchain->image_count, sizeof(VkSemaphore));
     swapchain->render_complete_semaphore =
-        (VkSemaphore *)scalloc(swapchain->image_count, sizeof(VkSemaphore));
+        (VkSemaphore *)sCalloc(swapchain->image_count, sizeof(VkSemaphore));
     VkSemaphoreCreateInfo semaphore_ci = {};
     semaphore_ci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     for(u32 i = 0; i < swapchain->image_count; i++) {
@@ -440,9 +440,9 @@ internal void DestroySwapchain(const Renderer *context, Swapchain *swapchain) {
                          context->graphics_command_pool,
                          swapchain->image_count,
                          swapchain->command_buffers);
-    sfree(swapchain->command_buffers);
+    sFree(swapchain->command_buffers);
 
-    sfree(swapchain->images);
+    sFree(swapchain->images);
 
     for(u32 i = 0; i < swapchain->image_count; i++) {
         vkDestroyFence(context->device, swapchain->fences[i], NULL);
@@ -450,10 +450,10 @@ internal void DestroySwapchain(const Renderer *context, Swapchain *swapchain) {
         vkDestroySemaphore(context->device, swapchain->render_complete_semaphore[i], NULL);
         vkDestroyImageView(context->device, swapchain->image_views[i], NULL);
     }
-    sfree(swapchain->image_views);
-    sfree(swapchain->fences);
-    sfree(swapchain->image_acquired_semaphore);
-    sfree(swapchain->render_complete_semaphore);
+    sFree(swapchain->image_views);
+    sFree(swapchain->fences);
+    sFree(swapchain->image_acquired_semaphore);
+    sFree(swapchain->render_complete_semaphore);
 }
 
 internal void CreateRenderPass(const VkDevice device,
@@ -492,11 +492,11 @@ internal void DestroyRenderGroup(Renderer *context, RenderGroup *render_group) {
                          context->descriptor_pool,
                          render_group->descriptor_set_count,
                          render_group->descriptor_sets);
-    sfree(render_group->descriptor_sets);
+    sFree(render_group->descriptor_sets);
     for(u32 i = 0; i < render_group->descriptor_set_count; ++i) {
         vkDestroyDescriptorSetLayout(context->device, render_group->set_layouts[i], 0);
     }
-    sfree(render_group->set_layouts);
+    sFree(render_group->set_layouts);
 
     vkDestroyPipelineLayout(context->device, render_group->layout, 0);
 
@@ -504,7 +504,7 @@ internal void DestroyRenderGroup(Renderer *context, RenderGroup *render_group) {
 
     vkDestroyRenderPass(context->device, render_group->render_pass, 0);
 
-    sfree(render_group->clear_values);
+    sFree(render_group->clear_values);
 }
 
 internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render_group) {
@@ -568,10 +568,10 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
 
     // Set Layout
     render_group->descriptor_set_count = 1;
-    render_group->set_layouts = (VkDescriptorSetLayout *)scalloc(render_group->descriptor_set_count,
+    render_group->set_layouts = (VkDescriptorSetLayout *)sCalloc(render_group->descriptor_set_count,
                                                                  sizeof(VkDescriptorSetLayout));
     render_group->descriptor_sets =
-        (VkDescriptorSet *)scalloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
+        (VkDescriptorSet *)sCalloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
     const VkDescriptorSetLayoutBinding bindings[] = {{// CAMERA MATRICES
                                                       0,
                                                       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -712,7 +712,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
 
     render_group->clear_values_count = 1;
     render_group->clear_values =
-        (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
+        (VkClearValue *)sCalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
     render_group->clear_values[0].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 }
@@ -721,10 +721,10 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
     // TODO : Séparer ca en 2. un avec la texture. et un avec le reste. Bind la texture pour chaque primitive si necessaire
 
     render_group->descriptor_set_count = 1;
-    render_group->set_layouts = (VkDescriptorSetLayout *)scalloc(render_group->descriptor_set_count,
+    render_group->set_layouts = (VkDescriptorSetLayout *)sCalloc(render_group->descriptor_set_count,
                                                                  sizeof(VkDescriptorSetLayout));
     render_group->descriptor_sets =
-        (VkDescriptorSet *)scalloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
+        (VkDescriptorSet *)sCalloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
 
     const VkDescriptorSetLayoutBinding bindings[] = {
         {// CAMERA MATRICES
@@ -995,7 +995,7 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
 
     render_group->clear_values_count = 2;
     render_group->clear_values =
-        (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
+        (VkClearValue *)sCalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
     render_group->clear_values[0].color = (VkClearColorValue){0.43f, 0.77f, 0.91f, 0.0f};
     render_group->clear_values[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
@@ -1004,10 +1004,10 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
 internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *render_group) {
     { // Descriptors
         render_group->descriptor_set_count = 1;
-        render_group->set_layouts = (VkDescriptorSetLayout *)scalloc(
+        render_group->set_layouts = (VkDescriptorSetLayout *)sCalloc(
             render_group->descriptor_set_count, sizeof(VkDescriptorSetLayout));
         render_group->descriptor_sets =
-            (VkDescriptorSet *)scalloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
+            (VkDescriptorSet *)sCalloc(render_group->descriptor_set_count, sizeof(VkDescriptorSet));
 
         const VkDescriptorSetLayoutBinding bindings[] = {{// CAMERA MATRICES
                                                           0,
@@ -1279,13 +1279,13 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
     }
     render_group->clear_values_count = 1;
     render_group->clear_values =
-        (VkClearValue *)scalloc(render_group->clear_values_count, sizeof(VkClearValue));
+        (VkClearValue *)sCalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
     render_group->clear_values[0].color = (VkClearColorValue){0.f, 0.0f, 0.0f, 0.0f};
 }
 
 DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platform_api) {
-    Renderer *renderer = (Renderer *)smalloc(sizeof(Renderer));
+    Renderer *renderer = (Renderer *)sMalloc(sizeof(Renderer));
 
     renderer->platform = platform_api;
 
@@ -1468,13 +1468,13 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
                      &renderer->mat_buffer);
         DEBUGNameBuffer(renderer->device, &renderer->mat_buffer, "SCENE MATS");
 
-        // TEMP: switch to dyn arrays
         // Textures
         renderer->textures_capacity = 1;
-        renderer->textures = (Image *)scalloc(renderer->textures_capacity, sizeof(Image));
+        renderer->textures = (Image *)sCalloc(renderer->textures_capacity, sizeof(Image));
         renderer->textures_count = 0;
 
-        renderer->meshes = (Mesh **)scalloc(1, sizeof(Mesh *));
+        // TEMP: switch to dyn arrays
+        renderer->meshes = (Mesh **)sCalloc(1, sizeof(Mesh *));
         renderer->mesh_count = 0;
     }
     { // ShadowMap group
@@ -1557,7 +1557,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     { // Volumetric
         CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
         renderer->framebuffers =
-            (VkFramebuffer *)scalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
+            (VkFramebuffer *)sCalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
 
         for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
             VkFramebufferCreateInfo create_info = {};
@@ -1588,14 +1588,14 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
     for(u32 i = 0; i < context->textures_count; ++i) {
         DestroyImage(context->device, &context->textures[i]);
     }
-    sfree(context->textures);
+    sFree(context->textures);
 
     DestroyBuffer(context->device, &context->mat_buffer);
 
     for(u32 i = 0; i < context->mesh_count; ++i) {
         RendererDestroyMesh(context, i);
     }
-    sfree(context->meshes);
+    sFree(context->meshes);
 
     // Volumetric render group
     DestroyRenderGroup(context, &context->volumetric_render_group);
@@ -1612,7 +1612,7 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
     DestroyRenderGroup(context, &context->main_render_group);
     vkDestroyFramebuffer(context->device, context->color_pass_framebuffer, NULL);
 
-    sfree(context->framebuffers);
+    sFree(context->framebuffers);
 
     DestroyImage(context->device, &context->resolved_depth_image);
     DestroyImage(context->device, &context->color_pass_image);
@@ -1635,7 +1635,7 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
     pfn_vkDestroyDebugUtilsMessengerEXT(context->instance, debug_messenger, NULL);
     vkDestroyInstance(context->instance, NULL);
 
-    sfree(context);
+    sFree(context);
 
     DBG_END();
 }

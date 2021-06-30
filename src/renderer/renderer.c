@@ -26,15 +26,15 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
         // TODO : move that elsewhere, and recreate the pipeline because we have more textures now
         if(context->textures_count > context->textures_capacity) {
             Image *new_buffer =
-                (Image *)srealloc(context->textures, context->textures_count * sizeof(Image));
+                (Image *)sRealloc(context->textures, context->textures_count * sizeof(Image));
             ASSERT(new_buffer);
             context->textures = new_buffer;
         }
         SDL_Surface **surfaces =
-            (SDL_Surface **)scalloc(data->textures_count, sizeof(SDL_Surface *));
-        Buffer *image_buffers = (Buffer *)scalloc(data->textures_count, sizeof(Buffer));
+            (SDL_Surface **)sCalloc(data->textures_count, sizeof(SDL_Surface *));
+        Buffer *image_buffers = (Buffer *)sCalloc(data->textures_count, sizeof(Buffer));
         VkCommandBuffer *cmds =
-            (VkCommandBuffer *)scalloc(data->textures_count, sizeof(VkCommandBuffer));
+            (VkCommandBuffer *)sCalloc(data->textures_count, sizeof(VkCommandBuffer));
 
         AllocateCommandBuffers(
             context->device, context->graphics_command_pool, data->textures_count, cmds);
@@ -45,7 +45,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
                        "Attempting to load an embedded texture. "
                        "This isn't supported yet");
             u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
-            char *full_image_path = (char *)scalloc(file_path_length, sizeof(char *));
+            char *full_image_path = (char *)sCalloc(file_path_length, sizeof(char *));
             strcat_s(full_image_path, file_path_length, directory);
             strcat_s(full_image_path, file_path_length, image_path);
 
@@ -63,7 +63,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             } else {
                 surfaces[i] = temp_surf;
             }
-            sfree(full_image_path);
+            sFree(full_image_path);
         }
 
         for(u32 i = 0; i < data->textures_count; ++i) {
@@ -117,18 +117,18 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
 
         vkFreeCommandBuffers(
             context->device, context->graphics_command_pool, data->textures_count, cmds);
-        sfree(cmds);
+        sFree(cmds);
         for(u32 i = 0; i < data->textures_count; ++i) {
             SDL_FreeSurface(surfaces[i]);
             DestroyBuffer(context->device, &image_buffers[i]);
         }
-        sfree(surfaces);
-        sfree(image_buffers);
+        sFree(surfaces);
+        sFree(image_buffers);
     }
 }
 
 u32 RendererLoadMesh(Renderer *renderer, const char *path) {
-    Mesh *mesh = (Mesh *)smalloc(sizeof(Mesh));
+    Mesh *mesh = (Mesh *)sMalloc(sizeof(Mesh));
     *mesh = (Mesh){};
     renderer->mesh_count++;
 
@@ -151,7 +151,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
 
     // Transforms
     mesh->primitive_nodes_count = data->nodes_count;
-    mesh->primitive_transforms = (Mat4 *)scalloc(mesh->primitive_nodes_count, sizeof(Mat4));
+    mesh->primitive_transforms = (Mat4 *)sCalloc(mesh->primitive_nodes_count, sizeof(Mat4));
     GLTFLoadTransforms(data, mesh->primitive_transforms);
 
     // Primitives
@@ -159,7 +159,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     for(u32 m = 0; m < data->meshes_count; ++m) {
         mesh->total_primitives_count += data->meshes[m].primitives_count;
     };
-    mesh->primitives = (Primitive *)scalloc(mesh->total_primitives_count, sizeof(Primitive));
+    mesh->primitives = (Primitive *)sCalloc(mesh->total_primitives_count, sizeof(Primitive));
 
     u32 i = 0;
     for(u32 m = 0; m < data->meshes_count; ++m) {
@@ -188,7 +188,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     // TODO : Move that into something like this : RendererLoadGLTF(renderer, data);
     {
         // Vertex & Index Buffer
-        mesh->buffer = (Buffer *)smalloc(sizeof(Buffer));
+        mesh->buffer = (Buffer *)sMalloc(sizeof(Buffer));
         CreateBuffer(renderer->device,
                      &renderer->memory_properties,
                      buffer_size,
@@ -217,7 +217,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
         RendererLoadMaterialsAndTextures(renderer, data, directory);
     }
     mesh->instance_capacity = 1;
-    mesh->instance_transforms = (Mat4 *)scalloc(1, sizeof(Mat4));
+    mesh->instance_transforms = (Mat4 *)sCalloc(1, sizeof(Mat4));
 
     cgltf_free(data);
 
@@ -229,15 +229,15 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
 void RendererDestroyMesh(Renderer *renderer, u32 id) {
     Mesh *mesh = renderer->meshes[id];
 
-    sfree(mesh->primitives);
+    sFree(mesh->primitives);
 
-    sfree(mesh->instance_transforms);
+    sFree(mesh->instance_transforms);
 
     DestroyBuffer(renderer->device, mesh->buffer);
-    sfree(mesh->buffer);
+    sFree(mesh->buffer);
 
-    sfree(mesh->primitive_transforms);
-    sfree(mesh);
+    sFree(mesh->primitive_transforms);
+    sFree(mesh);
 }
 
 void RendererDrawMesh(Frame *frame,
@@ -278,7 +278,7 @@ MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
         // Resize the buffer
         u32 new_capacity = mesh->instance_capacity * 2;
         sLog("Resizing mesh buffer from %d to %d", mesh->instance_capacity, new_capacity);
-        Mat4 *new_buffer = (Mat4 *)srealloc(mesh->instance_transforms, new_capacity * sizeof(Mat4));
+        Mat4 *new_buffer = (Mat4 *)sRealloc(mesh->instance_transforms, new_capacity * sizeof(Mat4));
         ASSERT_MSG(new_buffer, "Unable to size up the instance buffer");
         mesh->instance_transforms = new_buffer;
         mesh->instance_capacity = new_capacity;
