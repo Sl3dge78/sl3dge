@@ -12,8 +12,12 @@ PUSHD tmp\
 DEL /Q win32_*.pdb 2> NUL
 POPD
 
+SET return=0
+
 ECHO Building win32.exe
 clang %args% %include_path% src/platform/platform_win32.c -o bin/win32.exe %linker_options% %libs% -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 IF !ERRORLEVEL! == 0 (
     ECHO BUILD OK
+
 )
+EXIT -b %ERRORLEVEL%

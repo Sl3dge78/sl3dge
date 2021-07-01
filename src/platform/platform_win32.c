@@ -106,7 +106,7 @@ internal int main(int argc, char *argv[]) {
 
     sLogSetCallback(&Win32Log);
     PNG_Image image;
-    sLoadImage("resources/1.png", &image);
+    sLoadImage("resources/test.png", &image);
 
     return (0);
 

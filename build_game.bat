@@ -20,3 +20,4 @@ IF !ERRORLEVEL! == 0 (
     ECHO a > bin/%module_name%.meta
     ECHO BUILD OK
 )
+EXIT -b %ERRORLEVEL%
