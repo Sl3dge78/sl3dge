@@ -41,7 +41,9 @@
             "functional": "cpp",
             "tuple": "cpp",
             "type_traits": "cpp",
-            "xtr1common": "cpp"
+            "xtr1common": "cpp",
+            "xstring": "c",
+            "sdebug.h": "c"
         }
     }
 }

@@ -46,11 +46,11 @@
             ]
         },
         {
-            "label": "Perform tests",
+            "label": "Build Tests",
             "problemMatcher": [
                 "$msCompile"
             ],
-            "command": "run_tests.bat",
+            "command": "build_tests.bat",
         }
     ]
 }
