@@ -86,15 +86,15 @@ void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
 void Win32Log(const char *message, u8 level) {
     unsigned long charsWritten;
 
-    static u8 levels[] = {8, 7, 6, 4};
-
+    static u8 levels[] = {FOREGROUND_INTENSITY,
+                          FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE,
+                          FOREGROUND_RED | FOREGROUND_GREEN,
+                          FOREGROUND_RED};
+    ASSERT(level < ARRAY_SIZE(levels));
     SetConsoleTextAttribute(stderrHandle, levels[level]);
     WriteConsoleA(stderrHandle, message, lstrlen(message), &charsWritten, NULL);
     OutputDebugStringA(message);
     SetConsoleTextAttribute(stderrHandle, levels[1]);
-}
-
-internal void RunGame() {
 }
 
 internal int main(int argc, char *argv[]) {
@@ -105,10 +105,6 @@ internal int main(int argc, char *argv[]) {
 #endif
 
     sLogSetCallback(&Win32Log);
-    PNG_Image image;
-    sLoadImage("resources/test.png", &image);
-
-    return (0);
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow(

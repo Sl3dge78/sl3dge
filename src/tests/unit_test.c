@@ -13,6 +13,17 @@ void TestHuffman() {
     for(u32 i = 0; i < ARRAY_SIZE(expected); ++i) {
         TEST_EQUALS(out[i], expected[i], "%X");
     }
+
+    u8 code[] = {0b00011010, 0b01111111};
+    u32 decoded[] = {0, 4, 5, 7, 6};
+    PNG_DataStream stream = {};
+    stream.contents = &code;
+    stream.contents_size = 2;
+    u32 result[ARRAY_SIZE(decoded)];
+    for(u32 i = 0; i < ARRAY_SIZE(decoded); ++i) {
+        result[i] = HuffmanDecode(&stream, expected, source, ARRAY_SIZE(source));
+        TEST_EQUALS(result[i], decoded[i], "%X");
+    }
 }
 
 void TestVec3() {
@@ -54,7 +65,12 @@ void TestVec3() {
 
 int main(const int argc, const char *argv[]) {
     TEST_BEGIN();
-    TestVec3();
+    //TestVec3();
+
+    u8 byte = 0b10110001;
+    u8 result = swap_u8(byte);
+    TEST_EQUALS(result, 0b10001101, "%X");
+
     TestHuffman();
 
     TEST_END();

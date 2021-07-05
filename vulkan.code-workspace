@@ -12,38 +12,4 @@
             "path": "resources\\shaders"
         }
     ],
-    "settings": {
-        "files.associations": {
-            "system_error": "cpp",
-            "xlocale": "cpp",
-            "atomic": "cpp",
-            "map": "cpp",
-            "set": "cpp",
-            "cstdlib": "cpp",
-            "list": "cpp",
-            "memory": "cpp",
-            "vector": "cpp",
-            "xlocinfo": "cpp",
-            "xlocnum": "cpp",
-            "xmemory": "cpp",
-            "xtree": "cpp",
-            "algorithm": "cpp",
-            "new": "cpp",
-            "vulkan_renderer.h": "c",
-            "gltf.cpp": "c",
-            "renderer.h": "c",
-            "sl3dge.h": "c",
-            "game.h": "c",
-            "array": "cpp",
-            "utility": "cpp",
-            "xutility": "cpp",
-            "compare": "cpp",
-            "functional": "cpp",
-            "tuple": "cpp",
-            "type_traits": "cpp",
-            "xtr1common": "cpp",
-            "xstring": "c",
-            "sdebug.h": "c"
-        }
-    }
 }
