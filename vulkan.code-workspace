@@ -12,4 +12,10 @@
             "path": "resources\\shaders"
         }
     ],
+    "settings": {
+        "files.associations": {
+            "vulkan.h": "c",
+            "cgltf.h": "c"
+        }
+    },
 }

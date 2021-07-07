@@ -357,7 +357,7 @@ internal void CreateMultiSampledImage(const VkDevice device,
     image_view_ci.subresourceRange.layerCount = 1;
     AssertVkResult(vkCreateImageView(device, &image_view_ci, NULL, &image->image_view));
 }
-
+// TODO: remove the pitch arg
 internal void CopyBufferToImage(VkCommandBuffer cmd,
                                 VkExtent2D extent,
                                 u32 pitch,

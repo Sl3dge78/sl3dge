@@ -1,4 +1,8 @@
 #include <sl3dge-utils/sl3dge.h>
+
+#define CGLTF_IMPLEMENTATION
+#include <cgltf/cgltf.h>
+
 #include "renderer/renderer.h"
 
 internal void

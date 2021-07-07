@@ -12,8 +12,9 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
 
+    //game_data->renderer_api.LoadMesh(game_data->renderer,"resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
     game_data->renderer_api.LoadMesh(game_data->renderer,
-                                     "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
+                                     "resources/3d/Motorcycle/motorcycle.gltf");
     game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
 }
 

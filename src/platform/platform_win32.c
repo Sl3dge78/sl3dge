@@ -105,6 +105,7 @@ internal int main(int argc, char *argv[]) {
 #endif
 
     sLogSetCallback(&Win32Log);
+    PNG_Image *image = sLoadImage("resources/1.png");
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow(
