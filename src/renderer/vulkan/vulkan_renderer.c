@@ -1576,42 +1576,6 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
         }
     }
 
-    // Test
-
-    PNG_Image *image = sLoadImage("resources/2.png");
-    ASSERT(image);
-
-    VkExtent2D extent = {image->width, image->height};
-
-    Image test_image;
-    Buffer test_image_buffer;
-    CreateImage(renderer->device,
-                &renderer->memory_properties,
-                VK_FORMAT_R8G8B8A8_SRGB,
-                extent,
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                &test_image);
-    DEBUGNameImage(renderer->device, &test_image, "TEST IMAGE");
-    CreateBuffer(renderer->device,
-                 &renderer->memory_properties,
-                 image->size,
-                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 &test_image_buffer);
-
-    UploadToBuffer(renderer->device, &test_image_buffer, image->pixels, image->size);
-
-    VkCommandBuffer cmd;
-    AllocateAndBeginCommandBuffer(renderer->device, renderer->graphics_command_pool, &cmd);
-
-    CopyBufferToImage(cmd, extent, 0, &test_image_buffer, &test_image);
-    vkEndCommandBuffer(cmd);
-    VkSubmitInfo si = {VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmd, 0, NULL};
-    vkQueueSubmit(renderer->graphics_queue, 1, &si, VK_NULL_HANDLE);
-    vkQueueWaitIdle(renderer->graphics_queue);
-    vkFreeCommandBuffers(renderer->device, renderer->graphics_command_pool, 1, &cmd);
-
     return renderer;
 }
 

@@ -30,8 +30,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             ASSERT(new_buffer);
             context->textures = new_buffer;
         }
-        SDL_Surface **surfaces =
-            (SDL_Surface **)sCalloc(data->textures_count, sizeof(SDL_Surface *));
+        PNG_Image **surfaces = sCalloc(data->textures_count, sizeof(PNG_Image *));
         Buffer *image_buffers = (Buffer *)sCalloc(data->textures_count, sizeof(Buffer));
         VkCommandBuffer *cmds =
             (VkCommandBuffer *)sCalloc(data->textures_count, sizeof(VkCommandBuffer));
@@ -48,7 +47,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             char *full_image_path = (char *)sCalloc(file_path_length, sizeof(char *));
             strcat_s(full_image_path, file_path_length, directory);
             strcat_s(full_image_path, file_path_length, image_path);
-
+            /*
             SDL_Surface *temp_surf = IMG_Load(full_image_path);
             if(!temp_surf) {
                 sError(IMG_GetError());
@@ -63,14 +62,16 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             } else {
                 surfaces[i] = temp_surf;
             }
+            */
+            surfaces[i] = sLoadImage(full_image_path);
             sFree(full_image_path);
         }
 
         for(u32 i = 0; i < data->textures_count; ++i) {
             u32 j = texture_start + i;
 
-            VkDeviceSize image_size = surfaces[i]->h * surfaces[i]->pitch;
-            VkExtent2D extent = {(u32)surfaces[i]->h, (u32)surfaces[i]->w};
+            VkDeviceSize image_size = surfaces[i]->size;
+            VkExtent2D extent = {(u32)surfaces[i]->width, (u32)surfaces[i]->height};
 
             VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
             if(data->textures[i].type == cgltf_texture_type_base_color)
@@ -91,15 +92,15 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                          &image_buffers[i]);
 
-            if(SDL_MUSTLOCK(surfaces[i]))
-                SDL_LockSurface(surfaces[i]);
             UploadToBuffer(context->device, &image_buffers[i], surfaces[i]->pixels, image_size);
-            if(SDL_MUSTLOCK(surfaces[i]))
-                SDL_UnlockSurface(surfaces[i]);
+
             BeginCommandBuffer(
                 context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-            CopyBufferToImage(
-                cmds[i], extent, surfaces[i]->pitch, &image_buffers[i], &context->textures[i]);
+            CopyBufferToImage(cmds[i],
+                              extent,
+                              surfaces[i]->width * surfaces[i]->bpp,
+                              &image_buffers[i],
+                              &context->textures[i]);
             vkEndCommandBuffer(cmds[i]);
             VkSubmitInfo si = {
                 VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmds[i], 0, NULL};
@@ -119,7 +120,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             context->device, context->graphics_command_pool, data->textures_count, cmds);
         sFree(cmds);
         for(u32 i = 0; i < data->textures_count; ++i) {
-            SDL_FreeSurface(surfaces[i]);
+            sDestroyImage(surfaces[i]);
             DestroyBuffer(context->device, &image_buffers[i]);
         }
         sFree(surfaces);
