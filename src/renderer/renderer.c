@@ -110,10 +110,8 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             context->device, context->graphics_command_pool, data->textures_count, cmds);
         sFree(cmds);
         for(u32 i = 0; i < data->textures_count; ++i) {
-            //sDestroyImage(surfaces[i]);
             DestroyBuffer(context->device, &image_buffers[i]);
         }
-        //sFree(surfaces);
         sFree(image_buffers);
     }
 }

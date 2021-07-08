@@ -2,7 +2,7 @@
     "version": "2.0.0",
     "presentation": {
         "echo": true,
-        "reveal": "always",
+        "reveal": "never",
         "focus": false,
         "panel": "shared",
         "showReuseMessage": false,
@@ -14,36 +14,11 @@
             "problemMatcher": [
                 "$msCompile"
             ],
+            "command": "build_all.bat",
             "group": {
                 "kind": "build",
                 "isDefault": true
-            },
-            "dependsOn": [
-                "Build Game",
-                "Build Renderer",
-                "Build Win32"
-            ]
-        },
-        {
-            "label": "Build Game",
-            "command": "build_game.bat",
-            "problemMatcher": [
-                "$msCompile"
-            ]
-        },
-        {
-            "label": "Build Renderer",
-            "command": "build_renderer.bat",
-            "problemMatcher": [
-                "$msCompile"
-            ]
-        },
-        {
-            "label": "Build Win32",
-            "command": "build_win32.bat",
-            "problemMatcher": [
-                "$msCompile"
-            ]
+            }
         },
         {
             "label": "Build Tests",
