@@ -105,6 +105,7 @@ internal int main(int argc, char *argv[]) {
 #endif
 
     sLogSetCallback(&Win32Log);
+    sLogLevel(LOG_LEVEL_LOG);
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow(
@@ -168,7 +169,7 @@ internal int main(int argc, char *argv[]) {
             Win32CloseModule(&game_module);
             Win32LoadModule(&game_module, "game");
             GameLoadFunctions(&game_module);
-            sLog("Game code reloaded");
+            sTrace("Game code reloaded");
         }
 
         // Reload shaders if necessary
@@ -176,7 +177,7 @@ internal int main(int argc, char *argv[]) {
         if(CompareFileTime(&shader_code.last_write_time, &shader_time)) {
             shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
             pfn_ReloadShaders(renderer);
-            sLog("Shaders reloaded");
+            sTrace("Shaders reloaded");
         }
 
         while(SDL_PollEvent(&event)) {
