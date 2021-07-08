@@ -30,7 +30,6 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             ASSERT(new_buffer);
             context->textures = new_buffer;
         }
-        PNG_Image **surfaces = sCalloc(data->textures_count, sizeof(PNG_Image *));
         Buffer *image_buffers = (Buffer *)sCalloc(data->textures_count, sizeof(Buffer));
         VkCommandBuffer *cmds =
             (VkCommandBuffer *)sCalloc(data->textures_count, sizeof(VkCommandBuffer));
@@ -39,39 +38,25 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             context->device, context->graphics_command_pool, data->textures_count, cmds);
 
         for(u32 i = 0; i < data->textures_count; ++i) {
+            u32 j = texture_start + i;
+
             char *image_path = data->textures[i].image->uri;
             ASSERT_MSG(image_path,
                        "Attempting to load an embedded texture. "
                        "This isn't supported yet");
-            u32 file_path_length = strlen(directory) + strlen(image_path) + 1;
-            char *full_image_path = (char *)sCalloc(file_path_length, sizeof(char *));
-            strcat_s(full_image_path, file_path_length, directory);
-            strcat_s(full_image_path, file_path_length, image_path);
-            /*
-            SDL_Surface *temp_surf = IMG_Load(full_image_path);
-            if(!temp_surf) {
-                sError(IMG_GetError());
+            char full_image_path[256] = {0};
+            strcat_s(full_image_path, 256, directory);
+            strcat_s(full_image_path, 256, image_path);
+
+            u32 w = 0;
+            u32 h = 0;
+            if(!sQueryImageSize(full_image_path, &w, &h)) {
+                sError("Unable to load image %s", image_path);
+                continue;
             }
 
-            if(temp_surf->format->format != SDL_PIXELFORMAT_ABGR8888) {
-                surfaces[i] = SDL_ConvertSurfaceFormat(temp_surf, SDL_PIXELFORMAT_ABGR8888, 0);
-                if(!surfaces[i]) {
-                    sError(SDL_GetError());
-                }
-                SDL_FreeSurface(temp_surf);
-            } else {
-                surfaces[i] = temp_surf;
-            }
-            */
-            surfaces[i] = sLoadImage(full_image_path);
-            sFree(full_image_path);
-        }
-
-        for(u32 i = 0; i < data->textures_count; ++i) {
-            u32 j = texture_start + i;
-
-            VkDeviceSize image_size = surfaces[i]->size;
-            VkExtent2D extent = {(u32)surfaces[i]->width, (u32)surfaces[i]->height};
+            VkDeviceSize image_size = w * h * 4;
+            VkExtent2D extent = {w, h};
 
             VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
             if(data->textures[i].type == cgltf_texture_type_base_color)
@@ -92,15 +77,20 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                          &image_buffers[i]);
 
-            UploadToBuffer(context->device, &image_buffers[i], surfaces[i]->pixels, image_size);
+            void *dst;
+            VkResult result = vkMapMemory(
+                context->device, image_buffers[i].memory, 0, image_buffers[i].size, 0, &dst);
+            AssertVkResult(result);
+            // Load image directly to the buffer
+            if(!sLoadImageTo(full_image_path, dst)) {
+                sError("Unable to load image %s", image_path);
+                continue;
+            }
+            vkUnmapMemory(context->device, image_buffers[i].memory);
 
             BeginCommandBuffer(
                 context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-            CopyBufferToImage(cmds[i],
-                              extent,
-                              surfaces[i]->width * surfaces[i]->bpp,
-                              &image_buffers[i],
-                              &context->textures[i]);
+            CopyBufferToImage(cmds[i], extent, w * 4, &image_buffers[i], &context->textures[i]);
             vkEndCommandBuffer(cmds[i]);
             VkSubmitInfo si = {
                 VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmds[i], 0, NULL};
@@ -120,10 +110,10 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             context->device, context->graphics_command_pool, data->textures_count, cmds);
         sFree(cmds);
         for(u32 i = 0; i < data->textures_count; ++i) {
-            sDestroyImage(surfaces[i]);
+            //sDestroyImage(surfaces[i]);
             DestroyBuffer(context->device, &image_buffers[i]);
         }
-        sFree(surfaces);
+        //sFree(surfaces);
         sFree(image_buffers);
     }
 }

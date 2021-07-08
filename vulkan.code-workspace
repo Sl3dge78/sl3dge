@@ -15,7 +15,8 @@
     "settings": {
         "files.associations": {
             "vulkan.h": "c",
-            "cgltf.h": "c"
+            "cgltf.h": "c",
+            "xlocale": "c"
         }
     },
 }
