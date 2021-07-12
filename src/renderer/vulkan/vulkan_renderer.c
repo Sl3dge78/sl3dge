@@ -17,7 +17,7 @@ global VkDebugUtilsMessengerEXT debug_messenger;
 // ========================
 
 internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
-    VkApplicationInfo app_info = {};
+    VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "Handmade";
     app_info.applicationVersion = 1;
@@ -25,7 +25,7 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
     app_info.engineVersion = 1;
     app_info.apiVersion = VK_API_VERSION_1_2;
 
-    VkInstanceCreateInfo create_info = {};
+    VkInstanceCreateInfo create_info = {0};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.pApplicationInfo = &app_info;
@@ -54,7 +54,7 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
 
 #if defined(_DEBUG)
     sLog("Requested extensions :");
-    for(int i = 0; i < total_count; i++) {
+    for(u32 i = 0; i < total_count; i++) {
         sLog("   %s", all_extensions[i]);
     }
 #endif
@@ -79,7 +79,7 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
         VK_LOAD_INSTANCE_FUNC(*instance, vkCmdEndDebugUtilsLabelEXT);
 
         // Create the messenger
-        VkDebugUtilsMessengerCreateInfoEXT debug_create_info = {};
+        VkDebugUtilsMessengerCreateInfoEXT debug_create_info = {0};
         debug_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         debug_create_info.pNext = NULL;
         debug_create_info.flags = 0;
@@ -102,7 +102,7 @@ internal void CreateVkPhysicalDevice(VkInstance instance, VkPhysicalDevice *phys
         (VkPhysicalDevice *)sCalloc(device_count, sizeof(VkPhysicalDevice));
     vkEnumeratePhysicalDevices(instance, &device_count, physical_devices);
 
-    for(int i = 0; i < device_count; i++) {
+    for(u32 i = 0; i < device_count; i++) {
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties(physical_devices[i], &properties);
     }
@@ -134,7 +134,7 @@ internal void GetQueuesId(Renderer *context) {
 
     u32 set_flags = 0;
 
-    for(int i = 0; i < queue_count && set_flags != 7; i++) {
+    for(u32 i = 0; i < queue_count && set_flags != 7; i++) {
         if(!(set_flags & 1) && queue_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             context->graphics_queue_id = i;
             set_flags |= 1;
@@ -167,7 +167,7 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
                              const u32 present_queue,
                              VkDevice *device) {
     // Queues
-    VkDeviceQueueCreateInfo queues_ci[3] = {};
+    VkDeviceQueueCreateInfo queues_ci[3] = {0};
 
     float queue_priority = 1.0f;
 
@@ -203,43 +203,43 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
                                 VK_KHR_SHADER_CLOCK_EXTENSION_NAME};
     const u32 extension_count = sizeof(extensions) / sizeof(extensions[0]);
 
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_feature = {};
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_feature = {0};
     accel_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
     accel_feature.pNext = NULL;
     accel_feature.accelerationStructure = VK_TRUE;
 
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_feature = {};
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_feature = {0};
     rt_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
     rt_feature.pNext = &accel_feature;
     rt_feature.rayTracingPipeline = VK_TRUE;
 
-    VkPhysicalDeviceBufferDeviceAddressFeatures device_address = {};
+    VkPhysicalDeviceBufferDeviceAddressFeatures device_address = {0};
     device_address.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
     device_address.pNext = &rt_feature;
     device_address.bufferDeviceAddress = VK_TRUE;
 
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness = {};
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness = {0};
     robustness.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
     robustness.pNext = &device_address;
     robustness.robustBufferAccess2 = VK_FALSE;
     robustness.robustImageAccess2 = VK_FALSE;
     robustness.nullDescriptor = VK_TRUE;
 
-    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing = {};
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing = {0};
     descriptor_indexing.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
     descriptor_indexing.pNext = &robustness;
     descriptor_indexing.runtimeDescriptorArray = VK_TRUE;
     descriptor_indexing.descriptorBindingVariableDescriptorCount = VK_TRUE;
     descriptor_indexing.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 
-    VkPhysicalDeviceFeatures2 features2 = {};
+    VkPhysicalDeviceFeatures2 features2 = {0};
     features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     features2.pNext = &descriptor_indexing;
     //features2.features = 0;
     features2.features.samplerAnisotropy = VK_TRUE;
     features2.features.shaderInt64 = VK_TRUE;
 
-    VkDeviceCreateInfo device_create_info = {};
+    VkDeviceCreateInfo device_create_info = {0};
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     device_create_info.pNext = &features2;
     device_create_info.flags = 0;
@@ -256,7 +256,7 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
 }
 
 internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapchain *swapchain) {
-    VkSwapchainCreateInfoKHR create_info = {};
+    VkSwapchainCreateInfoKHR create_info = {0};
 
     create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     create_info.pNext = NULL;
@@ -264,7 +264,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     create_info.surface = context->surface;
 
     // Img count
-    VkSurfaceCapabilitiesKHR surface_capabilities = {};
+    VkSurfaceCapabilitiesKHR surface_capabilities = {0};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
         context->physical_device, context->surface, &surface_capabilities);
     u32 image_count = 3;
@@ -314,7 +314,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     sFree(formats);
 
     // Extent
-    VkExtent2D extent = {};
+    VkExtent2D extent = {0};
     if(surface_capabilities.currentExtent.width != 0xFFFFFFFF) {
         extent = surface_capabilities.currentExtent;
     } else {
@@ -374,7 +374,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
         DEBUGNameObject(
             context->device, (u64)swapchain->images[i], VK_OBJECT_TYPE_IMAGE, "Swapchain image");
 
-        VkImageViewCreateInfo image_view_ci = {};
+        VkImageViewCreateInfo image_view_ci = {0};
         image_view_ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         image_view_ci.pNext = NULL;
         image_view_ci.flags = 0;
@@ -395,7 +395,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     // Command buffers
     swapchain->command_buffers =
         (VkCommandBuffer *)sCalloc(swapchain->image_count, sizeof(VkCommandBuffer));
-    VkCommandBufferAllocateInfo cmd_buf_ai = {};
+    VkCommandBufferAllocateInfo cmd_buf_ai = {0};
     cmd_buf_ai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmd_buf_ai.pNext = NULL;
     cmd_buf_ai.commandPool = context->graphics_command_pool;
@@ -419,7 +419,7 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
         (VkSemaphore *)sCalloc(swapchain->image_count, sizeof(VkSemaphore));
     swapchain->render_complete_semaphore =
         (VkSemaphore *)sCalloc(swapchain->image_count, sizeof(VkSemaphore));
-    VkSemaphoreCreateInfo semaphore_ci = {};
+    VkSemaphoreCreateInfo semaphore_ci = {0};
     semaphore_ci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     for(u32 i = 0; i < swapchain->image_count; i++) {
         vkCreateSemaphore(
@@ -453,17 +453,11 @@ internal void DestroySwapchain(const Renderer *context, Swapchain *swapchain) {
     sFree(swapchain->render_complete_semaphore);
 }
 
-internal void CreateRenderPass(const VkDevice device,
-                               const Swapchain *swapchain,
-                               VkSampleCountFlagBits sample_count,
-                               VkRenderPass *render_pass) {
-}
-
 internal void BeginRenderGroup(VkCommandBuffer cmd,
                                const RenderGroup *render_group,
                                VkFramebuffer target,
                                const VkExtent2D extent) {
-    VkRenderPassBeginInfo renderpass_begin = {};
+    VkRenderPassBeginInfo renderpass_begin = {0};
     renderpass_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderpass_begin.pNext = 0;
     renderpass_begin.renderPass = render_group->render_pass;
@@ -505,12 +499,12 @@ internal void DestroyRenderGroup(Renderer *context, RenderGroup *render_group) {
 }
 
 internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render_group) {
-    VkRenderPassCreateInfo render_pass_ci = {};
+    VkRenderPassCreateInfo render_pass_ci = {0};
     render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     render_pass_ci.pNext = NULL;
     render_pass_ci.flags = 0;
 
-    VkAttachmentDescription depth_attachment = {};
+    VkAttachmentDescription depth_attachment = {0};
     depth_attachment.flags = 0;
     depth_attachment.format = renderer->depth_format;
     depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -527,7 +521,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
     render_pass_ci.pAttachments = attachments;
 
     VkAttachmentReference depth_ref = {0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
-    VkSubpassDependency dependencies[2] = {};
+    VkSubpassDependency dependencies[2] = {0};
     dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
     dependencies[0].dstSubpass = 0;
     dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -544,7 +538,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
     dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-    VkSubpassDescription subpass_desc = {};
+    VkSubpassDescription subpass_desc = {0};
     subpass_desc.flags = 0;
     subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass_desc.inputAttachmentCount = 0;
@@ -577,7 +571,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
                                                       NULL}};
     const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
 
-    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+    VkDescriptorSetLayoutCreateInfo game_set_create_info = {0};
     game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     game_set_create_info.pNext = NULL;
     game_set_create_info.flags = 0;
@@ -587,7 +581,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
         renderer->device, &game_set_create_info, NULL, render_group->set_layouts));
 
     // Descriptor Set
-    VkDescriptorSetAllocateInfo allocate_info = {};
+    VkDescriptorSetAllocateInfo allocate_info = {0};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
     allocate_info.descriptorPool = renderer->descriptor_pool;
@@ -602,7 +596,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
     //render_group->push_constant_size = push_constant_range.size;
 
     // Layout
-    VkPipelineLayoutCreateInfo create_info = {};
+    VkPipelineLayoutCreateInfo create_info = {0};
     create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.flags = 0;
@@ -632,7 +626,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
 
     vkUpdateDescriptorSets(renderer->device, static_writes_count, static_writes, 0, NULL);
 
-    VkGraphicsPipelineCreateInfo pipeline_ci = {};
+    VkGraphicsPipelineCreateInfo pipeline_ci = {0};
     pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline_ci.pNext = NULL;
     pipeline_ci.flags = 0;
@@ -751,7 +745,7 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
 
     const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
 
-    VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+    VkDescriptorSetLayoutCreateInfo game_set_create_info = {0};
     game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     game_set_create_info.pNext = NULL;
     game_set_create_info.flags = 0;
@@ -761,7 +755,7 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
         renderer->device, &game_set_create_info, NULL, &render_group->set_layouts[0]));
 
     // Descriptor Set
-    VkDescriptorSetAllocateInfo allocate_info = {};
+    VkDescriptorSetAllocateInfo allocate_info = {0};
     allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
     allocate_info.descriptorPool = renderer->descriptor_pool;
@@ -869,7 +863,8 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
         render_pass_ci.dependencyCount = 0;
         render_pass_ci.pDependencies = NULL;
 */
-        VkAttachmentDescription2 color_attachment = {VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2};
+        VkAttachmentDescription2 color_attachment = {0};
+        color_attachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
         color_attachment.pNext = NULL;
         color_attachment.flags = 0;
         color_attachment.format = renderer->swapchain.format;
@@ -881,7 +876,8 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
         color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        VkAttachmentDescription2 depth_attachment = {VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2};
+        VkAttachmentDescription2 depth_attachment = {0};
+        depth_attachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
         depth_attachment.pNext = NULL;
         depth_attachment.flags = 0;
         depth_attachment.format = renderer->depth_format;
@@ -893,8 +889,8 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
         depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        VkAttachmentDescription2 depth_resolve_attachment = {
-            VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2};
+        VkAttachmentDescription2 depth_resolve_attachment = {0};
+        depth_resolve_attachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
         depth_resolve_attachment.pNext = NULL;
         depth_resolve_attachment.flags = 0;
         depth_resolve_attachment.format = renderer->depth_format;
@@ -909,30 +905,33 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
         VkAttachmentDescription2 attachments[] = {
             color_attachment, depth_attachment, depth_resolve_attachment};
 
-        VkAttachmentReference2 color_attachement_ref = {VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+        VkAttachmentReference2 color_attachement_ref = {0};
+        color_attachement_ref.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
         color_attachement_ref.attachment = 0;
         color_attachement_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachement_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-        VkAttachmentReference2 depth_attachement_ref = {VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+        VkAttachmentReference2 depth_attachement_ref = {0};
+        depth_attachement_ref.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
         depth_attachement_ref.attachment = 1;
         depth_attachement_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         depth_attachement_ref.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-        VkAttachmentReference2 depth_resolve_attachement_ref = {
-            VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+        VkAttachmentReference2 depth_resolve_attachement_ref = {0};
+        depth_resolve_attachement_ref.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
         depth_resolve_attachement_ref.attachment = 2;
         depth_resolve_attachement_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         depth_resolve_attachement_ref.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-        VkSubpassDescriptionDepthStencilResolve depth_resolve = {
-            VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE};
+        VkSubpassDescriptionDepthStencilResolve depth_resolve = {0};
+        depth_resolve.sType = VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE;
         depth_resolve.pNext = NULL;
         depth_resolve.depthResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
         depth_resolve.stencilResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
         depth_resolve.pDepthStencilResolveAttachment = &depth_resolve_attachement_ref;
 
-        VkSubpassDescription2 subpasses = {VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2};
+        VkSubpassDescription2 subpasses = {0};
+        subpasses.sType = VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2;
         subpasses.pNext = &depth_resolve;
         subpasses.flags = 0;
         subpasses.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -946,7 +945,8 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
         subpasses.preserveAttachmentCount = 0;
         subpasses.pPreserveAttachments = NULL;
 
-        VkRenderPassCreateInfo2 renderpass_ci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2};
+        VkRenderPassCreateInfo2 renderpass_ci = {0};
+        renderpass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2;
         renderpass_ci.pNext = NULL;
         renderpass_ci.flags = 0;
         renderpass_ci.attachmentCount = ARRAY_SIZE(attachments);
@@ -968,7 +968,7 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
         const u32 push_constant_count = 1;
 
         // Layout
-        VkPipelineLayoutCreateInfo create_info = {};
+        VkPipelineLayoutCreateInfo create_info = {0};
         create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         create_info.pNext = NULL;
         create_info.flags = 0;
@@ -994,7 +994,7 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
     render_group->clear_values =
         (VkClearValue *)sCalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
-    render_group->clear_values[0].color = (VkClearColorValue){0.43f, 0.77f, 0.91f, 0.0f};
+    render_group->clear_values[0].color = (VkClearColorValue){{0.43f, 0.77f, 0.91f, 0.0f}};
     render_group->clear_values[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 }
 
@@ -1026,7 +1026,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
                                                           NULL}};
         const u32 descriptor_count = sizeof(bindings) / sizeof(bindings[0]);
 
-        VkDescriptorSetLayoutCreateInfo game_set_create_info = {};
+        VkDescriptorSetLayoutCreateInfo game_set_create_info = {0};
         game_set_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         game_set_create_info.pNext = NULL;
         game_set_create_info.flags = 0;
@@ -1040,7 +1040,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
                         "Volumetric descriptor set layout");
 
         // Descriptor Set
-        VkDescriptorSetAllocateInfo allocate_info = {};
+        VkDescriptorSetAllocateInfo allocate_info = {0};
         allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocate_info.pNext = NULL;
         allocate_info.descriptorPool = renderer->descriptor_pool;
@@ -1103,7 +1103,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
     }
     { // Render pass
 
-        VkAttachmentDescription previous_attachment = {};
+        VkAttachmentDescription previous_attachment = {0};
         previous_attachment.flags = 0;
         previous_attachment.format = renderer->swapchain.format;
         previous_attachment.samples = renderer->msaa_level;
@@ -1114,7 +1114,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         previous_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         previous_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-        VkAttachmentDescription resolve_attachment = {};
+        VkAttachmentDescription resolve_attachment = {0};
         resolve_attachment.flags = 0;
         resolve_attachment.format = renderer->swapchain.format;
         resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1133,7 +1133,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
 
         VkAttachmentReference resolve_ref = {1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
 
-        VkSubpassDescription subpass_desc = {};
+        VkSubpassDescription subpass_desc = {0};
         subpass_desc.flags = 0;
         subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass_desc.inputAttachmentCount = 0;
@@ -1145,7 +1145,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         subpass_desc.preserveAttachmentCount = 0;
         subpass_desc.pPreserveAttachments = NULL;
 
-        VkRenderPassCreateInfo render_pass_ci = {};
+        VkRenderPassCreateInfo render_pass_ci = {0};
         render_pass_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         render_pass_ci.pNext = NULL;
         render_pass_ci.flags = 0;
@@ -1160,7 +1160,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
             renderer->device, &render_pass_ci, NULL, &render_group->render_pass));
     }
     { // Pipeline layout
-        VkPipelineLayoutCreateInfo create_info = {};
+        VkPipelineLayoutCreateInfo create_info = {0};
         create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         create_info.pNext = NULL;
         create_info.flags = 0;
@@ -1243,7 +1243,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         depth_state.depthTestEnable = VK_FALSE;
         pipeline_ci.pDepthStencilState = &depth_state;
 
-        VkPipelineColorBlendAttachmentState color_blend_attachement = {};
+        VkPipelineColorBlendAttachmentState color_blend_attachement = {0};
         color_blend_attachement.blendEnable = VK_TRUE;
         color_blend_attachement.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         color_blend_attachement.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -1278,7 +1278,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
     render_group->clear_values =
         (VkClearValue *)sCalloc(render_group->clear_values_count, sizeof(VkClearValue));
 
-    render_group->clear_values[0].color = (VkClearColorValue){0.f, 0.0f, 0.0f, 0.0f};
+    render_group->clear_values[0].color = (VkClearColorValue){{0.f, 0.0f, 0.0f, 0.0f}};
 }
 
 DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platform_api) {
@@ -1326,7 +1326,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     vkGetDeviceQueue(renderer->device, renderer->transfer_queue_id, 0, &renderer->transfer_queue);
 
     // Graphics Command Pool
-    VkCommandPoolCreateInfo pool_create_info = {};
+    VkCommandPoolCreateInfo pool_create_info = {0};
     pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pool_create_info.pNext = NULL;
     pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -1345,7 +1345,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
     };
     const u32 pool_sizes_count = sizeof(pool_sizes) / sizeof(pool_sizes[0]);
 
-    VkDescriptorPoolCreateInfo pool_ci = {};
+    VkDescriptorPoolCreateInfo pool_ci = {0};
     pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_ci.pNext = NULL;
     pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -1364,7 +1364,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
 
     // Texture Sampler
     {
-        VkSamplerCreateInfo sampler_ci = {};
+        VkSamplerCreateInfo sampler_ci = {0};
         sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         sampler_ci.pNext = NULL;
         sampler_ci.flags = 0;
@@ -1409,7 +1409,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
                     &renderer->resolved_depth_image);
         DEBUGNameImage(renderer->device, &renderer->resolved_depth_image, "RESOLVED DEPTH IMAGE");
 
-        VkSamplerCreateInfo sampler_ci = {};
+        VkSamplerCreateInfo sampler_ci = {0};
         sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         sampler_ci.pNext = NULL;
         sampler_ci.flags = 0;
@@ -1487,7 +1487,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
                     &renderer->shadowmap);
         DEBUGNameImage(renderer->device, &renderer->shadowmap, "SHADOW MAP");
 
-        VkFramebufferCreateInfo framebuffer_create_info = {};
+        VkFramebufferCreateInfo framebuffer_create_info = {0};
         framebuffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebuffer_create_info.pNext = NULL;
         framebuffer_create_info.flags = 0;
@@ -1500,7 +1500,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
         AssertVkResult(vkCreateFramebuffer(
             renderer->device, &framebuffer_create_info, NULL, &renderer->shadowmap_framebuffer));
 
-        VkSamplerCreateInfo shdw_sampler_ci = {};
+        VkSamplerCreateInfo shdw_sampler_ci = {0};
         shdw_sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         shdw_sampler_ci.pNext = NULL;
         shdw_sampler_ci.flags = 0;
@@ -1533,7 +1533,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                 renderer->msaa_level,
                                 &renderer->color_pass_image);
-        VkFramebufferCreateInfo ci = {};
+        VkFramebufferCreateInfo ci = {0};
         ci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         ci.pNext = NULL;
         ci.flags = 0;
@@ -1557,7 +1557,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
             (VkFramebuffer *)sCalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
 
         for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
-            VkFramebufferCreateInfo create_info = {};
+            VkFramebufferCreateInfo create_info = {0};
             create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             create_info.pNext = NULL;
             create_info.flags = 0;
@@ -1742,7 +1742,7 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
     AssertVkResult(vkEndCommandBuffer(cmd));
 
     const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submit_info = {};
+    VkSubmitInfo submit_info = {0};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.pNext = NULL;
     submit_info.waitSemaphoreCount = 1;
@@ -1756,7 +1756,7 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
     AssertVkResult(result);
 
     // Present
-    VkPresentInfoKHR present_info = {};
+    VkPresentInfoKHR present_info = {0};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present_info.pNext = NULL;
     present_info.waitSemaphoreCount = 1;

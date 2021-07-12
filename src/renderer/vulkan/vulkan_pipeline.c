@@ -8,20 +8,20 @@ inline VkPipelineVertexInputStateCreateInfo
 PipelineGetDefaultVertexInputState(const VkVertexInputBindingDescription *vtx_input_binding,
                                    const u32 vtx_desc_count,
                                    const VkVertexInputAttributeDescription *vtx_descriptions) {
-    VkPipelineVertexInputStateCreateInfo vertex_input = {};
+    VkPipelineVertexInputStateCreateInfo vertex_input = {0};
     vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertex_input.pNext = NULL;
     vertex_input.flags = 0;
 
     vertex_input.vertexBindingDescriptionCount = 1;
     vertex_input.pVertexBindingDescriptions = vtx_input_binding;
-    vertex_input.vertexAttributeDescriptionCount = 3;
+    vertex_input.vertexAttributeDescriptionCount = vtx_desc_count;
     vertex_input.pVertexAttributeDescriptions = vtx_descriptions;
     return vertex_input;
 }
 
 inline VkPipelineInputAssemblyStateCreateInfo PipelineGetDefaultInputAssemblyState() {
-    VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {};
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_state = {0};
     input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     input_assembly_state.pNext = NULL;
     input_assembly_state.flags = 0;
@@ -34,19 +34,19 @@ inline VkPipelineViewportStateCreateInfo PipelineGetDefaultViewportState(const u
                                                                          const VkViewport *viewport,
                                                                          const u32 scissor_count,
                                                                          const VkRect2D *scissor) {
-    VkPipelineViewportStateCreateInfo viewport_state = {};
+    VkPipelineViewportStateCreateInfo viewport_state = {0};
     viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewport_state.pNext = NULL;
     viewport_state.flags = 0;
-    viewport_state.viewportCount = 1;
+    viewport_state.viewportCount = viewport_count;
     viewport_state.pViewports = viewport;
-    viewport_state.scissorCount = 1;
+    viewport_state.scissorCount = scissor_count;
     viewport_state.pScissors = scissor;
     return viewport_state;
 }
 
 inline VkPipelineRasterizationStateCreateInfo PipelineGetDefaultRasterizationState() {
-    VkPipelineRasterizationStateCreateInfo rasterization_state = {};
+    VkPipelineRasterizationStateCreateInfo rasterization_state = {0};
     rasterization_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterization_state.pNext = NULL;
     rasterization_state.flags = 0;
@@ -88,8 +88,8 @@ inline VkPipelineDepthStencilStateCreateInfo PipelineGetDefaultDepthStencilState
     stencil_state.depthCompareOp = VK_COMPARE_OP_LESS;
     stencil_state.depthBoundsTestEnable = VK_FALSE;
     stencil_state.stencilTestEnable = VK_FALSE;
-    stencil_state.front = (VkStencilOpState){};
-    stencil_state.back = (VkStencilOpState){};
+    stencil_state.front = (VkStencilOpState){0};
+    stencil_state.back = (VkStencilOpState){0};
     stencil_state.minDepthBounds = 0.0f;
     stencil_state.maxDepthBounds = 1.0f;
     return stencil_state;
@@ -147,7 +147,7 @@ void PipelineCreateDefault(VkDevice device,
 
     pipeline_ci.pStages = stages_ci;
 
-    VkVertexInputBindingDescription vtx_input_binding = {};
+    VkVertexInputBindingDescription vtx_input_binding = {0};
     vtx_input_binding.binding = 0;
     vtx_input_binding.stride = sizeof(Vertex);
     vtx_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -190,7 +190,7 @@ void PipelineCreateDefault(VkDevice device,
     VkPipelineDepthStencilStateCreateInfo stencil_state = PipelineGetDefaultDepthStencilState();
     pipeline_ci.pDepthStencilState = &stencil_state;
 
-    VkPipelineColorBlendAttachmentState color_blend_attachement = {};
+    VkPipelineColorBlendAttachmentState color_blend_attachement = {0};
     color_blend_attachement.blendEnable = VK_FALSE;
     color_blend_attachement.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;

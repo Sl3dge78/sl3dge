@@ -11,7 +11,7 @@
 void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const char *directory) {
     // Copy material data
     void *mapped_mat_buffer;
-    const u32 offset = context->materials_count * sizeof(Material);
+    //const u32 offset = context->materials_count * sizeof(Material);
     MapBuffer(context->device, &context->mat_buffer, &mapped_mat_buffer);
     GLTFLoadMaterialBuffer(data, (Material *)mapped_mat_buffer);
     UnmapBuffer(context->device, &context->mat_buffer);
@@ -88,9 +88,8 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
             }
             vkUnmapMemory(context->device, image_buffers[i].memory);
 
-            BeginCommandBuffer(
-                context->device, cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-            CopyBufferToImage(cmds[i], extent, w * 4, &image_buffers[i], &context->textures[i]);
+            BeginCommandBuffer(cmds[i], VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+            CopyBufferToImage(cmds[i], extent, &image_buffers[i], &context->textures[i]);
             vkEndCommandBuffer(cmds[i]);
             VkSubmitInfo si = {
                 VK_STRUCTURE_TYPE_SUBMIT_INFO, NULL, 0, NULL, 0, 1, &cmds[i], 0, NULL};
@@ -118,10 +117,10 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
 
 u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     Mesh *mesh = (Mesh *)sMalloc(sizeof(Mesh));
-    *mesh = (Mesh){};
+    *mesh = (Mesh){0};
     renderer->mesh_count++;
 
-    char directory[64] = {};
+    char directory[64] = {0};
     const char *last_sep = strrchr(path, '/');
     u32 size = last_sep - path;
     strncpy_s(directory, ARRAY_SIZE(directory), path, size);
@@ -129,7 +128,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     directory[size + 1] = '\0';
 
     cgltf_data *data;
-    cgltf_options options = {};
+    cgltf_options options = {0};
     cgltf_result result = cgltf_parse_file(&options, path, &data);
     if(result != cgltf_result_success) {
         sError("Error reading mesh");
@@ -260,7 +259,7 @@ void RendererDrawMesh(Frame *frame,
 }
 
 MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
-    MeshInstance result = {};
+    MeshInstance result = {0};
 
     Mesh *mesh = renderer->meshes[mesh_id];
     if(mesh->instance_count == mesh->instance_capacity) {

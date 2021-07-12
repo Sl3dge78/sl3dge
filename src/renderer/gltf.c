@@ -100,7 +100,7 @@ void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim,
 void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
     for(u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material *mat = &data->materials[i];
-        Material dst = {};
+        Material dst = {0};
 
         if(!mat->has_pbr_metallic_roughness) {
             // TODO Handle metallic roughness
@@ -155,7 +155,7 @@ void GLTFLoadTransforms(cgltf_data *data, Mat4 *transforms) {
         cgltf_node *parent = node->parent;
 
         while(parent) {
-            Mat4 pm = {};
+            Mat4 pm = {0};
             GLTFGetNodeTransform(parent, &pm);
 
             for(u32 j = 0; j < 4; ++j) {

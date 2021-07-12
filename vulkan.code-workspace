@@ -16,7 +16,8 @@
         "files.associations": {
             "vulkan.h": "c",
             "cgltf.h": "c",
-            "xlocale": "c"
+            "xlocale": "c",
+            "renderer.h": "c"
         }
     },
 }

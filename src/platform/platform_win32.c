@@ -112,26 +112,26 @@ internal int main(int argc, char *argv[]) {
         "Vulkan", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
     IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
 
-    PlatformAPI platform_api = {};
+    PlatformAPI platform_api = {0};
     platform_api.ReadBinary = &PlatformReadBinary;
 
-    Module renderer_module = {};
+    Module renderer_module = {0};
     Win32LoadModule(&renderer_module, "renderer");
     RendererLoadFunctions(&renderer_module);
 
     Renderer *renderer = pfn_CreateRenderer(window, &platform_api);
 
-    Module game_module = {};
+    Module game_module = {0};
     Win32LoadModule(&game_module, "game");
     GameLoadFunctions(&game_module);
 
     SDL_ShowWindow(window);
 
-    ShaderCode shader_code = {};
+    ShaderCode shader_code = {0};
     shader_code.spv_path = "resources\\shaders\\shaders.meta";
     shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
 
-    GameData game_data = {};
+    GameData game_data = {0};
 
     // Load Game API functions
     GameLoadRendererAPI(renderer, &renderer_module, &game_data);

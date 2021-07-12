@@ -77,7 +77,7 @@ internal void CreateVkShaderModule(const char *path,
     u32 *code = (u32 *)sMalloc(size);
     platform->ReadBinary(path, &size, code);
 
-    VkShaderModuleCreateInfo create_info = {};
+    VkShaderModuleCreateInfo create_info = {0};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.flags = 0;
@@ -106,7 +106,7 @@ internal void DEBUGNameObject(const VkDevice device,
                               const u64 object,
                               const VkObjectType type,
                               const char *name) {
-    VkDebugUtilsObjectNameInfoEXT name_info = {};
+    VkDebugUtilsObjectNameInfoEXT name_info = {0};
     name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
     name_info.pNext = NULL;
     name_info.objectType = type;
@@ -146,7 +146,7 @@ internal void CreateBuffer(const VkDevice device,
 
     // Create the buffer
     {
-        VkBufferCreateInfo buffer_ci = {};
+        VkBufferCreateInfo buffer_ci = {0};
         buffer_ci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         buffer_ci.pNext = NULL;
         buffer_ci.flags = 0;
@@ -161,10 +161,10 @@ internal void CreateBuffer(const VkDevice device,
     }
     // Allocate the memory
     {
-        VkMemoryRequirements requirements = {};
+        VkMemoryRequirements requirements = {0};
         vkGetBufferMemoryRequirements(device, buffer->buffer, &requirements);
 
-        VkMemoryAllocateFlagsInfo flags_info = {};
+        VkMemoryAllocateFlagsInfo flags_info = {0};
         flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
         flags_info.pNext = NULL;
         flags_info.flags = 0;
@@ -172,7 +172,7 @@ internal void CreateBuffer(const VkDevice device,
         if(buffer_usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR)
             flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 
-        VkMemoryAllocateInfo alloc_info = {};
+        VkMemoryAllocateInfo alloc_info = {0};
         alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         alloc_info.pNext = &flags_info;
         alloc_info.allocationSize = requirements.size;
@@ -229,7 +229,7 @@ internal void CreateImage(const VkDevice device,
                           const VkImageUsageFlags usage,
                           const VkMemoryPropertyFlags memory_flags,
                           Image *image) {
-    VkImageCreateInfo image_ci = {};
+    VkImageCreateInfo image_ci = {0};
     image_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_ci.pNext = NULL;
     image_ci.flags = 0;
@@ -248,16 +248,16 @@ internal void CreateImage(const VkDevice device,
 
     AssertVkResult(vkCreateImage(device, &image_ci, NULL, &image->image));
 
-    VkMemoryRequirements requirements = {};
+    VkMemoryRequirements requirements = {0};
     vkGetImageMemoryRequirements(device, image->image, &requirements);
 
-    VkMemoryAllocateFlagsInfo flags_info = {};
+    VkMemoryAllocateFlagsInfo flags_info = {0};
     flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
     flags_info.pNext = NULL;
     flags_info.flags = 0;
     flags_info.deviceMask = 0;
 
-    VkMemoryAllocateInfo alloc_info = {};
+    VkMemoryAllocateInfo alloc_info = {0};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.pNext = &flags_info;
     alloc_info.allocationSize = requirements.size;
@@ -267,7 +267,7 @@ internal void CreateImage(const VkDevice device,
 
     AssertVkResult(vkBindImageMemory(device, image->image, image->memory, 0));
 
-    VkImageViewCreateInfo image_view_ci = {};
+    VkImageViewCreateInfo image_view_ci = {0};
     image_view_ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     image_view_ci.pNext = NULL;
     image_view_ci.flags = 0;
@@ -298,7 +298,7 @@ internal void CreateMultiSampledImage(const VkDevice device,
                                       const VkMemoryPropertyFlags memory_flags,
                                       VkSampleCountFlagBits sample_count,
                                       Image *image) {
-    VkImageCreateInfo image_ci = {};
+    VkImageCreateInfo image_ci = {0};
     image_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_ci.pNext = NULL;
     image_ci.flags = 0;
@@ -317,16 +317,16 @@ internal void CreateMultiSampledImage(const VkDevice device,
 
     AssertVkResult(vkCreateImage(device, &image_ci, NULL, &image->image));
 
-    VkMemoryRequirements requirements = {};
+    VkMemoryRequirements requirements = {0};
     vkGetImageMemoryRequirements(device, image->image, &requirements);
 
-    VkMemoryAllocateFlagsInfo flags_info = {};
+    VkMemoryAllocateFlagsInfo flags_info = {0};
     flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
     flags_info.pNext = NULL;
     flags_info.flags = 0;
     flags_info.deviceMask = 0;
 
-    VkMemoryAllocateInfo alloc_info = {};
+    VkMemoryAllocateInfo alloc_info = {0};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.pNext = &flags_info;
     alloc_info.allocationSize = requirements.size;
@@ -336,7 +336,7 @@ internal void CreateMultiSampledImage(const VkDevice device,
 
     AssertVkResult(vkBindImageMemory(device, image->image, image->memory, 0));
 
-    VkImageViewCreateInfo image_view_ci = {};
+    VkImageViewCreateInfo image_view_ci = {0};
     image_view_ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     image_view_ci.pNext = NULL;
     image_view_ci.flags = 0;
@@ -357,13 +357,10 @@ internal void CreateMultiSampledImage(const VkDevice device,
     image_view_ci.subresourceRange.layerCount = 1;
     AssertVkResult(vkCreateImageView(device, &image_view_ci, NULL, &image->image_view));
 }
-// TODO: remove the pitch arg
-internal void CopyBufferToImage(VkCommandBuffer cmd,
-                                VkExtent2D extent,
-                                u32 pitch,
-                                Buffer *image_buffer,
-                                Image *image) {
-    VkBufferImageCopy region = {};
+
+internal void
+CopyBufferToImage(VkCommandBuffer cmd, VkExtent2D extent, Buffer *image_buffer, Image *image) {
+    VkBufferImageCopy region = {0};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
@@ -371,7 +368,7 @@ internal void CopyBufferToImage(VkCommandBuffer cmd,
     region.imageOffset = (VkOffset3D){0, 0, 0};
     region.imageExtent = (VkExtent3D){extent.width, extent.height, 1};
 
-    VkImageMemoryBarrier barrier = {};
+    VkImageMemoryBarrier barrier = {0};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.pNext = NULL;
     barrier.srcAccessMask = 0;
@@ -396,7 +393,7 @@ internal void CopyBufferToImage(VkCommandBuffer cmd,
     vkCmdCopyBufferToImage(
         cmd, image_buffer->buffer, image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-    VkImageMemoryBarrier barrier2 = {};
+    VkImageMemoryBarrier barrier2 = {0};
     barrier2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier2.pNext = NULL;
     barrier2.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -430,7 +427,7 @@ internal void AllocateCommandBuffers(const VkDevice device,
                                      const VkCommandPool pool,
                                      const u32 count,
                                      VkCommandBuffer *command_buffers) {
-    VkCommandBufferAllocateInfo allocate_info = {};
+    VkCommandBufferAllocateInfo allocate_info = {0};
     allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocate_info.pNext = NULL;
     allocate_info.commandPool = pool;
@@ -439,10 +436,8 @@ internal void AllocateCommandBuffers(const VkDevice device,
     AssertVkResult(vkAllocateCommandBuffers(device, &allocate_info, command_buffers));
 }
 
-internal void BeginCommandBuffer(const VkDevice device,
-                                 const VkCommandBuffer cmd,
-                                 VkCommandBufferUsageFlags flags) {
-    VkCommandBufferBeginInfo begin_info = {};
+internal void BeginCommandBuffer(const VkCommandBuffer cmd, VkCommandBufferUsageFlags flags) {
+    VkCommandBufferBeginInfo begin_info = {0};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin_info.pNext = NULL;
     begin_info.flags = flags;
@@ -454,7 +449,7 @@ internal void AllocateAndBeginCommandBuffer(const VkDevice device,
                                             const VkCommandPool pool,
                                             VkCommandBuffer *cmd) {
     AllocateCommandBuffers(device, pool, 1, cmd);
-    BeginCommandBuffer(device, *cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    BeginCommandBuffer(*cmd, VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 }
 
 internal void EndAndExecuteCommandBuffer(const VkDevice device,
@@ -491,7 +486,7 @@ internal void VulkanUpdateTextureDescriptorSet(VkDevice device,
             images_info[i].imageView = textures[i].image_view;
         }
 
-        VkWriteDescriptorSet textures_buffer = {};
+        VkWriteDescriptorSet textures_buffer = {0};
         textures_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         textures_buffer.pNext = NULL;
         textures_buffer.dstSet = set;

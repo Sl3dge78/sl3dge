@@ -12,7 +12,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
 
-    //game_data->renderer_api.LoadMesh(game_data->renderer,"resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
+    //game_data->renderer_api.LoadMesh(game_data->renderer, "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
     game_data->renderer_api.LoadMesh(game_data->renderer,
                                      "resources/3d/Motorcycle/motorcycle.gltf");
     game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
@@ -43,9 +43,9 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data) {
 
     Vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
     Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
-    Vec3 up = vec3_cross(right, forward);
+    //Vec3 up = vec3_cross(right, forward);
 
-    Vec3 movement = {};
+    Vec3 movement = {0};
     const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
 
     if(keyboard[SDL_SCANCODE_LSHIFT]) {

@@ -71,7 +71,6 @@ WIN32 :
         - Should I make my own memory allocator?
         - Remove SDL?
             > We need it for input
-            > Image loading > WIP
             > Window creating
     IMPROVEMENTS:
     IDEAS:
