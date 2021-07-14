@@ -71,7 +71,9 @@ WIN32 :
         - Should I make my own memory allocator?
         - Remove SDL?
             > We need it for input
-            > Window creating
+                - More keys
+                - Optimize keyboard entering, this is dumb
+                - Mouse
     IMPROVEMENTS:
     IDEAS:
         - In game console

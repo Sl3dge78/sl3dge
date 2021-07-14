@@ -16,7 +16,7 @@ global VkDebugUtilsMessengerEXT debug_messenger;
 //
 // ========================
 
-internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
+internal void CreateVkInstance(VkInstance *instance, PlatformAPI *platform) {
     VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "Handmade";
@@ -38,19 +38,19 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
     u32 sl3_count = 1;
     const char *sl3_extensions[1] = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
 
-    // Get SDL extensions
-    u32 sdl_count = 0;
-    SDL_Vulkan_GetInstanceExtensions(window, &sdl_count, NULL);
-    const char **sdl_extensions = (const char **)sCalloc(sdl_count, sizeof(char *));
-    SDL_Vulkan_GetInstanceExtensions(window, &sdl_count, sdl_extensions);
+    // Get platform extensions
+    u32 platform_count = 0;
+    platform->GetInstanceExtensions(&platform_count, NULL);
+    const char **platform_extensions = (const char **)sCalloc(platform_count, sizeof(char *));
+    platform->GetInstanceExtensions(&platform_count, platform_extensions);
 
-    u32 total_count = sdl_count + sl3_count;
+    u32 total_count = platform_count + sl3_count;
 
     const char **all_extensions = (const char **)sCalloc(total_count, sizeof(char *));
-    memcpy(all_extensions, sdl_extensions, sdl_count * sizeof(char *));
-    memcpy(all_extensions + sdl_count, sl3_extensions, sl3_count * sizeof(char *));
+    memcpy(all_extensions, platform_extensions, platform_count * sizeof(char *));
+    memcpy(all_extensions + platform_count, sl3_extensions, sl3_count * sizeof(char *));
 
-    sFree(sdl_extensions);
+    sFree(platform_extensions);
 
 #if defined(_DEBUG)
     sLog("Requested extensions :");
@@ -59,13 +59,10 @@ internal void CreateVkInstance(SDL_Window *window, VkInstance *instance) {
     }
 #endif
 
-    create_info.enabledExtensionCount = sdl_count + sl3_count;
+    create_info.enabledExtensionCount = total_count;
     create_info.ppEnabledExtensionNames = all_extensions;
 
-    VkResult result = vkCreateInstance(&create_info, NULL, instance);
-
-    AssertVkResult(result);
-
+    AssertVkResult(vkCreateInstance(&create_info, NULL, instance));
     sFree(all_extensions);
 
     { // Create debug messenger
@@ -255,7 +252,7 @@ internal void CreateVkDevice(VkPhysicalDevice physical_device,
     AssertVkResult(result);
 }
 
-internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapchain *swapchain) {
+internal void CreateSwapchain(const Renderer *context, Swapchain *swapchain) {
     VkSwapchainCreateInfoKHR create_info = {0};
 
     create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -318,8 +315,10 @@ internal void CreateSwapchain(const Renderer *context, SDL_Window *window, Swapc
     if(surface_capabilities.currentExtent.width != 0xFFFFFFFF) {
         extent = surface_capabilities.currentExtent;
     } else {
-        int w, h;
-        SDL_Vulkan_GetDrawableSize(window, &w, &h);
+        ASSERT(0);
+        i32 w = 1280; // TODO
+        i32 h = 720;
+        //SDL_Vulkan_GetDrawableSize(window, &w, &h);
 
         extent.width = w;
         extent.height = h;
@@ -1281,13 +1280,13 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
     render_group->clear_values[0].color = (VkClearColorValue){{0.f, 0.0f, 0.0f, 0.0f}};
 }
 
-DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platform_api) {
+DLL_EXPORT Renderer *VulkanCreateRenderer(PlatformWindow *window, PlatformAPI *platform_api) {
     Renderer *renderer = (Renderer *)sMalloc(sizeof(Renderer));
 
     renderer->platform = platform_api;
 
-    CreateVkInstance(window, &renderer->instance);
-    SDL_Vulkan_CreateSurface(window, renderer->instance, &renderer->surface);
+    CreateVkInstance(&renderer->instance, platform_api);
+    platform_api->CreateVkSurface(renderer->instance, window, &renderer->surface);
     CreateVkPhysicalDevice(renderer->instance, &renderer->physical_device);
 
     // Get device properties
@@ -1357,7 +1356,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(SDL_Window *window, PlatformAPI *platf
 
     // Swapchain
     renderer->swapchain.swapchain = VK_NULL_HANDLE;
-    CreateSwapchain(renderer, window, &renderer->swapchain);
+    CreateSwapchain(renderer, &renderer->swapchain);
 
     // TODO : pick that don't hard code it
     renderer->depth_format = VK_FORMAT_D32_SFLOAT;

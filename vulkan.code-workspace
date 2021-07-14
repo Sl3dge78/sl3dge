@@ -17,7 +17,8 @@
             "vulkan.h": "c",
             "cgltf.h": "c",
             "xlocale": "c",
-            "renderer.h": "c"
+            "renderer.h": "c",
+            "sl3dge.h": "c"
         }
     },
 }

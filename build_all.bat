@@ -6,7 +6,7 @@ SET args= -std=c17 -g -DDEBUG -D_DEBUG -DRENDERER_VULKAN -debug -D_CRT_SECURE_NO
 SET include_path=-I D:\Guigui\Work\Prog\_include\ -I %VULKAN_SDK%\include -I src/
 
 SET linker_options=-L D:\Guigui\Work\Prog\_lib -L %VULKAN_SDK%\lib -Xlinker -incremental:no
-SET libs=-lSDL2main.lib -lSDL2.lib -lSDL2_image.lib -lShell32.lib -lvulkan-1.lib
+SET libs=-lSDL2main.lib -lSDL2.lib -lSDL2_image.lib  -lvulkan-1.lib
 
 SET start_time=%TIME%
 
@@ -15,7 +15,7 @@ DEL /Q *.pdb 2> NUL
 POPD
 
 ECHO Building win32.exe
-clang %args% %include_path% src/platform/platform_win32.c -o bin/win32.exe %linker_options% %libs% -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
+clang %args% %include_path% src/platform/platform_win32.c -o bin/win32.exe %linker_options% %libs% -lShell32.lib -lUser32.lib -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 IF !ERRORLEVEL! == 0 (
     ECHO BUILD OK
 )

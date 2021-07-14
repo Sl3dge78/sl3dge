@@ -79,7 +79,7 @@ typedef struct CameraMatrices {
 
 // Platform level functions
 
-typedef Renderer *CreateRenderer_t(SDL_Window *window, PlatformAPI *platform_api);
+typedef Renderer *CreateRenderer_t(PlatformWindow *window, PlatformAPI *platform_api);
 CreateRenderer_t *pfn_CreateRenderer;
 
 typedef void DestroyRenderer_t(Renderer *renderer);

@@ -116,6 +116,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
 }
 
 u32 RendererLoadMesh(Renderer *renderer, const char *path) {
+    sLog("Loading Mesh...");
     Mesh *mesh = (Mesh *)sMalloc(sizeof(Mesh));
     *mesh = (Mesh){0};
     renderer->mesh_count++;
@@ -211,6 +212,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
 
     // TEMP: hardcoded mesh id
     renderer->meshes[0] = mesh;
+    sLog("Loading done");
     return 0;
 }
 
