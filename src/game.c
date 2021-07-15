@@ -42,39 +42,39 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     //Vec3 up = vec3_cross(right, forward);
 
     Vec3 movement = {0};
-    const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
+    //const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
 
-    if(keyboard[SDL_SCANCODE_LSHIFT]) { // TODO input
+    if(input->keyboard[SCANCODE_LSHIFT] & KEY_PRESSED) { // TODO input
         move_speed *= 10.0f;
     }
 
-    if(input->keyboard[KEY_W]) {
+    if(input->keyboard[SCANCODE_W] & KEY_PRESSED) {
         movement = vec3_add(movement, vec3_fmul(forward, move_speed));
     }
-    if(input->keyboard[KEY_S]) {
+    if(input->keyboard[SCANCODE_S] & KEY_PRESSED) {
         movement = vec3_add(movement, vec3_fmul(forward, -move_speed));
     }
-    if(input->keyboard[KEY_A]) {
+    if(input->keyboard[SCANCODE_A] & KEY_PRESSED) {
         movement = vec3_add(movement, vec3_fmul(right, -move_speed));
     }
-    if(input->keyboard[KEY_D]) {
+    if(input->keyboard[SCANCODE_D] & KEY_PRESSED) {
         movement = vec3_add(movement, vec3_fmul(right, move_speed));
     }
-    if(input->keyboard[KEY_Q]) {
+    if(input->keyboard[SCANCODE_Q] & KEY_PRESSED) {
         movement.y -= move_speed;
     }
-    if(input->keyboard[KEY_E]) {
+    if(input->keyboard[SCANCODE_E] & KEY_PRESSED) {
         movement.y += move_speed;
     }
 
     // Reset
-    if(keyboard[SDL_SCANCODE_SPACE]) { // TODO input
+    if(input->keyboard[SCANCODE_SPACE] & KEY_PRESSED) { // TODO input
         // GameStart(game_data);
         game_data->position = (Vec3){0.0f, 0, 0};
         *game_data->moto.transform = mat4_identity();
     }
 
-    if(keyboard[SDL_SCANCODE_P]) { // TODO input
+    if(input->keyboard[SCANCODE_P] & KEY_PRESSED) { // TODO input
         game_data->cos += delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
@@ -85,7 +85,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         game_data->renderer_api.SetSunDirection(
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
-    if(keyboard[SDL_SCANCODE_O]) { // TODO input
+    if(input->keyboard[SCANCODE_O] & KEY_PRESSED) { // TODO input
         game_data->cos -= delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
@@ -96,7 +96,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
 
-    if(keyboard[SDL_SCANCODE_M]) {
+    if(input->keyboard[SDL_SCANCODE_M] & KEY_PRESSED) {
         game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
     }
 

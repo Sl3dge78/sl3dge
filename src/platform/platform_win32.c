@@ -88,16 +88,9 @@ void PlatformGetInstanceExtensions(u32 *count, const char **extensions) {
 }
 
 i64 PlatformGetTicks() {
-    static i64 frequency = 0;
-    if(!frequency) {
-        LARGE_INTEGER freq;
-        QueryPerformanceFrequency(&freq);
-        frequency = freq.QuadPart;
-    }
-
     LARGE_INTEGER ticks;
     QueryPerformanceCounter(&ticks);
-    return ticks.QuadPart / frequency;
+    return ticks.QuadPart;
 }
 
 // if result is NULL, function will query the file size for allocation in file_size.
@@ -144,8 +137,40 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         sLog("WM_CLOSE");
         PostQuitMessage(0);
         return 0;
-
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN: sError("This is bad dude!"); return 0;
     default: return DefWindowProc(hwnd, msg, wparam, lparam);
+    }
+}
+
+void Win32HandleKeyboardMessages(LPARAM lparam, GameInput *input) {
+    u32 scancode = (lparam >> 16) & 0x7F;
+    bool is_down = !(lparam & (1 << 31));
+    bool was_down = !(lparam & (1 << 30));
+    u8 value = 0;
+    if(is_down) {
+        value |= KEY_PRESSED;
+        //sLog("Keydown : 0x%x", scancode);
+        if(!was_down)
+            value |= KEY_DOWN;
+    } else if(was_down) {
+        value |= KEY_UP;
+    }
+
+    input->keyboard[scancode] = value;
+}
+
+void Win32ProcessMessages(MSG *msg, GameInput *input) {
+    switch(msg->message) {
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP: Win32HandleKeyboardMessages(msg->lParam, input); return;
+
+    default:
+        TranslateMessage(msg);
+        DispatchMessage(msg);
+        break;
     }
 }
 
@@ -179,35 +204,6 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
     return true;
 }
 
-enum Win32ScanCodes {
-    WIN32_Q = 0x10,
-    WIN32_W = 0x11,
-    WIN32_E = 0x12,
-    WIN32_A = 0x1E,
-    WIN32_S = 0x1F,
-    WIN32_D = 0x20,
-    WIN32_SPACE = 0x39
-};
-
-void Win32PrintScanCode(const char c) {
-    u32 vkeycode = MapVirtualKey(LOBYTE(VkKeyScan(c)), 0);
-    sLog("%c %x", c, vkeycode);
-}
-
-// There are probably better ways to handle this
-// TODO input update the mouse
-void Win32UpdateInput(GameInput *input) {
-    BYTE win32_keyboard[256];
-    GetKeyboardState(win32_keyboard);
-
-    input->keyboard[KEY_Q] = win32_keyboard[MapVirtualKey(WIN32_Q, 1)] & 0x80;
-    input->keyboard[KEY_W] = win32_keyboard[MapVirtualKey(WIN32_W, 1)] & 0x80;
-    input->keyboard[KEY_E] = win32_keyboard[MapVirtualKey(WIN32_E, 1)] & 0x80;
-    input->keyboard[KEY_A] = win32_keyboard[MapVirtualKey(WIN32_A, 1)] & 0x80;
-    input->keyboard[KEY_S] = win32_keyboard[MapVirtualKey(WIN32_S, 1)] & 0x80;
-    input->keyboard[KEY_D] = win32_keyboard[MapVirtualKey(WIN32_D, 1)] & 0x80;
-}
-
 i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, INT cmd_show) {
     AttachConsole(ATTACH_PARENT_PROCESS);
     stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
@@ -238,17 +234,11 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
 
     GameData game_data = {0};
+    GameInput input = {0};
     Win32GameLoadRendererAPI(renderer, &renderer_module, &game_data);
 
     ShowWindow(window.hwnd, cmd_show);
     pfn_GameStart(&game_data);
-
-    Win32PrintScanCode('S');
-    Win32PrintScanCode('Z');
-    Win32PrintScanCode('D');
-    Win32PrintScanCode('A');
-    Win32PrintScanCode('E');
-    Win32PrintScanCode(' ');
 
     bool running = true;
     f32 delta_time = 0;
@@ -258,7 +248,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         {
             // Sync
             i64 time = PlatformGetTicks();
-            delta_time = (float)(time - frame_start) / 1000.f;
+            delta_time = (float)(time - frame_start) / 10000000.f;
             frame_start = time;
         }
 
@@ -266,8 +256,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         while(PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE)) {
             BOOL value = GetMessage(&msg, NULL, 0, 0);
             if(value != 0) {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                Win32ProcessMessages(&msg, &input);
             } else if(value == 0) {
                 running = false;
                 break;
@@ -275,20 +264,19 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 sError("WIN32 : Message error");
             }
         }
-        GameInput input = {0};
-        Win32UpdateInput(&input);
+
         pfn_GameLoop(delta_time, &game_data, &input);
         pfn_DrawFrame(renderer);
 
         {
             // 60 fps cap
-            i32 now = PlatformGetTicks();
-            i32 frame_time_ms = (now - frame_start);
+            i64 now = PlatformGetTicks();
+            i64 frame_time_ms = (now - frame_start) / 10000;
             char title[40];
             f32 idle_percent = frame_time_ms / (1000.0f / 60.0f);
             idle_percent = 1 - idle_percent;
             idle_percent *= 100.0f;
-            snprintf(title, 40, "Frametime : %dms Idle: %2.f%%", frame_time_ms, idle_percent);
+            snprintf(title, 40, "Frametime : %lldms Idle: %2.f%%", frame_time_ms, idle_percent);
             SetWindowText(window.hwnd, title);
             if(frame_time_ms < 1.0f / 0.06) {
                 Sleep(16.6 - frame_time_ms);

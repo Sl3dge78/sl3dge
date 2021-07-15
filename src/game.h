@@ -5,10 +5,8 @@
 
 #include "renderer/renderer.h"
 
-enum Keys { KEY_A, KEY_D, KEY_E, KEY_Q, KEY_S, KEY_W, KEY_LSHIFT, KEY_COUNT };
-
 typedef struct GameInput {
-    u32 keyboard[KEY_COUNT];
+    Keyboard keyboard;
     u8 mouse;
     i32 mouse_x;
     i32 mouse_y;

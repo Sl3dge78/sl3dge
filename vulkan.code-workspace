@@ -18,7 +18,8 @@
             "cgltf.h": "c",
             "xlocale": "c",
             "renderer.h": "c",
-            "sl3dge.h": "c"
+            "sl3dge.h": "c",
+            "cmath": "c"
         }
     },
 }
