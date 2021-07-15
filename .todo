@@ -27,24 +27,18 @@ RENDERER:
                 ? Spliting the renderer in two (backend/frontend) could make it possible to reload the backend only.
                     > Frontend has mesh data and all and sends it to the backend on reload
                     > Backend is the current stuff
+                ? Push all rendering data each frame. Seems dumbs but it could work. Easy to multithread. Works with a procedural approach.
         - Dynamic array of meshes
             - Take a decision on frontend/backend first
         ? Split the way we store render data
             > Renderer has list of meshes
             > Game has pointer to these meshes and their xform info
                 > To render, pack this all up and send it to the renderer
-        - Make sure that we can load different GLTF, I think the mat id and tex id are hardcoded
+        - !!!!Make sure that we can load different GLTF, I think the mat id and tex id are hardcoded
 
     MAJOR:
-        - Descriptor set 0 > could be the same for all pipelines
-            > Could have the camera matrices and the shadowmap sampler
-
     BACKLOG:
         - Window Resize > Pipline dynamic states ?
-        - Mipmaps
-        - Volumetric clouds?
-        - Have a look at vkCmdDrawIndirect
-        - Maybe use rayquery for shadows?
 
     IMPROVEMENTS:
         - Can't create a scene without textures
@@ -54,7 +48,14 @@ RENDERER:
         - Pick the device according to our specs
         - Pipeline dynamic state
         - Apparently we should only allocate big stacks of memory
-
+    IDEAS:
+        - Volumetric clouds
+        - Mipmaps
+        - Have a look at vkCmdDrawIndirect
+        - Maybe use rayquery for shadows?
+        - Group descrptor sets
+            - Descriptor set 0 > could be the same for all pipelines
+            > Could have the camera matrices and the shadowmap sampler
 GLTF:
     CRITICAL:
     MAJOR:
@@ -68,12 +69,9 @@ WIN32 :
     CRITICAL:
     MAJOR:
     BACKLOG:
-        - Should I make my own memory allocator?
-        - Remove SDL?
-            > We need it for input
-                - More keys
-                - Optimize keyboard entering, this is dumb
-                - Mouse
+        - Figure out sleep
+        - Figure out multithreading
     IMPROVEMENTS:
     IDEAS:
         - In game console
+        - Should I make my own memory allocator?

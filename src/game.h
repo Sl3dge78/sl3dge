@@ -5,16 +5,10 @@
 
 #include "renderer/renderer.h"
 
-typedef struct GameInput {
-    Keyboard keyboard;
-    u8 mouse;
-    i32 mouse_x;
-    i32 mouse_y;
-} GameInput;
-
 typedef struct GameData {
     Renderer *renderer;
     RendererGameAPI renderer_api;
+    PlatformAPI platform_api;
     Vec3 position;
     Vec2f spherical_coordinates;
     Vec3 light_pos;

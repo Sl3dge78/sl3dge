@@ -6,7 +6,7 @@ SET args= -std=c17 -g -DDEBUG -D_DEBUG -DRENDERER_VULKAN -debug -D_CRT_SECURE_NO
 SET include_path=-I D:\Guigui\Work\Prog\_include\ -I %VULKAN_SDK%\include -I src/
 
 SET linker_options=-L D:\Guigui\Work\Prog\_lib -L %VULKAN_SDK%\lib -Xlinker -incremental:no
-SET libs=-lSDL2main.lib -lSDL2.lib -lSDL2_image.lib  -lvulkan-1.lib
+SET libs= -lvulkan-1.lib
 
 SET start_time=%TIME%
 

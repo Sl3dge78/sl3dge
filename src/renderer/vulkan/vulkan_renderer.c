@@ -1,5 +1,3 @@
-#include <SDL/SDL_image.h>
-#include <SDL/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
 #include "game.h"

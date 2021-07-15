@@ -5,10 +5,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define __WIN32__
 #include <windows.h>
-
-#include <SDL/SDL.h>
-#include <SDL/SDL_image.h>
 
 // Surface creation
 #include <vulkan/vulkan_core.h>
@@ -22,6 +20,7 @@
 #include "renderer/renderer.h"
 
 global HANDLE stderrHandle;
+global bool mouse_captured; // TODO this probably shouldn't be a global
 
 typedef struct ShaderCode {
     const char *spv_path;
@@ -93,6 +92,19 @@ i64 PlatformGetTicks() {
     return ticks.QuadPart;
 }
 
+void PlatformSetCaptureMouse(bool val) {
+    if(mouse_captured == val)
+        return;
+    if(val) {
+        SetCapture(GetActiveWindow());
+        ShowCursor(FALSE);
+    } else {
+        ReleaseCapture();
+        ShowCursor(TRUE);
+    }
+    mouse_captured = val;
+}
+
 // if result is NULL, function will query the file size for allocation in file_size.
 void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     FILE *file;
@@ -132,11 +144,8 @@ void Win32Log(const char *message, u8 level) {
 
 LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch(msg) {
-    case WM_DESTROY: sLog("WM_DESTROY"); return 0;
-    case WM_CLOSE:
-        sLog("WM_CLOSE");
-        PostQuitMessage(0);
-        return 0;
+    case WM_DESTROY: sWarn("WM_DESTROY"); return 0;
+    case WM_CLOSE: PostQuitMessage(0); return 0;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN: sError("This is bad dude!"); return 0;
     default: return DefWindowProc(hwnd, msg, wparam, lparam);
@@ -150,7 +159,7 @@ void Win32HandleKeyboardMessages(LPARAM lparam, GameInput *input) {
     u8 value = 0;
     if(is_down) {
         value |= KEY_PRESSED;
-        //sLog("Keydown : 0x%x", scancode);
+        sTrace("Keydown : 0x%x", scancode);
         if(!was_down)
             value |= KEY_DOWN;
     } else if(was_down) {
@@ -166,7 +175,12 @@ void Win32ProcessMessages(MSG *msg, GameInput *input) {
     case WM_SYSKEYDOWN:
     case WM_KEYUP:
     case WM_SYSKEYUP: Win32HandleKeyboardMessages(msg->lParam, input); return;
-
+    case WM_LBUTTONDOWN: input->mouse |= MOUSE_LEFT; return;
+    case WM_LBUTTONUP: input->mouse &= ~MOUSE_LEFT; return;
+    case WM_MBUTTONDOWN: input->mouse |= MOUSE_MIDDLE; return;
+    case WM_MBUTTONUP: input->mouse &= ~MOUSE_MIDDLE; return;
+    case WM_RBUTTONDOWN: input->mouse |= MOUSE_RIGHT; return;
+    case WM_RBUTTONUP: input->mouse &= ~MOUSE_RIGHT; return;
     default:
         TranslateMessage(msg);
         DispatchMessage(msg);
@@ -218,6 +232,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     platform_api.ReadBinary = &PlatformReadBinary;
     platform_api.CreateVkSurface = &PlatformCreateVkSurface;
     platform_api.GetInstanceExtensions = &PlatformGetInstanceExtensions;
+    platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
 
     Module renderer_module = {0};
     Win32LoadModule(&renderer_module, "renderer");
@@ -235,6 +250,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
 
     GameData game_data = {0};
     GameInput input = {0};
+    game_data.platform_api = platform_api;
     Win32GameLoadRendererAPI(renderer, &renderer_module, &game_data);
 
     ShowWindow(window.hwnd, cmd_show);
@@ -250,6 +266,44 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             i64 time = PlatformGetTicks();
             delta_time = (float)(time - frame_start) / 10000000.f;
             frame_start = time;
+        }
+
+        RECT window_size;
+        GetWindowRect(window.hwnd, &window_size);
+
+        { // Hot Reloading
+            if(Win32ShouldReloadModule(&game_module)) {
+                Win32CloseModule(&game_module);
+                Win32LoadModule(&game_module, "game");
+                Win32GameLoadFunctions(&game_module);
+                sLog("Game code reloaded");
+            }
+
+            // Reload shaders if necessary
+            FILETIME shader_time = Win32GetLastWriteTime(shader_code.spv_path);
+            if(CompareFileTime(&shader_code.last_write_time, &shader_time)) {
+                shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
+                pfn_ReloadShaders(renderer);
+                sLog("Shaders reloaded");
+            }
+        }
+
+        { // Mouse Position
+            POINT pos;
+            GetCursorPos(&pos);
+            input.mouse_delta_x = pos.x - input.mouse_x;
+            input.mouse_delta_y = pos.y - input.mouse_y;
+
+            if(mouse_captured) {
+                u32 center_x = window_size.left + window_size.right / 2;
+                u32 center_y = window_size.top + window_size.bottom / 2;
+                input.mouse_x = center_x;
+                input.mouse_y = center_y;
+                SetCursorPos(center_x, center_y);
+            } else {
+                input.mouse_x = pos.x;
+                input.mouse_y = pos.y;
+            }
         }
 
         MSG msg = {0};
@@ -270,17 +324,29 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
 
         {
             // 60 fps cap
+            const i64 max_frame_time = 10000000.0f / 60.f;
             i64 now = PlatformGetTicks();
-            i64 frame_time_ms = (now - frame_start) / 10000;
-            char title[40];
-            f32 idle_percent = frame_time_ms / (1000.0f / 60.0f);
-            idle_percent = 1 - idle_percent;
-            idle_percent *= 100.0f;
-            snprintf(title, 40, "Frametime : %lldms Idle: %2.f%%", frame_time_ms, idle_percent);
-            SetWindowText(window.hwnd, title);
-            if(frame_time_ms < 1.0f / 0.06) {
-                Sleep(16.6 - frame_time_ms);
+            i64 frame_time_us = (now - frame_start);
+            i64 sleep_time = max_frame_time - frame_time_us;
+
+            f32 percent = (f32)frame_time_us / (f32)max_frame_time * 100.0f;
+
+            char title[64];
+            snprintf(title,
+                     40,
+                     "FPS : %.2f | %lldms | %2.f%% | %s",
+                     10000000.0f / frame_time_us,
+                     frame_time_us / 10000,
+                     percent,
+                     sleep_time > 0 ? "CPU" : "GPU");
+
+            while(sleep_time > 0) {
+                now = PlatformGetTicks();
+                frame_time_us = (now - frame_start);
+                sleep_time = max_frame_time - frame_time_us;
             }
+
+            SetWindowText(window.hwnd, title);
         }
     }
     pfn_DestroyRenderer(renderer);
@@ -291,132 +357,17 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
 
     return 0;
 }
-
 /*
-
-internal int main(int argc, char *argv[]) {
-#if DEBUG
-    //AllocConsole(); // This might be needed
-    AttachConsole(ATTACH_PARENT_PROCESS);
-    stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
-#endif
-
-    sLogSetCallback(&Win32Log);
-    sLogLevel(LOG_LEVEL_LOG);
-
-    SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Window *window = SDL_CreateWindow(
-        "Vulkan", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_VULKAN);
-    IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
-
-    PlatformAPI platform_api = {0};
-    platform_api.ReadBinary = &PlatformReadBinary;
-
-    Module renderer_module = {0};
-    Win32LoadModule(&renderer_module, "renderer");
-    RendererLoadFunctions(&renderer_module);
-
-    Renderer *renderer = pfn_CreateRenderer(window, &platform_api);
-
-    Module game_module = {0};
-    Win32LoadModule(&game_module, "game");
-    GameLoadFunctions(&game_module);
-
-    SDL_ShowWindow(window);
-
-    ShaderCode shader_code = {0};
-    shader_code.spv_path = "resources\\shaders\\shaders.meta";
-    shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
-
-    GameData game_data = {0};
-
-    // Load Game API functions
-    GameLoadRendererAPI(renderer, &renderer_module, &game_data);
-    pfn_GameStart(&game_data);
-
-    bool running = true;
-    float delta_time = 0;
-    int frame_start = SDL_GetTicks();
-
-    SDL_Event event;
-    while(running) {
-        {
-            // Sync
-            int time = SDL_GetTicks();
-            delta_time = (float)(time - frame_start) / 1000.f;
-            frame_start = time;
-        }
-
-        // Reload vulkan if necessary
-        if(Win32ShouldReloadModule(&renderer_module)) {
-            pfn_DestroyRenderer(renderer);
-            Win32CloseModule(&renderer_module);
-
-            Win32LoadModule(&renderer_module, "renderer");
-            RendererLoadFunctions(&renderer_module);
-            renderer = pfn_CreateRenderer(window, &platform_api);
-            GameLoadRendererAPI(renderer, &renderer_module, &game_data);
-
-            sLog("Vulkan reloaded");
-        }
-
-
-        // Reload gamecode if necessary
-        if(Win32ShouldReloadModule(&game_module)) {
-            Win32CloseModule(&game_module);
-            Win32LoadModule(&game_module, "game");
-            GameLoadFunctions(&game_module);
-            sTrace("Game code reloaded");
-        }
-
-        // Reload shaders if necessary
-        FILETIME shader_time = Win32GetLastWriteTime(shader_code.spv_path);
-        if(CompareFileTime(&shader_code.last_write_time, &shader_time)) {
-            shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
-            pfn_ReloadShaders(renderer);
-            sTrace("Shaders reloaded");
-        }
-
-        while(SDL_PollEvent(&event)) {
-            if(event.type == SDL_QUIT) {
-                sLog("Quit!");
-                SDL_HideWindow(window);
-                running = false;
-            }
-        }
-
-        pfn_GameLoop(delta_time, &game_data);
-        pfn_DrawFrame(renderer);
-
-        {
-            // 60 fps cap
-
-            i32 now = SDL_GetTicks();
-            i32 frame_time_ms = now - frame_start;
-            char title[40];
-            f32 idle_percent = frame_time_ms / (1000.0f / 60.0f);
-            idle_percent = 1 - idle_percent;
-            idle_percent *= 100.0f;
-            snprintf(title, 40, "Frametime : %dms Idle: %2.f%%", frame_time_ms, idle_percent);
-            SDL_SetWindowTitle(window, title);
-            if(frame_time_ms < 1.0f / 0.06) {
-                Sleep(16.6 - frame_time_ms);
-            }
-        }
-    }
-
+// Reload vulkan if necessary
+if(Win32ShouldReloadModule(&renderer_module)) {
     pfn_DestroyRenderer(renderer);
-
-    Win32CloseModule(&game_module);
-
     Win32CloseModule(&renderer_module);
 
-    SDL_DestroyWindow(window);
-    IMG_Quit();
-    SDL_Quit();
+    Win32LoadModule(&renderer_module, "renderer");
+    RendererLoadFunctions(&renderer_module);
+    renderer = pfn_CreateRenderer(window, &platform_api);
+    GameLoadRendererAPI(renderer, &renderer_module, &game_data);
 
-    DBG_END();
-
-    return (0);
+    sLog("Vulkan reloaded");
 }
 */

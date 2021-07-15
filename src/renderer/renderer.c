@@ -1,4 +1,3 @@
-#include <SDL/SDL.h>
 #include <sl3dge-utils/sl3dge.h>
 
 #include "renderer/renderer.h"

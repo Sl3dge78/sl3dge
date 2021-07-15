@@ -19,7 +19,9 @@
             "xlocale": "c",
             "renderer.h": "c",
             "sl3dge.h": "c",
-            "cmath": "c"
+            "cmath": "c",
+            "slogging.h": "c",
+            "smodule.h": "c"
         }
     },
 }

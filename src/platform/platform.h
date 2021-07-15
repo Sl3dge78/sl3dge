@@ -17,15 +17,19 @@ DLL_EXPORT PlatformCreateVkSurface_t PlatformCreateVkSurface;
 typedef void PlatformGetInstanceExtensions_t(u32 *count, const char **extensions);
 DLL_EXPORT PlatformGetInstanceExtensions_t PlatformGetInstanceExtensions;
 
+typedef void PlatformSetCaptureMouse_t(bool val);
+DLL_EXPORT PlatformSetCaptureMouse_t PlatformSetCaptureMouse;
+
 typedef struct PlatformAPI {
     PlatformReadBinary_t *ReadBinary;
     PlatformCreateVkSurface_t *CreateVkSurface;
     PlatformGetInstanceExtensions_t *GetInstanceExtensions;
+    PlatformSetCaptureMouse_t *SetCaptureMouse;
 } PlatformAPI;
 
-#define MOUSE_LEFT 0
-#define MOUSE_MIDDLE 1
-#define MOUSE_RIGHT 2
+#define MOUSE_LEFT 1
+#define MOUSE_MIDDLE 2
+#define MOUSE_RIGHT 4
 
 enum KeyState {
     KEY_NOTPRESSED = 0x0,
@@ -49,5 +53,14 @@ enum ScanCodes {
 };
 
 typedef u8 Keyboard[256];
+
+typedef struct GameInput {
+    Keyboard keyboard;
+    u8 mouse;
+    i32 mouse_x;
+    i32 mouse_delta_x;
+    i32 mouse_y;
+    i32 mouse_delta_y;
+} GameInput;
 
 #endif

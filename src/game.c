@@ -1,8 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <SDL/SDL.h>
-
 #include <sl3dge-utils/sl3dge.h>
 
 #include "game.h"
@@ -11,7 +9,13 @@
 DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
-
+    /*
+    game_data->cos = 0.0f;
+    game_data->light_pos.x = cos(game_data->cos);
+    game_data->light_pos.y = sin(game_data->cos);
+    */
+    game_data->renderer_api.SetSunDirection(game_data->renderer,
+                                            vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     //game_data->renderer_api.LoadMesh(game_data->renderer, "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
     game_data->renderer_api.LoadMesh(game_data->renderer,
                                      "resources/3d/Motorcycle/motorcycle.gltf");
@@ -23,18 +27,19 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     f32 look_speed = 0.01f;
 
     if(input->mouse & MOUSE_RIGHT) {
-        if(input->mouse_x != 0) {
-            game_data->spherical_coordinates.x += look_speed * input->mouse_x;
+        if(input->mouse_delta_x != 0) {
+            game_data->spherical_coordinates.x += look_speed * input->mouse_delta_x;
         }
-        if(input->mouse_y != 0) {
-            float new_rot = game_data->spherical_coordinates.y + look_speed * input->mouse_y;
+        if(input->mouse_delta_y != 0) {
+            float new_rot = game_data->spherical_coordinates.y + look_speed * input->mouse_delta_y;
             if(new_rot > -PI / 2.0f && new_rot < PI / 2.0f) {
                 game_data->spherical_coordinates.y = new_rot;
             }
         }
-        SDL_SetRelativeMouseMode(SDL_TRUE); // TODO input
+        game_data->platform_api.SetCaptureMouse(true);
+
     } else {
-        SDL_SetRelativeMouseMode(SDL_FALSE);
+        game_data->platform_api.SetCaptureMouse(false);
     }
 
     Vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
@@ -42,9 +47,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     //Vec3 up = vec3_cross(right, forward);
 
     Vec3 movement = {0};
-    //const Uint8 *keyboard = SDL_GetKeyboardState(NULL);
 
-    if(input->keyboard[SCANCODE_LSHIFT] & KEY_PRESSED) { // TODO input
+    if(input->keyboard[SCANCODE_LSHIFT] & KEY_PRESSED) {
         move_speed *= 10.0f;
     }
 
@@ -68,13 +72,13 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     }
 
     // Reset
-    if(input->keyboard[SCANCODE_SPACE] & KEY_PRESSED) { // TODO input
+    if(input->keyboard[SCANCODE_SPACE] & KEY_PRESSED) {
         // GameStart(game_data);
         game_data->position = (Vec3){0.0f, 0, 0};
         *game_data->moto.transform = mat4_identity();
     }
 
-    if(input->keyboard[SCANCODE_P] & KEY_PRESSED) { // TODO input
+    if(input->keyboard[SCANCODE_P] & KEY_PRESSED) {
         game_data->cos += delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
@@ -85,7 +89,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         game_data->renderer_api.SetSunDirection(
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
-    if(input->keyboard[SCANCODE_O] & KEY_PRESSED) { // TODO input
+    if(input->keyboard[SCANCODE_O] & KEY_PRESSED) {
         game_data->cos -= delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
@@ -96,7 +100,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
 
-    if(input->keyboard[SDL_SCANCODE_M] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_M] & KEY_PRESSED) {
         game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
     }
 

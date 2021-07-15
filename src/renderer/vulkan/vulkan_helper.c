@@ -4,7 +4,6 @@
 #define VULKAN_HELPER_CPP
 
 #include <vulkan/vulkan.h>
-#include <SDL/SDL.h>
 #include <sl3dge-utils/sl3dge.h>
 
 #include "platform/platform.h"
