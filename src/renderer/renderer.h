@@ -90,11 +90,15 @@ RendererReloadShaders_t *pfn_ReloadShaders;
 typedef void DrawFrame_t(Renderer *renderer);
 DrawFrame_t *pfn_DrawFrame;
 
+typedef void UpdateWindow_t(Renderer *renderer, PlatformWindow *window);
+UpdateWindow_t *pfn_UpdateWindow;
+
 typedef struct RendererPlatformAPI {
     CreateRenderer_t *CreateRenderer;
     DestroyRenderer_t *DestroyRenderer;
     RendererReloadShaders_t *ReloadShaders;
     DrawFrame_t *DrawFrame;
+    UpdateWindow_t *UpdateWindow;
 } RendererPlatformAPI;
 
 // Game functions

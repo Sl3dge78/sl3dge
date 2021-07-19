@@ -37,8 +37,11 @@ RENDERER:
         - !!!!Make sure that we can load different GLTF, I think the mat id and tex id are hardcoded
 
     MAJOR:
+        - Have a way to update render groups without recreating the whole thing? What we do in UpdateWindow is kind of a cheat.
+        - Dynamic Volumetric Fog resolution for perf
+
     BACKLOG:
-        - Window Resize > Pipline dynamic states ?
+        - UI
 
     IMPROVEMENTS:
         - Can't create a scene without textures
@@ -64,12 +67,12 @@ GLTF:
     BACKLOG:
     IMPROVEMENTS:
     IDEAS:
+        - This is our last dependency. It looks super annoying to handle.
 
 WIN32 :
     CRITICAL:
     MAJOR:
     BACKLOG:
-        - Figure out sleep
         - Figure out multithreading
     IMPROVEMENTS:
     IDEAS:

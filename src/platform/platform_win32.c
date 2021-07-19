@@ -19,9 +19,6 @@
 #include "game.h"
 #include "renderer/renderer.h"
 
-global HANDLE stderrHandle;
-global bool mouse_captured; // TODO this probably shouldn't be a global
-
 typedef struct ShaderCode {
     const char *spv_path;
     FILETIME last_write_time;
@@ -31,6 +28,15 @@ typedef struct PlatformWindow {
     HWND hwnd;
     HINSTANCE hinstance;
 } PlatformWindow;
+
+/* GLOBALS */
+
+global HANDLE stderrHandle;
+global bool mouse_captured; // TODO this probably shouldn't be a global
+global Renderer *renderer;
+global PlatformWindow global_window;
+
+/* FUNCTIONS */
 
 void Win32GameLoadFunctions(Module *dll) {
     pfn_GameStart = (GameStart_t *)GetProcAddress(dll->dll, "GameStart");
@@ -65,6 +71,8 @@ void Win32RendererLoadFunctions(Module *dll) {
     ASSERT(pfn_ReloadShaders);
     pfn_DrawFrame = (DrawFrame_t *)GetProcAddress(dll->dll, "VulkanDrawFrame");
     ASSERT(pfn_DrawFrame);
+    pfn_UpdateWindow = (UpdateWindow_t *)GetProcAddress(dll->dll, "VulkanUpdateWindow");
+    ASSERT(pfn_UpdateWindow);
 }
 
 void PlatformCreateVkSurface(VkInstance instance, PlatformWindow *window, VkSurfaceKHR *surface) {
@@ -147,7 +155,14 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     case WM_DESTROY: sWarn("WM_DESTROY"); return 0;
     case WM_CLOSE: PostQuitMessage(0); return 0;
     case WM_KEYDOWN:
-    case WM_SYSKEYDOWN: sError("This is bad dude!"); return 0;
+    case WM_SYSKEYDOWN:
+        sError("Keydown intercepted in window proc, this shouldn't happen");
+        return 0;
+    case WM_SIZE:
+    case WM_SIZING: {
+        pfn_UpdateWindow(renderer, &global_window);
+        return 0;
+    }
     default: return DefWindowProc(hwnd, msg, wparam, lparam);
     }
 }
@@ -167,25 +182,6 @@ void Win32HandleKeyboardMessages(LPARAM lparam, GameInput *input) {
     }
 
     input->keyboard[scancode] = value;
-}
-
-void Win32ProcessMessages(MSG *msg, GameInput *input) {
-    switch(msg->message) {
-    case WM_KEYDOWN:
-    case WM_SYSKEYDOWN:
-    case WM_KEYUP:
-    case WM_SYSKEYUP: Win32HandleKeyboardMessages(msg->lParam, input); return;
-    case WM_LBUTTONDOWN: input->mouse |= MOUSE_LEFT; return;
-    case WM_LBUTTONUP: input->mouse &= ~MOUSE_LEFT; return;
-    case WM_MBUTTONDOWN: input->mouse |= MOUSE_MIDDLE; return;
-    case WM_MBUTTONUP: input->mouse &= ~MOUSE_MIDDLE; return;
-    case WM_RBUTTONDOWN: input->mouse |= MOUSE_RIGHT; return;
-    case WM_RBUTTONUP: input->mouse &= ~MOUSE_RIGHT; return;
-    default:
-        TranslateMessage(msg);
-        DispatchMessage(msg);
-        break;
-    }
 }
 
 bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
@@ -215,6 +211,8 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
     window->hinstance = instance;
     window->hwnd = hwnd;
 
+    //SetWindowLongPtr(window->hwnd, 0, window);
+
     return true;
 }
 
@@ -223,8 +221,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
     sLogSetCallback(&Win32Log);
 
-    PlatformWindow window = {0};
-    if(!Win32CreateWindow(instance, &window)) {
+    if(!Win32CreateWindow(instance, &global_window)) {
         return -1;
     }
 
@@ -238,7 +235,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     Win32LoadModule(&renderer_module, "renderer");
     Win32RendererLoadFunctions(&renderer_module);
 
-    Renderer *renderer = pfn_CreateRenderer(&window, &platform_api);
+    renderer = pfn_CreateRenderer(&global_window, &platform_api);
 
     Module game_module = {0};
     Win32LoadModule(&game_module, "game");
@@ -253,7 +250,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     game_data.platform_api = platform_api;
     Win32GameLoadRendererAPI(renderer, &renderer_module, &game_data);
 
-    ShowWindow(window.hwnd, cmd_show);
+    ShowWindow(global_window.hwnd, cmd_show);
     pfn_GameStart(&game_data);
 
     bool running = true;
@@ -269,7 +266,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         }
 
         RECT window_size;
-        GetWindowRect(window.hwnd, &window_size);
+        GetWindowRect(global_window.hwnd, &window_size);
 
         { // Hot Reloading
             if(Win32ShouldReloadModule(&game_module)) {
@@ -309,8 +306,25 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         MSG msg = {0};
         while(PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE)) {
             BOOL value = GetMessage(&msg, NULL, 0, 0);
+            TranslateMessage(&msg);
             if(value != 0) {
-                Win32ProcessMessages(&msg, &input);
+                switch(msg.message) {
+                case WM_KEYDOWN:
+                case WM_SYSKEYDOWN:
+                case WM_KEYUP:
+                case WM_SYSKEYUP: Win32HandleKeyboardMessages(msg.lParam, &input); break;
+                case WM_LBUTTONDOWN: input.mouse |= MOUSE_LEFT; break;
+                case WM_LBUTTONUP: input.mouse &= ~MOUSE_LEFT; break;
+                case WM_MBUTTONDOWN: input.mouse |= MOUSE_MIDDLE; break;
+                case WM_MBUTTONUP: input.mouse &= ~MOUSE_MIDDLE; break;
+                case WM_RBUTTONDOWN: input.mouse |= MOUSE_RIGHT; break;
+                case WM_RBUTTONUP: input.mouse &= ~MOUSE_RIGHT; break;
+                case WM_EXITSIZEMOVE: sLog("exit!"); break;
+                default:
+                    //sLog("MSG: %x", msg.message);
+                    DispatchMessage(&msg);
+                    break;
+                }
             } else if(value == 0) {
                 running = false;
                 break;
@@ -346,7 +360,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 sleep_time = max_frame_time - frame_time_us;
             }
 
-            SetWindowText(window.hwnd, title);
+            SetWindowText(global_window.hwnd, title);
         }
     }
     pfn_DestroyRenderer(renderer);

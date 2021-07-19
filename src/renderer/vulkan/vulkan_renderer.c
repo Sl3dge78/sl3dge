@@ -123,7 +123,7 @@ internal void GetQueuesId(Renderer *context) {
     u32 queue_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(context->physical_device, &queue_count, NULL);
     VkQueueFamilyProperties *queue_properties =
-        (VkQueueFamilyProperties *)sCalloc(queue_count, sizeof(VkQueueFamilyProperties));
+        sCalloc(queue_count, sizeof(VkQueueFamilyProperties));
     vkGetPhysicalDeviceQueueFamilyProperties(
         context->physical_device, &queue_count, queue_properties);
 
@@ -586,6 +586,10 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
     allocate_info.pSetLayouts = render_group->set_layouts;
     AssertVkResult(
         vkAllocateDescriptorSets(renderer->device, &allocate_info, render_group->descriptor_sets));
+    DEBUGNameObject(renderer->device,
+                    (u64)render_group->descriptor_sets[0],
+                    VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                    "SHADOW MAP");
 
     // Push constants
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstant)};
@@ -707,7 +711,6 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
 
 internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_group) {
     // TODO : Séparer ca en 2. un avec la texture. et un avec le reste. Bind la texture pour chaque primitive si necessaire
-
     render_group->descriptor_set_count = 1;
     render_group->set_layouts = (VkDescriptorSetLayout *)sCalloc(render_group->descriptor_set_count,
                                                                  sizeof(VkDescriptorSetLayout));
@@ -760,7 +763,10 @@ internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_grou
     allocate_info.pSetLayouts = render_group->set_layouts;
     AssertVkResult(
         vkAllocateDescriptorSets(renderer->device, &allocate_info, render_group->descriptor_sets));
-
+    DEBUGNameObject(renderer->device,
+                    (u64)render_group->descriptor_sets[0],
+                    VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                    "MAIN SET");
     // Writes
     const u32 static_writes_count = 3;
     VkWriteDescriptorSet static_writes[static_writes_count];
@@ -1278,18 +1284,143 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
     render_group->clear_values[0].color = (VkClearColorValue){{0.f, 0.0f, 0.0f, 0.0f}};
 }
 
+// Creates the swapchain and other resources that are screen resolution dependent
+void CreateScreenResources(Renderer *renderer, PlatformWindow *window) {
+    // Swapchain
+    renderer->swapchain.swapchain = VK_NULL_HANDLE;
+    CreateSwapchain(renderer, &renderer->swapchain);
+
+    { // Depth image
+        CreateMultiSampledImage(renderer->device,
+                                &renderer->memory_properties,
+                                renderer->depth_format,
+                                renderer->swapchain.extent,
+                                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                renderer->msaa_level,
+                                &renderer->depth_image);
+        DEBUGNameImage(renderer->device, &renderer->depth_image, "DEPTH IMAGE");
+
+        CreateImage(renderer->device,
+                    &renderer->memory_properties,
+                    renderer->depth_format,
+                    renderer->swapchain.extent,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    &renderer->resolved_depth_image);
+        DEBUGNameImage(renderer->device, &renderer->resolved_depth_image, "RESOLVED DEPTH IMAGE");
+
+        // MSAA Image
+        CreateMultiSampledImage(renderer->device,
+                                &renderer->memory_properties,
+                                renderer->swapchain.format,
+                                renderer->swapchain.extent,
+                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                renderer->msaa_level,
+                                &renderer->msaa_image);
+        DEBUGNameImage(renderer->device, &renderer->msaa_image, "MSAA RENDER TGT");
+    }
+
+    { // Main
+        CreateMainRenderGroup(renderer, &renderer->main_render_group);
+        CreateMultiSampledImage(renderer->device,
+                                &renderer->memory_properties,
+                                renderer->swapchain.format,
+                                renderer->swapchain.extent,
+                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                renderer->msaa_level,
+                                &renderer->color_pass_image);
+        VkFramebufferCreateInfo ci = {0};
+        ci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        ci.pNext = NULL;
+        ci.flags = 0;
+        ci.renderPass = renderer->main_render_group.render_pass;
+
+        VkImageView attachments[] = {renderer->color_pass_image.image_view,
+                                     renderer->depth_image.image_view,
+                                     renderer->resolved_depth_image.image_view};
+
+        ci.attachmentCount = ARRAY_SIZE(attachments);
+        ci.pAttachments = attachments;
+        ci.width = renderer->swapchain.extent.width;
+        ci.height = renderer->swapchain.extent.height;
+        ci.layers = 1;
+        AssertVkResult(
+            vkCreateFramebuffer(renderer->device, &ci, NULL, &renderer->color_pass_framebuffer));
+    }
+    { // Volumetric
+        CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
+        renderer->framebuffers =
+            (VkFramebuffer *)sCalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
+
+        for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
+            VkFramebufferCreateInfo create_info = {0};
+            create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            create_info.pNext = NULL;
+            create_info.flags = 0;
+            create_info.renderPass = renderer->volumetric_render_group.render_pass;
+
+            VkImageView attachments[] = {renderer->color_pass_image.image_view,
+                                         renderer->swapchain.image_views[i]};
+
+            create_info.attachmentCount = ARRAY_SIZE(attachments);
+            create_info.pAttachments = attachments;
+            create_info.width = renderer->swapchain.extent.width;
+            create_info.height = renderer->swapchain.extent.height;
+            create_info.layers = 1;
+            AssertVkResult(vkCreateFramebuffer(
+                renderer->device, &create_info, NULL, &renderer->framebuffers[i]));
+        }
+    }
+
+    renderer->camera_info.proj = mat4_perspective(
+        70.0f, renderer->swapchain.extent.width / renderer->swapchain.extent.height, 0.1f, 1000.0f);
+    sLog("%d, %d", renderer->swapchain.extent.width, renderer->swapchain.extent.height);
+    mat4_inverse(&renderer->camera_info.proj, &renderer->camera_info.proj_inverse);
+}
+
+void DestroyScreenResources(Renderer *renderer) {
+    // Volumetric render group
+    DestroyRenderGroup(renderer, &renderer->volumetric_render_group);
+    for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
+        vkDestroyFramebuffer(renderer->device, renderer->framebuffers[i], NULL);
+    }
+    sFree(renderer->framebuffers);
+
+    // Color Pass
+    vkDestroyFramebuffer(renderer->device, renderer->color_pass_framebuffer, NULL);
+    DestroyImage(renderer->device, &renderer->color_pass_image);
+    DestroyRenderGroup(renderer, &renderer->main_render_group);
+
+    DestroyImage(renderer->device, &renderer->depth_image);
+    DestroyImage(renderer->device, &renderer->resolved_depth_image);
+
+    DestroyImage(renderer->device, &renderer->msaa_image);
+
+    DestroySwapchain(renderer, &renderer->swapchain);
+    vkDestroySwapchainKHR(renderer->device, renderer->swapchain.swapchain, NULL);
+    vkDestroySurfaceKHR(renderer->instance, renderer->surface, NULL);
+}
+
 DLL_EXPORT Renderer *VulkanCreateRenderer(PlatformWindow *window, PlatformAPI *platform_api) {
     Renderer *renderer = (Renderer *)sMalloc(sizeof(Renderer));
-
     renderer->platform = platform_api;
 
     CreateVkInstance(&renderer->instance, platform_api);
-    platform_api->CreateVkSurface(renderer->instance, window, &renderer->surface);
+    renderer->platform->CreateVkSurface(renderer->instance, window, &renderer->surface);
     CreateVkPhysicalDevice(renderer->instance, &renderer->physical_device);
 
     // Get device properties
     vkGetPhysicalDeviceMemoryProperties(renderer->physical_device, &renderer->memory_properties);
     vkGetPhysicalDeviceProperties(renderer->physical_device, &renderer->physical_device_properties);
+
+    // TODO : pick that don't hard code it
+    renderer->depth_format = VK_FORMAT_D32_SFLOAT;
 
     // MSAA
     VkSampleCountFlags msaa_levels =
@@ -1352,15 +1483,49 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(PlatformWindow *window, PlatformAPI *p
     AssertVkResult(
         vkCreateDescriptorPool(renderer->device, &pool_ci, NULL, &renderer->descriptor_pool));
 
-    // Swapchain
-    renderer->swapchain.swapchain = VK_NULL_HANDLE;
-    CreateSwapchain(renderer, &renderer->swapchain);
+    VkSamplerCreateInfo sampler_ci = {0};
+    sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_ci.pNext = NULL;
+    sampler_ci.flags = 0;
+    sampler_ci.magFilter = VK_FILTER_LINEAR;
+    sampler_ci.minFilter = VK_FILTER_LINEAR;
+    sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_ci.mipLodBias = 0.0f;
+    sampler_ci.anisotropyEnable = VK_TRUE;
+    sampler_ci.maxAnisotropy = renderer->physical_device_properties.limits.maxSamplerAnisotropy;
+    sampler_ci.compareEnable = VK_FALSE;
+    sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_ci.minLod = 0.0f;
+    sampler_ci.maxLod = 0.0f;
+    sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_ci.unnormalizedCoordinates = VK_FALSE;
+    AssertVkResult(vkCreateSampler(renderer->device, &sampler_ci, NULL, &renderer->depth_sampler));
 
-    // TODO : pick that don't hard code it
-    renderer->depth_format = VK_FORMAT_D32_SFLOAT;
-
-    // Texture Sampler
     {
+        // Camera info
+        CreateBuffer(renderer->device,
+                     &renderer->memory_properties,
+                     sizeof(CameraMatrices),
+                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                     &renderer->camera_info_buffer);
+        DEBUGNameBuffer(renderer->device, &renderer->camera_info_buffer, "Camera Info");
+
+        // Scene info
+        // Materials
+        renderer->materials_count = 0;
+        CreateBuffer(renderer->device,
+                     &renderer->memory_properties,
+                     128 * sizeof(Material),
+                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     &renderer->mat_buffer);
+        DEBUGNameBuffer(renderer->device, &renderer->mat_buffer, "SCENE MATS");
+
+        // Texture Sampler
         VkSamplerCreateInfo sampler_ci = {0};
         sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         sampler_ci.pNext = NULL;
@@ -1382,85 +1547,6 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(PlatformWindow *window, PlatformAPI *p
         sampler_ci.unnormalizedCoordinates = VK_FALSE;
         AssertVkResult(
             vkCreateSampler(renderer->device, &sampler_ci, NULL, &renderer->texture_sampler));
-    }
-
-    { // Depth image
-        CreateMultiSampledImage(renderer->device,
-                                &renderer->memory_properties,
-                                renderer->depth_format,
-                                renderer->swapchain.extent,
-                                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                renderer->msaa_level,
-                                &renderer->depth_image);
-        DEBUGNameImage(renderer->device, &renderer->depth_image, "DEPTH IMAGE");
-
-        CreateImage(renderer->device,
-                    &renderer->memory_properties,
-                    renderer->depth_format,
-                    renderer->swapchain.extent,
-                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                        VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    &renderer->resolved_depth_image);
-        DEBUGNameImage(renderer->device, &renderer->resolved_depth_image, "RESOLVED DEPTH IMAGE");
-
-        VkSamplerCreateInfo sampler_ci = {0};
-        sampler_ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        sampler_ci.pNext = NULL;
-        sampler_ci.flags = 0;
-        sampler_ci.magFilter = VK_FILTER_LINEAR;
-        sampler_ci.minFilter = VK_FILTER_LINEAR;
-        sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-        sampler_ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler_ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler_ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler_ci.mipLodBias = 0.0f;
-        sampler_ci.anisotropyEnable = VK_TRUE;
-        sampler_ci.maxAnisotropy = renderer->physical_device_properties.limits.maxSamplerAnisotropy;
-        sampler_ci.compareEnable = VK_FALSE;
-        sampler_ci.compareOp = VK_COMPARE_OP_ALWAYS;
-        sampler_ci.minLod = 0.0f;
-        sampler_ci.maxLod = 0.0f;
-        sampler_ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        sampler_ci.unnormalizedCoordinates = VK_FALSE;
-        AssertVkResult(
-            vkCreateSampler(renderer->device, &sampler_ci, NULL, &renderer->depth_sampler));
-        // MSAA Image
-        CreateMultiSampledImage(renderer->device,
-                                &renderer->memory_properties,
-                                renderer->swapchain.format,
-                                renderer->swapchain.extent,
-                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                renderer->msaa_level,
-                                &renderer->msaa_image);
-        DEBUGNameImage(renderer->device, &renderer->msaa_image, "MSAA RENDER TGT");
-    }
-    {
-        // Camera info
-        CreateBuffer(renderer->device,
-                     &renderer->memory_properties,
-                     sizeof(CameraMatrices),
-                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-                     &renderer->camera_info_buffer);
-        DEBUGNameBuffer(renderer->device, &renderer->camera_info_buffer, "Camera Info");
-        renderer->camera_info.proj = mat4_perspective(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
-        mat4_inverse(&renderer->camera_info.proj, &renderer->camera_info.proj_inverse);
-
-        // Scene info
-        // Materials
-        renderer->materials_count = 0;
-        CreateBuffer(renderer->device,
-                     &renderer->memory_properties,
-                     128 * sizeof(Material),
-                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     &renderer->mat_buffer);
-        DEBUGNameBuffer(renderer->device, &renderer->mat_buffer, "SCENE MATS");
 
         // Textures
         renderer->textures_capacity = 1;
@@ -1520,116 +1606,47 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(PlatformWindow *window, PlatformAPI *p
             renderer->device, &shdw_sampler_ci, NULL, &renderer->shadowmap_sampler));
     }
 
-    { // Main
-        CreateMainRenderGroup(renderer, &renderer->main_render_group);
-        CreateMultiSampledImage(renderer->device,
-                                &renderer->memory_properties,
-                                renderer->swapchain.format,
-                                renderer->swapchain.extent,
-                                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                renderer->msaa_level,
-                                &renderer->color_pass_image);
-        VkFramebufferCreateInfo ci = {0};
-        ci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        ci.pNext = NULL;
-        ci.flags = 0;
-        ci.renderPass = renderer->main_render_group.render_pass;
-
-        VkImageView attachments[] = {renderer->color_pass_image.image_view,
-                                     renderer->depth_image.image_view,
-                                     renderer->resolved_depth_image.image_view};
-
-        ci.attachmentCount = ARRAY_SIZE(attachments);
-        ci.pAttachments = attachments;
-        ci.width = renderer->swapchain.extent.width;
-        ci.height = renderer->swapchain.extent.height;
-        ci.layers = 1;
-        AssertVkResult(
-            vkCreateFramebuffer(renderer->device, &ci, NULL, &renderer->color_pass_framebuffer));
-    }
-    { // Volumetric
-        CreateVolumetricRenderGroup(renderer, &renderer->volumetric_render_group);
-        renderer->framebuffers =
-            (VkFramebuffer *)sCalloc(renderer->swapchain.image_count, sizeof(VkFramebuffer));
-
-        for(u32 i = 0; i < renderer->swapchain.image_count; ++i) {
-            VkFramebufferCreateInfo create_info = {0};
-            create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            create_info.pNext = NULL;
-            create_info.flags = 0;
-            create_info.renderPass = renderer->volumetric_render_group.render_pass;
-
-            VkImageView attachments[] = {renderer->color_pass_image.image_view,
-                                         renderer->swapchain.image_views[i]};
-
-            create_info.attachmentCount = ARRAY_SIZE(attachments);
-            create_info.pAttachments = attachments;
-            create_info.width = renderer->swapchain.extent.width;
-            create_info.height = renderer->swapchain.extent.height;
-            create_info.layers = 1;
-            AssertVkResult(vkCreateFramebuffer(
-                renderer->device, &create_info, NULL, &renderer->framebuffers[i]));
-        }
-    }
+    CreateScreenResources(renderer, window);
 
     return renderer;
 }
 
-DLL_EXPORT void VulkanDestroyRenderer(Renderer *context) {
-    vkDeviceWaitIdle(context->device);
+DLL_EXPORT void VulkanDestroyRenderer(Renderer *renderer) {
+    vkDeviceWaitIdle(renderer->device);
 
-    for(u32 i = 0; i < context->textures_count; ++i) {
-        DestroyImage(context->device, &context->textures[i]);
+    DestroyScreenResources(renderer);
+
+    for(u32 i = 0; i < renderer->textures_count; ++i) {
+        DestroyImage(renderer->device, &renderer->textures[i]);
     }
-    sFree(context->textures);
+    sFree(renderer->textures);
 
-    DestroyBuffer(context->device, &context->mat_buffer);
+    DestroyBuffer(renderer->device, &renderer->mat_buffer);
 
-    for(u32 i = 0; i < context->mesh_count; ++i) {
-        RendererDestroyMesh(context, i);
+    for(u32 i = 0; i < renderer->mesh_count; ++i) {
+        RendererDestroyMesh(renderer, i);
     }
-    sFree(context->meshes);
+    sFree(renderer->meshes);
 
-    // Volumetric render group
-    DestroyRenderGroup(context, &context->volumetric_render_group);
-    for(u32 i = 0; i < context->swapchain.image_count; ++i) {
-        vkDestroyFramebuffer(context->device, context->framebuffers[i], NULL);
-    }
     // Shadowmap render group
-    DestroyImage(context->device, &context->shadowmap);
-    vkDestroySampler(context->device, context->shadowmap_sampler, NULL);
-    vkDestroyFramebuffer(context->device, context->shadowmap_framebuffer, NULL);
-    DestroyRenderGroup(context, &context->shadowmap_render_group);
+    DestroyImage(renderer->device, &renderer->shadowmap);
+    vkDestroySampler(renderer->device, renderer->shadowmap_sampler, NULL);
+    vkDestroyFramebuffer(renderer->device, renderer->shadowmap_framebuffer, NULL);
+    DestroyRenderGroup(renderer, &renderer->shadowmap_render_group);
 
-    // Main render group
-    DestroyRenderGroup(context, &context->main_render_group);
-    vkDestroyFramebuffer(context->device, context->color_pass_framebuffer, NULL);
+    vkDestroySampler(renderer->device, renderer->texture_sampler, NULL);
+    vkDestroySampler(renderer->device, renderer->depth_sampler, NULL);
 
-    sFree(context->framebuffers);
+    DestroyBuffer(renderer->device, &renderer->camera_info_buffer);
 
-    DestroyImage(context->device, &context->resolved_depth_image);
-    DestroyImage(context->device, &context->color_pass_image);
-    DestroyImage(context->device, &context->depth_image);
-    DestroyImage(context->device, &context->msaa_image);
+    vkDestroyDescriptorPool(renderer->device, renderer->descriptor_pool, NULL);
+    vkDestroyCommandPool(renderer->device, renderer->graphics_command_pool, NULL);
 
-    vkDestroySampler(context->device, context->texture_sampler, NULL);
-    vkDestroySampler(context->device, context->depth_sampler, NULL);
+    vkDestroyDevice(renderer->device, NULL);
+    pfn_vkDestroyDebugUtilsMessengerEXT(renderer->instance, debug_messenger, NULL);
+    vkDestroyInstance(renderer->instance, NULL);
 
-    DestroyBuffer(context->device, &context->camera_info_buffer);
-
-    DestroySwapchain(context, &context->swapchain);
-    vkDestroySwapchainKHR(context->device, context->swapchain.swapchain, NULL);
-    vkDestroySurfaceKHR(context->instance, context->surface, NULL);
-
-    vkDestroyDescriptorPool(context->device, context->descriptor_pool, NULL);
-    vkDestroyCommandPool(context->device, context->graphics_command_pool, NULL);
-
-    vkDestroyDevice(context->device, NULL);
-    pfn_vkDestroyDebugUtilsMessengerEXT(context->instance, debug_messenger, NULL);
-    vkDestroyInstance(context->instance, NULL);
-
-    sFree(context);
+    sFree(renderer);
 
     DBG_END();
 }
@@ -1660,6 +1677,23 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
 //
 // ================
 
+DLL_EXPORT void
+VulkanUpdateWindow(Renderer *renderer, PlatformWindow *window, const u32 width, const u32 height) {
+    DestroyScreenResources(renderer);
+    renderer->platform->CreateVkSurface(renderer->instance, window, &renderer->surface);
+    VkBool32 is_supported = VK_FALSE;
+    vkGetPhysicalDeviceSurfaceSupportKHR(
+        renderer->physical_device, renderer->present_queue_id, renderer->surface, &is_supported);
+    ASSERT(is_supported);
+    CreateScreenResources(renderer, window);
+    // Cheat
+    VulkanUpdateTextureDescriptorSet(renderer->device,
+                                     renderer->main_render_group.descriptor_sets[0],
+                                     renderer->texture_sampler,
+                                     renderer->textures_count,
+                                     renderer->textures);
+}
+
 DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
     UploadToBuffer(renderer->device,
                    &renderer->camera_info_buffer,
@@ -1676,7 +1710,8 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
                                    swapchain->image_acquired_semaphore[swapchain->semaphore_id],
                                    VK_NULL_HANDLE,
                                    &image_id);
-    AssertVkResult(result); // TODO : Recreate swapchain if Suboptimal or outofdate;
+    if(result != VK_ERROR_OUT_OF_DATE_KHR)
+        AssertVkResult(result);
 
     // If the frame hasn't finished rendering wait for it to finish
     AssertVkResult(
@@ -1763,8 +1798,9 @@ DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
     present_info.pImageIndices = &image_id;
     present_info.pResults = NULL;
     result = vkQueuePresentKHR(renderer->present_queue, &present_info);
-    AssertVkResult(result);
-    // TODO : Recreate Swapchain if necessary
+    if(result != VK_ERROR_OUT_OF_DATE_KHR) {
+        AssertVkResult(result);
+    }
 
     swapchain->semaphore_id = (swapchain->semaphore_id + 1) % swapchain->image_count;
 

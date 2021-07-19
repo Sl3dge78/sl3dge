@@ -96,6 +96,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
         }
         vkQueueWaitIdle(context->graphics_queue);
 
+        // HACK We need a way to update the render group set without recreating it
         DestroyRenderGroup(context, &context->main_render_group);
         CreateMainRenderGroup(context, &context->main_render_group);
         VulkanUpdateTextureDescriptorSet(context->device,

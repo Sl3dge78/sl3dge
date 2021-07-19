@@ -21,7 +21,8 @@
             "sl3dge.h": "c",
             "cmath": "c",
             "slogging.h": "c",
-            "smodule.h": "c"
+            "smodule.h": "c",
+            "*.rh": "c"
         }
     },
 }
