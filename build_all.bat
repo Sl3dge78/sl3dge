@@ -20,14 +20,14 @@ IF !ERRORLEVEL! == 0 (
     ECHO BUILD OK
 )
 
-SET module_name=renderer
+REM SET module_name=renderer
 
-ECHO Building %module_name% module
-clang %args% %include_path% -shared src/%module_name%/%module_name%.c -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib
-if !ERRORLEVEL! == 0 (
-    ECHO a > bin/%module_name%.meta
-    ECHO BUILD OK
-)
+REM ECHO Building %module_name% module
+REM clang %args% %include_path% -shared src/%module_name%/%module_name%.c -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib
+REM if !ERRORLEVEL! == 0 (
+REM     ECHO a > bin/%module_name%.meta
+REM     ECHO BUILD OK
+REM )
 
 SET module_name=game
 

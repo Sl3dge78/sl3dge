@@ -1408,7 +1408,7 @@ void DestroyScreenResources(Renderer *renderer) {
     vkDestroySurfaceKHR(renderer->instance, renderer->surface, NULL);
 }
 
-DLL_EXPORT Renderer *VulkanCreateRenderer(PlatformWindow *window, PlatformAPI *platform_api) {
+Renderer *RendererCreate(PlatformWindow *window, PlatformAPI *platform_api) {
     Renderer *renderer = (Renderer *)sMalloc(sizeof(Renderer));
     renderer->platform = platform_api;
 
@@ -1612,7 +1612,7 @@ DLL_EXPORT Renderer *VulkanCreateRenderer(PlatformWindow *window, PlatformAPI *p
     return renderer;
 }
 
-DLL_EXPORT void VulkanDestroyRenderer(Renderer *renderer) {
+void RendererDestroy(Renderer *renderer) {
     vkDeviceWaitIdle(renderer->device);
 
     DestroyScreenResources(renderer);
@@ -1652,7 +1652,7 @@ DLL_EXPORT void VulkanDestroyRenderer(Renderer *renderer) {
     DBG_END();
 }
 
-DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
+void VulkanReloadShaders(Renderer *renderer) {
     vkDestroyPipeline(renderer->device, renderer->main_render_group.pipeline, NULL);
 
     PipelineCreateDefault(renderer->device,
@@ -1678,8 +1678,7 @@ DLL_EXPORT void VulkanReloadShaders(Renderer *renderer) {
 //
 // ================
 
-DLL_EXPORT void
-VulkanUpdateWindow(Renderer *renderer, PlatformWindow *window, const u32 width, const u32 height) {
+void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
     DestroyScreenResources(renderer);
     renderer->platform->CreateVkSurface(renderer->instance, window, &renderer->surface);
     VkBool32 is_supported = VK_FALSE;
@@ -1695,7 +1694,7 @@ VulkanUpdateWindow(Renderer *renderer, PlatformWindow *window, const u32 width, 
                                      renderer->textures);
 }
 
-DLL_EXPORT void VulkanDrawFrame(Renderer *renderer) {
+void RendererDrawFrame(Renderer *renderer) {
     UploadToBuffer(renderer->device,
                    &renderer->camera_info_buffer,
                    &renderer->camera_info,

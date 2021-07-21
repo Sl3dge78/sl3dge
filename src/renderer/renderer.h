@@ -77,28 +77,10 @@ typedef struct CameraMatrices {
 } CameraMatrices;
 
 // Platform level functions
-typedef Renderer *CreateRenderer_t(PlatformWindow *window, PlatformAPI *platform_api);
-CreateRenderer_t *pfn_CreateRenderer;
-
-typedef void DestroyRenderer_t(Renderer *renderer);
-DestroyRenderer_t *pfn_DestroyRenderer;
-
-typedef void RendererReloadShaders_t(Renderer *renderer);
-RendererReloadShaders_t *pfn_ReloadShaders;
-
-typedef void DrawFrame_t(Renderer *renderer);
-DrawFrame_t *pfn_DrawFrame;
-
-typedef void UpdateWindow_t(Renderer *renderer, PlatformWindow *window);
-UpdateWindow_t *pfn_UpdateWindow;
-
-typedef struct RendererPlatformAPI {
-    CreateRenderer_t *CreateRenderer;
-    DestroyRenderer_t *DestroyRenderer;
-    RendererReloadShaders_t *ReloadShaders;
-    DrawFrame_t *DrawFrame;
-    UpdateWindow_t *UpdateWindow;
-} RendererPlatformAPI;
+Renderer *RendererCreate(PlatformWindow *window, PlatformAPI *platform_api);
+void RendererDrawFrame(Renderer *renderer);
+void RendererDestroy(Renderer *renderer);
+void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window);
 
 // Game functions
 typedef u32 LoadMesh_t(Renderer *renderer, const char *path);

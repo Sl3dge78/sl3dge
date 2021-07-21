@@ -17,7 +17,7 @@
 #include "platform.h"
 
 #include "game.h"
-#include "renderer/renderer.h"
+#include "renderer/renderer.c"
 
 typedef struct ShaderCode {
     const char *spv_path;
@@ -43,36 +43,13 @@ void Win32GameLoadFunctions(Module *dll) {
     pfn_GameLoop = (GameLoop_t *)GetProcAddress(dll->dll, "GameLoop");
 }
 
-void Win32GameLoadRendererAPI(Renderer *renderer, Module *renderer_module, GameData *game_data) {
+void Win32GameLoadRendererAPI(Renderer *renderer, GameData *game_data) {
     game_data->renderer = renderer;
-    game_data->renderer_api.LoadMesh =
-        (LoadMesh_t *)GetProcAddress(renderer_module->dll, "RendererLoadMesh");
-    ASSERT(game_data->renderer_api.LoadMesh);
-    game_data->renderer_api.DestroyMesh =
-        (DestroyMesh_t *)GetProcAddress(renderer_module->dll, "RendererDestroyMesh");
-    ASSERT(game_data->renderer_api.DestroyMesh);
-    game_data->renderer_api.InstantiateMesh =
-        (InstantiateMesh_t *)GetProcAddress(renderer_module->dll, "RendererInstantiateMesh");
-    ASSERT(game_data->renderer_api.InstantiateMesh);
-    game_data->renderer_api.SetCamera =
-        (SetCamera_t *)GetProcAddress(renderer_module->dll, "RendererSetCamera");
-    ASSERT(game_data->renderer_api.SetCamera);
-    game_data->renderer_api.SetSunDirection =
-        (SetSunDirection_t *)GetProcAddress(renderer_module->dll, "RendererSetSunDirection");
-    ASSERT(game_data->renderer_api.SetSunDirection);
-}
-
-void Win32RendererLoadFunctions(Module *dll) {
-    pfn_CreateRenderer = (CreateRenderer_t *)GetProcAddress(dll->dll, "VulkanCreateRenderer");
-    ASSERT(pfn_CreateRenderer);
-    pfn_DestroyRenderer = (DestroyRenderer_t *)GetProcAddress(dll->dll, "VulkanDestroyRenderer");
-    ASSERT(pfn_DestroyRenderer);
-    pfn_ReloadShaders = (RendererReloadShaders_t *)GetProcAddress(dll->dll, "VulkanReloadShaders");
-    ASSERT(pfn_ReloadShaders);
-    pfn_DrawFrame = (DrawFrame_t *)GetProcAddress(dll->dll, "VulkanDrawFrame");
-    ASSERT(pfn_DrawFrame);
-    pfn_UpdateWindow = (UpdateWindow_t *)GetProcAddress(dll->dll, "VulkanUpdateWindow");
-    ASSERT(pfn_UpdateWindow);
+    game_data->renderer_api.LoadMesh = &RendererLoadMesh;
+    game_data->renderer_api.DestroyMesh = &RendererDestroyMesh;
+    game_data->renderer_api.InstantiateMesh = &RendererInstantiateMesh;
+    game_data->renderer_api.SetCamera = &RendererSetCamera;
+    game_data->renderer_api.SetSunDirection = &RendererSetSunDirection;
 }
 
 void PlatformCreateVkSurface(VkInstance instance, PlatformWindow *window, VkSurfaceKHR *surface) {
@@ -160,7 +137,7 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         return 0;
     case WM_SIZE:
     case WM_SIZING: {
-        pfn_UpdateWindow(renderer, &global_window);
+        RendererUpdateWindow(renderer, &global_window);
         return 0;
     }
     default: return DefWindowProc(hwnd, msg, wparam, lparam);
@@ -211,8 +188,6 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
     window->hinstance = instance;
     window->hwnd = hwnd;
 
-    //SetWindowLongPtr(window->hwnd, 0, window);
-
     return true;
 }
 
@@ -231,24 +206,16 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     platform_api.GetInstanceExtensions = &PlatformGetInstanceExtensions;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
 
-    Module renderer_module = {0};
-    Win32LoadModule(&renderer_module, "renderer");
-    Win32RendererLoadFunctions(&renderer_module);
-
-    renderer = pfn_CreateRenderer(&global_window, &platform_api);
+    renderer = RendererCreate(&global_window, &platform_api);
 
     Module game_module = {0};
     Win32LoadModule(&game_module, "game");
     Win32GameLoadFunctions(&game_module);
 
-    ShaderCode shader_code = {0};
-    shader_code.spv_path = "resources\\shaders\\shaders.meta";
-    shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
-
     GameData game_data = {0};
     GameInput input = {0};
     game_data.platform_api = platform_api;
-    Win32GameLoadRendererAPI(renderer, &renderer_module, &game_data);
+    Win32GameLoadRendererAPI(renderer, &game_data);
 
     ShowWindow(global_window.hwnd, cmd_show);
     pfn_GameStart(&game_data);
@@ -274,14 +241,6 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 Win32LoadModule(&game_module, "game");
                 Win32GameLoadFunctions(&game_module);
                 sLog("Game code reloaded");
-            }
-
-            // Reload shaders if necessary
-            FILETIME shader_time = Win32GetLastWriteTime(shader_code.spv_path);
-            if(CompareFileTime(&shader_code.last_write_time, &shader_time)) {
-                shader_code.last_write_time = Win32GetLastWriteTime(shader_code.spv_path);
-                pfn_ReloadShaders(renderer);
-                sLog("Shaders reloaded");
             }
         }
 
@@ -334,7 +293,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         }
 
         pfn_GameLoop(delta_time, &game_data, &input);
-        pfn_DrawFrame(renderer);
+        RendererDrawFrame(renderer);
 
         {
             // 60 fps cap
@@ -363,10 +322,9 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             SetWindowText(global_window.hwnd, title);
         }
     }
-    pfn_DestroyRenderer(renderer);
+    RendererDestroy(renderer);
 
     Win32CloseModule(&game_module);
-    Win32CloseModule(&renderer_module);
     DBG_END();
 
     return 0;
