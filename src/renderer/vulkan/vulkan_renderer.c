@@ -5,6 +5,7 @@
 #include "renderer/vulkan/vulkan_renderer.h"
 #include "renderer/vulkan/vulkan_helper.c"
 #include "renderer/vulkan/vulkan_pipeline.c"
+#include "renderer/vulkan/vulkan_mesh.c"
 
 global VkDebugUtilsMessengerEXT debug_messenger;
 

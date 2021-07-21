@@ -17,7 +17,7 @@ GAME:
 
     IDEAS:
 
-RENDERER:
+VULKAN RENDERER:
     CRITICAL:
         - Resize the texture array, rebuild the pipeline?
         - Reloading the renderer doesn't reload the meshes and stuff

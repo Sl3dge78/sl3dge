@@ -56,6 +56,7 @@ vec3 get_normal(Material mat) {
         return in_normal.xyz;
     }
 }
+
 float get_shadow(float bias) {
     float shadow = 1.0;
     vec4 proj_coords = in_shadow_map_texcoord / in_shadow_map_texcoord.w;
@@ -83,6 +84,7 @@ float get_shadow(float bias) {
     }
     return shadow;
 }
+
 vec3 base_color(Material mat) {
 
     const int steps = 4;
@@ -97,7 +99,6 @@ vec3 base_color(Material mat) {
         diffuse = texture(textures[mat.base_color_texture], pos).rgb;
     } else if(mat.emissive_texture < UINT_MAX) {
         diffuse = texture(textures[mat.emissive_texture], pos).rgb;
-
     }
 
     return diffuse;

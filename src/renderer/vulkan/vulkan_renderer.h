@@ -137,4 +137,12 @@ struct Frame {
     VkPipelineLayout layout;
 };
 
+void DestroyRenderGroup(Renderer *context, RenderGroup *render_group);
+void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_group);
+void VulkanUpdateTextureDescriptorSet(VkDevice device,
+                                      VkDescriptorSet set,
+                                      VkSampler sampler,
+                                      const u32 texture_count,
+                                      Image *textures);
+
 #endif

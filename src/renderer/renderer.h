@@ -77,7 +77,6 @@ typedef struct CameraMatrices {
 } CameraMatrices;
 
 // Platform level functions
-
 typedef Renderer *CreateRenderer_t(PlatformWindow *window, PlatformAPI *platform_api);
 CreateRenderer_t *pfn_CreateRenderer;
 
@@ -102,7 +101,6 @@ typedef struct RendererPlatformAPI {
 } RendererPlatformAPI;
 
 // Game functions
-
 typedef u32 LoadMesh_t(Renderer *renderer, const char *path);
 DLL_EXPORT LoadMesh_t RendererLoadMesh;
 
@@ -126,12 +124,5 @@ typedef struct RendererGameAPI {
     SetCamera_t *SetCamera;
     SetSunDirection_t *SetSunDirection;
 } RendererGameAPI;
-
-// Other functions
-
-void RendererDrawMesh(Frame *frame,
-                      Mesh *mesh,
-                      const u32 instance_count,
-                      const Mat4 *instance_transforms);
 
 #endif
