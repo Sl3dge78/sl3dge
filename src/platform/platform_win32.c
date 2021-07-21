@@ -14,6 +14,9 @@
 #include "platform_win32.h"
 
 #include "game.h"
+
+// TEMP
+#include <gl/GL.h>
 #include "renderer/renderer.c"
 
 typedef struct ShaderCode {
@@ -110,6 +113,10 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
         return 0;
     case WM_SIZE:
     case WM_SIZING: {
+        RECT rect;
+        GetWindowRect(global_window.hwnd, &rect);
+        global_window.w = rect.right;
+        global_window.h = rect.bottom;
         RendererUpdateWindow(renderer, &global_window);
         return 0;
     }
@@ -160,6 +167,9 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
 
     window->hinstance = instance;
     window->hwnd = hwnd;
+    window->dc = GetDC(hwnd);
+    window->w = 1280;
+    window->h = 720;
 
     return true;
 }
@@ -294,6 +304,8 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         }
     }
     RendererDestroy(renderer);
+
+    ReleaseDC(global_window.hwnd, global_window.dc);
 
     Win32CloseModule(&game_module);
     DBG_END();

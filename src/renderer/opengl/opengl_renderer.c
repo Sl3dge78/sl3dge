@@ -3,15 +3,28 @@
 
 #include <gl/GL.h>
 
+#ifdef __WIN32__
+#include "renderer/opengl/opengl_win32.c"
+#endif
+
 Renderer *RendererCreate(PlatformWindow *window, PlatformAPI *platform_api) {
+    Renderer *renderer = sMalloc(sizeof(Renderer));
+    renderer->window = window;
+    PlatformCreateOpenGLContext(renderer, window);
+
     sLog("Init Opengl. Version %d", glGetString(GL_VERSION));
-    return 0;
+    return renderer;
 }
 
 void RendererDrawFrame(Renderer *renderer) {
+    glViewport(0, 0, renderer->width, renderer->height);
+    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    PlatformSwapBuffers(renderer);
 }
 
 void RendererDestroy(Renderer *renderer) {
+    sFree(renderer);
 }
 
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {

@@ -6,6 +6,9 @@
 typedef struct PlatformWindow {
     HWND hwnd;
     HINSTANCE hinstance;
+    HDC dc;
+    u32 h;
+    u32 w;
 } PlatformWindow;
 
 #endif

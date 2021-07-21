@@ -22,7 +22,8 @@
             "cmath": "c",
             "slogging.h": "c",
             "smodule.h": "c",
-            "*.rh": "c"
+            "*.rh": "c",
+            "gl.h": "c"
         }
     },
 }
