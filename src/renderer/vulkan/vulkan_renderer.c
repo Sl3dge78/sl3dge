@@ -1413,7 +1413,7 @@ Renderer *RendererCreate(PlatformWindow *window, PlatformAPI *platform_api) {
     renderer->platform = platform_api;
 
     CreateVkInstance(&renderer->instance, platform_api);
-    renderer->platform->CreateVkSurface(renderer->instance, window, &renderer->surface);
+    PlatformCreateVkSurface(renderer->instance, window, &renderer->surface);
     CreateVkPhysicalDevice(renderer->instance, &renderer->physical_device);
 
     // Get device properties
@@ -1680,7 +1680,7 @@ void VulkanReloadShaders(Renderer *renderer) {
 
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
     DestroyScreenResources(renderer);
-    renderer->platform->CreateVkSurface(renderer->instance, window, &renderer->surface);
+    PlatformCreateVkSurface(renderer->instance, window, &renderer->surface);
     VkBool32 is_supported = VK_FALSE;
     vkGetPhysicalDeviceSurfaceSupportKHR(
         renderer->physical_device, renderer->present_queue_id, renderer->surface, &is_supported);

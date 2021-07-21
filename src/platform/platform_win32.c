@@ -8,13 +8,11 @@
 #define __WIN32__
 #include <windows.h>
 
-// Surface creation
-#include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_win32.h>
-
 #include <sl3dge-utils/sl3dge.h>
 
 #include "platform.h"
+#include "platform_win32.h"
+#include "vulkan_win32.c"
 
 #include "game.h"
 #include "renderer/renderer.c"
@@ -23,11 +21,6 @@ typedef struct ShaderCode {
     const char *spv_path;
     FILETIME last_write_time;
 } ShaderCode;
-
-typedef struct PlatformWindow {
-    HWND hwnd;
-    HINSTANCE hinstance;
-} PlatformWindow;
 
 /* GLOBALS */
 
@@ -50,16 +43,6 @@ void Win32GameLoadRendererAPI(Renderer *renderer, GameData *game_data) {
     game_data->renderer_api.InstantiateMesh = &RendererInstantiateMesh;
     game_data->renderer_api.SetCamera = &RendererSetCamera;
     game_data->renderer_api.SetSunDirection = &RendererSetSunDirection;
-}
-
-void PlatformCreateVkSurface(VkInstance instance, PlatformWindow *window, VkSurfaceKHR *surface) {
-    VkWin32SurfaceCreateInfoKHR ci = {0};
-    ci.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-    ci.pNext = NULL;
-    ci.flags = 0;
-    ci.hinstance = window->hinstance;
-    ci.hwnd = window->hwnd;
-    vkCreateWin32SurfaceKHR(instance, &ci, NULL, surface);
 }
 
 void PlatformGetInstanceExtensions(u32 *count, const char **extensions) {
@@ -202,7 +185,6 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
 
     PlatformAPI platform_api = {0};
     platform_api.ReadBinary = &PlatformReadBinary;
-    platform_api.CreateVkSurface = &PlatformCreateVkSurface;
     platform_api.GetInstanceExtensions = &PlatformGetInstanceExtensions;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
 

@@ -13,7 +13,6 @@ typedef struct Frame Frame;
 typedef struct Buffer Buffer;
 
 // Structures
-
 typedef struct Primitive {
     u32 material_id;
     u32 node_id;

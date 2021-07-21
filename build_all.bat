@@ -2,11 +2,14 @@
 setlocal enabledelayedexpansion
 
 SET timestamp=%TIME:~3,2%%TIME:~6,2%
-SET args= -std=c17 -g -DDEBUG -D_DEBUG -DRENDERER_VULKAN -debug -D_CRT_SECURE_NO_WARNINGS -Werror -Wall -Wno-unused-function -Wgnu-empty-initializer
-SET include_path=-I D:\Guigui\Work\Prog\_include\ -I %VULKAN_SDK%\include -I src/
 
-SET linker_options=-L D:\Guigui\Work\Prog\_lib -L %VULKAN_SDK%\lib -Xlinker -incremental:no
-SET libs= -lvulkan-1.lib
+SET rdr_arg=-DRENDERER_VULKAN -I %VULKAN_SDK%\include -L %VULKAN_SDK%\lib -lvulkan-1.lib
+rem SET rdr_arg=-DRENDERER_OPENGL -lOpenGL32.lib )
+
+SET args= -std=c17 -g -DDEBUG -D_DEBUG -debug -D_CRT_SECURE_NO_WARNINGS -Werror -Wall -Wno-unused-function -Wgnu-empty-initializer
+SET include_path=-I D:\Guigui\Work\Prog\_include\  -I src/
+SET linker_options=-L D:\Guigui\Work\Prog\_lib -Xlinker -incremental:no
+SET libs=
 
 SET start_time=%TIME%
 
@@ -15,7 +18,7 @@ DEL /Q *.pdb 2> NUL
 POPD
 
 ECHO Building win32.exe
-clang %args% %include_path% src/platform/platform_win32.c -o bin/win32.exe %linker_options% %libs% -lShell32.lib -lUser32.lib -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
+clang %args% %include_path% %rdr_arg% src/platform/platform_win32.c -o bin/win32.exe  %linker_options% %libs% -lShell32.lib -lUser32.lib -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 IF !ERRORLEVEL! == 0 (
     ECHO BUILD OK
 )
