@@ -2,6 +2,11 @@
 
 #include "game.h"
 #include "renderer/gltf.c"
+
+#ifdef __WIN32__
+#include "renderer/vulkan/vulkan_win32.c"
+#endif
+
 #include "renderer/vulkan/vulkan_renderer.h"
 #include "renderer/vulkan/vulkan_helper.c"
 #include "renderer/vulkan/vulkan_pipeline.c"
@@ -39,9 +44,9 @@ internal void CreateVkInstance(VkInstance *instance, PlatformAPI *platform) {
 
     // Get platform extensions
     u32 platform_count = 0;
-    platform->GetInstanceExtensions(&platform_count, NULL);
+    PlatformGetInstanceExtensions(&platform_count, NULL);
     const char **platform_extensions = (const char **)sCalloc(platform_count, sizeof(char *));
-    platform->GetInstanceExtensions(&platform_count, platform_extensions);
+    PlatformGetInstanceExtensions(&platform_count, platform_extensions);
 
     u32 total_count = platform_count + sl3_count;
 

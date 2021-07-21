@@ -3,8 +3,8 @@ setlocal enabledelayedexpansion
 
 SET timestamp=%TIME:~3,2%%TIME:~6,2%
 
-SET rdr_arg=-DRENDERER_VULKAN -I %VULKAN_SDK%\include -L %VULKAN_SDK%\lib -lvulkan-1.lib
-rem SET rdr_arg=-DRENDERER_OPENGL -lOpenGL32.lib )
+REM SET rdr_arg=-DRENDERER_VULKAN -I %VULKAN_SDK%\include -L %VULKAN_SDK%\lib -lvulkan-1.lib
+SET rdr_arg=-DRENDERER_OPENGL -lOpenGL32.lib
 
 SET args= -std=c17 -g -DDEBUG -D_DEBUG -debug -D_CRT_SECURE_NO_WARNINGS -Werror -Wall -Wno-unused-function -Wgnu-empty-initializer
 SET include_path=-I D:\Guigui\Work\Prog\_include\  -I src/

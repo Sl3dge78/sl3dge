@@ -12,7 +12,6 @@
 
 #include "platform.h"
 #include "platform_win32.h"
-#include "vulkan_win32.c"
 
 #include "game.h"
 #include "renderer/renderer.c"
@@ -43,15 +42,6 @@ void Win32GameLoadRendererAPI(Renderer *renderer, GameData *game_data) {
     game_data->renderer_api.InstantiateMesh = &RendererInstantiateMesh;
     game_data->renderer_api.SetCamera = &RendererSetCamera;
     game_data->renderer_api.SetSunDirection = &RendererSetSunDirection;
-}
-
-void PlatformGetInstanceExtensions(u32 *count, const char **extensions) {
-    *count = 2;
-
-    if(extensions != NULL) {
-        extensions[0] = VK_KHR_SURFACE_EXTENSION_NAME;
-        extensions[1] = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
-    }
 }
 
 i64 PlatformGetTicks() {
@@ -185,7 +175,6 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
 
     PlatformAPI platform_api = {0};
     platform_api.ReadBinary = &PlatformReadBinary;
-    platform_api.GetInstanceExtensions = &PlatformGetInstanceExtensions;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
 
     renderer = RendererCreate(&global_window, &platform_api);

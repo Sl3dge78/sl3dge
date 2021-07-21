@@ -17,7 +17,6 @@ DLL_EXPORT PlatformSetCaptureMouse_t PlatformSetCaptureMouse;
 
 typedef struct PlatformAPI {
     PlatformReadBinary_t *ReadBinary;
-    PlatformGetInstanceExtensions_t *GetInstanceExtensions;
     PlatformSetCaptureMouse_t *SetCaptureMouse;
 } PlatformAPI;
 
