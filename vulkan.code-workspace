@@ -23,7 +23,8 @@
             "slogging.h": "c",
             "smodule.h": "c",
             "*.rh": "c",
-            "gl.h": "c"
+            "gl.h": "c",
+            "opengl_renderer.h": "c"
         }
     },
 }

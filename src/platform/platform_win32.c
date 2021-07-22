@@ -15,8 +15,6 @@
 
 #include "game.h"
 
-// TEMP
-#include <gl/GL.h>
 #include "renderer/renderer.c"
 
 typedef struct ShaderCode {
@@ -187,7 +185,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     platform_api.ReadBinary = &PlatformReadBinary;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
 
-    renderer = RendererCreate(&global_window, &platform_api);
+    renderer = RendererCreate(&global_window);
 
     Module game_module = {0};
     Win32LoadModule(&game_module, "game");

@@ -20,7 +20,7 @@ global VkDebugUtilsMessengerEXT debug_messenger;
 //
 // ========================
 
-internal void CreateVkInstance(VkInstance *instance, PlatformAPI *platform) {
+internal void CreateVkInstance(VkInstance *instance) {
     VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "Handmade";
@@ -1413,11 +1413,10 @@ void DestroyScreenResources(Renderer *renderer) {
     vkDestroySurfaceKHR(renderer->instance, renderer->surface, NULL);
 }
 
-Renderer *RendererCreate(PlatformWindow *window, PlatformAPI *platform_api) {
+Renderer *RendererCreate(PlatformWindow *window) {
     Renderer *renderer = (Renderer *)sMalloc(sizeof(Renderer));
-    renderer->platform = platform_api;
 
-    CreateVkInstance(&renderer->instance, platform_api);
+    CreateVkInstance(&renderer->instance);
     PlatformCreateVkSurface(renderer->instance, window, &renderer->surface);
     CreateVkPhysicalDevice(renderer->instance, &renderer->physical_device);
 

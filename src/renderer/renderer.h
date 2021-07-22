@@ -76,7 +76,7 @@ typedef struct CameraMatrices {
 } CameraMatrices;
 
 // Platform level functions
-Renderer *RendererCreate(PlatformWindow *window, PlatformAPI *platform_api);
+Renderer *RendererCreate(PlatformWindow *window);
 void RendererDrawFrame(Renderer *renderer);
 void RendererDestroy(Renderer *renderer);
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window);
