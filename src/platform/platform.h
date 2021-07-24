@@ -6,6 +6,8 @@
 struct PlatformWindow;
 typedef struct PlatformWindow PlatformWindow;
 
+char *PlatformReadWholeFile(const char *path);
+
 typedef void PlatformReadBinary_t(const char *path, i64 *file_size, u32 *content);
 DLL_EXPORT PlatformReadBinary_t PlatformReadBinary;
 

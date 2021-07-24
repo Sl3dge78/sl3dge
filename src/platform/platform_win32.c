@@ -64,6 +64,26 @@ void PlatformSetCaptureMouse(bool val) {
     mouse_captured = val;
 }
 
+char *PlatformReadWholeFile(const char *path) {
+    FILE *file;
+    fopen_s(&file, path, "r");
+    if(!file) {
+        sError(0, "Unable to open file");
+        sError(0, path);
+    }
+    // Get the size
+    fseek(file, 0, SEEK_END);
+    i32 file_size = ftell(file);
+
+    char *result = sCalloc(file_size, sizeof(char));
+
+    rewind(file);
+    // Copy into result
+    fread(result, 1, file_size, file);
+    fclose(file);
+    return result;
+}
+
 // if result is NULL, function will query the file size for allocation in file_size.
 void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     FILE *file;

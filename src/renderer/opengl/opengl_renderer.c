@@ -61,13 +61,13 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glEnableVertexAttribArray(0);
 
     // Shader
-    const char *vtx_shader =
-        "#version 330 core\nlayout(location = 0) in vec3 aPos;\nvoid main() { gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0); }\0";
+    char *vtx_shader = PlatformReadWholeFile("resources/shaders/gl/main.vert");
     GLCreateAndCompileShader(GL_VERTEX_SHADER, vtx_shader, &renderer->vertex_shader);
+    sFree(vtx_shader);
 
-    const char *frag_shader =
-        "#version 330 core\nout vec4 FragColor;\nvoid main() { FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f); }\0";
+    char *frag_shader = PlatformReadWholeFile("resources/shaders/gl/main.frag");
     GLCreateAndCompileShader(GL_FRAGMENT_SHADER, frag_shader, &renderer->fragment_shader);
+    sFree(frag_shader);
 
     renderer->shader_program = glCreateProgram();
     glAttachShader(renderer->shader_program, renderer->vertex_shader);
