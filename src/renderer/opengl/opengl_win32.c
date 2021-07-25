@@ -50,7 +50,12 @@ void GLLoadFunctions() {
     LOAD_GL_FUNC(PFNGLDELETEVERTEXARRAYSPROC, glDeleteVertexArrays);
 }
 
-void PlatformCreateOpenGLContext(Renderer *renderer, PlatformWindow *window) {
+void PlatformCreateorUpdateOpenGLContext(Renderer *renderer, PlatformWindow *window) {
+    if(window->opengl_rc != 0) {
+        wglDeleteContext(window->opengl_rc);
+        window->opengl_rc = 0;
+    }
+
     PIXELFORMATDESCRIPTOR desired_pixel_fmt = {0};
     desired_pixel_fmt.nSize = sizeof(PIXELFORMATDESCRIPTOR);
     desired_pixel_fmt.nVersion = 1;
@@ -89,8 +94,8 @@ void PlatformCreateOpenGLContext(Renderer *renderer, PlatformWindow *window) {
     PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = NULL;
     wglCreateContextAttribsARB =
         (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
-    HGLRC opengl_rc = wglCreateContextAttribsARB(window->dc, 0, attribs);
-    if(!wglMakeCurrent(window->dc, opengl_rc)) {
+    window->opengl_rc = wglCreateContextAttribsARB(window->dc, 0, attribs);
+    if(!wglMakeCurrent(window->dc, window->opengl_rc)) {
         DWORD error = GetLastError();
         sError("Unable to init opengl %d", error);
     }

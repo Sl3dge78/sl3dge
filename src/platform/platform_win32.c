@@ -50,6 +50,11 @@ i64 PlatformGetTicks() {
     return ticks.QuadPart;
 }
 
+void PlatformGetWindowSize(const PlatformWindow *window, u32 *w, u32 *h) {
+    *w = window->w;
+    *h = window->h;
+}
+
 void PlatformSetCaptureMouse(bool val) {
     if(mouse_captured == val)
         return;

@@ -344,11 +344,26 @@ internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass
 // ---------------
 // Renderer
 
+void UpdateCameraProj(Renderer *renderer) {
+    renderer->camera_proj =
+        mat4_perspective_gl(90.0f, (f32)renderer->width / (f32)renderer->height, 0.1f, 1000.0f);
+    mat4_inverse(&renderer->camera_proj, &renderer->camera_proj_inverse);
+
+    // Init uniforms
+    glUseProgram(renderer->color_pass.program);
+    u32 loc = glGetUniformLocation(renderer->color_pass.program, "projection");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj.v);
+
+    glUseProgram(renderer->vol_pass.program);
+    loc = glGetUniformLocation(renderer->vol_pass.program, "proj_inverse");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj_inverse.v);
+}
+
 Renderer *RendererCreate(PlatformWindow *window) {
     Renderer *renderer = sCalloc(1, sizeof(Renderer));
 
     renderer->window = window;
-    PlatformCreateOpenGLContext(renderer, window);
+    PlatformCreateorUpdateOpenGLContext(renderer, window);
     GLLoadFunctions();
 
     // Global init
@@ -356,13 +371,13 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glDebugMessageCallback(GLMessageCallback, 0);
     glDisable(GL_CULL_FACE);
 
+    // Meshes
+    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->moto);
+
     // Render passes
     CreateShadowmapRenderPass(&renderer->shadowmap_pass);
     CreateColorRenderPass(renderer->width, renderer->height, &renderer->color_pass);
     CreateVolumetricRenderPass(&renderer->vol_pass);
-
-    // Meshes
-    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->moto);
 
     // Screen quad
     glGenVertexArrays(1, &renderer->screen_quad);
@@ -377,18 +392,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
     glEnableVertexAttribArray(1);
 
-    // Constant stuff
-    renderer->camera_proj = mat4_perspective_gl(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
-    mat4_inverse(&renderer->camera_proj, &renderer->camera_proj_inverse);
-
-    // Init uniforms
-    glUseProgram(renderer->color_pass.program);
-    u32 loc = glGetUniformLocation(renderer->color_pass.program, "projection");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj.v);
-
-    glUseProgram(renderer->vol_pass.program);
-    loc = glGetUniformLocation(renderer->vol_pass.program, "proj_inverse");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj_inverse.v);
+    UpdateCameraProj(renderer);
 
     return renderer;
 }
@@ -445,6 +449,21 @@ void RendererDrawFrame(Renderer *renderer) {
 }
 
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
+    sLog("Update window!");
+    PlatformGetWindowSize(window, &renderer->width, &renderer->height);
+    //PlatformCreateorUpdateOpenGLContext(renderer, window);
+
+    DestroyColorRenderPass(&renderer->color_pass);
+    CreateColorRenderPass(renderer->width, renderer->height, &renderer->color_pass);
+    UpdateCameraProj(renderer);
+
+    glUseProgram(renderer->color_pass.program);
+    u32 loc = glGetUniformLocation(renderer->color_pass.program, "view");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_view.v);
+    loc = glGetUniformLocation(renderer->color_pass.program, "light_dir");
+    glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
+    loc = glGetUniformLocation(renderer->color_pass.program, "light_matrix");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 }
 
 MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
@@ -458,6 +477,9 @@ void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forwa
     mat4_inverse(&renderer->camera_view, &renderer->camera_view_inverse);
 
     // Update uniforms
+
+    // Color pass
+    glUseProgram(renderer->color_pass.program);
     u32 loc = glGetUniformLocation(renderer->color_pass.program, "view");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_view.v);
 
@@ -477,16 +499,19 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     renderer->light_dir = direction;
 
     // Update uniforms
+    // Shadowmap
     glUseProgram(renderer->shadowmap_pass.program);
     u32 loc = glGetUniformLocation(renderer->shadowmap_pass.program, "light_matrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 
+    // Color pass
     glUseProgram(renderer->color_pass.program);
     loc = glGetUniformLocation(renderer->color_pass.program, "light_dir");
     glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
     loc = glGetUniformLocation(renderer->color_pass.program, "light_matrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 
+    // Volumetric
     glUseProgram(renderer->vol_pass.program);
     loc = glGetUniformLocation(renderer->vol_pass.program, "light_dir");
     glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
