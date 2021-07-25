@@ -20,7 +20,5 @@ layout(push_constant) uniform PushConstants {
 } constants;
 
 void main() {
-
     gl_Position = cam.light_vp * constants.transform * vec4(in_position, 1.0);
-
 }

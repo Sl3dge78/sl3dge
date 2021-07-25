@@ -5,13 +5,20 @@ layout (location = 2) in vec2 aTexCoord;
 
 out vec3 Normal;
 out vec2 TexCoord;
+out vec4 shadow_map_texcoord;
+out vec3 worldpos;
 
 uniform mat4 transform;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat4 light_matrix;
 
 void main() {
-    gl_Position =  projection * view * vec4(aPos, 1.0);
+    vec4 pos = vec4(aPos, 1.0);
+    worldpos = pos.xyz;
     Normal = aNormal;
     TexCoord = aTexCoord;
+    shadow_map_texcoord = light_matrix * pos;
+    gl_Position =  projection * view * pos;
+    //gl_Position =  light_matrix * pos;
 }

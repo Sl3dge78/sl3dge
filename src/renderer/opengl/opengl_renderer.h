@@ -21,9 +21,18 @@ typedef struct Renderer {
     u32 width;
     u32 height;
 
-    u32 vertex_shader;
-    u32 fragment_shader;
+    u32 shadowmap_framebuffer;
+    u32 shadowmap_texture;
+    u32 shadowmap_program;
+
+    u32 main_framebuffer;
+    u32 main_renderbuffer;
+    u32 main_render_target;
     u32 shader_program;
+
+    u32 screen_quad;
+    u32 screen_quad_vbuffer;
+    u32 postprocess_program;
 
     Mesh moto;
 
@@ -35,8 +44,8 @@ typedef struct Renderer {
     Mat4 camera_view_inverse;
     Vec3 camera_pos;
 
-    u32 texture_count;
-    u32 textures[12];
+    Mat4 light_matrix;
+    Vec3 light_dir;
 
 } Renderer;
 
