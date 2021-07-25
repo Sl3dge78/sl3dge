@@ -12,6 +12,8 @@ typedef struct Mesh {
     u32 index_buffer;
 
     u32 vertex_count;
+    u32 index_count;
+    u32 diffuse_texture;
 } Mesh;
 
 typedef struct Renderer {
@@ -23,14 +25,19 @@ typedef struct Renderer {
     u32 fragment_shader;
     u32 shader_program;
 
+    Mesh moto;
+
     u32 mesh_count;
     Mesh **meshes;
-    u32 materials_count;
 
     Mat4 camera_proj;
     Mat4 camera_view;
     Mat4 camera_view_inverse;
     Vec3 camera_pos;
+
+    u32 texture_count;
+    u32 textures[12];
+
 } Renderer;
 
 typedef struct Frame {

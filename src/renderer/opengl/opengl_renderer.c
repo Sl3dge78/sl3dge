@@ -53,13 +53,17 @@ internal void GLCreateAndCompileShader(GLenum type, const char *code, u32 *resul
     GLCheckShaderCompilation(*result);
 }
 
-u32 RendererLoadMesh(Renderer *renderer, const char *path) {
+u32 RendererCreateMesh(Renderer *renderer, const char *path) {
+    ASSERT_MSG(0, "Not implemented");
+    return 0;
+}
+
+u32 RendererLoadMesh(Renderer *renderer, const char *path, Mesh *mesh) {
     sLog("Loading Mesh...");
-    Mesh *mesh = (Mesh *)sMalloc(sizeof(Mesh));
     *mesh = (Mesh){0};
     renderer->mesh_count++;
 
-    char directory[64] = {0};
+    char directory[128] = {0};
     const char *last_sep = strrchr(path, '/');
     u32 size = last_sep - path;
     strncpy_s(directory, ARRAY_SIZE(directory), path, size);
@@ -90,6 +94,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
         }
         for(u32 p = 0; p < data->meshes[m].primitives_count; p++) {
             cgltf_primitive *prim = &data->meshes[m].primitives[p];
+            mesh->index_count = data->meshes[m].primitives[p].indices->count;
             u32 index_buffer_size = 0;
             void *index_data = GLTFGetIndexBuffer(prim, &index_buffer_size);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
@@ -118,6 +123,40 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
     glEnableVertexAttribArray(2);
+
+    // Textures
+    for(u32 i = 0; i < data->textures_count; ++i) {
+        u32 *texture = &renderer->textures[renderer->texture_count++];
+
+        char *image_path = data->textures[i].image->uri;
+        char full_image_path[256] = {0};
+        strcat_s(full_image_path, 256, directory);
+        strcat_s(full_image_path, 256, image_path);
+
+        PNG_Image *image = sLoadImage(full_image_path);
+        glGenTextures(1, texture);
+        glBindTexture(GL_TEXTURE_2D, *texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glObjectLabel(GL_TEXTURE, *texture, -1, "NAME");
+        glTexImage2D(GL_TEXTURE_2D,
+                     0,
+                     GL_RGBA,
+                     image->width,
+                     image->height,
+                     0,
+                     GL_RGBA,
+                     GL_UNSIGNED_BYTE,
+                     image->pixels);
+        sDestroyImage(image);
+
+        if(data->textures[i].type == cgltf_texture_type_base_color) {
+            mesh->diffuse_texture = *texture;
+        }
+    }
+
     cgltf_free(data);
 
     // TEMP: hardcoded mesh id
@@ -130,11 +169,11 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
 void RendererDestroyMesh(Mesh *mesh) {
     glDeleteBuffers(1, &mesh->index_buffer);
     glDeleteBuffers(1, &mesh->vertex_buffer);
-    sFree(mesh);
 }
 
 Renderer *RendererCreate(PlatformWindow *window) {
-    Renderer *renderer = sMalloc(sizeof(Renderer));
+    Renderer *renderer = sCalloc(1, sizeof(Renderer));
+
     renderer->window = window;
     PlatformCreateOpenGLContext(renderer, window);
     GLLoadFunctions();
@@ -161,11 +200,11 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
     renderer->meshes = sCalloc(1, sizeof(Mesh *));
 
-    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf");
+    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->moto);
     //RendererLoadMesh(renderer, "resources/models/gltf_samples/Box/glTF/Box.gltf");
 
     glViewport(0, 0, renderer->width, renderer->height);
-    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+    glClearColor(0.43f, 0.77f, 0.91f, 0.0f);
 
     glUseProgram(renderer->shader_program);
     renderer->camera_proj = mat4_perspective_gl(90, 1280.0f / 720.0f, 0.1, 1000);
@@ -173,6 +212,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glUniformMatrix4fv(proj_loc, 1, GL_FALSE, renderer->camera_proj.v);
 
     glEnable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
 
     return renderer;
 }
@@ -181,9 +221,12 @@ void RendererDrawFrame(Renderer *renderer) {
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
     glUseProgram(renderer->shader_program);
+    u32 view_loc = glGetUniformLocation(renderer->shader_program, "view");
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, renderer->camera_view.v);
 
-    glBindVertexArray(renderer->meshes[0]->vertex_array);
-    glDrawElements(GL_TRIANGLES, renderer->meshes[0]->vertex_count, GL_UNSIGNED_INT, 0);
+    glBindTexture(GL_TEXTURE_2D, renderer->moto.diffuse_texture);
+    glBindVertexArray(renderer->moto.vertex_array);
+    glDrawElements(GL_TRIANGLES, renderer->moto.index_count, GL_UNSIGNED_INT, 0);
 
     PlatformSwapBuffers(renderer);
 }
@@ -208,8 +251,6 @@ void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forwa
     renderer->camera_pos = position;
     renderer->camera_view = mat4_look_at(vec3_add(position, forward), position, up);
     mat4_inverse(&renderer->camera_view, &renderer->camera_view_inverse);
-    u32 view_loc = glGetUniformLocation(renderer->shader_program, "view");
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, renderer->camera_view.v);
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {

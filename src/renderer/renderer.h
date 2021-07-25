@@ -65,8 +65,8 @@ void RendererDestroy(Renderer *renderer);
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window);
 
 // Game functions
-typedef u32 LoadMesh_t(Renderer *renderer, const char *path);
-DLL_EXPORT LoadMesh_t RendererLoadMesh;
+typedef u32 CreateMesh_t(Renderer *renderer, const char *path);
+DLL_EXPORT CreateMesh_t RendererCreateMesh;
 
 typedef MeshInstance InstantiateMesh_t(Renderer *renderer, u32 mesh_id);
 DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
@@ -79,7 +79,7 @@ typedef void SetSunDirection_t(Renderer *renderer, const Vec3 direction);
 DLL_EXPORT SetSunDirection_t RendererSetSunDirection;
 
 typedef struct RendererGameAPI {
-    LoadMesh_t *LoadMesh;
+    CreateMesh_t *CreateMesh;
     InstantiateMesh_t *InstantiateMesh;
     SetCamera_t *SetCamera;
     SetSunDirection_t *SetSunDirection;
