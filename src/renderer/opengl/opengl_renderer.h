@@ -28,7 +28,8 @@ typedef struct Renderer {
     u32 main_framebuffer;
     u32 main_renderbuffer;
     u32 main_render_target;
-    u32 shader_program;
+    u32 main_program;
+    u32 main_depthmap;
 
     u32 screen_quad;
     u32 screen_quad_vbuffer;
@@ -40,6 +41,7 @@ typedef struct Renderer {
     Mesh **meshes;
 
     Mat4 camera_proj;
+    Mat4 camera_proj_inverse;
     Mat4 camera_view;
     Mat4 camera_view_inverse;
     Vec3 camera_pos;

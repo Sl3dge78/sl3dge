@@ -2,8 +2,6 @@
 
 #define M_PI 3.141592653589793
 
-
-
 layout (binding = 0) uniform CameraMatrices {
 	mat4 proj;
     mat4 proj_inverse;
