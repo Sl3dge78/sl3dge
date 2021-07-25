@@ -16,44 +16,50 @@ typedef struct Mesh {
     u32 diffuse_texture;
 } Mesh;
 
+typedef struct ShadowmapRenderPass {
+    u32 framebuffer;
+    u32 texture;
+    u32 program;
+} ShadowmapRenderPass;
+
+typedef struct ColorRenderPass {
+    u32 framebuffer;
+    u32 render_target;
+    u32 program;
+    u32 depthmap;
+
+    u32 width;
+    u32 height;
+} ColorRenderPass;
+
+typedef struct VolumetricRenderPass {
+    u32 program;
+} VolumetricRenderPass;
+
 typedef struct Renderer {
     PlatformWindow *window;
     u32 width;
     u32 height;
 
-    u32 shadowmap_framebuffer;
-    u32 shadowmap_texture;
-    u32 shadowmap_program;
-
-    u32 main_framebuffer;
-    u32 main_renderbuffer;
-    u32 main_render_target;
-    u32 main_program;
-    u32 main_depthmap;
+    ShadowmapRenderPass shadowmap_pass;
+    ColorRenderPass color_pass;
+    VolumetricRenderPass vol_pass;
 
     u32 screen_quad;
     u32 screen_quad_vbuffer;
-    u32 postprocess_program;
 
     Mesh moto;
 
-    u32 mesh_count;
-    Mesh **meshes;
-
+    // Uniform data
     Mat4 camera_proj;
     Mat4 camera_proj_inverse;
     Mat4 camera_view;
     Mat4 camera_view_inverse;
     Vec3 camera_pos;
-
     Mat4 light_matrix;
     Vec3 light_dir;
 
 } Renderer;
-
-typedef struct Frame {
-    // TODO
-} Frame;
 
 void GLLoadFunctions();
 

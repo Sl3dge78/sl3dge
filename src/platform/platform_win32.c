@@ -69,6 +69,7 @@ char *PlatformReadWholeFile(const char *path) {
     if(!file) {
         sError(0, "Unable to open file");
         sError(0, path);
+        return NULL;
     }
     // Get the size
     fseek(file, 0, SEEK_END);

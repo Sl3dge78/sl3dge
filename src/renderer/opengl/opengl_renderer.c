@@ -36,7 +36,10 @@ void APIENTRY GLMessageCallback(GLenum source,
     }
 }
 
-internal void GLCheckShaderCompilation(u32 shader) {
+// ---------------
+// Programs & shaders
+
+internal void CheckShaderCompilation(u32 shader) {
     i32 result;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
     if(!result) {
@@ -46,12 +49,47 @@ internal void GLCheckShaderCompilation(u32 shader) {
     }
 }
 
-internal void GLCreateAndCompileShader(GLenum type, const char *code, u32 *result) {
-    *result = glCreateShader(type);
-    glShaderSource(*result, 1, &code, NULL);
-    glCompileShader(*result);
-    GLCheckShaderCompilation(*result);
+internal u32 CreateAndCompileShader(GLenum type, const char *code) {
+    u32 result = glCreateShader(type);
+    glShaderSource(result, 1, &code, NULL);
+    glCompileShader(result);
+    CheckShaderCompilation(result);
+    return result;
 }
+
+internal u32 CreateProgram(const char *name) {
+    u32 result = glCreateProgram();
+    char buffer[128] = {0};
+
+    snprintf(buffer, 128, "resources/shaders/gl/%s.vert", name);
+    char *vtx_code = PlatformReadWholeFile(buffer);
+    ASSERT(vtx_code != NULL); // Vertex shaders are mandatory
+    u32 vtx_shader = CreateAndCompileShader(GL_VERTEX_SHADER, vtx_code);
+    sFree(vtx_code);
+    glAttachShader(result, vtx_shader);
+
+    snprintf(buffer, 128, "resources/shaders/gl/%s.frag", name);
+    char *frag_code = PlatformReadWholeFile(buffer);
+
+    u32 frag_shader = 0;
+    if(frag_code == NULL) {
+        sLog("No fragment shader for %s", name);
+    } else {
+        u32 frag_shader = CreateAndCompileShader(GL_FRAGMENT_SHADER, frag_code);
+        sFree(frag_code);
+        glAttachShader(result, frag_shader);
+    }
+    glLinkProgram(result);
+    glObjectLabel(GL_PROGRAM, result, -1, name);
+    glDeleteShader(vtx_shader);
+    if(frag_code != NULL) {
+        glDeleteShader(frag_shader);
+    }
+    return result;
+}
+
+// --------------
+// Mesh
 
 u32 RendererCreateMesh(Renderer *renderer, const char *path) {
     ASSERT_MSG(0, "Not implemented");
@@ -61,7 +99,6 @@ u32 RendererCreateMesh(Renderer *renderer, const char *path) {
 u32 RendererLoadMesh(Renderer *renderer, const char *path, Mesh *mesh) {
     sLog("Loading Mesh...");
     *mesh = (Mesh){0};
-    renderer->mesh_count++;
 
     char directory[128] = {0};
     const char *last_sep = strrchr(path, '/');
@@ -158,8 +195,6 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path, Mesh *mesh) {
 
     cgltf_free(data);
 
-    // TEMP: hardcoded mesh id
-    renderer->meshes[0] = mesh;
     sLog("Loading done");
 
     return 0;
@@ -170,200 +205,214 @@ void RendererDestroyMesh(Mesh *mesh) {
     glDeleteBuffers(1, &mesh->vertex_buffer);
 }
 
+// ---------------
+// Shadowmap
+
+internal void CreateShadowmapRenderPass(ShadowmapRenderPass *pass) {
+    pass->program = CreateProgram("shadow");
+
+    glGenTextures(1, &pass->texture);
+    glBindTexture(GL_TEXTURE_2D, pass->texture);
+    glTexImage2D(
+        GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 2048, 2048, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    glGenFramebuffers(1, &pass->framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
+    glObjectLabel(GL_FRAMEBUFFER, pass->framebuffer, -1, "Shadowmap framebuffer");
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, pass->texture, 0);
+}
+
+internal void DestroyShadowmapRenderPass(ShadowmapRenderPass *pass) {
+    glDeleteProgram(pass->program);
+    glDeleteFramebuffers(1, &pass->framebuffer);
+    glDeleteTextures(1, &pass->texture);
+}
+
+internal void BeginShadowmapRenderPass(ShadowmapRenderPass *pass) {
+    glEnable(GL_DEPTH_TEST);
+    glViewport(0, 0, 2048, 2048);
+    glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    glUseProgram(pass->program);
+}
+
+// -------------
+// Color
+
+internal void CreateColorRenderPass(const u32 width, const u32 height, ColorRenderPass *pass) {
+    pass->program = CreateProgram("color");
+    glUseProgram(pass->program);
+    glUniform1i(glGetUniformLocation(pass->program, "shadow_map"), 0);
+    glUniform1i(glGetUniformLocation(pass->program, "diffuse"), 1);
+
+    glGenFramebuffers(1, &pass->framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
+    glObjectLabel(GL_FRAMEBUFFER, pass->framebuffer, -1, "Color framebuffer");
+
+    // Color attachment
+    glGenTextures(1, &pass->render_target);
+    glBindTexture(GL_TEXTURE_2D, pass->render_target);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(
+        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pass->render_target, 0);
+
+    // Depth attachment
+    glGenTextures(1, &pass->depthmap);
+    glBindTexture(GL_TEXTURE_2D, pass->depthmap);
+    glTexImage2D(
+        GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, pass->depthmap, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+internal void DestroyColorRenderPass(ColorRenderPass *pass) {
+    glDeleteFramebuffers(1, &pass->framebuffer);
+    glDeleteTextures(1, &pass->render_target);
+    glDeleteProgram(pass->program);
+    glDeleteTextures(1, &pass->depthmap);
+}
+
+internal void BeginColorRenderPass(Renderer *renderer, ColorRenderPass *pass) {
+    glEnable(GL_DEPTH_TEST);
+    glViewport(0, 0, renderer->width, renderer->height);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
+    glClearColor(0.43f, 0.77f, 0.91f, 0.0f);
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+    glUseProgram(pass->program);
+
+    // Shadowmap
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
+}
+
+// --------------
+// Volumetric
+
+internal void CreateVolumetricRenderPass(VolumetricRenderPass *pass) {
+    pass->program = CreateProgram("volumetric");
+
+    glUseProgram(pass->program);
+    glUniform1i(glGetUniformLocation(pass->program, "shadow_map"), 0);
+    glUniform1i(glGetUniformLocation(pass->program, "depth_map"), 1);
+    glUniform1i(glGetUniformLocation(pass->program, "screen_texture"), 2);
+}
+
+internal void DestroyVolumetricRenderPass(VolumetricRenderPass *pass) {
+    glDeleteProgram(pass->program);
+}
+
+internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass *pass) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glUseProgram(pass->program);
+    glUniformMatrix4fv(
+        glGetUniformLocation(pass->program, "cam_view"), 1, GL_FALSE, renderer->camera_view.v);
+    glUniformMatrix4fv(glGetUniformLocation(pass->program, "view_inverse"),
+                       1,
+                       GL_FALSE,
+                       renderer->camera_view_inverse.v);
+    glUniform3f(glGetUniformLocation(pass->program, "view_pos"),
+                renderer->camera_pos.x,
+                renderer->camera_pos.y,
+                renderer->camera_pos.z);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, renderer->color_pass.depthmap);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, renderer->color_pass.render_target);
+}
+
+// ---------------
+// Renderer
+
 Renderer *RendererCreate(PlatformWindow *window) {
     Renderer *renderer = sCalloc(1, sizeof(Renderer));
 
     renderer->window = window;
     PlatformCreateOpenGLContext(renderer, window);
     GLLoadFunctions();
+
+    // Global init
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(GLMessageCallback, 0);
+    glDisable(GL_CULL_FACE);
 
-    // SHADOWMAP
-    {
-        renderer->shadowmap_program = glCreateProgram();
-        char *vtx_code = PlatformReadWholeFile("resources/shaders/gl/shadow.vert");
-        u32 vtx_shader;
-        GLCreateAndCompileShader(GL_VERTEX_SHADER, vtx_code, &vtx_shader);
-        sFree(vtx_code);
-        glAttachShader(renderer->shadowmap_program, vtx_shader);
+    // Render passes
+    CreateShadowmapRenderPass(&renderer->shadowmap_pass);
+    CreateColorRenderPass(renderer->width, renderer->height, &renderer->color_pass);
+    CreateVolumetricRenderPass(&renderer->vol_pass);
 
-        char *frag_code = PlatformReadWholeFile("resources/shaders/gl/shadow.frag");
-        u32 frag_shader;
-        GLCreateAndCompileShader(GL_FRAGMENT_SHADER, frag_code, &frag_shader);
-        sFree(frag_code);
-        glAttachShader(renderer->shadowmap_program, frag_shader);
+    // Meshes
+    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->moto);
 
-        glLinkProgram(renderer->shadowmap_program);
-        glObjectLabel(GL_PROGRAM, renderer->shadowmap_program, -1, "Shadowmap Program");
-        i32 result;
-        glGetProgramiv(renderer->shadowmap_program, GL_LINK_STATUS, &result);
-        ASSERT(result == GL_TRUE);
+    // Screen quad
+    glGenVertexArrays(1, &renderer->screen_quad);
+    glBindVertexArray(renderer->screen_quad);
+    glGenBuffers(1, &renderer->screen_quad_vbuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, renderer->screen_quad_vbuffer);
+    const f32 quad[] = {-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+                        -1.0f, 1.0f,  0.0f, 1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 1.0f,  1.0f, 1.0f, 1.0f};
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), 0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
+    glEnableVertexAttribArray(1);
 
-        glDeleteShader(vtx_shader);
-        glDeleteShader(frag_shader);
-
-        glGenTextures(1, &renderer->shadowmap_texture);
-        glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_texture);
-        glTexImage2D(GL_TEXTURE_2D,
-                     0,
-                     GL_DEPTH_COMPONENT,
-                     2048,
-                     2048,
-                     0,
-                     GL_DEPTH_COMPONENT,
-                     GL_FLOAT,
-                     NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-
-        glGenFramebuffers(1, &renderer->shadowmap_framebuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, renderer->shadowmap_framebuffer);
-        glObjectLabel(GL_FRAMEBUFFER, renderer->shadowmap_framebuffer, -1, "Shadowmap framebuffer");
-        glFramebufferTexture2D(
-            GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, renderer->shadowmap_texture, 0);
-    }
-    // MAIN
-    {
-        char *vtx_shader = PlatformReadWholeFile("resources/shaders/gl/main.vert");
-        u32 vertex_shader;
-        GLCreateAndCompileShader(GL_VERTEX_SHADER, vtx_shader, &vertex_shader);
-        sFree(vtx_shader);
-
-        char *frag_shader = PlatformReadWholeFile("resources/shaders/gl/main.frag");
-        u32 fragment_shader;
-        GLCreateAndCompileShader(GL_FRAGMENT_SHADER, frag_shader, &fragment_shader);
-        sFree(frag_shader);
-
-        renderer->main_program = glCreateProgram();
-        glAttachShader(renderer->main_program, vertex_shader);
-        glAttachShader(renderer->main_program, fragment_shader);
-        glLinkProgram(renderer->main_program);
-        glObjectLabel(GL_PROGRAM, renderer->main_program, -1, "MAIN SHADER");
-        glUseProgram(renderer->main_program);
-        glDeleteShader(vertex_shader);
-        glDeleteShader(fragment_shader);
-        glUniform1i(glGetUniformLocation(renderer->main_program, "shadow_map"), 0);
-        glUniform1i(glGetUniformLocation(renderer->main_program, "diffuse"), 1);
-
-        glGenFramebuffers(1, &renderer->main_framebuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, renderer->main_framebuffer);
-        glObjectLabel(GL_FRAMEBUFFER, renderer->main_framebuffer, -1, "Color framebuffer");
-        // Color attachement
-        glGenTextures(1, &renderer->main_render_target);
-        glBindTexture(GL_TEXTURE_2D, renderer->main_render_target);
-        glTexImage2D(GL_TEXTURE_2D,
-                     0,
-                     GL_RGB,
-                     renderer->width,
-                     renderer->height,
-                     0,
-                     GL_RGB,
-                     GL_UNSIGNED_BYTE,
-                     NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glFramebufferTexture2D(
-            GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, renderer->main_render_target, 0);
-
-        glGenTextures(1, &renderer->main_depthmap);
-        glBindTexture(GL_TEXTURE_2D, renderer->main_depthmap);
-        glTexImage2D(GL_TEXTURE_2D,
-                     0,
-                     GL_DEPTH_COMPONENT,
-                     renderer->width,
-                     renderer->height,
-                     0,
-                     GL_DEPTH_COMPONENT,
-                     GL_FLOAT,
-                     NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glFramebufferTexture2D(
-            GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, renderer->main_depthmap, 0);
-        /*
-        glGenRenderbuffers(1, &renderer->main_renderbuffer);
-        glBindRenderbuffer(GL_RENDERBUFFER, renderer->main_renderbuffer);
-        glRenderbufferStorage(
-            GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, renderer->width, renderer->height);
-
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-                                  GL_DEPTH_STENCIL_ATTACHMENT,
-                                  GL_RENDERBUFFER,
-                                  renderer->main_renderbuffer);
-        */
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        renderer->meshes = sCalloc(1, sizeof(Mesh *));
-        RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->moto);
-    }
-    // ---------------
-    // POST PROCESS
-    {
-        glGenVertexArrays(1, &renderer->screen_quad);
-        glBindVertexArray(renderer->screen_quad);
-        glGenBuffers(1, &renderer->screen_quad_vbuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, renderer->screen_quad_vbuffer);
-        f32 quad[] = {-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
-                      -1.0f, 1.0f,  0.0f, 1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 1.0f,  1.0f, 1.0f, 1.0f};
-
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
-
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), 0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
-        glEnableVertexAttribArray(1);
-
-        char *pp_vshader = PlatformReadWholeFile("resources/shaders/gl/post.vert");
-        u32 vertex_shader;
-        GLCreateAndCompileShader(GL_VERTEX_SHADER, pp_vshader, &vertex_shader);
-        sFree(pp_vshader);
-
-        char *pp_fshader = PlatformReadWholeFile("resources/shaders/gl/post.frag");
-        u32 fragment_shader;
-        GLCreateAndCompileShader(GL_FRAGMENT_SHADER, pp_fshader, &fragment_shader);
-        sFree(pp_fshader);
-
-        renderer->postprocess_program = glCreateProgram();
-        glAttachShader(renderer->postprocess_program, vertex_shader);
-        glAttachShader(renderer->postprocess_program, fragment_shader);
-        glLinkProgram(renderer->postprocess_program);
-        glDeleteShader(vertex_shader);
-        glDeleteShader(fragment_shader);
-        glUseProgram(renderer->postprocess_program);
-        glUniform1i(glGetUniformLocation(renderer->postprocess_program, "shadow_map"), 0);
-        glUniform1i(glGetUniformLocation(renderer->postprocess_program, "depth_map"), 1);
-        glUniform1i(glGetUniformLocation(renderer->postprocess_program, "screen_texture"), 2);
-    }
-
-    glUseProgram(renderer->main_program);
+    // Constant stuff
     renderer->camera_proj = mat4_perspective_gl(90.0f, 1280.0f / 720.0f, 0.1f, 1000.0f);
     mat4_inverse(&renderer->camera_proj, &renderer->camera_proj_inverse);
 
-    glUniformMatrix4fv(glGetUniformLocation(renderer->main_program, "projection"),
-                       1,
-                       GL_FALSE,
-                       renderer->camera_proj.v);
-    glUseProgram(renderer->postprocess_program);
-    glUniformMatrix4fv(glGetUniformLocation(renderer->postprocess_program, "proj_inverse"),
-                       1,
-                       GL_FALSE,
-                       renderer->camera_proj_inverse.v);
-    glUniformMatrix4fv(glGetUniformLocation(renderer->postprocess_program, "proj"),
-                       1,
-                       GL_FALSE,
-                       renderer->camera_proj.v);
+    // Init uniforms
+    glUseProgram(renderer->color_pass.program);
+    u32 loc = glGetUniformLocation(renderer->color_pass.program, "projection");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj.v);
 
-    glDisable(GL_CULL_FACE);
+    glUseProgram(renderer->vol_pass.program);
+    loc = glGetUniformLocation(renderer->vol_pass.program, "proj_inverse");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj_inverse.v);
 
     return renderer;
 }
 
-void RendererDrawScene(Renderer *renderer) {
+void RendererDestroy(Renderer *renderer) {
+    // Render passes
+    DestroyShadowmapRenderPass(&renderer->shadowmap_pass);
+    DestroyColorRenderPass(&renderer->color_pass);
+    DestroyVolumetricRenderPass(&renderer->vol_pass);
+
+    // Screen quad
+    glDeleteVertexArrays(1, &renderer->screen_quad_vbuffer);
+    glDeleteBuffers(1, &renderer->screen_quad);
+
+    // Meshes
+    RendererDestroyMesh(&renderer->moto);
+
+    sFree(renderer);
+}
+
+// -------------
+// Drawing
+
+internal void DrawScene(Renderer *renderer) {
     // Draw bike
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, renderer->moto.diffuse_texture);
@@ -371,79 +420,28 @@ void RendererDrawScene(Renderer *renderer) {
     glDrawElements(GL_TRIANGLES, renderer->moto.index_count, GL_UNSIGNED_INT, 0);
 }
 
-void RendererDrawFrame(Renderer *renderer) {
-    //------------------
-    // Shadow map
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, 2048, 2048);
-    glBindFramebuffer(GL_FRAMEBUFFER, renderer->shadowmap_framebuffer);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    glUseProgram(renderer->shadowmap_program);
-    RendererDrawScene(renderer);
-
-    //------------------
-    // Color pass
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, renderer->width, renderer->height);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, renderer->main_framebuffer);
-    glClearColor(0.43f, 0.77f, 0.91f, 0.0f);
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-    glUseProgram(renderer->main_program);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_texture);
-
-    u32 view_loc = glGetUniformLocation(renderer->main_program, "view");
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, renderer->camera_view.v);
-    RendererDrawScene(renderer);
-
-    //---------------
-    // Post process
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glUseProgram(renderer->postprocess_program);
-    glUniformMatrix4fv(glGetUniformLocation(renderer->postprocess_program, "cam_view"),
-                       1,
-                       GL_FALSE,
-                       renderer->camera_view.v);
-    glUniformMatrix4fv(glGetUniformLocation(renderer->postprocess_program, "view_inverse"),
-                       1,
-                       GL_FALSE,
-                       renderer->camera_view_inverse.v);
-    glUniform3f(glGetUniformLocation(renderer->postprocess_program, "view_pos"),
-                renderer->camera_pos.x,
-                renderer->camera_pos.y,
-                renderer->camera_pos.z);
-    glUniform3f(glGetUniformLocation(renderer->postprocess_program, "light_dir"),
-                renderer->light_dir.x,
-                renderer->light_dir.y,
-                renderer->light_dir.z);
-
+internal void DrawScreenQuad(Renderer *renderer) {
     glBindVertexArray(renderer->screen_quad);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_texture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, renderer->main_depthmap);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, renderer->main_render_target);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-
-    PlatformSwapBuffers(renderer);
 }
 
-void RendererDestroy(Renderer *renderer) {
-    glDeleteFramebuffers(1, &renderer->main_framebuffer);
-    RendererDestroyMesh(renderer->meshes[0]);
+void RendererDrawFrame(Renderer *renderer) {
+    // ------------------
+    // Shadow map
+    BeginShadowmapRenderPass(&renderer->shadowmap_pass);
+    DrawScene(renderer);
 
-    sFree(renderer->meshes);
-    glDeleteProgram(renderer->main_program);
-    sFree(renderer);
+    // ------------------
+    // Color pass
+    BeginColorRenderPass(renderer, &renderer->color_pass);
+    DrawScene(renderer);
+
+    // ---------------
+    // Post process
+    BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
+    DrawScreenQuad(renderer);
+
+    PlatformSwapBuffers(renderer);
 }
 
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
@@ -458,6 +456,17 @@ void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forwa
     renderer->camera_pos = position;
     renderer->camera_view = mat4_look_at(vec3_add(position, forward), position, up);
     mat4_inverse(&renderer->camera_view, &renderer->camera_view_inverse);
+
+    // Update uniforms
+    u32 loc = glGetUniformLocation(renderer->color_pass.program, "view");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_view.v);
+
+    // Volumetric pass
+    glUseProgram(renderer->vol_pass.program);
+    loc = glGetUniformLocation(renderer->vol_pass.program, "view_inverse");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_view_inverse.v);
+    loc = glGetUniformLocation(renderer->vol_pass.program, "view_pos");
+    glUniform3f(loc, renderer->camera_pos.x, renderer->camera_pos.y, renderer->camera_pos.z);
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
@@ -467,18 +476,20 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     renderer->light_matrix = mat4_mul(&ortho, &look);
     renderer->light_dir = direction;
 
-    glUseProgram(renderer->shadowmap_program);
-    u32 mat_loc = glGetUniformLocation(renderer->shadowmap_program, "light_matrix");
-    glUniformMatrix4fv(mat_loc, 1, GL_FALSE, renderer->light_matrix.v);
+    // Update uniforms
+    glUseProgram(renderer->shadowmap_pass.program);
+    u32 loc = glGetUniformLocation(renderer->shadowmap_pass.program, "light_matrix");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 
-    glUseProgram(renderer->main_program);
-    u32 light_loc = glGetUniformLocation(renderer->main_program, "light_dir");
-    glUniform3f(light_loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
+    glUseProgram(renderer->color_pass.program);
+    loc = glGetUniformLocation(renderer->color_pass.program, "light_dir");
+    glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
+    loc = glGetUniformLocation(renderer->color_pass.program, "light_matrix");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 
-    mat_loc = glGetUniformLocation(renderer->main_program, "light_matrix");
-    glUniformMatrix4fv(mat_loc, 1, GL_FALSE, renderer->light_matrix.v);
-
-    glUseProgram(renderer->postprocess_program);
-    mat_loc = glGetUniformLocation(renderer->postprocess_program, "light_matrix");
-    glUniformMatrix4fv(mat_loc, 1, GL_FALSE, renderer->light_matrix.v);
+    glUseProgram(renderer->vol_pass.program);
+    loc = glGetUniformLocation(renderer->vol_pass.program, "light_dir");
+    glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
+    loc = glGetUniformLocation(renderer->vol_pass.program, "light_matrix");
+    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 }

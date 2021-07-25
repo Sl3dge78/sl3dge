@@ -43,7 +43,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
     Vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
     Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
-    //Vec3 up = vec3_cross(right, forward);
 
     Vec3 movement = {0};
 
@@ -72,7 +71,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
     // Reset
     if(input->keyboard[SCANCODE_SPACE] & KEY_PRESSED) {
-        // GameStart(game_data);
         game_data->position = (Vec3){0.0f, 0, 0};
         *game_data->moto.transform = mat4_identity();
     }
