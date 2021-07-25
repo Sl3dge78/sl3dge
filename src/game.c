@@ -17,9 +17,8 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->renderer_api.SetSunDirection(game_data->renderer,
                                             vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     //game_data->renderer_api.LoadMesh(game_data->renderer, "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
-    game_data->renderer_api.LoadMesh(game_data->renderer,
-                                     "resources/3d/Motorcycle/motorcycle.gltf");
-    game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
+    //game_data->renderer_api.LoadMesh(game_data->renderer,                                     "resources/3d/Motorcycle/motorcycle.gltf");
+    //game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
 }
 
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input) {

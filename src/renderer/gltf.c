@@ -15,7 +15,7 @@ GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst
     switch(acc->component_type) {
     case cgltf_component_type_r_16u: size = sizeof(u16); break;
     case cgltf_component_type_r_32u: size = sizeof(u32); break;
-    case cgltf_component_type_r_32f: size = sizeof(float); break;
+    case cgltf_component_type_r_32f: size = sizeof(f32); break;
     case cgltf_component_type_r_8u: size = sizeof(u8); break;
     default:
         sError("Unsupported component type : %d", acc->component_type);
@@ -60,6 +60,39 @@ inline u32 GLTFGetTextureID(cgltf_texture *texture) {
         return UINT_MAX;
 
     return texture->id;
+}
+
+void *GLTFGetIndexBuffer(cgltf_primitive *prim, u32 *size) {
+    *size = prim->indices->count * sizeof(u32);
+    u32 *result = sCalloc(prim->indices->count, sizeof(u32));
+    GLTFCopyAccessor(prim->indices, result, 0, sizeof(u32));
+    return result;
+}
+
+void *GLTFGetVertexBuffer(cgltf_primitive *prim, u32 *size) {
+    Vertex *result = sCalloc(prim->attributes[0].data->count, sizeof(Vertex));
+    *size = prim->attributes[0].data->count * sizeof(Vertex);
+    for(u32 a = 0; a < prim->attributes_count; ++a) {
+        switch(prim->attributes[a].type) {
+        case cgltf_attribute_type_position: {
+            GLTFCopyAccessor(
+                prim->attributes[a].data, result, offsetof(Vertex, pos), sizeof(Vertex));
+        } break;
+
+        case cgltf_attribute_type_normal: {
+            GLTFCopyAccessor(
+                prim->attributes[a].data, result, offsetof(Vertex, normal), sizeof(Vertex));
+        } break;
+        case cgltf_attribute_type_texcoord: {
+            GLTFCopyAccessor(
+                prim->attributes[a].data, result, offsetof(Vertex, uv), sizeof(Vertex));
+        } break;
+        default: {
+            continue;
+        }
+        }
+    }
+    return result;
 }
 
 void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim,

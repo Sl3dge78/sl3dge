@@ -67,6 +67,23 @@ typedef struct RenderGroup {
     VkClearValue *clear_values;
 } RenderGroup;
 
+typedef struct Mesh {
+    Buffer *buffer;
+    u32 all_index_offset; // Indices start at this offset in the buffer
+
+    u32 total_vertex_count;
+    u32 total_index_count;
+    u32 total_primitives_count;
+    Primitive *primitives;
+
+    u32 primitive_nodes_count;
+    Mat4 *primitive_transforms;
+
+    u32 instance_count;
+    u32 instance_capacity;
+    Mat4 *instance_transforms;
+} Mesh;
+
 typedef struct Renderer {
     PlatformAPI *platform;
 
@@ -128,6 +145,7 @@ typedef struct Renderer {
 
     u32 mesh_capacity;
     u32 mesh_count;
+    Buffer **meshes_buffer; // idx & vtx buffer
     Mesh **meshes;
 
 } Renderer;

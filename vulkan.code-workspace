@@ -24,7 +24,9 @@
             "smodule.h": "c",
             "*.rh": "c",
             "gl.h": "c",
-            "opengl_renderer.h": "c"
+            "opengl_renderer.h": "c",
+            "glext.h": "c",
+            "wglext.h": "c"
         }
     },
 }

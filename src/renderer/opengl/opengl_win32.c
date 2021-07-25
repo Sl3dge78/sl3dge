@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <GL/GL.h>
 #include <GL/glext.h>
+#include <GL/wglext.h>
 
 #include "platform/platform_win32.h"
 #include "renderer/opengl/opengl_renderer.h"
@@ -30,6 +31,7 @@ void GLLoadFunctions() {
     LOAD_GL_FUNC(PFNGLENABLEVERTEXATTRIBARRAYPROC, glEnableVertexAttribArray);
     LOAD_GL_FUNC(PFNGLGENVERTEXARRAYSPROC, glGenVertexArrays);
     LOAD_GL_FUNC(PFNGLBINDVERTEXARRAYPROC, glBindVertexArray);
+    LOAD_GL_FUNC(PFNGLDEBUGMESSAGECALLBACKPROC, glDebugMessageCallback);
 }
 
 void PlatformCreateOpenGLContext(Renderer *renderer, PlatformWindow *window) {
@@ -47,11 +49,36 @@ void PlatformCreateOpenGLContext(Renderer *renderer, PlatformWindow *window) {
         window->dc, suggested_pixel_fmt_id, sizeof(PIXELFORMATDESCRIPTOR), &suggested_pixel_fmt);
     SetPixelFormat(window->dc, suggested_pixel_fmt_id, &suggested_pixel_fmt);
 
-    HGLRC opengl_rc = wglCreateContext(window->dc);
+    HGLRC temp_rc = wglCreateContext(window->dc);
+    if(!wglMakeCurrent(window->dc, temp_rc)) {
+        DWORD error = GetLastError();
+        sError("Unable to init opengl %d", error);
+    }
+
+    i32 version_major = 0;
+    glGetIntegerv(GL_MAJOR_VERSION, &version_major);
+    i32 version_minor = 0;
+    glGetIntegerv(GL_MINOR_VERSION, &version_minor);
+    sLog("OpenGL V%d.%d", version_major, version_minor);
+
+    i32 attribs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB,
+                     version_major,
+                     WGL_CONTEXT_MINOR_VERSION_ARB,
+                     version_minor,
+                     WGL_CONTEXT_FLAGS_ARB,
+                     WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+                     WGL_CONTEXT_PROFILE_MASK_ARB,
+                     WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+                     0};
+    PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = NULL;
+    wglCreateContextAttribsARB =
+        (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+    HGLRC opengl_rc = wglCreateContextAttribsARB(window->dc, 0, attribs);
     if(!wglMakeCurrent(window->dc, opengl_rc)) {
         DWORD error = GetLastError();
         sError("Unable to init opengl %d", error);
     }
+    wglDeleteContext(temp_rc);
 
     renderer->width = window->w;
     renderer->height = window->h;

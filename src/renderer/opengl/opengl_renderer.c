@@ -15,9 +15,26 @@
 #endif
 
 #include <sl3dge-utils/sl3dge.h>
+#include <cgltf/cgltf.h>
 
 #include "renderer/renderer.h"
 #include "renderer/opengl/opengl_renderer.h"
+#include "renderer/gltf.c"
+
+void APIENTRY GLMessageCallback(GLenum source,
+                                GLenum type,
+                                GLuint id,
+                                GLenum severity,
+                                GLsizei length,
+                                const GLchar *message,
+                                const void *userParam) {
+    if(severity == GL_DEBUG_SEVERITY_HIGH) {
+        sError("GL ERROR: %s", message);
+        ASSERT(0);
+    } else if(severity == GL_DEBUG_SEVERITY_MEDIUM || severity == GL_DEBUG_SEVERITY_LOW) {
+        sWarn("GL WARN: %s", message);
+    }
+}
 
 internal void GLCheckShaderCompilation(u32 shader) {
     i32 result;
@@ -36,18 +53,88 @@ internal void GLCreateAndCompileShader(GLenum type, const char *code, u32 *resul
     GLCheckShaderCompilation(*result);
 }
 
+u32 RendererLoadMesh(Renderer *renderer, const char *path) {
+    sLog("Loading Mesh...");
+    Mesh *mesh = (Mesh *)sMalloc(sizeof(Mesh));
+    *mesh = (Mesh){0};
+    renderer->mesh_count++;
+
+    char directory[64] = {0};
+    const char *last_sep = strrchr(path, '/');
+    u32 size = last_sep - path;
+    strncpy_s(directory, ARRAY_SIZE(directory), path, size);
+    directory[size] = '/';
+    directory[size + 1] = '\0';
+
+    cgltf_data *data;
+    cgltf_options options = {0};
+    cgltf_result result = cgltf_parse_file(&options, path, &data);
+    if(result != cgltf_result_success) {
+        sError("Error reading mesh");
+        ASSERT(0);
+    }
+
+    cgltf_load_buffers(&options, data, path);
+
+    // Vertex & Index Buffer
+    glGenBuffers(1, &mesh->vertex_buffer);
+    glGenBuffers(1, &mesh->index_buffer);
+    glGenVertexArrays(1, &mesh->vertex_array);
+
+    glBindVertexArray(mesh->vertex_array);
+    u32 i = 0;
+    for(u32 m = 0; m < data->meshes_count; ++m) {
+        if(data->meshes[m].primitives_count > 1) {
+            sWarn("Only 1 primitive supported yet");
+            // TODO
+        }
+        for(u32 p = 0; p < data->meshes[m].primitives_count; p++) {
+            cgltf_primitive *prim = &data->meshes[m].primitives[p];
+            u32 index_buffer_size = 0;
+            void *index_data = GLTFGetIndexBuffer(prim, &index_buffer_size);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_buffer_size, index_data, GL_STATIC_DRAW);
+            sFree(index_data);
+
+            mesh->vertex_count = (u32)prim->attributes[0].data->count;
+            u32 vertex_buffer_size = 0;
+            void *vertex_data = GLTFGetVertexBuffer(prim, &vertex_buffer_size);
+
+            glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
+            glBufferData(GL_ARRAY_BUFFER, vertex_buffer_size, vertex_data, GL_STATIC_DRAW);
+            sFree(vertex_data);
+            ++i;
+        }
+    }
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(2);
+    cgltf_free(data);
+
+    // TEMP: hardcoded mesh id
+    renderer->meshes[0] = mesh;
+    sLog("Loading done");
+
+    return 0;
+}
+
+void RendererDestroyMesh(Mesh *mesh) {
+    glDeleteBuffers(1, &mesh->index_buffer);
+    glDeleteBuffers(1, &mesh->vertex_buffer);
+    sFree(mesh);
+}
+
 Renderer *RendererCreate(PlatformWindow *window) {
     Renderer *renderer = sMalloc(sizeof(Renderer));
     renderer->window = window;
     PlatformCreateOpenGLContext(renderer, window);
-
-    i32 version_major = 0;
-    glGetIntegerv(GL_MAJOR_VERSION, &version_major);
-    i32 version_minor = 0;
-    glGetIntegerv(GL_MINOR_VERSION, &version_minor);
-    sLog("OpenGL V%d.%d", version_major, version_minor);
-
     GLLoadFunctions();
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(GLMessageCallback, 0);
 
     // Create buffer
     glGenBuffers(1, &renderer->vbo);
@@ -77,36 +164,39 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glDeleteShader(renderer->vertex_shader);
     glDeleteShader(renderer->fragment_shader);
 
+    renderer->meshes = sCalloc(1, sizeof(Mesh *));
+
+    //RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf");
+    RendererLoadMesh(renderer, "resources/models/gltf_samples/Box/glTF/Box.gltf");
+
+    glViewport(0, 0, renderer->width, renderer->height);
+    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+
     return renderer;
 }
 
 void RendererDrawFrame(Renderer *renderer) {
-    glViewport(0, 0, renderer->width, renderer->height);
-
-    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(renderer->shader_program);
-    glBindVertexArray(renderer->vao);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    //glBindVertexArray(renderer->vao);
+    //glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(renderer->meshes[0]->vertex_array);
+    glDrawElements(GL_TRIANGLES, renderer->meshes[0]->vertex_count, GL_UNSIGNED_INT, 0);
 
     PlatformSwapBuffers(renderer);
 }
 
 void RendererDestroy(Renderer *renderer) {
+    RendererDestroyMesh(renderer->meshes[0]);
+
+    sFree(renderer->meshes);
     glDeleteProgram(renderer->shader_program);
     glDeleteBuffers(1, &renderer->vbo);
     sFree(renderer);
 }
 
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
-}
-
-u32 RendererLoadMesh(Renderer *renderer, const char *path) {
-    return 0;
-}
-
-void RendererDestroyMesh(Renderer *renderer, u32 mesh) {
 }
 
 MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {

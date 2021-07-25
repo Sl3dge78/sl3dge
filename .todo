@@ -17,6 +17,21 @@ GAME:
 
     IDEAS:
 
+OPENGL RENDERER :
+    CRITICAL:
+        - Camera movement
+            - Matrices > Will need an open gl mode in sMath
+            - Update vertex shader
+        - Use Mesh from gltf
+        - Depth
+        - Lighting (Shader)
+        - Shadows (Shader)
+        - Volumetric (Shader)
+    MAJOR:
+    BACKLOG:
+    IMPROVEMENTS:
+    IDEAS:
+
 VULKAN RENDERER:
     CRITICAL:
         - Resize the texture array, rebuild the pipeline?
