@@ -30,7 +30,7 @@ void APIENTRY GLMessageCallback(GLenum source,
                                 const void *userParam) {
     if(severity == GL_DEBUG_SEVERITY_HIGH) {
         sError("GL ERROR: %s", message);
-        ASSERT(0);
+        //ASSERT(0);
     } else if(severity == GL_DEBUG_SEVERITY_MEDIUM || severity == GL_DEBUG_SEVERITY_LOW) {
         sWarn("GL WARN: %s", message);
     }
@@ -106,6 +106,11 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
             ++i;
         }
     }
+
+    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, "GLTF VTX BUFFER");
+    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GLTF IDX BUFFER");
+    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GLTF ARRAY BUFFER");
+
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(
@@ -136,17 +141,6 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(GLMessageCallback, 0);
 
-    // Create buffer
-    glGenBuffers(1, &renderer->vbo);
-    glGenVertexArrays(1, &renderer->vao);
-
-    glBindVertexArray(renderer->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, renderer->vbo);
-    const f32 vertices[] = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f};
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(f32), 0);
-    glEnableVertexAttribArray(0);
-
     // Shader
     char *vtx_shader = PlatformReadWholeFile("resources/shaders/gl/main.vert");
     GLCreateAndCompileShader(GL_VERTEX_SHADER, vtx_shader, &renderer->vertex_shader);
@@ -160,27 +154,34 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glAttachShader(renderer->shader_program, renderer->vertex_shader);
     glAttachShader(renderer->shader_program, renderer->fragment_shader);
     glLinkProgram(renderer->shader_program);
+    glObjectLabel(GL_PROGRAM, renderer->shader_program, -1, "MAIN SHADER");
 
     glDeleteShader(renderer->vertex_shader);
     glDeleteShader(renderer->fragment_shader);
 
     renderer->meshes = sCalloc(1, sizeof(Mesh *));
 
-    //RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf");
-    RendererLoadMesh(renderer, "resources/models/gltf_samples/Box/glTF/Box.gltf");
+    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf");
+    //RendererLoadMesh(renderer, "resources/models/gltf_samples/Box/glTF/Box.gltf");
 
     glViewport(0, 0, renderer->width, renderer->height);
     glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+
+    glUseProgram(renderer->shader_program);
+    renderer->camera_proj = mat4_perspective_gl(90, 1280.0f / 720.0f, 0.1, 1000);
+    u32 proj_loc = glGetUniformLocation(renderer->shader_program, "projection");
+    glUniformMatrix4fv(proj_loc, 1, GL_FALSE, renderer->camera_proj.v);
+
+    glEnable(GL_DEPTH_TEST);
 
     return renderer;
 }
 
 void RendererDrawFrame(Renderer *renderer) {
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
     glUseProgram(renderer->shader_program);
-    //glBindVertexArray(renderer->vao);
-    //glDrawArrays(GL_TRIANGLES, 0, 3);
+
     glBindVertexArray(renderer->meshes[0]->vertex_array);
     glDrawElements(GL_TRIANGLES, renderer->meshes[0]->vertex_count, GL_UNSIGNED_INT, 0);
 
@@ -192,7 +193,6 @@ void RendererDestroy(Renderer *renderer) {
 
     sFree(renderer->meshes);
     glDeleteProgram(renderer->shader_program);
-    glDeleteBuffers(1, &renderer->vbo);
     sFree(renderer);
 }
 
@@ -205,6 +205,11 @@ MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
 }
 
 void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {
+    renderer->camera_pos = position;
+    renderer->camera_view = mat4_look_at(vec3_add(position, forward), position, up);
+    mat4_inverse(&renderer->camera_view, &renderer->camera_view_inverse);
+    u32 view_loc = glGetUniformLocation(renderer->shader_program, "view");
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, renderer->camera_view.v);
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {

@@ -32,6 +32,9 @@ void GLLoadFunctions() {
     LOAD_GL_FUNC(PFNGLGENVERTEXARRAYSPROC, glGenVertexArrays);
     LOAD_GL_FUNC(PFNGLBINDVERTEXARRAYPROC, glBindVertexArray);
     LOAD_GL_FUNC(PFNGLDEBUGMESSAGECALLBACKPROC, glDebugMessageCallback);
+    LOAD_GL_FUNC(PFNGLGETUNIFORMLOCATIONPROC, glGetUniformLocation);
+    LOAD_GL_FUNC(PFNGLUNIFORMMATRIX4FVPROC, glUniformMatrix4fv);
+    LOAD_GL_FUNC(PFNGLOBJECTLABELPROC, glObjectLabel);
 }
 
 void PlatformCreateOpenGLContext(Renderer *renderer, PlatformWindow *window) {
