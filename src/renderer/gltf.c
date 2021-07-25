@@ -94,7 +94,7 @@ void *GLTFGetVertexBuffer(cgltf_primitive *prim, u32 *size) {
     }
     return result;
 }
-
+/* // TODO this is vulkan specific
 void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim,
                                   Primitive *primitive,
                                   const u32 offset,
@@ -165,7 +165,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         buffer++;
     }
 }
-
+*/
 void GLTFGetNodeTransform(const cgltf_node *node, Mat4 *transform) {
     if(node->has_matrix) {
         memcpy(transform, node->matrix, sizeof(Mat4));

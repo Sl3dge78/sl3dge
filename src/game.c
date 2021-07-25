@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define SL3DGE_IMPLEMENTATION
 #include <sl3dge-utils/sl3dge.h>
 
 #include "game.h"

@@ -9,27 +9,6 @@
 
 typedef struct Renderer Renderer;
 typedef struct GameData GameData;
-typedef struct Frame Frame;
-typedef struct Buffer Buffer;
-
-// Structures
-typedef struct Primitive {
-    u32 material_id;
-    u32 node_id;
-    u32 index_count;
-    u32 index_offset;
-    u32 vertex_count;
-    u32 vertex_offset;
-} Primitive;
-
-typedef struct MeshInstance {
-    Mat4 *transform;
-} MeshInstance;
-
-typedef struct PushConstant {
-    alignas(16) Mat4 transform;
-    alignas(4) u32 material;
-} PushConstant;
 
 typedef struct Vertex {
     Vec3 pos;
@@ -37,26 +16,9 @@ typedef struct Vertex {
     Vec2 uv;
 } Vertex;
 
-typedef struct Material {
-    alignas(16) Vec3 base_color;
-    alignas(4) u32 base_color_texture;
-    alignas(4) u32 metallic_roughness_texture;
-    alignas(4) float metallic_factor;
-    alignas(4) float roughness_factor;
-    alignas(4) u32 normal_texture;
-    alignas(4) u32 ao_texture;
-    alignas(4) u32 emissive_texture;
-} Material;
-
-typedef struct CameraMatrices {
-    alignas(16) Mat4 proj;
-    alignas(16) Mat4 proj_inverse;
-    alignas(16) Mat4 view;
-    alignas(16) Mat4 view_inverse;
-    alignas(16) Mat4 shadow_mvp;
-    alignas(16) Vec3 pos;
-    alignas(16) Vec3 light_dir;
-} CameraMatrices;
+typedef struct MeshInstance {
+    Mat4 *transform;
+} MeshInstance;
 
 // Platform level functions
 Renderer *RendererCreate(PlatformWindow *window);

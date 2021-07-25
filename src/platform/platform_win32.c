@@ -8,6 +8,7 @@
 #define __WIN32__
 #include <windows.h>
 
+#define SL3DGE_IMPLEMENTATION
 #include <sl3dge-utils/sl3dge.h>
 
 #include "platform.h"

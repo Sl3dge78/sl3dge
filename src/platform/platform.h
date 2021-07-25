@@ -1,8 +1,6 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
-#include <sl3dge-utils/sl3dge.h>
-
 struct PlatformWindow;
 typedef struct PlatformWindow PlatformWindow;
 

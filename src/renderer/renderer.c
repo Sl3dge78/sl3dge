@@ -1,6 +1,3 @@
-#include <sl3dge-utils/sl3dge.h>
-#include <cgltf/cgltf.h>
-
 #include "renderer/renderer.h"
 
 #ifdef RENDERER_VULKAN

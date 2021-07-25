@@ -19,15 +19,10 @@ GAME:
 
 OPENGL RENDERER :
     CRITICAL:
-        - Camera movement
-            - Matrices > Will need an open gl mode in sMath
-            - Update vertex shader
-        - Use Mesh from gltf
-        - Depth
-        - Lighting (Shader)
-        - Shadows (Shader)
-        - Volumetric (Shader)
+        - UI
+        - Mesh Transforms
     MAJOR:
+        - Handle multiple primitives in single gltf
     BACKLOG:
     IMPROVEMENTS:
     IDEAS:
@@ -74,7 +69,8 @@ VULKAN RENDERER:
         - Group descrptor sets
             - Descriptor set 0 > could be the same for all pipelines
             > Could have the camera matrices and the shadowmap sampler
-GLTF:
+
+            GLTF:
     CRITICAL:
     MAJOR:
         - If we have multiple meshes that use the same primitve, right now we just duplicate it

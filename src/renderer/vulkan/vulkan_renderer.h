@@ -24,6 +24,43 @@ VK_DECL_FUNC(vkCmdBuildAccelerationStructuresKHR);
 VK_DECL_FUNC(vkDestroyAccelerationStructureKHR);
 VK_DECL_FUNC(vkGetAccelerationStructureDeviceAddressKHR);
 
+typedef struct Material {
+    alignas(16) Vec3 base_color;
+    alignas(4) u32 base_color_texture;
+    alignas(4) u32 metallic_roughness_texture;
+    alignas(4) float metallic_factor;
+    alignas(4) float roughness_factor;
+    alignas(4) u32 normal_texture;
+    alignas(4) u32 ao_texture;
+    alignas(4) u32 emissive_texture;
+} Material;
+
+typedef struct CameraMatrices {
+    alignas(16) Mat4 proj;
+    alignas(16) Mat4 proj_inverse;
+    alignas(16) Mat4 view;
+    alignas(16) Mat4 view_inverse;
+    alignas(16) Mat4 shadow_mvp;
+    alignas(16) Vec3 pos;
+    alignas(16) Vec3 light_dir;
+} CameraMatrices;
+
+// Structures
+typedef struct Primitive {
+    u32 material_id;
+    u32 node_id;
+    u32 index_count;
+    u32 index_offset;
+    u32 vertex_count;
+    u32 vertex_offset;
+} Primitive;
+
+
+typedef struct PushConstant {
+    alignas(16) Mat4 transform;
+    alignas(4) u32 material;
+} PushConstant;
+
 typedef struct Buffer {
     VkBuffer buffer;
     VkDeviceMemory memory;
