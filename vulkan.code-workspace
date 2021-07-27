@@ -26,7 +26,8 @@
             "gl.h": "c",
             "opengl_renderer.h": "c",
             "glext.h": "c",
-            "wglext.h": "c"
+            "wglext.h": "c",
+            "system_error": "c"
         }
     },
 }

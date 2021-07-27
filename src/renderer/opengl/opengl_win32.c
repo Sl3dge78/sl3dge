@@ -1,5 +1,6 @@
 #include <sl3dge-utils/sl3dge.h>
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <GL/GL.h>
 #include <GL/glext.h>

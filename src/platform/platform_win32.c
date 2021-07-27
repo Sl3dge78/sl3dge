@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #define __WIN32__
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #define SL3DGE_IMPLEMENTATION
@@ -138,7 +139,7 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     case WM_SIZE:
     case WM_SIZING: {
         RECT rect;
-        GetWindowRect(global_window.hwnd, &rect);
+        GetClientRect(global_window.hwnd, &rect);
         global_window.w = rect.right;
         global_window.h = rect.bottom;
         RendererUpdateWindow(renderer, &global_window);

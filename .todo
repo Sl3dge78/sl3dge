@@ -82,6 +82,7 @@ VULKAN RENDERER:
 
 WIN32 :
     CRITICAL:
+            -FTIME TRACE WHO DOES IT WORK
     MAJOR:
     BACKLOG:
         - Figure out multithreading

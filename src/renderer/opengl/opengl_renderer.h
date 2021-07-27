@@ -2,6 +2,7 @@
 #define OPENGL_RENDERER_H
 
 #include <sl3dge-utils/sl3dge.h>
+#include <stb/stb_truetype.h>
 
 #include "platform/platform.h"
 #include "renderer/renderer.h"
@@ -58,6 +59,13 @@ typedef struct Renderer {
     Vec3 camera_pos;
     Mat4 light_matrix;
     Vec3 light_dir;
+
+    // Font
+    u32 glyphs_texture;
+    stbtt_bakedchar *char_data;
+    u32 glyph_program;
+    u32 glyph_vertex_array;
+    u32 glyph_vertex_buffer;
 
 } Renderer;
 

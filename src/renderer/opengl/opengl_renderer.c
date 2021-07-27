@@ -1,3 +1,4 @@
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <GL/GL.h>
 
@@ -13,6 +14,9 @@
 #ifdef __WIN32__
 #include "renderer/opengl/opengl_win32.c"
 #endif
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include <stb/stb_truetype.h>
 
 #include <sl3dge-utils/sl3dge.h>
 #include <cgltf/cgltf.h>
@@ -30,7 +34,7 @@ void APIENTRY GLMessageCallback(GLenum source,
                                 const void *userParam) {
     if(severity == GL_DEBUG_SEVERITY_HIGH) {
         sError("GL ERROR: %s", message);
-        //ASSERT(0);
+        ASSERT(0);
     } else if(severity == GL_DEBUG_SEVERITY_MEDIUM || severity == GL_DEBUG_SEVERITY_LOW) {
         sWarn("GL WARN: %s", message);
     }
@@ -39,7 +43,7 @@ void APIENTRY GLMessageCallback(GLenum source,
 // ---------------
 // Programs & shaders
 
-internal void CheckShaderCompilation(u32 shader) {
+internal bool CheckShaderCompilation(u32 shader) {
     i32 result;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
     if(!result) {
@@ -47,13 +51,14 @@ internal void CheckShaderCompilation(u32 shader) {
         glGetShaderInfoLog(shader, 512, NULL, log);
         sError("Unable to compile shader:\n%s", log);
     }
+    return result;
 }
 
 internal u32 CreateAndCompileShader(GLenum type, const char *code) {
     u32 result = glCreateShader(type);
     glShaderSource(result, 1, &code, NULL);
     glCompileShader(result);
-    CheckShaderCompilation(result);
+    ASSERT(CheckShaderCompilation(result));
     return result;
 }
 
@@ -392,12 +397,46 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
     glEnableVertexAttribArray(1);
 
+    {
+        unsigned char *ttf_buffer = sCalloc(1 << 20, sizeof(unsigned char));
+        FILE *f = fopen("c:/windows/fonts/times.ttf", "rb");
+        ASSERT(f);
+        fread(ttf_buffer, 1, 1 << 20, f);
+        fclose(f);
+
+        unsigned char *temp_bmp = sCalloc(512 * 512, sizeof(unsigned char));
+        renderer->char_data = sCalloc(96, sizeof(stbtt_bakedchar));
+
+        stbtt_BakeFontBitmap(ttf_buffer, 0, 32.0f, temp_bmp, 512, 512, 32, 96, renderer->char_data);
+
+        sFree(ttf_buffer);
+        glGenTextures(1, &renderer->glyphs_texture);
+        glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 512, 512, 0, GL_RED, GL_UNSIGNED_BYTE, temp_bmp);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        sFree(temp_bmp);
+
+        glGenVertexArrays(1, &renderer->glyph_vertex_array);
+        glBindVertexArray(renderer->glyph_vertex_array);
+        glGenBuffers(1, &renderer->glyph_vertex_buffer);
+        glBindBuffer(GL_ARRAY_BUFFER, renderer->glyph_vertex_buffer);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), 0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
+        glEnableVertexAttribArray(1);
+
+        renderer->glyph_program = CreateProgram("text");
+    }
+
     UpdateCameraProj(renderer);
 
     return renderer;
 }
 
 void RendererDestroy(Renderer *renderer) {
+    // Font
+    sFree(renderer->char_data);
+
     // Render passes
     DestroyShadowmapRenderPass(&renderer->shadowmap_pass);
     DestroyColorRenderPass(&renderer->color_pass);
@@ -429,6 +468,84 @@ internal void DrawScreenQuad(Renderer *renderer) {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
+internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindVertexArray(0);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glUseProgram(renderer->glyph_program);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
+
+    while(*text) {
+        if(*text >= 32 && *text <= 127) {
+            // TODO optimize
+            stbtt_aligned_quad q;
+            stbtt_GetBakedQuad(renderer->char_data, 512, 512, *text - 32, &x, &y, &q, 1);
+
+            f32 y1 = q.y1 - q.y0;
+            f32 y0 = renderer->height - q.y0 - y1;
+            glViewport(q.x0, y0, q.x1 - q.x0, y1);
+            //const f32 halfw = / 2.0f;
+            //const f32 halfh = renderer->height / 2.0f;
+            /*
+            f32 x0 = ((2.0f * q.x0) / renderer->width) - 1.f;
+            f32 x1 = ((2.0f * q.x1) / renderer->width) - 1.f;
+            f32 y0 = ((2.0f * q.y0) / renderer->height) - 1.f;
+            y0 *= -1.0f;
+            f32 y1 = ((2.0f * q.y1) / renderer->height) - 1.f;
+            y1 *= -1.0f;
+
+            f32 quad[] = {
+                x0,
+                y0,
+                q.s0,
+                q.t1, // 0, 0
+                x0,
+                y1,
+                q.s0,
+                q.t0, // 0, 1
+                x1,
+                y0,
+                q.s1,
+                q.t1, // 1, 0
+                x1,
+                y1,
+                q.s1,
+                q.t0, // 1, 1
+            };
+            */
+            f32 quad[] = {
+                -1,
+                1,
+                q.s0,
+                q.t0, // 0, 0
+                1,
+                1,
+                q.s1,
+                q.t0, // 1, 0
+                -1,
+                -1,
+                q.s0,
+                q.t1, // 0, 1
+                1,
+                -1,
+                q.s1,
+                q.t1, // 1, 1
+            };
+
+            glBindBuffer(GL_ARRAY_BUFFER, renderer->glyph_vertex_buffer);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_DYNAMIC_DRAW);
+
+            glBindVertexArray(renderer->glyph_vertex_array);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        }
+        ++text;
+    }
+}
+
 void RendererDrawFrame(Renderer *renderer) {
     // ------------------
     // Shadow map
@@ -444,6 +561,8 @@ void RendererDrawFrame(Renderer *renderer) {
     // Post process
     BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
     DrawScreenQuad(renderer);
+
+    DrawString(renderer, 30, 30, "Hello my friends!");
 
     PlatformSwapBuffers(renderer);
 }
