@@ -7,6 +7,16 @@
 #include "platform/platform.h"
 #include "renderer/renderer.h"
 
+typedef struct PushBuffer {
+    u32 max_size;
+    u32 size;
+    void *buf;
+} PushBuffer;
+
+typedef struct UIPushBufferEntry {
+    u32 x, y, w, h;
+} UIPushBufferEntry;
+
 typedef struct Mesh {
     u32 vertex_array;
     u32 vertex_buffer;
@@ -60,10 +70,14 @@ typedef struct Renderer {
     Mat4 light_matrix;
     Vec3 light_dir;
 
+    // UI
+    PushBuffer ui_push_buffer;
+    u32 white_texture;
+
     // Font
     u32 glyphs_texture;
     stbtt_bakedchar *char_data;
-    u32 glyph_program;
+    u32 ui_program;
     u32 glyph_vertex_array;
     u32 glyph_vertex_buffer;
 

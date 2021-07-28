@@ -389,15 +389,38 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glBindVertexArray(renderer->screen_quad);
     glGenBuffers(1, &renderer->screen_quad_vbuffer);
     glBindBuffer(GL_ARRAY_BUFFER, renderer->screen_quad_vbuffer);
-    const f32 quad[] = {-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f,
-                        -1.0f, 1.0f,  0.0f, 1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 1.0f,  1.0f, 1.0f, 1.0f};
+    const f32 quad[] = {-1.0f,
+                        -1.0f,
+                        0.0f,
+                        0.0f,
+
+                        1.0f,
+                        -1.0f,
+                        1.0f,
+                        0.0f,
+
+                        -1.0f,
+                        1.0f,
+                        0.0f,
+                        1.0f,
+
+                        1.0f,
+                        1.0f,
+                        1.0f,
+                        1.0f};
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), 0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
     glEnableVertexAttribArray(1);
 
-    {
+    { // UI
+        // Init push buffer
+        renderer->ui_push_buffer.max_size = 128;
+        renderer->ui_push_buffer.buf = sCalloc(renderer->ui_push_buffer.max_size, 1);
+        renderer->ui_push_buffer.size = 0;
+
+        // Load font
         unsigned char *ttf_buffer = sCalloc(1 << 20, sizeof(unsigned char));
         FILE *f = fopen("c:/windows/fonts/times.ttf", "rb");
         ASSERT(f);
@@ -416,6 +439,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         sFree(temp_bmp);
 
+        // Init glyph array
         glGenVertexArrays(1, &renderer->glyph_vertex_array);
         glBindVertexArray(renderer->glyph_vertex_array);
         glGenBuffers(1, &renderer->glyph_vertex_buffer);
@@ -425,7 +449,17 @@ Renderer *RendererCreate(PlatformWindow *window) {
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
         glEnableVertexAttribArray(1);
 
-        renderer->glyph_program = CreateProgram("text");
+        // Load ui shader
+        renderer->ui_program = CreateProgram("ui");
+
+        // Load white texture
+        glGenTextures(1, &renderer->white_texture);
+        glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+        const u8 white[] = {
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 4, 4, 0, GL_RED, GL_UNSIGNED_BYTE, &white);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
 
     UpdateCameraProj(renderer);
@@ -434,8 +468,11 @@ Renderer *RendererCreate(PlatformWindow *window) {
 }
 
 void RendererDestroy(Renderer *renderer) {
-    // Font
+    // UI
+    sFree(renderer->ui_push_buffer.buf);
     sFree(renderer->char_data);
+    glDeleteTextures(1, &renderer->white_texture);
+    glDeleteTextures(1, &renderer->glyphs_texture);
 
     // Render passes
     DestroyShadowmapRenderPass(&renderer->shadowmap_pass);
@@ -465,7 +502,7 @@ internal void DrawScene(Renderer *renderer) {
 
 internal void DrawScreenQuad(Renderer *renderer) {
     glBindVertexArray(renderer->screen_quad);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
@@ -475,7 +512,7 @@ internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glUseProgram(renderer->glyph_program);
+    glUseProgram(renderer->ui_program);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
 
@@ -488,35 +525,6 @@ internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
             f32 y1 = q.y1 - q.y0;
             f32 y0 = renderer->height - q.y0 - y1;
             glViewport(q.x0, y0, q.x1 - q.x0, y1);
-            //const f32 halfw = / 2.0f;
-            //const f32 halfh = renderer->height / 2.0f;
-            /*
-            f32 x0 = ((2.0f * q.x0) / renderer->width) - 1.f;
-            f32 x1 = ((2.0f * q.x1) / renderer->width) - 1.f;
-            f32 y0 = ((2.0f * q.y0) / renderer->height) - 1.f;
-            y0 *= -1.0f;
-            f32 y1 = ((2.0f * q.y1) / renderer->height) - 1.f;
-            y1 *= -1.0f;
-
-            f32 quad[] = {
-                x0,
-                y0,
-                q.s0,
-                q.t1, // 0, 0
-                x0,
-                y1,
-                q.s0,
-                q.t0, // 0, 1
-                x1,
-                y0,
-                q.s1,
-                q.t1, // 1, 0
-                x1,
-                y1,
-                q.s1,
-                q.t0, // 1, 1
-            };
-            */
             f32 quad[] = {
                 -1,
                 1,
@@ -536,14 +544,51 @@ internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
                 q.t1, // 1, 1
             };
 
-            glBindBuffer(GL_ARRAY_BUFFER, renderer->glyph_vertex_buffer);
+            glBindBuffer(GL_ARRAY_BUFFER, renderer->screen_quad_vbuffer);
             glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_DYNAMIC_DRAW);
 
-            glBindVertexArray(renderer->glyph_vertex_array);
+            glBindVertexArray(renderer->screen_quad);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
         ++text;
     }
+}
+
+internal void
+UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h) {
+    UIPushBufferEntry *entry = (UIPushBufferEntry *)push_buffer->buf + push_buffer->size;
+
+    entry->x = x;
+    entry->y = y;
+    entry->w = w;
+    entry->h = h;
+    push_buffer->size += sizeof(UIPushBufferEntry);
+
+    ASSERT(push_buffer->size < push_buffer->max_size);
+}
+
+internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindVertexArray(0);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glUseProgram(renderer->ui_program);
+    glActiveTexture(GL_TEXTURE0);
+
+    for(u32 address = 0; address < push_buffer->size;) {
+        UIPushBufferEntry *entry = (UIPushBufferEntry *)push_buffer->buf + address;
+
+        // If glyph
+        // glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
+        // else
+        glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+        glViewport(entry->x, renderer->height - entry->h - entry->y, entry->w, entry->h);
+        DrawScreenQuad(renderer);
+        address += sizeof(UIPushBufferEntry);
+    }
+    push_buffer->size = 0;
 }
 
 void RendererDrawFrame(Renderer *renderer) {
@@ -562,7 +607,10 @@ void RendererDrawFrame(Renderer *renderer) {
     BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
     DrawScreenQuad(renderer);
 
-    DrawString(renderer, 30, 30, "Hello my friends!");
+    UIPushQuad(&renderer->ui_push_buffer, 10, 10, 100, 100);
+
+    DrawUI(renderer, &renderer->ui_push_buffer);
+    //DrawString(renderer, 30, 30, "Hello my friends!");
 
     PlatformSwapBuffers(renderer);
 }
