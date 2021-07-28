@@ -440,10 +440,10 @@ Renderer *RendererCreate(PlatformWindow *window) {
         sFree(temp_bmp);
 
         // Init glyph array
-        glGenVertexArrays(1, &renderer->glyph_vertex_array);
-        glBindVertexArray(renderer->glyph_vertex_array);
-        glGenBuffers(1, &renderer->glyph_vertex_buffer);
-        glBindBuffer(GL_ARRAY_BUFFER, renderer->glyph_vertex_buffer);
+        glGenVertexArrays(1, &renderer->ui_vertex_array);
+        glBindVertexArray(renderer->ui_vertex_array);
+        glGenBuffers(1, &renderer->ui_vertex_buffer);
+        glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), 0);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
@@ -451,6 +451,10 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
         // Load ui shader
         renderer->ui_program = CreateProgram("ui");
+        glUseProgram(renderer->ui_program);
+        const Mat4 ortho = mat4_ortho_gl(0, renderer->height, 0, renderer->width, -1, 1);
+        glUniformMatrix4fv(
+            glGetUniformLocation(renderer->ui_program, "proj"), 1, GL_FALSE, ortho.v);
 
         // Load white texture
         glGenTextures(1, &renderer->white_texture);
@@ -558,10 +562,26 @@ internal void
 UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h) {
     UIPushBufferEntry *entry = (UIPushBufferEntry *)push_buffer->buf + push_buffer->size;
 
-    entry->x = x;
-    entry->y = y;
-    entry->w = w;
-    entry->h = h;
+    const f32 vtx[] = {
+        x,
+        y,
+        0.0f,
+        1.0f, // UL
+        w,
+        y,
+        1.0f,
+        1.0f, // UR
+        x,
+        h,
+        0.0f,
+        0.0f, // LL
+        w,
+        h,
+        1.0f,
+        0.0f, // LR
+    };
+
+    memcpy(entry->vertices, vtx, sizeof(vtx));
     push_buffer->size += sizeof(UIPushBufferEntry);
 
     ASSERT(push_buffer->size < push_buffer->max_size);
@@ -583,9 +603,14 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
         // If glyph
         // glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
         // else
+
         glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-        glViewport(entry->x, renderer->height - entry->h - entry->y, entry->w, entry->h);
-        DrawScreenQuad(renderer);
+        glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * 16, entry->vertices, GL_DYNAMIC_DRAW);
+
+        glBindVertexArray(renderer->ui_vertex_array);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
         address += sizeof(UIPushBufferEntry);
     }
     push_buffer->size = 0;

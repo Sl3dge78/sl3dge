@@ -11,10 +11,12 @@ typedef struct PushBuffer {
     u32 max_size;
     u32 size;
     void *buf;
+
 } PushBuffer;
 
 typedef struct UIPushBufferEntry {
-    u32 x, y, w, h;
+    //u32 x, y, w, h;
+    f32 vertices[4 * 4];
 } UIPushBufferEntry;
 
 typedef struct Mesh {
@@ -71,15 +73,15 @@ typedef struct Renderer {
     Vec3 light_dir;
 
     // UI
+    u32 ui_program;
+    u32 ui_vertex_array;
+    u32 ui_vertex_buffer;
     PushBuffer ui_push_buffer;
     u32 white_texture;
 
     // Font
     u32 glyphs_texture;
     stbtt_bakedchar *char_data;
-    u32 ui_program;
-    u32 glyph_vertex_array;
-    u32 glyph_vertex_buffer;
 
 } Renderer;
 
