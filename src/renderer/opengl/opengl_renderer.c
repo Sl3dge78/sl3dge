@@ -559,9 +559,16 @@ internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
 
 internal void
 UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h) {
-    ASSERT(push_buffer->size + sizeof(UIPushBufferEntry) < UI_PUSHBUFFER_MAX_SIZE);
-    UIPushBufferEntry *entry = (UIPushBufferEntry *)(push_buffer->buf + push_buffer->size);
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryQuad) < UI_PUSHBUFFER_MAX_SIZE);
+    PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Quad;
+    entry->x = x;
+    entry->y = y;
+    entry->w = w;
+    entry->h = h;
+    entry->colour = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+    push_buffer->size += sizeof(PushBufferEntryQuad);
+    /*
     const f32 vtx[] = {
         x,
         y,
@@ -580,46 +587,28 @@ UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const
         1.0f,
         0.0f, // LR
     };
-
     memcpy(entry->vertices, vtx, sizeof(vtx));
-    push_buffer->size += sizeof(UIPushBufferEntry);
+    */
 }
 
-internal void
-UIPushText(Renderer *renderer, PushBuffer *push_buffer, f32 x, f32 y, const char *text) {
-    while(*text) {
-        ASSERT(push_buffer->size + sizeof(UIPushBufferEntry) < UI_PUSHBUFFER_MAX_SIZE);
-        UIPushBufferEntry *entry = (UIPushBufferEntry *)(push_buffer->buf + push_buffer->size);
-        entry->type = PushBufferEntryType_Text;
+internal void UIPushText(Renderer *renderer,
+                         PushBuffer *push_buffer,
+                         const u32 x,
+                         const u32 y,
+                         const char *text) {
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < UI_PUSHBUFFER_MAX_SIZE);
+    PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_Text;
+    entry->text = text;
+    entry->x = x;
+    entry->y = y;
+    entry->colour = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+    push_buffer->size += sizeof(PushBufferEntryText);
+    /*
 
-        if(*text >= 32 && *text <= 127) {
-            stbtt_aligned_quad q;
-            stbtt_GetBakedQuad(renderer->char_data, 512, 512, *text - 32, &x, &y, &q, 1);
 
-            f32 vtx[] = {
-                q.x0,
-                q.y0,
-                q.s0,
-                q.t0, // 0, 0
-                q.x1,
-                q.y0,
-                q.s1,
-                q.t0, // 1, 0
-                q.x0,
-                q.y1,
-                q.s0,
-                q.t1, // 0, 1
-                q.x1,
-                q.y1,
-                q.s1,
-                q.t1, // 1, 1
-            };
-
-            memcpy(entry->vertices, vtx, sizeof(vtx));
-            push_buffer->size += sizeof(UIPushBufferEntry);
-        }
-        ++text;
-    }
+    ++text;
+    */
 }
 
 internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
@@ -631,31 +620,85 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
 
     glUseProgram(renderer->ui_program);
     glActiveTexture(GL_TEXTURE0);
+    glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
+    glBindVertexArray(renderer->ui_vertex_array);
 
     for(u32 address = 0; address < push_buffer->size;) {
-        UIPushBufferEntry *entry = (UIPushBufferEntry *)(push_buffer->buf + address);
+        PushBufferEntryType *type = (PushBufferEntryType *)(push_buffer->buf + address);
 
-        switch(entry->type) {
+        switch(*type) {
         case PushBufferEntryType_Quad: {
+            PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + address);
+
+            const f32 vtx[] = {
+                entry->x,
+                entry->y,
+                0.0f,
+                1.0f, // UL
+                entry->x + entry->w,
+                entry->y,
+                1.0f,
+                1.0f, // UR
+                entry->x,
+                entry->y + entry->h,
+                0.0f,
+                0.0f, // LL
+                entry->x + entry->w,
+                entry->y + entry->h,
+                1.0f,
+                0.0f, // LR
+            };
+
             glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-        } break;
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            address += sizeof(PushBufferEntryQuad);
+            continue;
+        }
         case PushBufferEntryType_Text: {
             glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
+
+            PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + address);
+            const char *txt = entry->text;
+            f32 x = (f32)entry->x;
+            f32 y = (f32)entry->y;
+            while(*txt) {
+                if(*txt >= 32 && *txt <= 127) {
+                    stbtt_aligned_quad q;
+                    stbtt_GetBakedQuad(renderer->char_data, 512, 512, *txt - 32, &x, &y, &q, 1);
+
+                    f32 vtx[] = {
+                        q.x0,
+                        q.y0,
+                        q.s0,
+                        q.t0, // 0, 0
+                        q.x1,
+                        q.y0,
+                        q.s1,
+                        q.t0, // 1, 0
+                        q.x0,
+                        q.y1,
+                        q.s0,
+                        q.t1, // 0, 1
+                        q.x1,
+                        q.y1,
+                        q.s1,
+                        q.t1, // 1, 1
+                    };
+                    glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), vtx, GL_DYNAMIC_DRAW);
+                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                }
+                txt++;
+            }
+
+            address += sizeof(PushBufferEntryText);
+            continue;
         } break;
         default: {
             ASSERT(0);
         }
         }
-        // If glyph
-
-        // else
-        glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * 16, entry->vertices, GL_DYNAMIC_DRAW);
-
-        glBindVertexArray(renderer->ui_vertex_array);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-        address += sizeof(UIPushBufferEntry);
     }
     push_buffer->size = 0;
 }

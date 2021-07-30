@@ -17,12 +17,26 @@ typedef enum PushBufferEntryType {
     PushBufferEntryType_Text
 } PushBufferEntryType;
 
+/*
 typedef struct UIPushBufferEntry {
-    PushBufferEntryType type;
     f32 vertices[4 * 4];
 } UIPushBufferEntry;
+*/
 
-#define UI_PUSHBUFFER_MAX_SIZE (sizeof(UIPushBufferEntry) * 128)
+typedef struct PushBufferEntryQuad {
+    PushBufferEntryType type;
+    u32 x, y, w, h;
+    Vec4 colour;
+} PushBufferEntryQuad;
+
+typedef struct PushBufferEntryText {
+    PushBufferEntryType type;
+    const char *text;
+    u32 x, y;
+    Vec4 colour;
+} PushBufferEntryText;
+
+#define UI_PUSHBUFFER_MAX_SIZE (sizeof(PushBufferEntryText) * 128)
 
 typedef struct Mesh {
     u32 vertex_array;
