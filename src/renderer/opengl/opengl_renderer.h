@@ -7,37 +7,6 @@
 #include "platform/platform.h"
 #include "renderer/renderer.h"
 
-typedef struct PushBuffer {
-    u32 size;
-    void *buf;
-} PushBuffer;
-
-typedef enum PushBufferEntryType {
-    PushBufferEntryType_Quad,
-    PushBufferEntryType_Text
-} PushBufferEntryType;
-
-/*
-typedef struct UIPushBufferEntry {
-    f32 vertices[4 * 4];
-} UIPushBufferEntry;
-*/
-
-typedef struct PushBufferEntryQuad {
-    PushBufferEntryType type;
-    u32 x, y, w, h;
-    Vec4 colour;
-} PushBufferEntryQuad;
-
-typedef struct PushBufferEntryText {
-    PushBufferEntryType type;
-    const char *text;
-    u32 x, y;
-    Vec4 colour;
-} PushBufferEntryText;
-
-#define UI_PUSHBUFFER_MAX_SIZE (sizeof(PushBufferEntryText) * 128)
-
 typedef struct Mesh {
     u32 vertex_array;
     u32 vertex_buffer;

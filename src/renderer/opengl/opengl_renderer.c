@@ -508,114 +508,6 @@ internal void DrawScreenQuad(Renderer *renderer) {
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
-internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindVertexArray(0);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    glUseProgram(renderer->ui_program);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
-
-    while(*text) {
-        if(*text >= 32 && *text <= 127) {
-            // TODO optimize
-            stbtt_aligned_quad q;
-            stbtt_GetBakedQuad(renderer->char_data, 512, 512, *text - 32, &x, &y, &q, 1);
-
-            f32 y1 = q.y1 - q.y0;
-            f32 y0 = renderer->height - q.y0 - y1;
-            glViewport(q.x0, y0, q.x1 - q.x0, y1);
-            f32 quad[] = {
-                -1,
-                1,
-                q.s0,
-                q.t0, // 0, 0
-                1,
-                1,
-                q.s1,
-                q.t0, // 1, 0
-                -1,
-                -1,
-                q.s0,
-                q.t1, // 0, 1
-                1,
-                -1,
-                q.s1,
-                q.t1, // 1, 1
-            };
-
-            glBindBuffer(GL_ARRAY_BUFFER, renderer->screen_quad_vbuffer);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_DYNAMIC_DRAW);
-
-            glBindVertexArray(renderer->screen_quad);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        }
-        ++text;
-    }
-}
-
-internal void UIPushQuad(PushBuffer *push_buffer,
-                         const u32 x,
-                         const u32 y,
-                         const u32 w,
-                         const u32 h,
-                         const Vec4 color) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryQuad) < UI_PUSHBUFFER_MAX_SIZE);
-    PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Quad;
-    entry->x = x;
-    entry->y = y;
-    entry->w = w;
-    entry->h = h;
-    entry->colour = color;
-    push_buffer->size += sizeof(PushBufferEntryQuad);
-    /*
-    const f32 vtx[] = {
-        x,
-        y,
-        0.0f,
-        1.0f, // UL
-        x + w,
-        y,
-        1.0f,
-        1.0f, // UR
-        x,
-        y + h,
-        0.0f,
-        0.0f, // LL
-        x + w,
-        y + h,
-        1.0f,
-        0.0f, // LR
-    };
-    memcpy(entry->vertices, vtx, sizeof(vtx));
-    */
-}
-
-internal void UIPushText(Renderer *renderer,
-                         PushBuffer *push_buffer,
-                         const u32 x,
-                         const u32 y,
-                         const char *text,
-                         const Vec4 color) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < UI_PUSHBUFFER_MAX_SIZE);
-    PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Text;
-    entry->text = text;
-    entry->x = x;
-    entry->y = y;
-    entry->colour = color;
-    push_buffer->size += sizeof(PushBufferEntryText);
-    /*
-
-
-    ++text;
-    */
-}
-
 internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindVertexArray(0);
@@ -637,20 +529,20 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
             PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + address);
 
             const f32 vtx[] = {
-                entry->x,
-                entry->y,
+                entry->l,
+                entry->t,
                 0.0f,
                 1.0f, // UL
-                entry->x + entry->w,
-                entry->y,
+                entry->r,
+                entry->t,
                 1.0f,
                 1.0f, // UR
-                entry->x,
-                entry->y + entry->h,
+                entry->l,
+                entry->b,
                 0.0f,
                 0.0f, // LL
-                entry->x + entry->w,
-                entry->y + entry->h,
+                entry->r,
+                entry->b,
                 1.0f,
                 0.0f, // LR
             };
@@ -733,18 +625,10 @@ void RendererDrawFrame(Renderer *renderer) {
     BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
     DrawScreenQuad(renderer);
 
-    //UIPushQuad(&renderer->ui_push_buffer, 10, 10, 100, 100);
-    UIPushQuad(&renderer->ui_push_buffer, 200, 200, 100, 100, (Vec4){1.0f, 0.0f, 1.0f, 0.5f});
-
-    UIPushText(renderer,
-               &renderer->ui_push_buffer,
-               20,
-               20,
-               "Hello guise",
-               (Vec4){1.0f, 0.0f, 0.0f, 0.75f});
+    //UIPushQuad(renderer, 200, 200, 100, 100, (Vec4){1.0f, 0.0f, 1.0f, 0.5f});
+    //UIPushText(renderer, "Hello guise", 20, 20, (Vec4){1.0f, 0.0f, 0.0f, 0.75f});
 
     DrawUI(renderer, &renderer->ui_push_buffer);
-    //DrawString(renderer, 30, 30, "Hello my friends!");
 
     PlatformSwapBuffers(renderer);
 }
@@ -752,7 +636,6 @@ void RendererDrawFrame(Renderer *renderer) {
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
     sLog("Update window!");
     PlatformGetWindowSize(window, &renderer->width, &renderer->height);
-    //PlatformCreateorUpdateOpenGLContext(renderer, window);
 
     DestroyColorRenderPass(&renderer->color_pass);
     CreateColorRenderPass(renderer->width, renderer->height, &renderer->color_pass);
@@ -818,4 +701,8 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
     loc = glGetUniformLocation(renderer->vol_pass.program, "light_matrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
+}
+
+PushBuffer *RendererGetUIPushBuffer(Renderer *renderer) {
+    return &renderer->ui_push_buffer;
 }

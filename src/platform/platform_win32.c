@@ -226,6 +226,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     GameData game_data = {0};
     GameInput input = {0};
     game_data.platform_api = platform_api;
+    game_data.ui_push_buffer = RendererGetUIPushBuffer(renderer);
     Win32GameLoadRendererAPI(renderer, &game_data);
 
     ShowWindow(global_window.hwnd, cmd_show);

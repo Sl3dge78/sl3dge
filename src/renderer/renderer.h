@@ -20,11 +20,40 @@ typedef struct MeshInstance {
     Mat4 *transform;
 } MeshInstance;
 
+// -----------
+// Push Buffer
+
+typedef struct PushBuffer {
+    u32 size;
+    void *buf;
+} PushBuffer;
+
+typedef enum PushBufferEntryType {
+    PushBufferEntryType_Quad,
+    PushBufferEntryType_Text
+} PushBufferEntryType;
+
+typedef struct PushBufferEntryQuad {
+    PushBufferEntryType type;
+    u32 l, t, r, b;
+    Vec4 colour;
+} PushBufferEntryQuad;
+
+typedef struct PushBufferEntryText {
+    PushBufferEntryType type;
+    const char *text;
+    u32 x, y;
+    Vec4 colour;
+} PushBufferEntryText;
+
+#define UI_PUSHBUFFER_MAX_SIZE (sizeof(PushBufferEntryText) * 128)
+
 // Platform level functions
 Renderer *RendererCreate(PlatformWindow *window);
 void RendererDrawFrame(Renderer *renderer);
 void RendererDestroy(Renderer *renderer);
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window);
+PushBuffer *RendererGetUIPushBuffer(Renderer *renderer);
 
 // Game functions
 typedef u32 CreateMesh_t(Renderer *renderer, const char *path);

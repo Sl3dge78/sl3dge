@@ -14,6 +14,7 @@ typedef struct GameData {
     Vec3 light_pos;
     f32 cos;
     MeshInstance moto;
+    PushBuffer *ui_push_buffer;
 } GameData;
 
 typedef void GameStart_t(GameData *game_data);
