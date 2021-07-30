@@ -5,8 +5,8 @@
         "reveal": "never",
         "focus": false,
         "panel": "shared",
-        "showReuseMessage": false,
-        "clear": true
+        "showReuseMessage": true,
+        "clear": false
     },
     "tasks": [
         {

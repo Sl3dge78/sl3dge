@@ -362,6 +362,10 @@ void UpdateCameraProj(Renderer *renderer) {
     glUseProgram(renderer->vol_pass.program);
     loc = glGetUniformLocation(renderer->vol_pass.program, "proj_inverse");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj_inverse.v);
+
+    glUseProgram(renderer->ui_program);
+    const Mat4 ortho = mat4_ortho_gl(0, renderer->height, 0, renderer->width, -1, 1);
+    glUniformMatrix4fv(glGetUniformLocation(renderer->ui_program, "proj"), 1, GL_FALSE, ortho.v);
 }
 
 Renderer *RendererCreate(PlatformWindow *window) {
@@ -416,8 +420,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
     { // UI
         // Init push buffer
-        renderer->ui_push_buffer.max_size = 128;
-        renderer->ui_push_buffer.buf = sCalloc(renderer->ui_push_buffer.max_size, 1);
+        renderer->ui_push_buffer.buf = sCalloc(UI_PUSHBUFFER_MAX_SIZE, 1);
         renderer->ui_push_buffer.size = 0;
 
         // Load font
@@ -451,10 +454,6 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
         // Load ui shader
         renderer->ui_program = CreateProgram("ui");
-        glUseProgram(renderer->ui_program);
-        const Mat4 ortho = mat4_ortho_gl(0, renderer->height, 0, renderer->width, -1, 1);
-        glUniformMatrix4fv(
-            glGetUniformLocation(renderer->ui_program, "proj"), 1, GL_FALSE, ortho.v);
 
         // Load white texture
         glGenTextures(1, &renderer->white_texture);
@@ -560,31 +559,67 @@ internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
 
 internal void
 UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h) {
-    UIPushBufferEntry *entry = (UIPushBufferEntry *)push_buffer->buf + push_buffer->size;
-
+    ASSERT(push_buffer->size + sizeof(UIPushBufferEntry) < UI_PUSHBUFFER_MAX_SIZE);
+    UIPushBufferEntry *entry = (UIPushBufferEntry *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_Quad;
     const f32 vtx[] = {
         x,
         y,
         0.0f,
         1.0f, // UL
-        w,
+        x + w,
         y,
         1.0f,
         1.0f, // UR
         x,
-        h,
+        y + h,
         0.0f,
         0.0f, // LL
-        w,
-        h,
+        x + w,
+        y + h,
         1.0f,
         0.0f, // LR
     };
 
     memcpy(entry->vertices, vtx, sizeof(vtx));
     push_buffer->size += sizeof(UIPushBufferEntry);
+}
 
-    ASSERT(push_buffer->size < push_buffer->max_size);
+internal void
+UIPushText(Renderer *renderer, PushBuffer *push_buffer, f32 x, f32 y, const char *text) {
+    while(*text) {
+        ASSERT(push_buffer->size + sizeof(UIPushBufferEntry) < UI_PUSHBUFFER_MAX_SIZE);
+        UIPushBufferEntry *entry = (UIPushBufferEntry *)(push_buffer->buf + push_buffer->size);
+        entry->type = PushBufferEntryType_Text;
+
+        if(*text >= 32 && *text <= 127) {
+            stbtt_aligned_quad q;
+            stbtt_GetBakedQuad(renderer->char_data, 512, 512, *text - 32, &x, &y, &q, 1);
+
+            f32 vtx[] = {
+                q.x0,
+                q.y0,
+                q.s0,
+                q.t0, // 0, 0
+                q.x1,
+                q.y0,
+                q.s1,
+                q.t0, // 1, 0
+                q.x0,
+                q.y1,
+                q.s0,
+                q.t1, // 0, 1
+                q.x1,
+                q.y1,
+                q.s1,
+                q.t1, // 1, 1
+            };
+
+            memcpy(entry->vertices, vtx, sizeof(vtx));
+            push_buffer->size += sizeof(UIPushBufferEntry);
+        }
+        ++text;
+    }
 }
 
 internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
@@ -598,13 +633,22 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
     glActiveTexture(GL_TEXTURE0);
 
     for(u32 address = 0; address < push_buffer->size;) {
-        UIPushBufferEntry *entry = (UIPushBufferEntry *)push_buffer->buf + address;
+        UIPushBufferEntry *entry = (UIPushBufferEntry *)(push_buffer->buf + address);
 
+        switch(entry->type) {
+        case PushBufferEntryType_Quad: {
+            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+        } break;
+        case PushBufferEntryType_Text: {
+            glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
+        } break;
+        default: {
+            ASSERT(0);
+        }
+        }
         // If glyph
-        // glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
-        // else
 
-        glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+        // else
         glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * 16, entry->vertices, GL_DYNAMIC_DRAW);
 
@@ -632,7 +676,10 @@ void RendererDrawFrame(Renderer *renderer) {
     BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
     DrawScreenQuad(renderer);
 
-    UIPushQuad(&renderer->ui_push_buffer, 10, 10, 100, 100);
+    //UIPushQuad(&renderer->ui_push_buffer, 10, 10, 100, 100);
+    UIPushQuad(&renderer->ui_push_buffer, 200, 200, 100, 100);
+
+    UIPushText(renderer, &renderer->ui_push_buffer, 20, 20, "Hello guise");
 
     DrawUI(renderer, &renderer->ui_push_buffer);
     //DrawString(renderer, 30, 30, "Hello my friends!");

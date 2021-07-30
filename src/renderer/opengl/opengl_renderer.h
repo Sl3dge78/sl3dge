@@ -8,16 +8,21 @@
 #include "renderer/renderer.h"
 
 typedef struct PushBuffer {
-    u32 max_size;
     u32 size;
     void *buf;
-
 } PushBuffer;
 
+typedef enum PushBufferEntryType {
+    PushBufferEntryType_Quad,
+    PushBufferEntryType_Text
+} PushBufferEntryType;
+
 typedef struct UIPushBufferEntry {
-    //u32 x, y, w, h;
+    PushBufferEntryType type;
     f32 vertices[4 * 4];
 } UIPushBufferEntry;
+
+#define UI_PUSHBUFFER_MAX_SIZE (sizeof(UIPushBufferEntry) * 128)
 
 typedef struct Mesh {
     u32 vertex_array;

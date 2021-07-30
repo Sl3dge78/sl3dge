@@ -13,7 +13,7 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "console": "integratedTerminal",
+            "console": "newExternalWindow",
             "internalConsoleOptions": "neverOpen",
             "logging": {
                 "engineLogging": false,
@@ -22,7 +22,7 @@
                 "processExit": false,
                 "programOutput": true,
                 "threadExit": false
-            }
+            },
         },
         {
             "name": "Test",

@@ -130,7 +130,6 @@ void Win32Log(const char *message, u8 level) {
 
 LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch(msg) {
-    case WM_DESTROY: sWarn("WM_DESTROY"); return 0;
     case WM_CLOSE: PostQuitMessage(0); return 0;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
@@ -156,7 +155,7 @@ void Win32HandleKeyboardMessages(LPARAM lparam, GameInput *input) {
     u8 value = 0;
     if(is_down) {
         value |= KEY_PRESSED;
-        sTrace("Keydown : 0x%x", scancode);
+        sLog("Keydown : 0x%x", scancode);
         if(!was_down)
             value |= KEY_DOWN;
     } else if(was_down) {
@@ -164,6 +163,11 @@ void Win32HandleKeyboardMessages(LPARAM lparam, GameInput *input) {
     }
 
     input->keyboard[scancode] = value;
+
+    if(scancode == SCANCODE_ARRET_DEFIL) {
+        DBG_keep_console_open = true;
+        sLog("Console will stay open");
+    }
 }
 
 bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
@@ -200,7 +204,8 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
 }
 
 i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, INT cmd_show) {
-    AttachConsole(ATTACH_PARENT_PROCESS);
+    AllocConsole();
+
     stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
     sLogSetCallback(&Win32Log);
 
@@ -329,10 +334,11 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         }
     }
     RendererDestroy(renderer);
+    Win32CloseModule(&game_module);
 
+    DestroyWindow(global_window.hwnd);
     ReleaseDC(global_window.hwnd, global_window.dc);
 
-    Win32CloseModule(&game_module);
     DBG_END();
 
     return 0;

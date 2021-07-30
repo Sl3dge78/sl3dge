@@ -43,7 +43,8 @@ enum ScanCodes {
     SCANCODE_D = 0x20,
     SCANCODE_M = 0x27,
     SCANCODE_LSHIFT = 0x2A,
-    SCANCODE_SPACE = 0x39
+    SCANCODE_SPACE = 0x39,
+    SCANCODE_ARRET_DEFIL = 0x46,
 };
 
 typedef u8 Keyboard[256];

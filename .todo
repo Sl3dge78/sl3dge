@@ -21,8 +21,8 @@ OPENGL RENDERER :
     CRITICAL:
         - UI
             > Push buffer architecture
-                - Panel
-                - Text
+                - Add color to vertices
+                - Store less stuff in the buffer
         - Mesh Transforms
     MAJOR:
         - Handle multiple primitives in single gltf
@@ -85,7 +85,8 @@ VULKAN RENDERER:
 
 WIN32 :
     CRITICAL:
-            -FTIME TRACE WHO DOES IT WORK
+            - FTIME TRACE WHO DOES IT WORK
+            - We never register Up for keypresses
     MAJOR:
     BACKLOG:
         - Figure out multithreading
