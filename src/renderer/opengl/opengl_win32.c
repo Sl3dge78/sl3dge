@@ -49,6 +49,7 @@ void GLLoadFunctions() {
     LOAD_GL_FUNC(PFNGLGETPROGRAMIVPROC, glGetProgramiv);
     LOAD_GL_FUNC(PFNGLUNIFORM1IPROC, glUniform1i);
     LOAD_GL_FUNC(PFNGLDELETEVERTEXARRAYSPROC, glDeleteVertexArrays);
+    LOAD_GL_FUNC(PFNGLUNIFORM4FPROC, glUniform4f);
 }
 
 void PlatformCreateorUpdateOpenGLContext(Renderer *renderer, PlatformWindow *window) {

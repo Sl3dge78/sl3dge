@@ -155,7 +155,7 @@ void Win32HandleKeyboardMessages(LPARAM lparam, GameInput *input) {
     u8 value = 0;
     if(is_down) {
         value |= KEY_PRESSED;
-        sLog("Keydown : 0x%x", scancode);
+        sTrace("Keydown : 0x%x", scancode);
         if(!was_down)
             value |= KEY_DOWN;
     } else if(was_down) {

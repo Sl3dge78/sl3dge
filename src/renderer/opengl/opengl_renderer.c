@@ -557,8 +557,12 @@ internal void DrawString(Renderer *renderer, f32 x, f32 y, char *text) {
     }
 }
 
-internal void
-UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h) {
+internal void UIPushQuad(PushBuffer *push_buffer,
+                         const u32 x,
+                         const u32 y,
+                         const u32 w,
+                         const u32 h,
+                         const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryQuad) < UI_PUSHBUFFER_MAX_SIZE);
     PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Quad;
@@ -566,7 +570,7 @@ UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const
     entry->y = y;
     entry->w = w;
     entry->h = h;
-    entry->colour = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+    entry->colour = color;
     push_buffer->size += sizeof(PushBufferEntryQuad);
     /*
     const f32 vtx[] = {
@@ -595,14 +599,15 @@ internal void UIPushText(Renderer *renderer,
                          PushBuffer *push_buffer,
                          const u32 x,
                          const u32 y,
-                         const char *text) {
+                         const char *text,
+                         const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < UI_PUSHBUFFER_MAX_SIZE);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
     entry->text = text;
     entry->x = x;
     entry->y = y;
-    entry->colour = (Vec4){1.0f, 1.0f, 1.0f, 1.0f};
+    entry->colour = color;
     push_buffer->size += sizeof(PushBufferEntryText);
     /*
 
@@ -622,6 +627,7 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
     glActiveTexture(GL_TEXTURE0);
     glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
     glBindVertexArray(renderer->ui_vertex_array);
+    const u32 color_uniform = glGetUniformLocation(renderer->ui_program, "color");
 
     for(u32 address = 0; address < push_buffer->size;) {
         PushBufferEntryType *type = (PushBufferEntryType *)(push_buffer->buf + address);
@@ -648,7 +654,8 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
                 1.0f,
                 0.0f, // LR
             };
-
+            glUniform4f(
+                color_uniform, entry->colour.x, entry->colour.y, entry->colour.z, entry->colour.w);
             glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
             glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -663,6 +670,7 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
             const char *txt = entry->text;
             f32 x = (f32)entry->x;
             f32 y = (f32)entry->y;
+
             while(*txt) {
                 if(*txt >= 32 && *txt <= 127) {
                     stbtt_aligned_quad q;
@@ -686,6 +694,12 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
                         q.s1,
                         q.t1, // 1, 1
                     };
+
+                    glUniform4f(color_uniform,
+                                entry->colour.x,
+                                entry->colour.y,
+                                entry->colour.z,
+                                entry->colour.w);
                     glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), vtx, GL_DYNAMIC_DRAW);
                     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                 }
@@ -720,9 +734,14 @@ void RendererDrawFrame(Renderer *renderer) {
     DrawScreenQuad(renderer);
 
     //UIPushQuad(&renderer->ui_push_buffer, 10, 10, 100, 100);
-    UIPushQuad(&renderer->ui_push_buffer, 200, 200, 100, 100);
+    UIPushQuad(&renderer->ui_push_buffer, 200, 200, 100, 100, (Vec4){1.0f, 0.0f, 1.0f, 0.5f});
 
-    UIPushText(renderer, &renderer->ui_push_buffer, 20, 20, "Hello guise");
+    UIPushText(renderer,
+               &renderer->ui_push_buffer,
+               20,
+               20,
+               "Hello guise",
+               (Vec4){1.0f, 0.0f, 0.0f, 0.75f});
 
     DrawUI(renderer, &renderer->ui_push_buffer);
     //DrawString(renderer, 30, 30, "Hello my friends!");
