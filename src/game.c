@@ -41,6 +41,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     sLogSetCallback(game_data->logger);
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
+    
     /*
     game_data->cos = 0.0f;
     game_data->light_pos.x = cos(game_data->cos);
@@ -139,6 +140,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         if(game_data->cos < 0.0f) {
             game_data->cos = PI;
         }
+
         game_data->renderer_api.SetSunDirection(
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }   

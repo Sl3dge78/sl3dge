@@ -46,7 +46,7 @@ typedef struct PushBufferEntryText {
     Vec4 colour;
 } PushBufferEntryText;
 
-#define UI_PUSHBUFFER_MAX_SIZE (sizeof(PushBufferEntryText) * 128)
+#define UI_PUSHBUFFER_MAX_SIZE (sizeof(PushBufferEntryText) * 256)
 
 // Platform level functions
 Renderer *RendererCreate(PlatformWindow *window);
@@ -62,8 +62,8 @@ DLL_EXPORT CreateMesh_t RendererCreateMesh;
 typedef MeshInstance InstantiateMesh_t(Renderer *renderer, u32 mesh_id);
 DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
 
-typedef void
-SetCamera_t(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up);
+typedef void SetCamera_t(Renderer *renderer, const Vec3 position,
+                         const Vec3 forward, const Vec3 up);
 DLL_EXPORT SetCamera_t RendererSetCamera;
 
 typedef void SetSunDirection_t(Renderer *renderer, const Vec3 direction);
