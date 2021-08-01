@@ -43,5 +43,5 @@ IF !ERRORLEVEL! == 0 (
 
 SET end_time=%TIME%
 ECHO ----
-ECHO [%start_time%]
-ECHO [%end_time%]
+REM ECHO START TIME : [%start_time%]
+REM ECHO END TIME : [%end_time%]

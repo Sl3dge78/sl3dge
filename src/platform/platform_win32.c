@@ -151,15 +151,12 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
 void Win32HandleKeyboardMessages(LPARAM lparam, GameInput *input) {
     u32 scancode = (lparam >> 16) & 0x7F;
     bool is_down = !(lparam & (1 << 31));
-    bool was_down = !(lparam & (1 << 30));
     u8 value = 0;
     if(is_down) {
-        value |= KEY_PRESSED;
+        value = 1;
         sTrace("Keydown : 0x%x", scancode);
-        if(!was_down)
-            value |= KEY_DOWN;
-    } else if(was_down) {
-        value |= KEY_UP;
+    } else {
+        value = 0;
     }
 
     input->keyboard[scancode] = value;
@@ -227,6 +224,8 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     GameInput input = {0};
     game_data.platform_api = platform_api;
     game_data.ui_push_buffer = RendererGetUIPushBuffer(renderer);
+    game_data.window_width = global_window.w;
+    game_data.window_height = global_window.h;
     Win32GameLoadRendererAPI(renderer, &game_data);
 
     ShowWindow(global_window.hwnd, cmd_show);
@@ -244,9 +243,6 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             frame_start = time;
         }
 
-        RECT window_size;
-        GetWindowRect(global_window.hwnd, &window_size);
-
         { // Hot Reloading
             if(Win32ShouldReloadModule(&game_module)) {
                 Win32CloseModule(&game_module);
@@ -256,18 +252,30 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             }
         }
 
+        RECT window_size;
+        GetClientRect(global_window.hwnd, &window_size);
+
+        game_data.window_width = window_size.right;
+        game_data.window_height = window_size.bottom;
+         
+        memcpy(input.old_keyboard,input.keyboard,sizeof(Keyboard));
+        memset(input.keyboard,0, sizeof(Keyboard));
+        
         { // Mouse Position
             POINT pos;
             GetCursorPos(&pos);
+            ScreenToClient(global_window.hwnd, &pos);
             input.mouse_delta_x = pos.x - input.mouse_x;
             input.mouse_delta_y = pos.y - input.mouse_y;
 
             if(mouse_captured) {
-                u32 center_x = window_size.left + window_size.right / 2;
-                u32 center_y = window_size.top + window_size.bottom / 2;
+                u32 center_x = window_size.right / 2;
+                u32 center_y = window_size.bottom / 2;
                 input.mouse_x = center_x;
                 input.mouse_y = center_y;
-                SetCursorPos(center_x, center_y);
+                POINT screen_pos = {center_x, center_y};                               
+                ClientToScreen(global_window.hwnd, &screen_pos);
+                SetCursorPos(screen_pos.x, screen_pos.y);
             } else {
                 input.mouse_x = pos.x;
                 input.mouse_y = pos.y;

@@ -55,26 +55,26 @@ Vec3 Movement(GameInput *input, Vec3 forward, Vec3 right) {
     f32 move_speed = 0.1f;
     Vec3 movement = {0};
 
-    if(input->keyboard[SCANCODE_LSHIFT] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_LSHIFT]) {
         move_speed *= 10.0f;
     }
 
-    if(input->keyboard[SCANCODE_W] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_W]) {
         movement = vec3_add(movement, vec3_fmul(forward, move_speed));
     }
-    if(input->keyboard[SCANCODE_S] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_S]) {
         movement = vec3_add(movement, vec3_fmul(forward, -move_speed));
     }
-    if(input->keyboard[SCANCODE_A] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_A]) {
         movement = vec3_add(movement, vec3_fmul(right, -move_speed));
     }
-    if(input->keyboard[SCANCODE_D] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_D]) {
         movement = vec3_add(movement, vec3_fmul(right, move_speed));
     }
-    if(input->keyboard[SCANCODE_Q] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_Q]) {
         movement.y -= move_speed;
     }
-    if(input->keyboard[SCANCODE_E] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_E]) {
         movement.y += move_speed;
     }
 
@@ -115,11 +115,11 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     // Other inputs
 
     // Reset
-    if(input->keyboard[SCANCODE_SPACE] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_SPACE]) {
         game_data->position = (Vec3){0.0f, 0, 0};
         *game_data->moto.transform = mat4_identity();
     }
-    if(input->keyboard[SCANCODE_P] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_P]) {
         game_data->cos += delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
@@ -130,7 +130,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         game_data->renderer_api.SetSunDirection(
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
-    if(input->keyboard[SCANCODE_O] & KEY_PRESSED) {
+    if(input->keyboard[SCANCODE_O]) {
         game_data->cos -= delta_time;
         game_data->light_pos.x = cos(game_data->cos);
         game_data->light_pos.y = sin(game_data->cos);
@@ -141,15 +141,23 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
 
-    UIPushQuad(game_data->ui_push_buffer, 10, 20, 100, 30, (Vec4){0.5f, 0.5f, 0.5f, 0.75f});
-    UIPushText(game_data->ui_push_buffer, "Bonjour", 10, 45, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
+    if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
+        if(game_data->console_target <= 0) {
+            game_data->console_target = 300;
+        } else {
+            game_data->console_target = 0;
+        }
+    }
 
-    UIPushQuad(game_data->ui_push_buffer, 10, 100, 100, 30, (Vec4){0.5f, 0.5f, 0.5f, 0.75f});
-    UIPushText(game_data->ui_push_buffer,
-               "Franchement c'est hyper classe",
-               10,
-               125,
-               (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
+    if(game_data->console_open < game_data->console_target) {
+        game_data->console_open += 10;
+    } else if(game_data->console_open > game_data->console_target) {
+        game_data->console_open -= 10;
+    }
+
+    u32 console_y = game_data->console_open;
+    UIPushQuad(game_data->ui_push_buffer, 10, 0, game_data->window_width - 20, console_y, (Vec4){0.5f, 0.5f, 0.5f, 0.75f});
+    UIPushText(game_data->ui_push_buffer, "Bonjour", 10, 45, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
 
 #if 0
     mat4_rotate_euler(game_data->moto.transform, Vec3{0, game_data->spherical_coordinates.x, 0});
@@ -161,6 +169,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     Vec3 offset = offset_z + offset_y;
 
     game_data->renderer_api.SetCamera(
-        game_data->renderer, game_data->position + offset, forward, Vec3{0.0f, 1.0f, 0.0f});
+    game_data->renderer, game_data->position + offset, forward, Vec3{0.0f, 1.0f, 0.0f});
 #endif
 }

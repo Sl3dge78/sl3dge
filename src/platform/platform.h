@@ -25,13 +25,6 @@ typedef struct PlatformAPI {
 #define MOUSE_MIDDLE 2
 #define MOUSE_RIGHT 4
 
-enum KeyState {
-    KEY_NOTPRESSED = 0x0,
-    KEY_PRESSED = 0x1,
-    KEY_UP = 0x2,
-    KEY_DOWN = 0x4,
-};
-
 enum ScanCodes {
     SCANCODE_Q = 0x10,
     SCANCODE_W = 0x11,
@@ -42,6 +35,7 @@ enum ScanCodes {
     SCANCODE_S = 0x1F,
     SCANCODE_D = 0x20,
     SCANCODE_M = 0x27,
+    SCANCODE_TILDE = 0x29,
     SCANCODE_LSHIFT = 0x2A,
     SCANCODE_SPACE = 0x39,
     SCANCODE_ARRET_DEFIL = 0x46,
@@ -51,6 +45,7 @@ typedef u8 Keyboard[256];
 
 typedef struct GameInput {
     Keyboard keyboard;
+    Keyboard old_keyboard;
     u8 mouse;
     i32 mouse_x;
     i32 mouse_delta_x;

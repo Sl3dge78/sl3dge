@@ -1,4 +1,3 @@
-
 GAME:
     CRITICAL:
 
@@ -86,7 +85,6 @@ VULKAN RENDERER:
 WIN32 :
     CRITICAL:
             - FTIME TRACE WHO DOES IT WORK
-            - We never register Up for keypresses
     MAJOR:
     BACKLOG:
         - Figure out multithreading
