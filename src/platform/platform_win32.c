@@ -148,17 +148,21 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     }
 }
 
+
 void Win32HandleKeyboardMessages(WPARAM wParam, LPARAM lParam, GameInput *input) {
+    // 2149 5809
     u32 scancode = (lParam >> 16) & 0x7F;
-    bool is_down = !(lParam & (1 << 31)); 
-    if(!input->read_text_input || wParam < 0) { // Non ascii letters are not handled and given to the keyboard manager    
+    bool is_down = !(lParam & (1 << 31));
+
+    // Non ascii letters are not handled and given to the keyboard manager
+    if(!input->read_text_input || wParam < 0) {
         input->keyboard[scancode] = is_down;
 
         if(scancode == SCANCODE_ARRET_DEFIL) {
             DBG_keep_console_open = true;
             sLog("Console will stay open");
         }
-    } else if(is_down){
+    } else if(is_down) {
         input->text_input = wParam;
     }
 }
@@ -254,9 +258,9 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
 
         game_data.window_width = window_size.right;
         game_data.window_height = window_size.bottom;
-         
-        memcpy(input.old_keyboard,input.keyboard,sizeof(Keyboard));
-        
+
+        memcpy(input.old_keyboard, input.keyboard, sizeof(Keyboard));
+
         { // Mouse Position
             POINT pos;
             GetCursorPos(&pos);
@@ -269,7 +273,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 u32 center_y = window_size.bottom / 2;
                 input.mouse_x = center_x;
                 input.mouse_y = center_y;
-                POINT screen_pos = {center_x, center_y};                               
+                POINT screen_pos = {center_x, center_y};
                 ClientToScreen(global_window.hwnd, &screen_pos);
                 SetCursorPos(screen_pos.x, screen_pos.y);
             } else {
@@ -287,10 +291,18 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 case WM_KEYDOWN:
                 case WM_SYSKEYDOWN:
                 case WM_KEYUP:
-                case WM_SYSKEYUP: 
-                case WM_CHAR:
+                case WM_SYSKEYUP:
+                    if(!input.read_text_input) { 
                         Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input); 
-                    break;
+                    } break;
+                case WM_CHAR:
+                    if(input.read_text_input) {
+                        if (msg.wParam >= 0) {
+                            input.text_input = msg.wParam;
+                        } else {
+                            Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input); 
+                        }
+                    } break;
                 case WM_LBUTTONDOWN: input.mouse |= MOUSE_LEFT; break;
                 case WM_LBUTTONUP: input.mouse &= ~MOUSE_LEFT; break;
                 case WM_MBUTTONDOWN: input.mouse |= MOUSE_MIDDLE; break;
@@ -299,7 +311,6 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 case WM_RBUTTONUP: input.mouse &= ~MOUSE_RIGHT; break;
                 case WM_EXITSIZEMOVE: sLog("exit!"); break;
                 default:
-                    //sLog("MSG: %x", msg.message);
                     DispatchMessage(&msg);
                     break;
                 }

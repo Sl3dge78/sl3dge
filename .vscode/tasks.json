@@ -14,7 +14,7 @@
             "problemMatcher": [
                 "$msCompile"
             ],
-            "command": "build_all.bat",
+            "command": "build.bat",
             "group": {
                 "kind": "build",
                 "isDefault": true
