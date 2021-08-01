@@ -36,6 +36,8 @@ global PlatformWindow global_window;
 void Win32GameLoadFunctions(Module *dll) {
     pfn_GameStart = (GameStart_t *)GetProcAddress(dll->dll, "GameStart");
     pfn_GameLoop = (GameLoop_t *)GetProcAddress(dll->dll, "GameLoop");
+    pfn_GameLoad = (GameLoad_t *)GetProcAddress(dll->dll, "GameLoad");
+    sLogSetCallback((sLogCallback_t *)GetProcAddress(dll->dll, "ConsoleLogMessage"));
 }
 
 void Win32GameLoadRendererAPI(Renderer *renderer, GameData *game_data) {
@@ -148,7 +150,6 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     }
 }
 
-
 void Win32HandleKeyboardMessages(WPARAM wParam, LPARAM lParam, GameInput *input) {
     // 2149 5809
     u32 scancode = (lParam >> 16) & 0x7F;
@@ -223,13 +224,14 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     GameData game_data = {0};
     GameInput input = {0};
     game_data.platform_api = platform_api;
-    game_data.logger = &Win32Log;
     game_data.ui_push_buffer = RendererGetUIPushBuffer(renderer);
     game_data.window_width = global_window.w;
     game_data.window_height = global_window.h;
     Win32GameLoadRendererAPI(renderer, &game_data);
+    pfn_GameLoad(&game_data);
 
     ShowWindow(global_window.hwnd, cmd_show);
+    SetForegroundWindow(global_window.hwnd);
     pfn_GameStart(&game_data);
 
     bool running = true;
@@ -249,6 +251,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 Win32CloseModule(&game_module);
                 Win32LoadModule(&game_module, "game");
                 Win32GameLoadFunctions(&game_module);
+                pfn_GameLoad(&game_data);
                 sLog("Game code reloaded");
             }
         }
@@ -292,17 +295,19 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 case WM_SYSKEYDOWN:
                 case WM_KEYUP:
                 case WM_SYSKEYUP:
-                    if(!input.read_text_input) { 
-                        Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input); 
-                    } break;
+                    if(!input.read_text_input) {
+                        Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input);
+                    }
+                    break;
                 case WM_CHAR:
                     if(input.read_text_input) {
-                        if (msg.wParam >= 0) {
+                        if(msg.wParam >= 0) {
                             input.text_input = msg.wParam;
                         } else {
-                            Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input); 
+                            Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input);
                         }
-                    } break;
+                    }
+                    break;
                 case WM_LBUTTONDOWN: input.mouse |= MOUSE_LEFT; break;
                 case WM_LBUTTONUP: input.mouse &= ~MOUSE_LEFT; break;
                 case WM_MBUTTONDOWN: input.mouse |= MOUSE_MIDDLE; break;

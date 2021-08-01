@@ -37,11 +37,15 @@ UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, 
     push_buffer->size += sizeof(PushBufferEntryText);
 }
 
+DLL_EXPORT void GameLoad(GameData *game_data) {
+    sLogSetCallback(&ConsoleLogMessage);
+    global_console = &game_data->console;
+}
+
 DLL_EXPORT void GameStart(GameData *game_data) {
-    sLogSetCallback(game_data->logger);
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
-    
+
     /*
     game_data->cos = 0.0f;
     game_data->light_pos.x = cos(game_data->cos);
@@ -143,8 +147,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
         game_data->renderer_api.SetSunDirection(
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
-    }   
-     
+    }
+
     if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
         if(game_data->console.console_target <= 0) {
             game_data->console.console_target = 300;
@@ -153,11 +157,11 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
             game_data->console.console_target = 0;
             input->read_text_input = false;
         }
-    }                                                                   
+    }
 
     DrawConsole(&game_data->console, game_data);
     if(game_data->console.console_open) {
-         InputConsole(&game_data->console, input);
+        InputConsole(&game_data->console, input);
     }
 
 #if 0

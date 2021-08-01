@@ -20,7 +20,8 @@ typedef struct Console {
     const char *last_command;
     u32 current_char;
     char current_command[128];
-    ConsoleHistory history;
+    char command_history[32][128];
+    // ConsoleHistory history;
 } Console;
 
 void DrawConsole(Console *console, GameData *game_data);
