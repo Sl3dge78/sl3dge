@@ -425,7 +425,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
         // Load font
         unsigned char *ttf_buffer = sCalloc(1 << 20, sizeof(unsigned char));
-        FILE *f = fopen("c:/windows/fonts/times.ttf", "rb");
+        FILE *f = fopen("resources/font/LiberationMono-Regular.ttf", "rb");
         ASSERT(f);
         fread(ttf_buffer, 1, 1 << 20, f);
         fclose(f);
@@ -433,7 +433,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
         unsigned char *temp_bmp = sCalloc(512 * 512, sizeof(unsigned char));
         renderer->char_data = sCalloc(96, sizeof(stbtt_bakedchar));
 
-        stbtt_BakeFontBitmap(ttf_buffer, 0, 32.0f, temp_bmp, 512, 512, 32, 96, renderer->char_data);
+        stbtt_BakeFontBitmap(ttf_buffer, 0, 20.0f, temp_bmp, 512, 512, 32, 96, renderer->char_data);
 
         sFree(ttf_buffer);
         glGenTextures(1, &renderer->glyphs_texture);

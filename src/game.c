@@ -6,6 +6,7 @@
 
 #include "game.h"
 #include "renderer/renderer.h"
+#include "console.c"
 
 internal void UIPushQuad(PushBuffer *push_buffer,
                          const u32 x,
@@ -37,6 +38,7 @@ UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, 
 }
 
 DLL_EXPORT void GameStart(GameData *game_data) {
+    sLogSetCallback(game_data->logger);
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
     /*
@@ -139,25 +141,22 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         }
         game_data->renderer_api.SetSunDirection(
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
-    }
-
+    }   
+     
     if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
-        if(game_data->console_target <= 0) {
-            game_data->console_target = 300;
+        if(game_data->console.console_target <= 0) {
+            game_data->console.console_target = 300;
+            input->read_text_input = true;
         } else {
-            game_data->console_target = 0;
+            game_data->console.console_target = 0;
+            input->read_text_input = false;
         }
-    }
+    }                                                                   
 
-    if(game_data->console_open < game_data->console_target) {
-        game_data->console_open += 10;
-    } else if(game_data->console_open > game_data->console_target) {
-        game_data->console_open -= 10;
+    DrawConsole(&game_data->console, game_data);
+    if(game_data->console.console_open) {
+         InputConsole(&game_data->console, input);
     }
-
-    u32 console_y = game_data->console_open;
-    UIPushQuad(game_data->ui_push_buffer, 10, 0, game_data->window_width - 20, console_y, (Vec4){0.5f, 0.5f, 0.5f, 0.75f});
-    UIPushText(game_data->ui_push_buffer, "Bonjour", 10, 45, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
 
 #if 0
     mat4_rotate_euler(game_data->moto.transform, Vec3{0, game_data->spherical_coordinates.x, 0});

@@ -51,6 +51,8 @@ typedef struct GameInput {
     i32 mouse_delta_x;
     i32 mouse_y;
     i32 mouse_delta_y;
+    char text_input;
+    bool read_text_input;
 } GameInput;
 
 #endif
