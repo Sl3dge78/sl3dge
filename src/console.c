@@ -30,7 +30,7 @@ DLL_EXPORT void ConsoleLogMessage(const char *message, const u8 level) {
     }
 }
 
-internal void ConsoleParseMessage(const char *message) {
+internal void ConsoleParseMessage(const char *message, GameData *game_data) {
     // TODO : Split to arg list
     char command[64];
     if(sscanf(message, "%s ", command) != 1) {
@@ -38,6 +38,7 @@ internal void ConsoleParseMessage(const char *message) {
         return;
     }
     if(strcmp(command, "exit") == 0) {
+        EventPush(&game_data->event_queue, EVENT_TYPE_QUIT);
         sLog("Post quit message");
     } else {
         sError("Unknown command %s", command);
@@ -82,7 +83,7 @@ void DrawConsole(Console *console, GameData *game_data) {
     }
 }
 
-void InputConsole(Console *console, GameInput *input) {
+void InputConsole(Console *console, GameInput *input, GameData *game_data) {
     char c = input->text_input;
     if(c) {
         if(c >= 32 && c <= 125) { // Ascii letters
@@ -104,7 +105,7 @@ void InputConsole(Console *console, GameInput *input) {
                 break;
             case(13): // return
                 ConsoleLogMessage(console->current_command, LOG_LEVEL_LOG);
-                ConsoleParseMessage(console->current_command);
+                ConsoleParseMessage(console->current_command, game_data);
                 memset(console->current_command, '\0', 128);
                 console->current_char = 0;
                 break;

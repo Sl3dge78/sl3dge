@@ -7,6 +7,7 @@
 #include "game.h"
 #include "renderer/renderer.h"
 #include "console.c"
+#include "event.c"
 
 internal void UIPushQuad(PushBuffer *push_buffer,
                          const u32 x,
@@ -161,7 +162,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
     DrawConsole(&game_data->console, game_data);
     if(game_data->console.console_open) {
-        InputConsole(&game_data->console, input);
+        InputConsole(&game_data->console, input, game_data);
     }
 
 #if 0

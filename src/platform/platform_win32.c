@@ -18,6 +18,7 @@
 #include "game.h"
 
 #include "renderer/renderer.c"
+#include "event.c"
 
 typedef struct ShaderCode {
     const char *spv_path;
@@ -325,6 +326,18 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             } else {
                 sError("WIN32 : Message error");
             }
+        }
+
+        EventType e;
+        while(EventConsume(&game_data.event_queue, &e)) {
+            switch(e) {
+            case(EVENT_TYPE_QUIT):
+                running = false;
+                break;
+            default:
+
+                break;
+            };
         }
 
         pfn_GameLoop(delta_time, &game_data, &input);

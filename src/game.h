@@ -5,11 +5,18 @@
 
 #include "renderer/renderer.h"
 #include "console.h"
+#include "event.h"
 
 typedef struct GameData {
+    // System stuff
     Renderer *renderer;
     RendererGameAPI renderer_api;
     PlatformAPI platform_api;
+    PushBuffer *ui_push_buffer;
+    Console console;
+
+    EventQueue event_queue;
+
     u32 window_width;
     u32 window_height;
     Vec3 position;
@@ -17,8 +24,6 @@ typedef struct GameData {
     Vec3 light_pos;
     f32 cos;
     MeshInstance moto;
-    PushBuffer *ui_push_buffer;
-    Console console;
 } GameData;
 
 typedef void GameStart_t(GameData *game_data);
