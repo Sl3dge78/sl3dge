@@ -222,18 +222,18 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     Win32LoadModule(&game_module, "game");
     Win32GameLoadFunctions(&game_module);
 
-    GameData game_data = {0};
-    GameInput input = {0};
-    game_data.platform_api = platform_api;
-    game_data.ui_push_buffer = RendererGetUIPushBuffer(renderer);
-    game_data.window_width = global_window.w;
-    game_data.window_height = global_window.h;
-    Win32GameLoadRendererAPI(renderer, &game_data);
-    pfn_GameLoad(&game_data);
+    GameData *game_data = sCalloc(1, sizeof(GameData));
+    GameInput *input = sCalloc(1, sizeof(GameInput));
+    game_data->platform_api = platform_api;
+    game_data->ui_push_buffer = RendererGetUIPushBuffer(renderer);
+    game_data->window_width = global_window.w;
+    game_data->window_height = global_window.h;
+    Win32GameLoadRendererAPI(renderer, game_data);
+    pfn_GameLoad(game_data);
 
     ShowWindow(global_window.hwnd, cmd_show);
     SetForegroundWindow(global_window.hwnd);
-    pfn_GameStart(&game_data);
+    pfn_GameStart(game_data);
 
     bool running = true;
     f32 delta_time = 0;
@@ -252,7 +252,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 Win32CloseModule(&game_module);
                 Win32LoadModule(&game_module, "game");
                 Win32GameLoadFunctions(&game_module);
-                pfn_GameLoad(&game_data);
+                pfn_GameLoad(game_data);
                 sLog("Game code reloaded");
             }
         }
@@ -260,29 +260,29 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         RECT window_size;
         GetClientRect(global_window.hwnd, &window_size);
 
-        game_data.window_width = window_size.right;
-        game_data.window_height = window_size.bottom;
+        game_data->window_width = window_size.right;
+        game_data->window_height = window_size.bottom;
 
-        memcpy(input.old_keyboard, input.keyboard, sizeof(Keyboard));
+        memcpy(input->old_keyboard, input->keyboard, sizeof(Keyboard));
 
         { // Mouse Position
             POINT pos;
             GetCursorPos(&pos);
             ScreenToClient(global_window.hwnd, &pos);
-            input.mouse_delta_x = pos.x - input.mouse_x;
-            input.mouse_delta_y = pos.y - input.mouse_y;
+            input->mouse_delta_x = pos.x - input->mouse_x;
+            input->mouse_delta_y = pos.y - input->mouse_y;
 
             if(mouse_captured) {
                 u32 center_x = window_size.right / 2;
                 u32 center_y = window_size.bottom / 2;
-                input.mouse_x = center_x;
-                input.mouse_y = center_y;
+                input->mouse_x = center_x;
+                input->mouse_y = center_y;
                 POINT screen_pos = {center_x, center_y};
                 ClientToScreen(global_window.hwnd, &screen_pos);
                 SetCursorPos(screen_pos.x, screen_pos.y);
             } else {
-                input.mouse_x = pos.x;
-                input.mouse_y = pos.y;
+                input->mouse_x = pos.x;
+                input->mouse_y = pos.y;
             }
         }
 
@@ -296,25 +296,25 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 case WM_SYSKEYDOWN:
                 case WM_KEYUP:
                 case WM_SYSKEYUP:
-                    if(!input.read_text_input) {
-                        Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input);
+                    if(!input->read_text_input) {
+                        Win32HandleKeyboardMessages(msg.wParam, msg.lParam, input);
                     }
                     break;
                 case WM_CHAR:
-                    if(input.read_text_input) {
+                    if(input->read_text_input) {
                         if(msg.wParam >= 0) {
-                            input.text_input = msg.wParam;
+                            input->text_input = msg.wParam;
                         } else {
-                            Win32HandleKeyboardMessages(msg.wParam, msg.lParam, &input);
+                            Win32HandleKeyboardMessages(msg.wParam, msg.lParam, input);
                         }
                     }
                     break;
-                case WM_LBUTTONDOWN: input.mouse |= MOUSE_LEFT; break;
-                case WM_LBUTTONUP: input.mouse &= ~MOUSE_LEFT; break;
-                case WM_MBUTTONDOWN: input.mouse |= MOUSE_MIDDLE; break;
-                case WM_MBUTTONUP: input.mouse &= ~MOUSE_MIDDLE; break;
-                case WM_RBUTTONDOWN: input.mouse |= MOUSE_RIGHT; break;
-                case WM_RBUTTONUP: input.mouse &= ~MOUSE_RIGHT; break;
+                case WM_LBUTTONDOWN: input->mouse |= MOUSE_LEFT; break;
+                case WM_LBUTTONUP: input->mouse &= ~MOUSE_LEFT; break;
+                case WM_MBUTTONDOWN: input->mouse |= MOUSE_MIDDLE; break;
+                case WM_MBUTTONUP: input->mouse &= ~MOUSE_MIDDLE; break;
+                case WM_RBUTTONDOWN: input->mouse |= MOUSE_RIGHT; break;
+                case WM_RBUTTONUP: input->mouse &= ~MOUSE_RIGHT; break;
                 case WM_EXITSIZEMOVE: sLog("exit!"); break;
                 default:
                     DispatchMessage(&msg);
@@ -329,7 +329,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         }
 
         EventType e;
-        while(EventConsume(&game_data.event_queue, &e)) {
+        while(EventConsume(&game_data->event_queue, &e)) {
             switch(e) {
             case(EVENT_TYPE_QUIT):
                 running = false;
@@ -340,7 +340,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             };
         }
 
-        pfn_GameLoop(delta_time, &game_data, &input);
+        pfn_GameLoop(delta_time, game_data, input);
         RendererDrawFrame(renderer);
 
         {
@@ -372,6 +372,8 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     }
     RendererDestroy(renderer);
     Win32CloseModule(&game_module);
+    sFree(game_data);
+    sFree(input);
 
     DestroyWindow(global_window.hwnd);
     ReleaseDC(global_window.hwnd, global_window.dc);
