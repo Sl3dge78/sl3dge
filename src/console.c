@@ -6,18 +6,42 @@
 
 global Console *global_console;
 
-void ConsolePushHistory(const char *text, char command_history[32][128]) {
+void ConsolePushHistory(const char *text, const Vec4 color, Console *console) {
     // shift everything one down
     for(u32 i = 31; i > 0; i--) {
-        memcpy(command_history[i], command_history[i - 1], 128);
+        memcpy(&console->command_history[i], &console->command_history[i - 1], sizeof(ConsoleHistoryEntry));
     }
 
-    memcpy(command_history[0], text, 128);
+    memcpy(&console->command_history[0].command, text, 128);
+    memcpy(&console->command_history[0].color, &color, sizeof(Vec4));
 }
 
 DLL_EXPORT void ConsoleLogMessage(const char *message, const u8 level) {
-    if(global_console)
-        ConsolePushHistory(message, global_console->command_history);
+    if(global_console) {
+        Vec4 color;
+        switch(level) {
+        case(LOG_LEVEL_TRACE): color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; break;
+        case(LOG_LEVEL_LOG): color = (Vec4){0.85f, 0.85f, 0.85f, 1.0f}; break;
+        case(LOG_LEVEL_WARN): color = (Vec4){235.f / 255.f, 195.f / 255.f, 52.f / 255.f, 1.0f}; break;
+        case(LOG_LEVEL_ERROR): color = (Vec4){235.f / 255.f, 70.f / 255.f, 52.f / 255.f, 1.0f}; break;
+        };
+
+        ConsolePushHistory(message, color, global_console);
+    }
+}
+
+internal void ConsoleParseMessage(const char *message) {
+    // TODO : Split to arg list
+    char command[64];
+    if(sscanf(message, "%s ", command) != 1) {
+        sError("Parsing error");
+        return;
+    }
+    if(strcmp(command, "exit") == 0) {
+        sLog("Post quit message");
+    } else {
+        sError("Unknown command %s", command);
+    }
 }
 
 void DrawConsole(Console *console, GameData *game_data) {
@@ -42,7 +66,7 @@ void DrawConsole(Console *console, GameData *game_data) {
         i32 hist_y = console_y - 20 - pady;
         u32 i = 0;
         while(hist_y > 0) {
-            UIPushText(game_data->ui_push_buffer, console->command_history[i], padx, hist_y, (Vec4){0.8f, 0.8f, 0.8f, 1.0f});
+            UIPushText(game_data->ui_push_buffer, console->command_history[i].command, padx, hist_y, console->command_history[i].color);
             ++i;
             hist_y -= line_height;
         }
@@ -79,8 +103,8 @@ void InputConsole(Console *console, GameInput *input) {
                 }
                 break;
             case(13): // return
-
-                ConsolePushHistory(console->current_command, console->command_history);
+                ConsoleLogMessage(console->current_command, LOG_LEVEL_LOG);
+                ConsoleParseMessage(console->current_command);
                 memset(console->current_command, '\0', 128);
                 console->current_char = 0;
                 break;
