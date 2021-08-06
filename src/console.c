@@ -29,35 +29,6 @@ DLL_EXPORT void ConsoleLogMessage(const char *message, const u8 level) {
     }
 }
 
-internal i32 StringFindFirstChar(const char *string, const u32 length, const char c) {
-    for(u32 i = 0; i < length; ++i) {
-        if(string[i] == c)
-            return i;
-    }
-
-    return -1;
-}
-
-internal i32 StringEatSpaces(const char **string, const u32 length) {
-    i32 nb = 0;
-    while(**string == ' ') {
-        nb++;
-        (*string)++;
-    }
-    return nb;
-}
-
-internal void StringCopyLength(char *destination, const char *source, u32 max_length) {
-    u32 nb = 0;
-    while(nb < max_length) {
-        if(source[nb] == '\0')
-            break;
-        destination[nb] = source[nb];
-        nb++;
-    }
-    destination[nb] = '\0';
-}
-
 internal void ConsoleParseMessage(const char *message, GameData *game_data) {
     // TEMPORARY : 5 args max
 
