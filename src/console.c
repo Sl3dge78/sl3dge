@@ -1,7 +1,6 @@
 #pragma once
 
 #include "console.h"
-
 #include "game.h"
 
 global Console *global_console;
@@ -30,18 +29,69 @@ DLL_EXPORT void ConsoleLogMessage(const char *message, const u8 level) {
     }
 }
 
+internal i32 StringFindFirstChar(const char *string, const u32 length, const char c) {
+    for(u32 i = 0; i < length; ++i) {
+        if(string[i] == c)
+            return i;
+    }
+
+    return -1;
+}
+
+internal i32 StringEatSpaces(const char **string, const u32 length) {
+    i32 nb = 0;
+    while(**string == ' ') {
+        nb++;
+        (*string)++;
+    }
+    return nb;
+}
+
+internal void StringCopyLength(char *destination, const char *source, u32 max_length) {
+    u32 nb = 0;
+    while(nb < max_length) {
+        if(source[nb] == '\0')
+            break;
+        destination[nb] = source[nb];
+        nb++;
+    }
+    destination[nb] = '\0';
+}
+
 internal void ConsoleParseMessage(const char *message, GameData *game_data) {
-    // TODO : Split to arg list
+    // TEMPORARY : 5 args max
+
+    const char *head = message;
+    u32 length = strlen(message);
+
+    length -= StringEatSpaces(&head, length);
+
+    char args[5][64];
+    u32 argc = 0;
+    while(argc < 5 && length > 0) {
+        i32 val = StringFindFirstChar(head, length, ' ');
+        if(val == -1) {
+            StringCopyLength(args[argc], head, length);
+            break;
+        } else {
+            StringCopyLength(args[argc], head, val);
+            head += val + 1;
+            length -= val + 1;
+            argc++;
+        }
+    }
+    /*
     char command[64];
     if(sscanf(message, "%s ", command) != 1) {
         sError("Parsing error");
         return;
     }
-    if(strcmp(command, "exit") == 0) {
+    */
+    if(strcmp(args[0], "exit") == 0) {
         EventPush(&game_data->event_queue, EVENT_TYPE_QUIT);
         sLog("Post quit message");
     } else {
-        sError("Unknown command %s", command);
+        sError("Unknown command %s", args[0]);
     }
 }
 
