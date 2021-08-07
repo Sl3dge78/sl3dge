@@ -7,6 +7,11 @@
 #include "console.h"
 #include "event.h"
 
+typedef struct Camera {
+    Vec3 position;
+    Vec2f spherical_coordinates;
+} Camera;
+
 typedef struct GameData {
     // System stuff
     Renderer *renderer;
@@ -15,15 +20,13 @@ typedef struct GameData {
     PushBuffer *ui_push_buffer;
     PushBuffer *scene_push_buffer;
     Console console;
-
     EventQueue event_queue;
-
-    bool is_free_cam;
-
     u32 window_width;
     u32 window_height;
-    Vec3 position;
-    Vec2f spherical_coordinates;
+
+    bool is_free_cam;
+    Camera camera;
+
     Vec3 light_pos;
     f32 cos;
     Mat4 moto_xform;
@@ -38,11 +41,6 @@ GameLoop_t *pfn_GameLoop;
 typedef void GameLoad_t(GameData *game_data);
 GameLoad_t *pfn_GameLoad;
 
-internal void UIPushQuad(PushBuffer *push_buffer,
-                         const u32 x,
-                         const u32 y,
-                         const u32 w,
-                         const u32 h,
-                         const Vec4 color);
+internal void UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
 internal void UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color);
 #endif // MAIN_H

@@ -678,13 +678,6 @@ void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 }
 
-/*
-MeshInstance RendererInstantiateMesh(Renderer *renderer, MeshHandle mesh_id) {
-    MeshInstance result = {0};
-    return result;
-}
-*/
-
 void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {
     renderer->camera_pos = position;
     renderer->camera_view = mat4_look_at(vec3_add(position, forward), position, up);

@@ -9,12 +9,7 @@
 #include "console.c"
 #include "event.c"
 
-internal void UIPushQuad(PushBuffer *push_buffer,
-                         const u32 x,
-                         const u32 y,
-                         const u32 w,
-                         const u32 h,
-                         const Vec4 color) {
+internal void UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryQuad) < push_buffer->max_size);
     PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Quad;
@@ -26,8 +21,7 @@ internal void UIPushQuad(PushBuffer *push_buffer,
     push_buffer->size += sizeof(PushBufferEntryQuad);
 }
 
-internal void
-UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
+internal void UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
@@ -50,29 +44,42 @@ internal void PushMesh(PushBuffer *push_buffer, MeshHandle mesh, Mat4 *transform
 
 DLL_EXPORT void GameLoad(GameData *game_data) {
     sLogSetCallback(&ConsoleLogMessage);
+    ConsoleInit(&game_data->console);
     global_console = &game_data->console;
 }
 
 DLL_EXPORT void GameStart(GameData *game_data) {
-    ConsoleInit();
-
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
-    game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
+    game_data->camera.position = (Vec3){0.0f, 0.0f, 0.0f};
 
-    /*
-    game_data->cos = 0.0f;
-    game_data->light_pos.x = cos(game_data->cos);
-    game_data->light_pos.y = sin(game_data->cos);
-    */
     game_data->moto_xform = mat4_identity();
-    game_data->renderer_api.SetSunDirection(game_data->renderer,
-                                            vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
-    //game_data->renderer_api.LoadMesh(game_data->renderer, "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
-    //game_data->renderer_api.LoadMesh(game_data->renderer,                                     "resources/3d/Motorcycle/motorcycle.gltf");
-    //game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
+    game_data->renderer_api.SetSunDirection(game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+    game_data->renderer_api.SetCamera(game_data->renderer, game_data->camera.position, (Vec3){0.0f, 0.0f, -1.0f}, (Vec3){0.0f, 1.0f, 0.0f});
 }
 
-Vec3 FreecamMovement(GameInput *input, Vec3 forward, Vec3 right) {
+void FreecamMovement(GameData *game_data, GameInput *input) {
+    f32 look_speed = 0.01f;
+    if(input->mouse & MOUSE_RIGHT) {
+        if(input->mouse_delta_x != 0) {
+            game_data->camera.spherical_coordinates.x += look_speed * input->mouse_delta_x;
+        }
+        if(input->mouse_delta_y != 0) {
+            float new_rot = game_data->camera.spherical_coordinates.y + look_speed * input->mouse_delta_y;
+            if(new_rot > -PI / 2.0f && new_rot < PI / 2.0f) {
+                game_data->camera.spherical_coordinates.y = new_rot;
+            }
+        }
+        game_data->platform_api.SetCaptureMouse(true);
+
+    } else {
+        game_data->platform_api.SetCaptureMouse(false);
+    }
+    Vec3 forward = spherical_to_carthesian(game_data->camera.spherical_coordinates);
+    Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
+
+    // --------------
+    // Move
+
     f32 move_speed = 0.1f;
     Vec3 movement = {0};
 
@@ -99,39 +106,19 @@ Vec3 FreecamMovement(GameInput *input, Vec3 forward, Vec3 right) {
         movement.y += move_speed;
     }
 
-    return movement;
+    game_data->camera.position = vec3_add(game_data->camera.position, movement);
+    game_data->renderer_api.SetCamera(
+        game_data->renderer, game_data->camera.position, forward, (Vec3){0.0f, 1.0f, 0.0f});
 }
 
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input) {
-    // -----------
-    // Look
-
-    f32 look_speed = 0.01f;
-    if(input->mouse & MOUSE_RIGHT) {
-        if(input->mouse_delta_x != 0) {
-            game_data->spherical_coordinates.x += look_speed * input->mouse_delta_x;
-        }
-        if(input->mouse_delta_y != 0) {
-            float new_rot = game_data->spherical_coordinates.y + look_speed * input->mouse_delta_y;
-            if(new_rot > -PI / 2.0f && new_rot < PI / 2.0f) {
-                game_data->spherical_coordinates.y = new_rot;
-            }
-        }
-        game_data->platform_api.SetCaptureMouse(true);
-
-    } else {
-        game_data->platform_api.SetCaptureMouse(false);
-    }
-    Vec3 forward = spherical_to_carthesian(game_data->spherical_coordinates);
-    Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
-
-    // --------------
-    // Move
-
     if(game_data->is_free_cam) {
-        game_data->position = vec3_add(game_data->position, FreecamMovement(input, forward, right));
+        FreecamMovement(game_data, input);
+    } else {
+        game_data->camera.position = mat4_get_translation(&game_data->moto_xform);
+        game_data->camera.position = vec3_add(game_data->camera.position, (Vec3){0.0f, 50.0f, 60.0f});
         game_data->renderer_api.SetCamera(
-            game_data->renderer, game_data->position, forward, (Vec3){0.0f, 1.0f, 0.0f});
+            game_data->renderer, game_data->camera.position, (Vec3){0.0f, 0.0f, -1.0f}, (Vec3){0.0f, 1.0f, 0.0f});
     }
 
     // ----------------
@@ -166,16 +153,15 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
             game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
 
+    // --------------
+    // Console
     if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
-        if(game_data->console.console_target <= 0) {
+        if(game_data->console.console_target <= 0) { // Console is closed, open it
             game_data->console.console_target = 300;
             input->read_text_input = true;
-        } else {
-            game_data->console.console_target = 0;
-            input->read_text_input = false;
         }
+        // The closing of the console is handled in the console, as it grabs all input.
     }
-
     DrawConsole(&game_data->console, game_data);
     if(game_data->console.console_open) {
         InputConsole(&game_data->console, input, game_data);

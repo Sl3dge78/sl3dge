@@ -3,7 +3,7 @@
 #include "console.h"
 #include "game.h"
 
-global Console *global_console;
+global Console *global_console; // Set in GameLoad in game.c
 
 void CommandExit(ConsoleArgs *args, GameData *game_data) {
     EventPush(&game_data->event_queue, EVENT_TYPE_QUIT);
@@ -15,14 +15,12 @@ void CommandFreeCam(ConsoleArgs *args, GameData *game_data) {
     sLog("Freecam is %s", (game_data->is_free_cam ? "on" : "off"));
 }
 
-void ConsoleInit() {
-    global_console->command_count = 2;
-    global_console->commands = sCalloc(global_console->command_count, sizeof(ConsoleCommand));
+void ConsoleInit(Console *console) {
+    console->command_count = 2;
+    console->commands = sCalloc(console->command_count, sizeof(ConsoleCommand));
 
-    global_console->commands[0].command = "exit";
-    global_console->commands[0].function = &CommandExit;
-
-    global_console->commands[1] = (ConsoleCommand){"freecam", &CommandFreeCam};
+    console->commands[0] = (ConsoleCommand){"exit", &CommandExit};
+    console->commands[1] = (ConsoleCommand){"freecam", &CommandFreeCam};
 }
 
 void ConsoleCallCommand(ConsoleArgs *args, GameData *game_data) {
@@ -112,15 +110,6 @@ void DrawConsole(Console *console, GameData *game_data) {
             ++i;
             hist_y -= line_height;
         }
-
-        /*
-        ConsoleEntry *entry = console->history.first;
-        while(entry && hist_y > 0) {
-            UIPushText(game_data->ui_push_buffer, entry->command, padx, hist_y, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
-            entry = entry->next;
-            hist_y -= line_height;
-        }
-        */
     }
 }
 
