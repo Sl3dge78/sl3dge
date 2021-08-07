@@ -44,7 +44,7 @@ void Win32GameLoadFunctions(Module *dll) {
 void Win32GameLoadRendererAPI(Renderer *renderer, GameData *game_data) {
     game_data->renderer = renderer;
     game_data->renderer_api.CreateMesh = &RendererCreateMesh;
-    game_data->renderer_api.InstantiateMesh = &RendererInstantiateMesh;
+    //game_data->renderer_api.InstantiateMesh = &RendererInstantiateMesh;
     game_data->renderer_api.SetCamera = &RendererSetCamera;
     game_data->renderer_api.SetSunDirection = &RendererSetSunDirection;
 }
@@ -226,6 +226,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     GameInput *input = sCalloc(1, sizeof(GameInput));
     game_data->platform_api = platform_api;
     game_data->ui_push_buffer = RendererGetUIPushBuffer(renderer);
+    game_data->scene_push_buffer = RendererGetScenePushBuffer(renderer);
     game_data->window_width = global_window.w;
     game_data->window_height = global_window.h;
     Win32GameLoadRendererAPI(renderer, game_data);
@@ -370,6 +371,8 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             SetWindowText(global_window.hwnd, title);
         }
     }
+
+    sLogSetCallback(&DefaultLog);
     RendererDestroy(renderer);
     Win32CloseModule(&game_module);
     sFree(game_data);

@@ -16,21 +16,21 @@ typedef struct Vertex {
     Vec2 uv;
 } Vertex;
 
-typedef struct MeshInstance {
-    Mat4 *transform;
-} MeshInstance;
+typedef u32 MeshHandle;
 
 // -----------
 // Push Buffer
 
 typedef struct PushBuffer {
     u32 size;
+    u32 max_size;
     void *buf;
 } PushBuffer;
 
 typedef enum PushBufferEntryType {
     PushBufferEntryType_Quad,
-    PushBufferEntryType_Text
+    PushBufferEntryType_Text,
+    PushBufferEntryType_Mesh
 } PushBufferEntryType;
 
 typedef struct PushBufferEntryQuad {
@@ -46,24 +46,29 @@ typedef struct PushBufferEntryText {
     Vec4 colour;
 } PushBufferEntryText;
 
-#define UI_PUSHBUFFER_MAX_SIZE (sizeof(PushBufferEntryText) * 256)
+typedef struct PushBufferEntryMesh {
+    PushBufferEntryType type;
+    MeshHandle mesh_handle;
+    Mat4 *transform;
+} PushBufferEntryMesh;
 
 // Platform level functions
-Renderer *RendererCreate(PlatformWindow *window);
+Renderer *
+RendererCreate(PlatformWindow *window);
 void RendererDrawFrame(Renderer *renderer);
 void RendererDestroy(Renderer *renderer);
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window);
 PushBuffer *RendererGetUIPushBuffer(Renderer *renderer);
+PushBuffer *RendererGetScenePushBuffer(Renderer *renderer);
 
 // Game functions
 typedef u32 CreateMesh_t(Renderer *renderer, const char *path);
 DLL_EXPORT CreateMesh_t RendererCreateMesh;
 
-typedef MeshInstance InstantiateMesh_t(Renderer *renderer, u32 mesh_id);
-DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
+//typedef MeshInstance InstantiateMesh_t(Renderer *renderer, u32 mesh_id);
+//DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
 
-typedef void SetCamera_t(Renderer *renderer, const Vec3 position,
-                         const Vec3 forward, const Vec3 up);
+typedef void SetCamera_t(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up);
 DLL_EXPORT SetCamera_t RendererSetCamera;
 
 typedef void SetSunDirection_t(Renderer *renderer, const Vec3 direction);
@@ -71,7 +76,7 @@ DLL_EXPORT SetSunDirection_t RendererSetSunDirection;
 
 typedef struct RendererGameAPI {
     CreateMesh_t *CreateMesh;
-    InstantiateMesh_t *InstantiateMesh;
+    //InstantiateMesh_t *InstantiateMesh;
     SetCamera_t *SetCamera;
     SetSunDirection_t *SetSunDirection;
 } RendererGameAPI;

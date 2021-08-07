@@ -51,13 +51,7 @@ internal void ConsoleParseMessage(const char *message, GameData *game_data) {
             argc++;
         }
     }
-    /*
-    char command[64];
-    if(sscanf(message, "%s ", command) != 1) {
-        sError("Parsing error");
-        return;
-    }
-    */
+    
     if(strcmp(args[0], "exit") == 0) {
         EventPush(&game_data->event_queue, EVENT_TYPE_QUIT);
         sLog("Post quit message");

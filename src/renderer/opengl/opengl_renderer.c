@@ -381,7 +381,8 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glDisable(GL_CULL_FACE);
 
     // Meshes
-    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->moto);
+    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->meshes[0]);
+    renderer->mesh_count++;
 
     // Render passes
     CreateShadowmapRenderPass(&renderer->shadowmap_pass);
@@ -420,8 +421,9 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
     { // UI
         // Init push buffer
-        renderer->ui_push_buffer.buf = sCalloc(UI_PUSHBUFFER_MAX_SIZE, 1);
         renderer->ui_push_buffer.size = 0;
+        renderer->ui_push_buffer.max_size = sizeof(PushBufferEntryText) * 256;
+        renderer->ui_push_buffer.buf = sCalloc(renderer->ui_push_buffer.max_size, 1);
 
         // Load font
         unsigned char *ttf_buffer = sCalloc(1 << 20, sizeof(unsigned char));
@@ -465,6 +467,11 @@ Renderer *RendererCreate(PlatformWindow *window) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
 
+    { // Scene
+        renderer->scene_pushbuffer.size = 0;
+        renderer->scene_pushbuffer.max_size = sizeof(PushBufferEntryMesh) * 64;
+        renderer->scene_pushbuffer.buf = sCalloc(renderer->scene_pushbuffer.max_size, 1);
+    }
     UpdateCameraProj(renderer);
 
     return renderer;
@@ -473,6 +480,8 @@ Renderer *RendererCreate(PlatformWindow *window) {
 void RendererDestroy(Renderer *renderer) {
     // UI
     sFree(renderer->ui_push_buffer.buf);
+    sFree(renderer->scene_pushbuffer.buf);
+
     sFree(renderer->char_data);
     glDeleteTextures(1, &renderer->white_texture);
     glDeleteTextures(1, &renderer->glyphs_texture);
@@ -487,7 +496,9 @@ void RendererDestroy(Renderer *renderer) {
     glDeleteBuffers(1, &renderer->screen_quad);
 
     // Meshes
-    RendererDestroyMesh(&renderer->moto);
+    for(u32 i = 0; i < renderer->mesh_count; i++) {
+        RendererDestroyMesh(&renderer->meshes[i]);
+    }
 
     sFree(renderer);
 }
@@ -495,12 +506,29 @@ void RendererDestroy(Renderer *renderer) {
 // -------------
 // Drawing
 
-internal void DrawScene(Renderer *renderer) {
+internal void DrawScene(Renderer *renderer, u32 program) {
     // Draw bike
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, renderer->moto.diffuse_texture);
-    glBindVertexArray(renderer->moto.vertex_array);
-    glDrawElements(GL_TRIANGLES, renderer->moto.index_count, GL_UNSIGNED_INT, 0);
+
+    PushBuffer *pushb = &renderer->scene_pushbuffer;
+    if(pushb->size == 0)
+        return;
+
+    for(u32 address = 0; address < pushb->size;) {
+        PushBufferEntryType *type = (PushBufferEntryType *)(pushb->buf + address);
+
+        ASSERT(*type == PushBufferEntryType_Mesh); // Only meshes for now
+        PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(pushb->buf + address);
+
+        Mesh *mesh = &renderer->meshes[entry->mesh_handle];
+
+        glBindTexture(GL_TEXTURE_2D, mesh->diffuse_texture);
+        glBindVertexArray(mesh->vertex_array);
+        glUniformMatrix4fv(glGetUniformLocation(program, "transform"), 1, GL_FALSE, entry->transform->v);
+        glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
+
+        address += sizeof(PushBufferEntryMesh);
+    }
 }
 
 internal void DrawScreenQuad(Renderer *renderer) {
@@ -606,31 +634,31 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
         }
         }
     }
-    push_buffer->size = 0;
 }
 
 void RendererDrawFrame(Renderer *renderer) {
     // ------------------
     // Shadow map
     BeginShadowmapRenderPass(&renderer->shadowmap_pass);
-    DrawScene(renderer);
+    DrawScene(renderer, renderer->shadowmap_pass.program);
 
     // ------------------
     // Color pass
     BeginColorRenderPass(renderer, &renderer->color_pass);
-    DrawScene(renderer);
+    DrawScene(renderer, renderer->color_pass.program);
 
     // ---------------
     // Post process
     BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
     DrawScreenQuad(renderer);
 
-    //UIPushQuad(renderer, 200, 200, 100, 100, (Vec4){1.0f, 0.0f, 1.0f, 0.5f});
-    //UIPushText(renderer, "Hello guise", 20, 20, (Vec4){1.0f, 0.0f, 0.0f, 0.75f});
-
     DrawUI(renderer, &renderer->ui_push_buffer);
 
     PlatformSwapBuffers(renderer);
+
+    // Clear pushbuffers
+    renderer->scene_pushbuffer.size = 0;
+    renderer->ui_push_buffer.size = 0;
 }
 
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
@@ -650,10 +678,12 @@ void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 }
 
-MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
+/*
+MeshInstance RendererInstantiateMesh(Renderer *renderer, MeshHandle mesh_id) {
     MeshInstance result = {0};
     return result;
 }
+*/
 
 void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {
     renderer->camera_pos = position;
@@ -705,4 +735,8 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
 
 PushBuffer *RendererGetUIPushBuffer(Renderer *renderer) {
     return &renderer->ui_push_buffer;
+}
+
+PushBuffer *RendererGetScenePushBuffer(Renderer *renderer) {
+    return &renderer->scene_pushbuffer;
 }

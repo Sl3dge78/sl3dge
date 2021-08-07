@@ -2,17 +2,17 @@
     "version": "2.0.0",
     "presentation": {
         "echo": true,
-        "reveal": "never",
+        "reveal": "always",
         "focus": false,
         "panel": "shared",
         "showReuseMessage": true,
-        "clear": false
+        "clear": true
     },
     "tasks": [
         {
             "label": "Build All",
             "problemMatcher": [
-                "$msCompile"
+                "$gcc"
             ],
             "command": "build.bat",
             "group": {
@@ -23,7 +23,7 @@
         {
             "label": "Build Tests",
             "problemMatcher": [
-                "$msCompile"
+                "$gcc"
             ],
             "command": "build_tests.bat",
         }

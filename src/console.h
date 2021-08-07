@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sl3dge-utils/sl3dge.h>
+
 #define CONSOLE_HISTORY_MAX_SIZE 32
 
 typedef struct ConsoleHistoryEntry {

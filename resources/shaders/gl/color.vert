@@ -14,7 +14,7 @@ uniform mat4 projection;
 uniform mat4 light_matrix;
 
 void main() {
-    vec4 pos = vec4(aPos, 1.0);
+    vec4 pos = transform * vec4(aPos, 1.0);
     worldpos = pos.xyz;
     Normal = aNormal;
     TexCoord = aTexCoord;

@@ -15,7 +15,7 @@ internal void UIPushQuad(PushBuffer *push_buffer,
                          const u32 w,
                          const u32 h,
                          const Vec4 color) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryQuad) < UI_PUSHBUFFER_MAX_SIZE);
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryQuad) < push_buffer->max_size);
     PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Quad;
     entry->l = x;
@@ -28,7 +28,7 @@ internal void UIPushQuad(PushBuffer *push_buffer,
 
 internal void
 UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < UI_PUSHBUFFER_MAX_SIZE);
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
     entry->text = text;
@@ -36,6 +36,16 @@ UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, 
     entry->y = y;
     entry->colour = color;
     push_buffer->size += sizeof(PushBufferEntryText);
+}
+
+internal void PushMesh(PushBuffer *push_buffer, MeshHandle mesh, Mat4 *transform) {
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
+    PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_Mesh;
+    entry->mesh_handle = mesh;
+    entry->transform = transform;
+
+    push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
 DLL_EXPORT void GameLoad(GameData *game_data) {
@@ -52,6 +62,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->light_pos.x = cos(game_data->cos);
     game_data->light_pos.y = sin(game_data->cos);
     */
+    game_data->moto_xform = mat4_identity();
     game_data->renderer_api.SetSunDirection(game_data->renderer,
                                             vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     //game_data->renderer_api.LoadMesh(game_data->renderer, "resources/models/gltf_samples/Sponza/glTF/Sponza.gltf");
@@ -124,8 +135,9 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
     // Reset
     if(input->keyboard[SCANCODE_SPACE]) {
-        game_data->position = (Vec3){0.0f, 0, 0};
-        *game_data->moto.transform = mat4_identity();
+        //game_data->position = (Vec3){0.0f, 0, 0};
+        //game_data->moto_xform = mat4_identity();
+        mat4_translate(&game_data->moto_xform, (Vec3){0.0f, 0.0f, delta_time * 2.0f});
     }
     if(input->keyboard[SCANCODE_P]) {
         game_data->cos += delta_time;
@@ -164,6 +176,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     if(game_data->console.console_open) {
         InputConsole(&game_data->console, input, game_data);
     }
+
+    PushMesh(game_data->scene_push_buffer, 0, &game_data->moto_xform);
 
 #if 0
     mat4_rotate_euler(game_data->moto.transform, Vec3{0, game_data->spherical_coordinates.x, 0});

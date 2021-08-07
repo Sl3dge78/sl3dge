@@ -49,7 +49,10 @@ typedef struct Renderer {
     u32 screen_quad;
     u32 screen_quad_vbuffer;
 
-    Mesh moto;
+    PushBuffer scene_pushbuffer;
+    //Mesh moto;
+    Mesh meshes[64];
+    u32 mesh_count;
 
     // Uniform data
     Mat4 camera_proj;

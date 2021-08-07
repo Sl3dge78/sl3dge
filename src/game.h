@@ -13,6 +13,7 @@ typedef struct GameData {
     RendererGameAPI renderer_api;
     PlatformAPI platform_api;
     PushBuffer *ui_push_buffer;
+    PushBuffer *scene_push_buffer;
     Console console;
 
     EventQueue event_queue;
@@ -23,7 +24,7 @@ typedef struct GameData {
     Vec2f spherical_coordinates;
     Vec3 light_pos;
     f32 cos;
-    MeshInstance moto;
+    Mat4 moto_xform;
 } GameData;
 
 typedef void GameStart_t(GameData *game_data);
