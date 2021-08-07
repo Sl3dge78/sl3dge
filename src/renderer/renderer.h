@@ -68,7 +68,7 @@ DLL_EXPORT CreateMesh_t RendererCreateMesh;
 //typedef MeshInstance InstantiateMesh_t(Renderer *renderer, u32 mesh_id);
 //DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
 
-typedef void SetCamera_t(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up);
+typedef void SetCamera_t(Renderer *renderer, const Mat4 *view);
 DLL_EXPORT SetCamera_t RendererSetCamera;
 
 typedef void SetSunDirection_t(Renderer *renderer, const Vec3 direction);

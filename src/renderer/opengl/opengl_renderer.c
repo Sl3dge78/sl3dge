@@ -678,9 +678,9 @@ void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 }
 
-void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forward, const Vec3 up) {
-    renderer->camera_pos = position;
-    renderer->camera_view = mat4_look_at(vec3_add(position, forward), position, up);
+void RendererSetCamera(Renderer *renderer, const Mat4 *view) {
+    renderer->camera_pos = mat4_get_translation(view);
+    renderer->camera_view = *view;
     mat4_inverse(&renderer->camera_view, &renderer->camera_view_inverse);
 
     // Update uniforms

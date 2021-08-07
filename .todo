@@ -1,11 +1,9 @@
 GAME:
     CRITICAL:
-
     MAJOR:
-
     BACKLOG:
         - Moto movement
-            > Need to be able to move meshes
+            > We can do it
         - Moto cam
             > We can do it
         - Generate roads
@@ -13,16 +11,10 @@ GAME:
             > Vertex color could be good here
 
     IMPROVEMENTS:
-
     IDEAS:
 
 OPENGL RENDERER :
     CRITICAL:
-        - UI
-            > Push buffer architecture
-                - Add color to vertices
-                - Store less stuff in the buffer
-        - Mesh Transforms
     MAJOR:
         - Handle multiple primitives in single gltf
     BACKLOG:
@@ -84,11 +76,10 @@ VULKAN RENDERER:
 
 WIN32 :
     CRITICAL:
-            - FTIME TRACE WHO DOES IT WORK
+        - FTIME TRACE HOW DOES IT WORK
     MAJOR:
     BACKLOG:
         - Figure out multithreading
     IMPROVEMENTS:
     IDEAS:
-        - In game console
         - Should I make my own memory allocator?

@@ -174,7 +174,7 @@ void GLTFGetNodeTransform(const cgltf_node *node, Mat4 *transform) {
         Quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]};
         Vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
 
-        trs_to_mat4(transform, &t, &r, &s);
+        trs_quat_to_mat4(transform, &t, &r, &s);
     }
 }
 

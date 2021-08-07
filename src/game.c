@@ -53,8 +53,11 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->camera.position = (Vec3){0.0f, 0.0f, 0.0f};
 
     game_data->moto_xform = mat4_identity();
+    game_data->bike_dir = 0.0f;
+    game_data->bike_forward = (Vec3){0.0f, 0.0f, -1.0f};
     game_data->renderer_api.SetSunDirection(game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
-    game_data->renderer_api.SetCamera(game_data->renderer, game_data->camera.position, (Vec3){0.0f, 0.0f, -1.0f}, (Vec3){0.0f, 1.0f, 0.0f});
+
+    //game_data->renderer_api.SetCamera(game_data->renderer, game_data->camera.position, (Vec3){0.0f, 0.0f, -1.0f}, (Vec3){0.0f, 1.0f, 0.0f});
 }
 
 void FreecamMovement(GameData *game_data, GameInput *input) {
@@ -107,18 +110,44 @@ void FreecamMovement(GameData *game_data, GameInput *input) {
     }
 
     game_data->camera.position = vec3_add(game_data->camera.position, movement);
-    game_data->renderer_api.SetCamera(
-        game_data->renderer, game_data->camera.position, forward, (Vec3){0.0f, 1.0f, 0.0f});
+
+    Mat4 cam = mat4_look_at(vec3_add(forward, game_data->camera.position), game_data->camera.position, (Vec3){0.0f, 1.0f, 0.0f});
+
+    game_data->renderer_api.SetCamera(game_data->renderer, &cam);
 }
 
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input) {
     if(game_data->is_free_cam) {
         FreecamMovement(game_data, input);
     } else {
-        game_data->camera.position = mat4_get_translation(&game_data->moto_xform);
-        game_data->camera.position = vec3_add(game_data->camera.position, (Vec3){0.0f, 50.0f, 60.0f});
-        game_data->renderer_api.SetCamera(
-            game_data->renderer, game_data->camera.position, (Vec3){0.0f, 0.0f, -1.0f}, (Vec3){0.0f, 1.0f, 0.0f});
+        if(input->keyboard[SCANCODE_A]) {
+            game_data->bike_dir -= delta_time;
+            game_data->bank_angle -= delta_time * 1.5f;
+        }
+        if(input->keyboard[SCANCODE_D]) {
+            game_data->bike_dir += delta_time;
+            game_data->bank_angle += delta_time * 1.5f;
+        }
+
+        if(game_data->bank_angle < 0)
+            game_data->bank_angle += delta_time;
+        else if(game_data->bank_angle > 0) {
+            game_data->bank_angle -= delta_time;
+        }
+
+        game_data->bike_forward.x = -sin(game_data->bike_dir - 3.14f);
+        game_data->bike_forward.z = cos(game_data->bike_dir - 3.14f);
+
+        game_data->moto_xform = trs_to_mat4((Vec3){0.0f, 0.0f, 0.0f}, (Vec3){0.0f, game_data->bike_dir, game_data->bank_angle}, (Vec3){1.0f, 1.0f, 1.0f});
+
+        Vec3 flat_forward = vec3_normalize(game_data->bike_forward);
+        Vec3 offset_z = vec3_fmul(flat_forward, -60.f);
+        Vec3 offset_y = {0.0f, 50.f, 0.f};
+        Vec3 offset = vec3_add(offset_z, offset_y);
+
+        Mat4 cam_xform = mat4_look_at(vec3_add(game_data->bike_forward, offset), offset, (Vec3){0.0f, 1.0f, 0.0f});
+
+        game_data->renderer_api.SetCamera(game_data->renderer, &cam_xform);
     }
 
     // ----------------
@@ -155,6 +184,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
     // --------------
     // Console
+
     if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
         if(game_data->console.console_target <= 0) { // Console is closed, open it
             game_data->console.console_target = 300;
@@ -168,17 +198,4 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     }
 
     PushMesh(game_data->scene_push_buffer, 0, &game_data->moto_xform);
-
-#if 0
-    mat4_rotate_euler(game_data->moto.transform, Vec3{0, game_data->spherical_coordinates.x, 0});
-    mat4_set_position(game_data->moto.transform, game_data->position);
-    Vec3 flat_forward = {forward.x, 0, forward.z};
-    flat_forward = vec3_normalize(flat_forward);
-    Vec3 offset_z = flat_forward * -10.f;
-    Vec3 offset_y = {0.0f, 40.f, 0.f};
-    Vec3 offset = offset_z + offset_y;
-
-    game_data->renderer_api.SetCamera(
-    game_data->renderer, game_data->position + offset, forward, Vec3{0.0f, 1.0f, 0.0f});
-#endif
 }
