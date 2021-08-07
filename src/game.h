@@ -18,6 +18,8 @@ typedef struct GameData {
 
     EventQueue event_queue;
 
+    bool is_free_cam;
+
     u32 window_width;
     u32 window_height;
     Vec3 position;

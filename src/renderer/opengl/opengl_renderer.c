@@ -657,7 +657,7 @@ void RendererDrawFrame(Renderer *renderer) {
     PlatformSwapBuffers(renderer);
 
     // Clear pushbuffers
-    renderer->scene_pushbuffer.size = 0;
+    renderer->scene_pushbuffer.size = 0; // Maybe we don't need to reset it each frame? do some tests
     renderer->ui_push_buffer.size = 0;
 }
 

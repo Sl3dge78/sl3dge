@@ -54,6 +54,8 @@ DLL_EXPORT void GameLoad(GameData *game_data) {
 }
 
 DLL_EXPORT void GameStart(GameData *game_data) {
+    ConsoleInit();
+
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->position = (Vec3){0.0f, 0.0f, 0.0f};
 
@@ -70,7 +72,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     //game_data->moto = game_data->renderer_api.InstantiateMesh(game_data->renderer, 0);
 }
 
-Vec3 Movement(GameInput *input, Vec3 forward, Vec3 right) {
+Vec3 FreecamMovement(GameInput *input, Vec3 forward, Vec3 right) {
     f32 move_speed = 0.1f;
     Vec3 movement = {0};
 
@@ -126,9 +128,11 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     // --------------
     // Move
 
-    game_data->position = vec3_add(game_data->position, Movement(input, forward, right));
-    game_data->renderer_api.SetCamera(
-        game_data->renderer, game_data->position, forward, (Vec3){0.0f, 1.0f, 0.0f});
+    if(game_data->is_free_cam) {
+        game_data->position = vec3_add(game_data->position, FreecamMovement(input, forward, right));
+        game_data->renderer_api.SetCamera(
+            game_data->renderer, game_data->position, forward, (Vec3){0.0f, 1.0f, 0.0f});
+    }
 
     // ----------------
     // Other inputs

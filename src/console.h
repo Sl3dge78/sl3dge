@@ -4,6 +4,14 @@
 
 #define CONSOLE_HISTORY_MAX_SIZE 32
 
+typedef char ConsoleArgs[5][64];
+typedef void ConsoleFunction(ConsoleArgs *args, GameData *game_data);
+
+typedef struct ConsoleCommand {
+    const char *command;
+    ConsoleFunction *function;
+} ConsoleCommand;
+
 typedef struct ConsoleHistoryEntry {
     char command[128];
     Vec4 color;
@@ -16,7 +24,8 @@ typedef struct Console {
     u32 current_char;
     char current_command[128];
     ConsoleHistoryEntry command_history[32];
+    ConsoleCommand *commands;
+    u32 command_count;
 } Console;
 
 void DrawConsole(Console *console, GameData *game_data);
-

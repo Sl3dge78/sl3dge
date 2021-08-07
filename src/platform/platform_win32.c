@@ -44,7 +44,6 @@ void Win32GameLoadFunctions(Module *dll) {
 void Win32GameLoadRendererAPI(Renderer *renderer, GameData *game_data) {
     game_data->renderer = renderer;
     game_data->renderer_api.CreateMesh = &RendererCreateMesh;
-    //game_data->renderer_api.InstantiateMesh = &RendererInstantiateMesh;
     game_data->renderer_api.SetCamera = &RendererSetCamera;
     game_data->renderer_api.SetSunDirection = &RendererSetSunDirection;
 }

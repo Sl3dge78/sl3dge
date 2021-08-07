@@ -5,6 +5,36 @@
 
 global Console *global_console;
 
+void CommandExit(ConsoleArgs *args, GameData *game_data) {
+    EventPush(&game_data->event_queue, EVENT_TYPE_QUIT);
+    sLog("Exiting...");
+}
+
+void CommandFreeCam(ConsoleArgs *args, GameData *game_data) {
+    game_data->is_free_cam = !game_data->is_free_cam;
+    sLog("Freecam is %s", (game_data->is_free_cam ? "on" : "off"));
+}
+
+void ConsoleInit() {
+    global_console->command_count = 2;
+    global_console->commands = sCalloc(global_console->command_count, sizeof(ConsoleCommand));
+
+    global_console->commands[0].command = "exit";
+    global_console->commands[0].function = &CommandExit;
+
+    global_console->commands[1] = (ConsoleCommand){"freecam", &CommandFreeCam};
+}
+
+void ConsoleCallCommand(ConsoleArgs *args, GameData *game_data) {
+    for(u32 i = 0; i < global_console->command_count; ++i) {
+        if(strcmp(*args[0], global_console->commands[i].command) == 0) {
+            global_console->commands[i].function(args, game_data);
+            return;
+        }
+    }
+    sError("Unknown command %s", args[0]);
+}
+
 void ConsolePushHistory(const char *text, const Vec4 color, Console *console) {
     // shift everything one down
     for(u32 i = 31; i > 0; i--) {
@@ -37,7 +67,8 @@ internal void ConsoleParseMessage(const char *message, GameData *game_data) {
 
     length -= StringEatSpaces(&head, length);
 
-    char args[5][64];
+    ConsoleArgs args;
+    //char args[5][64];
     u32 argc = 0;
     while(argc < 5 && length > 0) {
         i32 val = StringFindFirstChar(head, length, ' ');
@@ -51,13 +82,8 @@ internal void ConsoleParseMessage(const char *message, GameData *game_data) {
             argc++;
         }
     }
-    
-    if(strcmp(args[0], "exit") == 0) {
-        EventPush(&game_data->event_queue, EVENT_TYPE_QUIT);
-        sLog("Post quit message");
-    } else {
-        sError("Unknown command %s", args[0]);
-    }
+
+    ConsoleCallCommand(&args, game_data);
 }
 
 void DrawConsole(Console *console, GameData *game_data) {
