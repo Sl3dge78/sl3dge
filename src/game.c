@@ -42,6 +42,18 @@ internal void PushMesh(PushBuffer *push_buffer, MeshHandle mesh, Mat4 *transform
     push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
+void ResetCubes(GameData *game_data) {
+    for(u32 i = 0; i < 64; i++) {
+        game_data->cube_xforms[i] = mat4_identity();
+        f32 x_pos = 200.0f;
+        if(i % 2 == 1) {
+            x_pos *= -1.0f;
+        }
+        mat4_translate(&game_data->cube_xforms[i], (Vec3){x_pos, 0.0f, i * -180.0f});
+        mat4_scale(&game_data->cube_xforms[i], (Vec3){200.0f, 500.0f, 200.0f});
+    }
+}
+
 DLL_EXPORT void GameLoad(GameData *game_data) {
     sLogSetCallback(&ConsoleLogMessage);
     ConsoleInit(&game_data->console);
@@ -59,14 +71,22 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->renderer_api.SetSunDirection(game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
 
     Vertex vertices[] = {
-        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-        {{10.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-        {{0.0f, 10.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-        {{10.0f, 10.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}};
-    u32 indices[] = {0, 1, 2, 1, 3, 2};
+        {{-.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+        {{.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+        {{-.5f, 1.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{.5f, 1.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
 
-    game_data->quad = game_data->renderer_api.LoadMeshFromVertices(game_data->renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
-    game_data->quad_xform = mat4_identity();
+        {{-.5f, 0.0f, .5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+        {{.5f, 0.0f, .5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+        {{-.5f, 1.0f, .5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+        {{.5f, 1.0f, .5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+
+    };
+    u32 indices[] = {0, 1, 2, 1, 3, 2, 0, 4, 1, 4, 5, 1, 4, 2, 6, 4, 0, 2, 5, 6, 7, 5, 4, 6, 1, 7, 3, 1, 5, 7, 2, 3, 6, 7, 6, 3};
+
+    game_data->cube = game_data->renderer_api.LoadMeshFromVertices(game_data->renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
+    game_data->cube_xforms = sCalloc(64, sizeof(Mat4));
+    ResetCubes(game_data);
 }
 
 void FreecamMovement(GameData *game_data, GameInput *input) {
@@ -130,29 +150,38 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         FreecamMovement(game_data, input);
     } else {
         if(input->keyboard[SCANCODE_A]) {
-            game_data->bike_dir -= delta_time;
+            //game_data->bike_dir -= delta_time;
             game_data->bank_angle -= delta_time * 1.5f;
+            if(game_data->bank_angle < -0.5f) {
+                game_data->bank_angle = -0.5f;
+            }
+            game_data->bike_x -= delta_time * 50.0f;
         }
         if(input->keyboard[SCANCODE_D]) {
-            game_data->bike_dir += delta_time;
+            //game_data->bike_dir += delta_time;
             game_data->bank_angle += delta_time * 1.5f;
+            if(game_data->bank_angle > 0.5f) {
+                game_data->bank_angle = 0.5f;
+            }
+            game_data->bike_x += delta_time * 50.0f;
         }
 
-        if(game_data->bank_angle < 0)
+        if(game_data->bank_angle < 0) {
             game_data->bank_angle += delta_time;
-        else if(game_data->bank_angle > 0) {
+        } else if(game_data->bank_angle > 0) {
             game_data->bank_angle -= delta_time;
         }
 
         game_data->bike_forward.x = -sin(game_data->bike_dir - 3.14f);
         game_data->bike_forward.z = cos(game_data->bike_dir - 3.14f);
 
-        game_data->moto_xform = trs_to_mat4((Vec3){0.0f, 0.0f, 0.0f}, (Vec3){0.0f, game_data->bike_dir, game_data->bank_angle}, (Vec3){1.0f, 1.0f, 1.0f});
+        game_data->moto_xform = trs_to_mat4((Vec3){game_data->bike_x, 0.0f, 0.0f}, (Vec3){0.0f, game_data->bike_dir, game_data->bank_angle}, (Vec3){1.0f, 1.0f, 1.0f});
 
         Vec3 flat_forward = vec3_normalize(game_data->bike_forward);
         Vec3 offset_z = vec3_fmul(flat_forward, -60.f);
         Vec3 offset_y = {0.0f, 50.f, 0.f};
         Vec3 offset = vec3_add(offset_z, offset_y);
+        offset.x += game_data->bike_x;
 
         Mat4 cam_xform = mat4_look_at(vec3_add(game_data->bike_forward, offset), offset, (Vec3){0.0f, 1.0f, 0.0f});
 
@@ -164,10 +193,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
     // Reset
     if(input->keyboard[SCANCODE_SPACE]) {
-        game_data->camera.position = (Vec3){0};
-        //game_data->moto_xform = mat4_identity();
-        mat4_translate(&game_data->moto_xform, (Vec3){0.0f, 0.0f, delta_time * 2.0f});
-        game_data->quad_xform = mat4_identity();
+        ResetCubes(game_data);
     }
     if(input->keyboard[SCANCODE_P]) {
         game_data->cos += delta_time;
@@ -207,6 +233,15 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         InputConsole(&game_data->console, input, game_data);
     }
 
-    //PushMesh(game_data->scene_push_buffer, game_data->bike, &game_data->moto_xform);
-    PushMesh(game_data->scene_push_buffer, game_data->quad, &game_data->quad_xform);
+    // -------------
+    // Building
+    for(u32 i = 0; i < 64; i++) {
+        game_data->cube_xforms[i].v[14] += delta_time * 200.0f;
+        PushMesh(game_data->scene_push_buffer, game_data->cube, &game_data->cube_xforms[i]);
+        if(game_data->cube_xforms[i].v[14] > 200.0f) {
+            game_data->cube_xforms[i].v[14] = 64.0f * -180.0f;
+        }
+    }
+
+    PushMesh(game_data->scene_push_buffer, game_data->bike, &game_data->moto_xform);
 }

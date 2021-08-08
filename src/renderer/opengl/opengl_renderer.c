@@ -395,7 +395,7 @@ internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass
 
 void UpdateCameraProj(Renderer *renderer) {
     renderer->camera_proj =
-        mat4_perspective_gl(90.0f, (f32)renderer->width / (f32)renderer->height, 0.1f, 1000.0f);
+        mat4_perspective_gl(90.0f, (f32)renderer->width / (f32)renderer->height, 0.1f, 100000.0f);
     mat4_inverse(&renderer->camera_proj, &renderer->camera_proj_inverse);
 
     // Init uniforms
@@ -439,25 +439,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glBindVertexArray(renderer->screen_quad);
     glGenBuffers(1, &renderer->screen_quad_vbuffer);
     glBindBuffer(GL_ARRAY_BUFFER, renderer->screen_quad_vbuffer);
-    const f32 quad[] = {-1.0f,
-                        -1.0f,
-                        0.0f,
-                        0.0f,
-
-                        1.0f,
-                        -1.0f,
-                        1.0f,
-                        0.0f,
-
-                        -1.0f,
-                        1.0f,
-                        0.0f,
-                        1.0f,
-
-                        1.0f,
-                        1.0f,
-                        1.0f,
-                        1.0f};
+    const f32 quad[] = {-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), 0);
     glEnableVertexAttribArray(0);
@@ -514,7 +496,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
     { // Scene
         renderer->scene_pushbuffer.size = 0;
-        renderer->scene_pushbuffer.max_size = sizeof(PushBufferEntryMesh) * 64;
+        renderer->scene_pushbuffer.max_size = sizeof(PushBufferEntryMesh) * 70;
         renderer->scene_pushbuffer.buf = sCalloc(renderer->scene_pushbuffer.max_size, 1);
     }
     UpdateCameraProj(renderer);
