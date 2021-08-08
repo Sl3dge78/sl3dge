@@ -96,14 +96,23 @@ internal u32 CreateProgram(const char *name) {
 // --------------
 // Mesh
 
-u32 RendererCreateMesh(Renderer *renderer, const char *path) {
-    ASSERT_MSG(0, "Not implemented");
-    return 0;
+internal Mesh *GetNewMesh(Renderer *renderer) {
+    if(renderer->mesh_count == renderer->mesh_capacity) {
+        u32 new_capacity = renderer->mesh_capacity * 2;
+        void *ptr = sRealloc(renderer->meshes, sizeof(Mesh) * new_capacity);
+        ASSERT(ptr);
+        if(ptr) {
+            renderer->meshes = (Mesh *)ptr;
+        }
+    }
+
+    return &renderer->meshes[renderer->mesh_count];
 }
 
-u32 RendererLoadMesh(Renderer *renderer, const char *path, Mesh *mesh) {
+MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     sLog("Loading Mesh...");
-    *mesh = (Mesh){0};
+
+    Mesh *mesh = GetNewMesh(renderer);
 
     char directory[128] = {0};
     const char *last_sep = strrchr(path, '/');
@@ -202,7 +211,42 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path, Mesh *mesh) {
 
     sLog("Loading done");
 
-    return 0;
+    return renderer->mesh_count++;
+}
+
+MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
+    Mesh *mesh = GetNewMesh(renderer);
+
+    mesh->index_count = index_count;
+    mesh->vertex_count = vertex_count;
+
+    // Vertex & Index Buffer
+    glGenBuffers(1, &mesh->vertex_buffer);
+    glGenBuffers(1, &mesh->index_buffer);
+    glGenVertexArrays(1, &mesh->vertex_array);
+    glBindVertexArray(mesh->vertex_array);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(u32), indices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(Vertex), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+        1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(2);
+
+    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, "GEN VTX BUFFER");
+    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GEN IDX BUFFER");
+    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GEN ARRAY BUFFER");
+
+    mesh->diffuse_texture = renderer->white_texture;
+
+    return renderer->mesh_count++;
 }
 
 void RendererDestroyMesh(Mesh *mesh) {
@@ -381,8 +425,9 @@ Renderer *RendererCreate(PlatformWindow *window) {
     glDisable(GL_CULL_FACE);
 
     // Meshes
-    RendererLoadMesh(renderer, "resources/3d/Motorcycle/motorcycle.gltf", &renderer->meshes[0]);
-    renderer->mesh_count++;
+    renderer->mesh_count = 0;
+    renderer->mesh_capacity = 8;
+    renderer->meshes = sCalloc(renderer->mesh_capacity, sizeof(Mesh));
 
     // Render passes
     CreateShadowmapRenderPass(&renderer->shadowmap_pass);
@@ -499,6 +544,7 @@ void RendererDestroy(Renderer *renderer) {
     for(u32 i = 0; i < renderer->mesh_count; i++) {
         RendererDestroyMesh(&renderer->meshes[i]);
     }
+    sFree(renderer->meshes);
 
     sFree(renderer);
 }

@@ -51,7 +51,8 @@ typedef struct Renderer {
 
     PushBuffer scene_pushbuffer;
     //Mesh moto;
-    Mesh meshes[64];
+    Mesh *meshes;
+    u32 mesh_capacity;
     u32 mesh_count;
 
     // Uniform data

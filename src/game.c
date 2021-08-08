@@ -52,12 +52,21 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->camera.position = (Vec3){0.0f, 0.0f, 0.0f};
 
+    game_data->bike = game_data->renderer_api.LoadMesh(game_data->renderer, "resources/3d/Motorcycle/motorcycle.gltf");
     game_data->moto_xform = mat4_identity();
     game_data->bike_dir = 0.0f;
     game_data->bike_forward = (Vec3){0.0f, 0.0f, -1.0f};
     game_data->renderer_api.SetSunDirection(game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
 
-    //game_data->renderer_api.SetCamera(game_data->renderer, game_data->camera.position, (Vec3){0.0f, 0.0f, -1.0f}, (Vec3){0.0f, 1.0f, 0.0f});
+    Vertex vertices[] = {
+        {{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+        {{10.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+        {{0.0f, 10.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{10.0f, 10.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}};
+    u32 indices[] = {0, 1, 2, 1, 3, 2};
+
+    game_data->quad = game_data->renderer_api.LoadMeshFromVertices(game_data->renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
+    game_data->quad_xform = mat4_identity();
 }
 
 void FreecamMovement(GameData *game_data, GameInput *input) {
@@ -155,9 +164,10 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
     // Reset
     if(input->keyboard[SCANCODE_SPACE]) {
-        //game_data->position = (Vec3){0.0f, 0, 0};
+        game_data->camera.position = (Vec3){0};
         //game_data->moto_xform = mat4_identity();
         mat4_translate(&game_data->moto_xform, (Vec3){0.0f, 0.0f, delta_time * 2.0f});
+        game_data->quad_xform = mat4_identity();
     }
     if(input->keyboard[SCANCODE_P]) {
         game_data->cos += delta_time;
@@ -197,5 +207,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         InputConsole(&game_data->console, input, game_data);
     }
 
-    PushMesh(game_data->scene_push_buffer, 0, &game_data->moto_xform);
+    //PushMesh(game_data->scene_push_buffer, game_data->bike, &game_data->moto_xform);
+    PushMesh(game_data->scene_push_buffer, game_data->quad, &game_data->quad_xform);
 }

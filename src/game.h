@@ -30,10 +30,14 @@ typedef struct GameData {
     Vec3 light_pos;
     f32 cos;
 
+    MeshHandle bike;
     Mat4 moto_xform;
     Vec3 bike_forward;
     f32 bike_dir;
     f32 bank_angle;
+
+    MeshHandle quad;
+    Mat4 quad_xform;
 } GameData;
 
 typedef void GameStart_t(GameData *game_data);

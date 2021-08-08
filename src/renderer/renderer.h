@@ -53,8 +53,7 @@ typedef struct PushBufferEntryMesh {
 } PushBufferEntryMesh;
 
 // Platform level functions
-Renderer *
-RendererCreate(PlatformWindow *window);
+Renderer *RendererCreate(PlatformWindow *window);
 void RendererDrawFrame(Renderer *renderer);
 void RendererDestroy(Renderer *renderer);
 void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window);
@@ -62,8 +61,11 @@ PushBuffer *RendererGetUIPushBuffer(Renderer *renderer);
 PushBuffer *RendererGetScenePushBuffer(Renderer *renderer);
 
 // Game functions
-typedef u32 CreateMesh_t(Renderer *renderer, const char *path);
-DLL_EXPORT CreateMesh_t RendererCreateMesh;
+typedef MeshHandle LoadMesh_t(Renderer *renderer, const char *path);
+DLL_EXPORT LoadMesh_t RendererLoadMesh;
+
+typedef MeshHandle LoadMeshFromVertices_t(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
+DLL_EXPORT LoadMeshFromVertices_t RendererLoadMeshFromVertices;
 
 //typedef MeshInstance InstantiateMesh_t(Renderer *renderer, u32 mesh_id);
 //DLL_EXPORT InstantiateMesh_t RendererInstantiateMesh;
@@ -75,8 +77,8 @@ typedef void SetSunDirection_t(Renderer *renderer, const Vec3 direction);
 DLL_EXPORT SetSunDirection_t RendererSetSunDirection;
 
 typedef struct RendererGameAPI {
-    CreateMesh_t *CreateMesh;
-    //InstantiateMesh_t *InstantiateMesh;
+    LoadMesh_t *LoadMesh;
+    LoadMeshFromVertices_t *LoadMeshFromVertices;
     SetCamera_t *SetCamera;
     SetSunDirection_t *SetSunDirection;
 } RendererGameAPI;
