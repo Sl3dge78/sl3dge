@@ -102,9 +102,6 @@ void PlatformCreateorUpdateOpenGLContext(Renderer *renderer, PlatformWindow *win
         sError("Unable to init opengl %d", error);
     }
     wglDeleteContext(temp_rc);
-
-    renderer->width = window->w;
-    renderer->height = window->h;
 }
 
 void PlatformSwapBuffers(Renderer *renderer) {

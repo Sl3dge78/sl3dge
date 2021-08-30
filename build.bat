@@ -6,7 +6,7 @@ SET timestamp=%TIME:~3,2%%TIME:~6,2%
 REM SET rdr_arg=-DRENDERER_VULKAN -I %VULKAN_SDK%\include -L %VULKAN_SDK%\lib -lvulkan-1.lib
 SET rdr_arg=-DRENDERER_OPENGL -lOpenGL32.lib -lGdi32.lib
 
-SET args= -std=c17 -g -DDEBUG -D_DEBUG -debug -D_CRT_SECURE_NO_WARNINGS -Werror -Wall -Wno-unused-function -Wgnu-empty-initializer
+SET args= -std=c17 -D__WIN32__ -g -DDEBUG -D_DEBUG -debug -D_CRT_SECURE_NO_WARNINGS -Werror -Wall -Wno-unused-function -Wgnu-empty-initializer
 SET include_path=-I D:\Guigui\Work\Prog\_include\  -I src/
 SET linker_options=-L D:\Guigui\Work\Prog\_lib -Xlinker -incremental:no
 SET libs=
@@ -18,7 +18,7 @@ DEL /Q *.pdb 2> NUL
 POPD
 
 ECHO Building win32.exe
-clang %args% %include_path% %rdr_arg% -MJ compile_commands.json src/platform/platform_win32.c -o bin/win32.exe  %linker_options% %libs% -lShell32.lib -lUser32.lib -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
+clang %args% %include_path% -MJ compile_commands.json src/platform/platform_win32.c -o bin/win32.exe  %linker_options% %libs% -lShell32.lib -lUser32.lib -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 IF !ERRORLEVEL! == 0 (
     ECHO BUILD OK
 )
@@ -35,7 +35,7 @@ REM )
 SET module_name=game
 
 ECHO Building %module_name% module
-clang %args% %include_path% -MJ game_build.json -shared src/game.c -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib
+clang %args% %include_path%  %rdr_arg% -MJ game_build.json -shared src/game.c -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib
 IF !ERRORLEVEL! == 0 (
     ECHO a > bin/%module_name%.meta
     ECHO BUILD OK

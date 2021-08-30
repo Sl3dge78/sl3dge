@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#define __WIN32__
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
@@ -15,9 +14,8 @@
 #include "platform.h"
 #include "platform_win32.h"
 
-#include "game.h"
-
-#include "renderer/renderer.c"
+#include "game_api.h"
+#include "renderer/renderer_api.h"
 #include "event.c"
 
 typedef struct ShaderCode {
@@ -29,35 +27,36 @@ typedef struct ShaderCode {
 
 global HANDLE stderrHandle;
 global bool mouse_captured; // TODO this probably shouldn't be a global
-global Renderer *renderer;
+global Renderer *renderer;  //Global to have it in the window proc
 global PlatformWindow global_window;
+global PlatformAPI platform_api;
 
 /* FUNCTIONS */
-
 void Win32GameLoadFunctions(Module *dll) {
+    pfn_GameGetSize = (GameGetSize_t *)GetProcAddress(dll->dll, "GameGetSize");
+    pfn_GameLoad = (GameLoad_t *)GetProcAddress(dll->dll, "GameLoad");
     pfn_GameStart = (GameStart_t *)GetProcAddress(dll->dll, "GameStart");
     pfn_GameLoop = (GameLoop_t *)GetProcAddress(dll->dll, "GameLoop");
-    pfn_GameLoad = (GameLoad_t *)GetProcAddress(dll->dll, "GameLoad");
     sLogSetCallback((sLogCallback_t *)GetProcAddress(dll->dll, "ConsoleLogMessage"));
 }
 
-void Win32GameLoadRendererAPI(Renderer *renderer, GameData *game_data) {
-    game_data->renderer = renderer;
-    game_data->renderer_api.LoadMesh = &RendererLoadMesh;
-    game_data->renderer_api.LoadMeshFromVertices = &RendererLoadMeshFromVertices;
-    game_data->renderer_api.SetCamera = &RendererSetCamera;
-    game_data->renderer_api.SetSunDirection = &RendererSetSunDirection;
+void Win32RendererLoadFunctions(Module *dll) {
+    pfn_GetRendererSize = (GetRendererSize_t *)GetProcAddress(dll->dll, "GetRendererSize");
+    pfn_RendererInit = (RendererInit_t *)GetProcAddress(dll->dll, "RendererInit");
+    pfn_RendererDrawFrame = (RendererDrawFrame_t *)GetProcAddress(dll->dll, "RendererDrawFrame");
+    pfn_RendererDestroy = (RendererDestroy_t *)GetProcAddress(dll->dll, "RendererDestroy");
+    pfn_RendererUpdateWindow = (RendererUpdateWindow_t *)GetProcAddress(dll->dll, "RendererUpdateWindow");
+}
+
+void Win32LoadFunctions(Module *dll) {
+    Win32GameLoadFunctions(dll);
+    Win32RendererLoadFunctions(dll);
 }
 
 i64 PlatformGetTicks() {
     LARGE_INTEGER ticks;
     QueryPerformanceCounter(&ticks);
     return ticks.QuadPart;
-}
-
-void PlatformGetWindowSize(const PlatformWindow *window, u32 *w, u32 *h) {
-    *w = window->w;
-    *h = window->h;
 }
 
 void PlatformSetCaptureMouse(bool val) {
@@ -73,25 +72,26 @@ void PlatformSetCaptureMouse(bool val) {
     mouse_captured = val;
 }
 
-char *PlatformReadWholeFile(const char *path) {
+void PlatformReadWholeFile(const char *path, i32 *file_size, char *dest) {
     FILE *file;
     fopen_s(&file, path, "r");
     if(!file) {
         sError(0, "Unable to open file");
         sError(0, path);
-        return NULL;
+        return;
     }
-    // Get the size
-    fseek(file, 0, SEEK_END);
-    i32 file_size = ftell(file);
-
-    char *result = sCalloc(file_size, sizeof(char));
-
-    rewind(file);
-    // Copy into result
-    fread(result, 1, file_size, file);
-    fclose(file);
-    return result;
+    if(dest == NULL) {
+        // Get the size
+        fseek(file, 0, SEEK_END);
+        *file_size = ftell(file);
+        fclose(file);
+        return;
+    } else {
+        // Copy into result
+        fread(dest, 1, *file_size, file);
+        fclose(file);
+        return;
+    }
 }
 
 // if result is NULL, function will query the file size for allocation in file_size.
@@ -142,16 +142,14 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
     case WM_SIZING: {
         RECT rect;
         GetClientRect(global_window.hwnd, &rect);
-        global_window.w = rect.right;
-        global_window.h = rect.bottom;
-        RendererUpdateWindow(renderer, &global_window);
+        pfn_RendererUpdateWindow(renderer, &platform_api, rect.right, rect.bottom);
         return 0;
     }
     default: return DefWindowProc(hwnd, msg, wparam, lparam);
     }
 }
 
-void Win32HandleKeyboardMessages(WPARAM wParam, LPARAM lParam, GameInput *input) {
+void Win32HandleKeyboardMessages(WPARAM wParam, LPARAM lParam, Input *input) {
     // 2149 5809
     u32 scancode = (lParam >> 16) & 0x7F;
     bool is_down = !(lParam & (1 << 31));
@@ -176,13 +174,15 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
     wc.lpszClassName = "Vulkan";
     RegisterClass(&wc);
 
+    window->w = 1280;
+    window->h = 720;
     HWND hwnd = CreateWindow("Vulkan",
                              "Vulkan",
                              WS_OVERLAPPEDWINDOW,
                              CW_USEDEFAULT,
                              CW_USEDEFAULT,
-                             1280,
-                             720,
+                             window->w,
+                             window->h,
                              NULL,
                              NULL,
                              instance,
@@ -196,8 +196,6 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
     window->hinstance = instance;
     window->hwnd = hwnd;
     window->dc = GetDC(hwnd);
-    window->w = 1280;
-    window->h = 720;
 
     return true;
 }
@@ -212,25 +210,22 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         return -1;
     }
 
-    PlatformAPI platform_api = {0};
     platform_api.ReadBinary = &PlatformReadBinary;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
-
-    renderer = RendererCreate(&global_window);
+    platform_api.ReadWholeFile = &PlatformReadWholeFile;
+    platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
 
     Module game_module = {0};
     Win32LoadModule(&game_module, "game");
-    Win32GameLoadFunctions(&game_module);
+    Win32LoadFunctions(&game_module);
 
-    GameData *game_data = sCalloc(1, sizeof(GameData));
-    GameInput *input = sCalloc(1, sizeof(GameInput));
-    game_data->platform_api = platform_api;
-    game_data->ui_push_buffer = RendererGetUIPushBuffer(renderer);
-    game_data->scene_push_buffer = RendererGetScenePushBuffer(renderer);
-    game_data->window_width = global_window.w;
-    game_data->window_height = global_window.h;
-    Win32GameLoadRendererAPI(renderer, game_data);
-    pfn_GameLoad(game_data);
+    renderer = sCalloc(1, pfn_GetRendererSize());
+    pfn_RendererInit(renderer, &platform_api, &global_window);
+
+    Input *input = sCalloc(1, sizeof(Input));
+
+    GameData *game_data = sCalloc(1, pfn_GameGetSize());
+    pfn_GameLoad(game_data, renderer, &platform_api); // This allocates game_data, but will be freed on program exit. We don't reallocate it ever.
 
     ShowWindow(global_window.hwnd, cmd_show);
     SetForegroundWindow(global_window.hwnd);
@@ -252,17 +247,14 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             if(Win32ShouldReloadModule(&game_module)) {
                 Win32CloseModule(&game_module);
                 Win32LoadModule(&game_module, "game");
-                Win32GameLoadFunctions(&game_module);
-                pfn_GameLoad(game_data);
+                Win32LoadFunctions(&game_module);
+                pfn_GameLoad(game_data, renderer, &platform_api);
                 sLog("Game code reloaded");
             }
         }
 
         RECT window_size;
         GetClientRect(global_window.hwnd, &window_size);
-
-        game_data->window_width = window_size.right;
-        game_data->window_height = window_size.bottom;
 
         memcpy(input->old_keyboard, input->keyboard, sizeof(Keyboard));
 
@@ -328,7 +320,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 sError("WIN32 : Message error");
             }
         }
-
+        /* TODO
         EventType e;
         while(EventConsume(&game_data->event_queue, &e)) {
             switch(e) {
@@ -340,9 +332,9 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 break;
             };
         }
-
+*/
         pfn_GameLoop(delta_time, game_data, input);
-        RendererDrawFrame(renderer);
+        pfn_RendererDrawFrame(renderer);
 
         {
             // 60 fps cap
@@ -372,8 +364,10 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
         }
     }
 
-    sLogSetCallback(&DefaultLog);
-    RendererDestroy(renderer);
+    sLogSetCallback(&Win32Log);
+    pfn_RendererDestroy(renderer);
+    sFree(renderer);
+
     Win32CloseModule(&game_module);
     sFree(game_data);
     sFree(input);

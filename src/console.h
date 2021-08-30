@@ -4,8 +4,10 @@
 
 #define CONSOLE_HISTORY_MAX_SIZE 32
 
+struct GameData;
+
 typedef char ConsoleArgs[5][64];
-typedef void ConsoleFunction(ConsoleArgs *args, GameData *game_data);
+typedef void ConsoleFunction(ConsoleArgs *args, struct GameData *game_data);
 
 typedef struct ConsoleCommand {
     const char *command;

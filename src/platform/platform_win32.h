@@ -7,9 +7,9 @@ typedef struct PlatformWindow {
     HWND hwnd;
     HINSTANCE hinstance;
     HDC dc;
-    u32 h;
-    u32 w;
     HGLRC opengl_rc;
+    u32 w;
+    u32 h;
 } PlatformWindow;
 
 #endif

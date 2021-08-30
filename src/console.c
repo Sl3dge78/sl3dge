@@ -95,25 +95,25 @@ void DrawConsole(Console *console, GameData *game_data) {
         const u32 padx = 5;
         const u32 pady = 5;
         // History area
-        UIPushQuad(game_data->ui_push_buffer, 0, 0, game_data->window_width, console_y - 20, (Vec4){0.1f, 0.1f, 0.1f, 0.8f});
+        UIPushQuad(global_renderer, 0, 0, global_renderer->width, console_y - 20, (Vec4){0.1f, 0.1f, 0.1f, 0.8f});
         // Edit area
-        UIPushQuad(game_data->ui_push_buffer, 0, console_y - 20, game_data->window_width, 20, (Vec4){0.5f, 0.3f, 0.3f, 0.9f});
-        UIPushText(game_data->ui_push_buffer, console->current_command, padx, console_y - pady, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        UIPushQuad(global_renderer, 0, console_y - 20, global_renderer->width, 20, (Vec4){0.5f, 0.3f, 0.3f, 0.9f});
+        UIPushText(global_renderer, console->current_command, padx, console_y - pady, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
         // Caret
-        UIPushQuad(game_data->ui_push_buffer, padx + (console->current_char * 10.5f), console_y - 20, 10, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
+        UIPushQuad(global_renderer, padx + (console->current_char * 10.5f), console_y - 20, 10, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
         u32 line_height = 20;
 
         i32 hist_y = console_y - 20 - pady;
         u32 i = 0;
         while(hist_y > 0) {
-            UIPushText(game_data->ui_push_buffer, console->command_history[i].command, padx, hist_y, console->command_history[i].color);
+            UIPushText(global_renderer, console->command_history[i].command, padx, hist_y, console->command_history[i].color);
             ++i;
             hist_y -= line_height;
         }
     }
 }
 
-void InputConsole(Console *console, GameInput *input, GameData *game_data) {
+void InputConsole(Console *console, Input *input, GameData *game_data) {
     char c = input->text_input;
     if(c) {
         if(c >= 32 && c <= 125) { // Ascii letters

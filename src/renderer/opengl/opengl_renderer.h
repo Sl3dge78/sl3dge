@@ -68,7 +68,7 @@ typedef struct Renderer {
     u32 ui_program;
     u32 ui_vertex_array;
     u32 ui_vertex_buffer;
-    PushBuffer ui_push_buffer;
+    PushBuffer ui_pushbuffer;
     u32 white_texture;
 
     // Font

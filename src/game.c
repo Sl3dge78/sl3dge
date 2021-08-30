@@ -5,42 +5,14 @@
 #include <sl3dge-utils/sl3dge.h>
 
 #include "game.h"
-#include "renderer/renderer.h"
+#include "platform/platform.h"
+#include "renderer/renderer.c"
+
+global Renderer *global_renderer;
+global PlatformAPI *platform;
+
 #include "console.c"
 #include "event.c"
-
-internal void UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryQuad) < push_buffer->max_size);
-    PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Quad;
-    entry->l = x;
-    entry->t = y;
-    entry->r = w + x;
-    entry->b = h + y;
-    entry->colour = color;
-    push_buffer->size += sizeof(PushBufferEntryQuad);
-}
-
-internal void UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
-    PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Text;
-    entry->text = text;
-    entry->x = x;
-    entry->y = y;
-    entry->colour = color;
-    push_buffer->size += sizeof(PushBufferEntryText);
-}
-
-internal void PushMesh(PushBuffer *push_buffer, MeshHandle mesh, Mat4 *transform) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
-    PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Mesh;
-    entry->mesh_handle = mesh;
-    entry->transform = transform;
-
-    push_buffer->size += sizeof(PushBufferEntryMesh);
-}
 
 void ResetCubes(GameData *game_data) {
     for(u32 i = 0; i < 64; i++) {
@@ -54,21 +26,30 @@ void ResetCubes(GameData *game_data) {
     }
 }
 
-DLL_EXPORT void GameLoad(GameData *game_data) {
+u32 GameGetSize() {
+    return sizeof(GameData);
+}
+
+// This is called when the game is reloaded
+void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
+    global_renderer = renderer;
+    platform = platform_api;
+
+    GLLoadFunctions();
     sLogSetCallback(&ConsoleLogMessage);
     ConsoleInit(&game_data->console);
     global_console = &game_data->console;
 }
 
-DLL_EXPORT void GameStart(GameData *game_data) {
+void GameStart(GameData *game_data) {
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->camera.position = (Vec3){0.0f, 0.0f, 0.0f};
 
-    game_data->bike = game_data->renderer_api.LoadMesh(game_data->renderer, "resources/3d/Motorcycle/motorcycle.gltf");
+    game_data->bike = RendererLoadMesh(global_renderer, "resources/3d/Motorcycle/motorcycle.gltf");
     game_data->moto_xform = mat4_identity();
     game_data->bike_dir = 0.0f;
     game_data->bike_forward = (Vec3){0.0f, 0.0f, -1.0f};
-    game_data->renderer_api.SetSunDirection(game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+    RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
 
     Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
@@ -84,12 +65,11 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     };
     u32 indices[] = {0, 1, 2, 1, 3, 2, 0, 4, 1, 4, 5, 1, 4, 2, 6, 4, 0, 2, 5, 6, 7, 5, 4, 6, 1, 7, 3, 1, 5, 7, 2, 3, 6, 7, 6, 3};
 
-    game_data->cube = game_data->renderer_api.LoadMeshFromVertices(game_data->renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
-    game_data->cube_xforms = sCalloc(64, sizeof(Mat4));
+    game_data->cube = RendererLoadMeshFromVertices(global_renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
     ResetCubes(game_data);
 }
 
-void FreecamMovement(GameData *game_data, GameInput *input) {
+void FreecamMovement(GameData *game_data, Input *input) {
     f32 look_speed = 0.01f;
     if(input->mouse & MOUSE_RIGHT) {
         if(input->mouse_delta_x != 0) {
@@ -101,10 +81,10 @@ void FreecamMovement(GameData *game_data, GameInput *input) {
                 game_data->camera.spherical_coordinates.y = new_rot;
             }
         }
-        game_data->platform_api.SetCaptureMouse(true);
+        platform->SetCaptureMouse(true);
 
     } else {
-        game_data->platform_api.SetCaptureMouse(false);
+        platform->SetCaptureMouse(false);
     }
     Vec3 forward = spherical_to_carthesian(game_data->camera.spherical_coordinates);
     Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
@@ -142,10 +122,10 @@ void FreecamMovement(GameData *game_data, GameInput *input) {
 
     Mat4 cam = mat4_look_at(vec3_add(forward, game_data->camera.position), game_data->camera.position, (Vec3){0.0f, 1.0f, 0.0f});
 
-    game_data->renderer_api.SetCamera(game_data->renderer, &cam);
+    RendererSetCamera(global_renderer, &cam);
 }
 
-DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input) {
+void GameLoop(float delta_time, GameData *game_data, Input *input) {
     if(game_data->is_free_cam) {
         FreecamMovement(game_data, input);
     } else {
@@ -185,7 +165,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
 
         Mat4 cam_xform = mat4_look_at(vec3_add(game_data->bike_forward, offset), offset, (Vec3){0.0f, 1.0f, 0.0f});
 
-        game_data->renderer_api.SetCamera(game_data->renderer, &cam_xform);
+        RendererSetCamera(global_renderer, &cam_xform);
     }
 
     // ----------------
@@ -203,8 +183,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
         if(game_data->cos > PI) {
             game_data->cos = 0.0f;
         }
-        game_data->renderer_api.SetSunDirection(
-            game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+        RendererSetSunDirection(
+            global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
     if(input->keyboard[SCANCODE_O]) {
         game_data->cos -= delta_time;
@@ -214,8 +194,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
             game_data->cos = PI;
         }
 
-        game_data->renderer_api.SetSunDirection(
-            game_data->renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+        RendererSetSunDirection(
+            global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
     }
 
     // --------------
@@ -237,11 +217,11 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, GameInput *input
     // Building
     for(u32 i = 0; i < 64; i++) {
         game_data->cube_xforms[i].v[14] += delta_time * 200.0f;
-        PushMesh(game_data->scene_push_buffer, game_data->cube, &game_data->cube_xforms[i]);
+        PushMesh(global_renderer, game_data->cube, &game_data->cube_xforms[i]);
         if(game_data->cube_xforms[i].v[14] > 200.0f) {
             game_data->cube_xforms[i].v[14] = 64.0f * -180.0f;
         }
     }
 
-    PushMesh(game_data->scene_push_buffer, game_data->bike, &game_data->moto_xform);
+    PushMesh(global_renderer, game_data->bike, &game_data->moto_xform);
 }

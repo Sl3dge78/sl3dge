@@ -13,6 +13,8 @@
 
 #ifdef __WIN32__
 #include "renderer/opengl/opengl_win32.c"
+#else
+#error "Platform not implemented"
 #endif
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -62,19 +64,26 @@ internal u32 CreateAndCompileShader(GLenum type, const char *code) {
     return result;
 }
 
-internal u32 CreateProgram(const char *name) {
+internal u32 CreateProgram(PlatformAPI *platform, const char *name) {
     u32 result = glCreateProgram();
     char buffer[128] = {0};
 
     snprintf(buffer, 128, "resources/shaders/gl/%s.vert", name);
-    char *vtx_code = PlatformReadWholeFile(buffer);
+
+    i32 file_size = 0;
+    platform->ReadWholeFile(buffer, &file_size, NULL);
+    char *vtx_code = sCalloc(file_size, sizeof(char));
+    platform->ReadWholeFile(buffer, &file_size, vtx_code);
+
     ASSERT(vtx_code != NULL); // Vertex shaders are mandatory
     u32 vtx_shader = CreateAndCompileShader(GL_VERTEX_SHADER, vtx_code);
     sFree(vtx_code);
     glAttachShader(result, vtx_shader);
 
     snprintf(buffer, 128, "resources/shaders/gl/%s.frag", name);
-    char *frag_code = PlatformReadWholeFile(buffer);
+    platform->ReadWholeFile(buffer, &file_size, NULL);
+    char *frag_code = sCalloc(file_size, sizeof(char));
+    platform->ReadWholeFile(buffer, &file_size, frag_code);
 
     u32 frag_shader = 0;
     if(frag_code == NULL) {
@@ -257,8 +266,8 @@ void RendererDestroyMesh(Mesh *mesh) {
 // ---------------
 // Shadowmap
 
-internal void CreateShadowmapRenderPass(ShadowmapRenderPass *pass) {
-    pass->program = CreateProgram("shadow");
+internal void CreateShadowmapRenderPass(PlatformAPI *platform_api, ShadowmapRenderPass *pass) {
+    pass->program = CreateProgram(platform_api, "shadow");
 
     glGenTextures(1, &pass->texture);
     glBindTexture(GL_TEXTURE_2D, pass->texture);
@@ -293,8 +302,8 @@ internal void BeginShadowmapRenderPass(ShadowmapRenderPass *pass) {
 // -------------
 // Color
 
-internal void CreateColorRenderPass(const u32 width, const u32 height, ColorRenderPass *pass) {
-    pass->program = CreateProgram("color");
+internal void CreateColorRenderPass(PlatformAPI *platform_api, const u32 width, const u32 height, ColorRenderPass *pass) {
+    pass->program = CreateProgram(platform_api, "color");
     glUseProgram(pass->program);
     glUniform1i(glGetUniformLocation(pass->program, "shadow_map"), 0);
     glUniform1i(glGetUniformLocation(pass->program, "diffuse"), 1);
@@ -350,8 +359,8 @@ internal void BeginColorRenderPass(Renderer *renderer, ColorRenderPass *pass) {
 // --------------
 // Volumetric
 
-internal void CreateVolumetricRenderPass(VolumetricRenderPass *pass) {
-    pass->program = CreateProgram("volumetric");
+internal void CreateVolumetricRenderPass(PlatformAPI *platform_api, VolumetricRenderPass *pass) {
+    pass->program = CreateProgram(platform_api, "volumetric");
 
     glUseProgram(pass->program);
     glUniform1i(glGetUniformLocation(pass->program, "shadow_map"), 0);
@@ -412,9 +421,12 @@ void UpdateCameraProj(Renderer *renderer) {
     glUniformMatrix4fv(glGetUniformLocation(renderer->ui_program, "proj"), 1, GL_FALSE, ortho.v);
 }
 
-Renderer *RendererCreate(PlatformWindow *window) {
-    Renderer *renderer = sCalloc(1, sizeof(Renderer));
+DLL_EXPORT u32 GetRendererSize() {
+    u32 result = sizeof(Renderer);
+    return result;
+}
 
+DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, PlatformWindow *window) {
     renderer->window = window;
     PlatformCreateorUpdateOpenGLContext(renderer, window);
     GLLoadFunctions();
@@ -430,9 +442,9 @@ Renderer *RendererCreate(PlatformWindow *window) {
     renderer->meshes = sCalloc(renderer->mesh_capacity, sizeof(Mesh));
 
     // Render passes
-    CreateShadowmapRenderPass(&renderer->shadowmap_pass);
-    CreateColorRenderPass(renderer->width, renderer->height, &renderer->color_pass);
-    CreateVolumetricRenderPass(&renderer->vol_pass);
+    CreateShadowmapRenderPass(platform_api, &renderer->shadowmap_pass);
+    CreateColorRenderPass(platform_api, window->w, window->h, &renderer->color_pass);
+    CreateVolumetricRenderPass(platform_api, &renderer->vol_pass);
 
     // Screen quad
     glGenVertexArrays(1, &renderer->screen_quad);
@@ -448,9 +460,9 @@ Renderer *RendererCreate(PlatformWindow *window) {
 
     { // UI
         // Init push buffer
-        renderer->ui_push_buffer.size = 0;
-        renderer->ui_push_buffer.max_size = sizeof(PushBufferEntryText) * 256;
-        renderer->ui_push_buffer.buf = sCalloc(renderer->ui_push_buffer.max_size, 1);
+        renderer->ui_pushbuffer.size = 0;
+        renderer->ui_pushbuffer.max_size = sizeof(PushBufferEntryText) * 256;
+        renderer->ui_pushbuffer.buf = sCalloc(renderer->ui_pushbuffer.max_size, 1);
 
         // Load font
         unsigned char *ttf_buffer = sCalloc(1 << 20, sizeof(unsigned char));
@@ -482,16 +494,18 @@ Renderer *RendererCreate(PlatformWindow *window) {
         glEnableVertexAttribArray(1);
 
         // Load ui shader
-        renderer->ui_program = CreateProgram("ui");
+        renderer->ui_program = CreateProgram(platform_api, "ui");
 
         // Load white texture
         glGenTextures(1, &renderer->white_texture);
         glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-        const u8 white[] = {
-            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 4, 4, 0, GL_RED, GL_UNSIGNED_BYTE, &white);
+        u8 *white = sCalloc(4 * 4 * 3, sizeof(u8));
+        memset(white, 255, 4 * 4 * 3 * sizeof(u8));
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_UNSIGNED_BYTE, white);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        sFree(white);
     }
 
     { // Scene
@@ -500,13 +514,11 @@ Renderer *RendererCreate(PlatformWindow *window) {
         renderer->scene_pushbuffer.buf = sCalloc(renderer->scene_pushbuffer.max_size, 1);
     }
     UpdateCameraProj(renderer);
-
-    return renderer;
 }
 
-void RendererDestroy(Renderer *renderer) {
+DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     // UI
-    sFree(renderer->ui_push_buffer.buf);
+    sFree(renderer->ui_pushbuffer.buf);
     sFree(renderer->scene_pushbuffer.buf);
 
     sFree(renderer->char_data);
@@ -527,8 +539,6 @@ void RendererDestroy(Renderer *renderer) {
         RendererDestroyMesh(&renderer->meshes[i]);
     }
     sFree(renderer->meshes);
-
-    sFree(renderer);
 }
 
 // -------------
@@ -664,7 +674,7 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
     }
 }
 
-void RendererDrawFrame(Renderer *renderer) {
+DLL_EXPORT void RendererDrawFrame(Renderer *renderer) {
     // ------------------
     // Shadow map
     BeginShadowmapRenderPass(&renderer->shadowmap_pass);
@@ -680,21 +690,23 @@ void RendererDrawFrame(Renderer *renderer) {
     BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
     DrawScreenQuad(renderer);
 
-    DrawUI(renderer, &renderer->ui_push_buffer);
+    DrawUI(renderer, &renderer->ui_pushbuffer);
 
     PlatformSwapBuffers(renderer);
 
     // Clear pushbuffers
     renderer->scene_pushbuffer.size = 0; // Maybe we don't need to reset it each frame? do some tests
-    renderer->ui_push_buffer.size = 0;
+    renderer->ui_pushbuffer.size = 0;
 }
 
-void RendererUpdateWindow(Renderer *renderer, PlatformWindow *window) {
+DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_api, const u32 width, const u32 height) {
     sLog("Update window!");
-    PlatformGetWindowSize(window, &renderer->width, &renderer->height);
+
+    renderer->width = width;
+    renderer->height = height;
 
     DestroyColorRenderPass(&renderer->color_pass);
-    CreateColorRenderPass(renderer->width, renderer->height, &renderer->color_pass);
+    CreateColorRenderPass(platform_api, renderer->width, renderer->height, &renderer->color_pass);
     UpdateCameraProj(renderer);
 
     glUseProgram(renderer->color_pass.program);
@@ -752,12 +764,4 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
     loc = glGetUniformLocation(renderer->vol_pass.program, "light_matrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
-}
-
-PushBuffer *RendererGetUIPushBuffer(Renderer *renderer) {
-    return &renderer->ui_push_buffer;
-}
-
-PushBuffer *RendererGetScenePushBuffer(Renderer *renderer) {
-    return &renderer->scene_pushbuffer;
 }

@@ -4,8 +4,11 @@
 struct PlatformWindow;
 typedef struct PlatformWindow PlatformWindow;
 
-char *PlatformReadWholeFile(const char *path);
-void PlatformGetWindowSize(const PlatformWindow *window, u32 *w, u32 *h);
+typedef void PlatformReadWholeFile_t(const char *path, i32 *file_size, char *dest);
+DLL_EXPORT PlatformReadWholeFile_t PlatformReadWholeFile;
+
+typedef void PlatformGetWindowSize_t(const PlatformWindow *window, u32 *w, u32 *h);
+DLL_EXPORT PlatformGetWindowSize_t PlatformGetWindowSize;
 
 typedef void PlatformReadBinary_t(const char *path, i64 *file_size, u32 *content);
 DLL_EXPORT PlatformReadBinary_t PlatformReadBinary;
@@ -18,6 +21,8 @@ DLL_EXPORT PlatformSetCaptureMouse_t PlatformSetCaptureMouse;
 
 typedef struct PlatformAPI {
     PlatformReadBinary_t *ReadBinary;
+    PlatformReadWholeFile_t *ReadWholeFile;
+    PlatformGetWindowSize_t *GetWindowSize;
     PlatformSetCaptureMouse_t *SetCaptureMouse;
 } PlatformAPI;
 
@@ -43,7 +48,7 @@ enum ScanCodes {
 
 typedef u8 Keyboard[256];
 
-typedef struct GameInput {
+typedef struct Input {
     Keyboard keyboard;
     Keyboard old_keyboard;
     u8 mouse;
@@ -53,6 +58,6 @@ typedef struct GameInput {
     i32 mouse_delta_y;
     char text_input;
     bool read_text_input;
-} GameInput;
+} Input;
 
 #endif
