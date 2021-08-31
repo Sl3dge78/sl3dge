@@ -1,7 +1,8 @@
 #pragma once
 
 enum event_type {
-    EVENT_TYPE_QUIT
+    EVENT_TYPE_QUIT,
+    EVENT_TYPE_RESTART
 };
 
 typedef u32 EventType;

@@ -198,7 +198,7 @@ void PipelineCreateDefault(VkDevice device,
         PipelineGetDefaultColorBlendState(1, &color_blend_attachement);
     pipeline_ci.pColorBlendState = &color_blend_state;
 
-    pipeline_ci.pDynamicState = NULL; // TODO: look at this
+    pipeline_ci.pDynamicState = NULL; // @TODO: look at this
     pipeline_ci.layout = layout;
 
     pipeline_ci.renderPass = render_pass;
@@ -206,7 +206,7 @@ void PipelineCreateDefault(VkDevice device,
     pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_ci.basePipelineIndex = 0;
 
-    // TODO: handle pipeline caching
+    // @TODO: handle pipeline caching
     AssertVkResult(
         vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, pipeline));
 

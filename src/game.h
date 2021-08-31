@@ -24,20 +24,15 @@ typedef struct GameData {
     Vec3 light_pos;
     f32 cos;
 
-    MeshHandle bike;
-    Mat4 moto_xform;
-    Vec3 bike_forward;
-    f32 bike_x;
-    f32 bike_dir;
-    f32 bank_angle;
+    MeshHandle floor;
+    Mat4 floor_xform;
 
-    MeshHandle cube;
-    Mat4 cube_xforms[64];
 } GameData;
 
 DLL_EXPORT GameGetSize_t GameGetSize;
 DLL_EXPORT GameStart_t GameStart;
 DLL_EXPORT GameLoop_t GameLoop;
 DLL_EXPORT GameLoad_t GameLoad;
+DLL_EXPORT GameEnd_t GameEnd;
 
 #endif // MAIN_H

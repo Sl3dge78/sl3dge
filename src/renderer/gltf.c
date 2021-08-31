@@ -94,7 +94,7 @@ void *GLTFGetVertexBuffer(cgltf_primitive *prim, u32 *size) {
     }
     return result;
 }
-/* // TODO this is vulkan specific
+/* // @TODO this is vulkan specific
 void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim,
                                   Primitive *primitive,
                                   const u32 offset,
@@ -136,7 +136,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
         Material dst = {0};
 
         if(!mat->has_pbr_metallic_roughness) {
-            // TODO Handle metallic roughness
+            // @TODO Handle metallic roughness
             sError("Only metallic_roughness is supported");
             ASSERT(0);
         }

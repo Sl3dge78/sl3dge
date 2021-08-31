@@ -17,6 +17,7 @@ typedef struct PlatformAPI {
     PlatformGetWindowSize_t *GetWindowSize;
     PlatformSetCaptureMouse_t *SetCaptureMouse;
     PlatformRequestExit_t *RequestExit;
+    void *DebugInfo;
 } PlatformAPI;
 
 #define MOUSE_LEFT 1
@@ -37,6 +38,10 @@ enum ScanCodes {
     SCANCODE_LSHIFT = 0x2A,
     SCANCODE_SPACE = 0x39,
     SCANCODE_ARRET_DEFIL = 0x46,
+    SCANCODE_UP = 0x48,
+    SCANCODE_DOWN = 0x50,
+    SCANCODE_LEFT = 0x4B,
+    SCANCODE_RIGHT = 0x4D,
 };
 
 typedef u8 Keyboard[256];

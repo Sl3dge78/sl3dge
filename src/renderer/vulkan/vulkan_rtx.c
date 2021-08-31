@@ -617,7 +617,7 @@ internal void CreateInstanceGeometry(VulkanRenderer *context,
     DEBUGNameBuffer(context->device, instance_data, "Instance Data");
     UploadToBuffer(
         context->device, instance_data, &instance, sizeof(VkAccelerationStructureInstanceKHR));
-    // TODO : don't create 1 buffer for each instance
+    // @TODO : don't create 1 buffer for each instance
 
     geometry->sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
     geometry->pNext = NULL;
@@ -739,7 +739,7 @@ DLL_EXPORT void VulkanDrawRTXFrame(VulkanRenderer *context, Scene *scene, GameDa
                                    swapchain->image_acquired_semaphore[swapchain->semaphore_id],
                                    VK_NULL_HANDLE,
                                    &image_id);
-    AssertVkResult(result); // TODO(Guigui): Recreate swapchain if Suboptimal or
+    AssertVkResult(result); // @TODO(Guigui): Recreate swapchain if Suboptimal or
                             // outofdate;
 
     // If the frame hasn't finished rendering wait for it to finish
@@ -879,7 +879,7 @@ DLL_EXPORT void VulkanDrawRTXFrame(VulkanRenderer *context, Scene *scene, GameDa
     AssertVkResult(result);
 
     // Submit the queue
-    // TODO(Guigui): Record buffers beforehand, no need to do it each frame now
+    // @TODO(Guigui): Record buffers beforehand, no need to do it each frame now
     const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -906,7 +906,7 @@ DLL_EXPORT void VulkanDrawRTXFrame(VulkanRenderer *context, Scene *scene, GameDa
     present_info.pResults = NULL;
     result = vkQueuePresentKHR(context->present_queue, &present_info);
     AssertVkResult(result);
-    // TODO(Guigui): Recreate Swapchain if necessary
+    // @TODO(Guigui): Recreate Swapchain if necessary
 
     swapchain->semaphore_id = (swapchain->semaphore_id + 1) % swapchain->image_count;
 
@@ -1068,7 +1068,7 @@ internal void CreateRTXPipelineLayout(const VkDevice device, const Image
 *result_image, VulkanRTXRenderer *pipeline, GameCode *game) {
 	// Set Layout
 
-	// TODO(Guigui): TEMP
+	// @TODO(Guigui): TEMP
 	const u32 mesh_count = 1;
 	const u32 material_count = 1;
 
@@ -1132,7 +1132,7 @@ vkCreateDescriptorSetLayout(device, &game_set_create_info, NULL,
 &pipeline->game_set_layout); AssertVkResult(result);
 
 	// Descriptor Pool
-	// TODO(Guigui): if the game doesn't use one of these types, we get a
+	// @TODO(Guigui): if the game doesn't use one of these types, we get a
 validation error VkDescriptorPoolSize pool_sizes[] = { {
 VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0 }, { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0 },
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0 },
@@ -1180,7 +1180,7 @@ pipeline->game_set_layout }; VkDescriptorSetAllocateInfo allocate_info = {};
 pipeline->descriptor_sets));
 
 	// Push constants
-	// TODO(Guigui): Currently limited to 1 PC
+	// @TODO(Guigui): Currently limited to 1 PC
 
 	VkPushConstantRange push_constant_range = { VK_SHADER_STAGE_RAYGEN_BIT_KHR |
 VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR, 0,

@@ -14,23 +14,16 @@ global PlatformAPI *platform;
 #include "console.c"
 #include "event.c"
 
-void ResetCubes(GameData *game_data) {
-    for(u32 i = 0; i < 64; i++) {
-        game_data->cube_xforms[i] = mat4_identity();
-        f32 x_pos = 200.0f;
-        if(i % 2 == 1) {
-            x_pos *= -1.0f;
-        }
-        mat4_translate(&game_data->cube_xforms[i], (Vec3){x_pos, 0.0f, i * -180.0f});
-        mat4_scale(&game_data->cube_xforms[i], (Vec3){200.0f, 500.0f, 200.0f});
-    }
-}
-
 u32 GameGetSize() {
     return sizeof(GameData);
 }
+void FreecamMovement(GameData *game_data, Input *input) {
+}
 
-// This is called when the game is reloaded
+// ---------------
+// Exported functions
+
+/// This is called when the game is (re)loaded
 void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
     global_renderer = renderer;
     platform = platform_api;
@@ -39,54 +32,41 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
     sLogSetCallback(&ConsoleLogMessage);
     ConsoleInit(&game_data->console);
     global_console = &game_data->console;
+
+    DEBUG_SetLeakList(platform_api->DebugInfo);
 }
 
+/// This is called ONCE before the first frame
 void GameStart(GameData *game_data) {
     game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
-    game_data->camera.position = (Vec3){0.0f, 0.0f, 0.0f};
-
-    game_data->bike = RendererLoadMesh(global_renderer, "resources/3d/Motorcycle/motorcycle.gltf");
-    game_data->moto_xform = mat4_identity();
-    game_data->bike_dir = 0.0f;
-    game_data->bike_forward = (Vec3){0.0f, 0.0f, -1.0f};
+    game_data->camera.position = (Vec3){0.0f, 1.8f, 0.0f};
     RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
 
-    Vertex vertices[] = {
-        {{-.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-        {{.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-        {{-.5f, 1.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-        {{.5f, 1.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+    platform->SetCaptureMouse(true);
 
-        {{-.5f, 0.0f, .5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
-        {{.5f, 0.0f, .5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
-        {{-.5f, 1.0f, .5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
-        {{.5f, 1.0f, .5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
-
-    };
-    u32 indices[] = {0, 1, 2, 1, 3, 2, 0, 4, 1, 4, 5, 1, 4, 2, 6, 4, 0, 2, 5, 6, 7, 5, 4, 6, 1, 7, 3, 1, 5, 7, 2, 3, 6, 7, 6, 3};
-
-    game_data->cube = RendererLoadMeshFromVertices(global_renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
-    ResetCubes(game_data);
+    game_data->floor = LoadQuad(global_renderer);
+    game_data->floor_xform = mat4_identity();
+    mat4_scaleby(&game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
 }
 
-void FreecamMovement(GameData *game_data, Input *input) {
-    f32 look_speed = 0.01f;
-    if(input->mouse & MOUSE_RIGHT) {
-        if(input->mouse_delta_x != 0) {
-            game_data->camera.spherical_coordinates.x += look_speed * input->mouse_delta_x;
-        }
-        if(input->mouse_delta_y != 0) {
-            float new_rot = game_data->camera.spherical_coordinates.y + look_speed * input->mouse_delta_y;
-            if(new_rot > -PI / 2.0f && new_rot < PI / 2.0f) {
-                game_data->camera.spherical_coordinates.y = new_rot;
-            }
-        }
-        platform->SetCaptureMouse(true);
+void GameEnd(GameData *game_data) {
+    sFree(game_data->event_queue.queue);
+}
 
-    } else {
-        platform->SetCaptureMouse(false);
+void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
+    f32 look_speed = 0.01f;
+
+    if(input->mouse_delta_x != 0) {
+        camera->spherical_coordinates.x += look_speed * input->mouse_delta_x;
     }
-    Vec3 forward = spherical_to_carthesian(game_data->camera.spherical_coordinates);
+    if(input->mouse_delta_y != 0) {
+        float new_rot = camera->spherical_coordinates.y + look_speed * input->mouse_delta_y;
+        if(new_rot > -PI / 2.0f && new_rot < PI / 2.0f) {
+            camera->spherical_coordinates.y = new_rot;
+        }
+    }
+
+    Vec3 forward = spherical_to_carthesian(camera->spherical_coordinates);
     Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
 
     // --------------
@@ -96,7 +76,7 @@ void FreecamMovement(GameData *game_data, Input *input) {
     Vec3 movement = {0};
 
     if(input->keyboard[SCANCODE_LSHIFT]) {
-        move_speed *= 10.0f;
+        move_speed *= 5.0f;
     }
 
     if(input->keyboard[SCANCODE_W]) {
@@ -111,24 +91,102 @@ void FreecamMovement(GameData *game_data, Input *input) {
     if(input->keyboard[SCANCODE_D]) {
         movement = vec3_add(movement, vec3_fmul(right, move_speed));
     }
-    if(input->keyboard[SCANCODE_Q]) {
-        movement.y -= move_speed;
-    }
-    if(input->keyboard[SCANCODE_E]) {
-        movement.y += move_speed;
+    if(is_free_cam) {
+        if(input->keyboard[SCANCODE_Q]) {
+            movement.y -= move_speed;
+        }
+        if(input->keyboard[SCANCODE_E]) {
+            movement.y += move_speed;
+        }
     }
 
-    game_data->camera.position = vec3_add(game_data->camera.position, movement);
+    camera->position = vec3_add(camera->position, movement);
 
-    Mat4 cam = mat4_look_at(vec3_add(forward, game_data->camera.position), game_data->camera.position, (Vec3){0.0f, 1.0f, 0.0f});
+    if(!is_free_cam) {
+        camera->position.y = 1.8f;
+    }
+
+    Mat4 cam = mat4_look_at(vec3_add(forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f});
 
     RendererSetCamera(global_renderer, &cam);
 }
 
+// Called every frame
 void GameLoop(float delta_time, GameData *game_data, Input *input) {
-    if(game_data->is_free_cam) {
-        FreecamMovement(game_data, input);
+    // ----------
+    // Input
+
+    if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
+        if(game_data->console.console_target <= 0) { // Console is closed, open it
+            game_data->console.console_target = 300;
+            input->read_text_input = true;
+            platform->SetCaptureMouse(false);
+        } else { // Console is opened, close it
+            game_data->console.console_target = 0;
+            input->read_text_input = false;
+            platform->SetCaptureMouse(true);
+        }
+    }
+
+    if(game_data->console.console_open) {
+        InputConsole(&game_data->console, input, game_data);
     } else {
+        FPSCamera(&game_data->camera, input, game_data->is_free_cam);
+
+        // Move the sun
+        if(input->keyboard[SCANCODE_P]) {
+            game_data->cos += delta_time;
+            game_data->light_pos.x = cos(game_data->cos);
+            game_data->light_pos.y = sin(game_data->cos);
+
+            if(game_data->cos > PI) {
+                game_data->cos = 0.0f;
+            }
+            RendererSetSunDirection(
+                global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+        }
+
+        if(input->keyboard[SCANCODE_O]) {
+            game_data->cos -= delta_time;
+            game_data->light_pos.x = cos(game_data->cos);
+            game_data->light_pos.y = sin(game_data->cos);
+            if(game_data->cos < 0.0f) {
+                game_data->cos = PI;
+            }
+
+            RendererSetSunDirection(
+                global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+        }
+    }
+
+    // --------------
+    // Event
+
+    EventType e;
+    while(EventConsume(&game_data->event_queue, &e)) {
+        switch(e) {
+        case(EVENT_TYPE_QUIT): {
+            platform->RequestExit();
+        } break;
+        case(EVENT_TYPE_RESTART): {
+            GameStart(game_data);
+        } break;
+        default:
+
+            break;
+        };
+    }
+
+    // -------------
+    // Drawing
+
+    DrawConsole(&game_data->console, game_data);
+
+    PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
+}
+
+// @Clean Just in case
+/*else {
         if(input->keyboard[SCANCODE_A]) {
             //game_data->bike_dir -= delta_time;
             game_data->bank_angle -= delta_time * 1.5f;
@@ -166,76 +224,4 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         Mat4 cam_xform = mat4_look_at(vec3_add(game_data->bike_forward, offset), offset, (Vec3){0.0f, 1.0f, 0.0f});
 
         RendererSetCamera(global_renderer, &cam_xform);
-    }
-
-    // ----------------
-    // Other inputs
-
-    // Reset
-    if(input->keyboard[SCANCODE_SPACE]) {
-        ResetCubes(game_data);
-    }
-    if(input->keyboard[SCANCODE_P]) {
-        game_data->cos += delta_time;
-        game_data->light_pos.x = cos(game_data->cos);
-        game_data->light_pos.y = sin(game_data->cos);
-
-        if(game_data->cos > PI) {
-            game_data->cos = 0.0f;
-        }
-        RendererSetSunDirection(
-            global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
-    }
-    if(input->keyboard[SCANCODE_O]) {
-        game_data->cos -= delta_time;
-        game_data->light_pos.x = cos(game_data->cos);
-        game_data->light_pos.y = sin(game_data->cos);
-        if(game_data->cos < 0.0f) {
-            game_data->cos = PI;
-        }
-
-        RendererSetSunDirection(
-            global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
-    }
-
-    // --------------
-    // Event
-    EventType e;
-    while(EventConsume(&game_data->event_queue, &e)) {
-        switch(e) {
-        case(EVENT_TYPE_QUIT): {
-            platform->RequestExit();
-        } break;
-        default:
-
-            break;
-        };
-    }
-
-    // --------------
-    // Console
-
-    if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
-        if(game_data->console.console_target <= 0) { // Console is closed, open it
-            game_data->console.console_target = 300;
-            input->read_text_input = true;
-        }
-        // The closing of the console is handled in the console, as it grabs all input.
-    }
-    DrawConsole(&game_data->console, game_data);
-    if(game_data->console.console_open) {
-        InputConsole(&game_data->console, input, game_data);
-    }
-
-    // -------------
-    // Building
-    for(u32 i = 0; i < 64; i++) {
-        game_data->cube_xforms[i].v[14] += delta_time * 200.0f;
-        PushMesh(global_renderer, game_data->cube, &game_data->cube_xforms[i]);
-        if(game_data->cube_xforms[i].v[14] > 200.0f) {
-            game_data->cube_xforms[i].v[14] = 64.0f * -180.0f;
-        }
-    }
-
-    PushMesh(global_renderer, game_data->bike, &game_data->moto_xform);
-}
+    }*/

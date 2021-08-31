@@ -28,16 +28,16 @@ typedef struct PushBuffer {
 } PushBuffer;
 
 typedef enum PushBufferEntryType {
-    PushBufferEntryType_Quad,
+    PushBufferEntryType_UIQuad,
     PushBufferEntryType_Text,
     PushBufferEntryType_Mesh
 } PushBufferEntryType;
 
-typedef struct PushBufferEntryQuad {
+typedef struct PushBufferEntryUIQuad {
     PushBufferEntryType type;
     u32 l, t, r, b;
     Vec4 colour;
-} PushBufferEntryQuad;
+} PushBufferEntryUIQuad;
 
 typedef struct PushBufferEntryText {
     PushBufferEntryType type;
@@ -50,6 +50,7 @@ typedef struct PushBufferEntryMesh {
     PushBufferEntryType type;
     MeshHandle mesh_handle;
     Mat4 *transform;
+    Vec3 diffuse_color;
 } PushBufferEntryMesh;
 
 // Game functions
@@ -60,6 +61,6 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
 
 internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
 internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color);
-internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform);
+internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform, Vec3 diffuse_color);
 
 #endif

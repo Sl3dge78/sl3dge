@@ -2,16 +2,16 @@ GAME:
     CRITICAL:
     MAJOR:
     BACKLOG:
-        - Moto movement
-            > We can do it
-        - Moto cam
-            > We can do it
-        - Generate roads
-            > Need to be able to create quads and push them
-            > Vertex color could be good here
-
+        - Create a testbed scene. And use it to develop stuff
+            - Flat
+            - Add NPCs
+            - Add buildings
+            - ...
     IMPROVEMENTS:
     IDEAS:
+        - Stat based combat
+        - Dialogues
+        - Quest tree
 
 OPENGL RENDERER :
     CRITICAL:

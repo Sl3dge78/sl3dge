@@ -9,6 +9,7 @@
 #include <windows.h>
 
 #define SL3DGE_IMPLEMENTATION
+#define LEAK_TEST
 #include <sl3dge-utils/sl3dge.h>
 
 #include "platform.h"
@@ -25,7 +26,7 @@ typedef struct ShaderCode {
 /* GLOBALS */
 
 global HANDLE stderrHandle;
-global bool mouse_captured; // TODO this probably shouldn't be a global
+global bool mouse_captured; // @TODO this probably shouldn't be a global
 global Renderer *renderer;  //Global to have it in the window proc
 global PlatformWindow global_window;
 global PlatformAPI platform_api;
@@ -36,6 +37,7 @@ void Win32GameLoadFunctions(Module *dll) {
     pfn_GameGetSize = (GameGetSize_t *)GetProcAddress(dll->dll, "GameGetSize");
     pfn_GameLoad = (GameLoad_t *)GetProcAddress(dll->dll, "GameLoad");
     pfn_GameStart = (GameStart_t *)GetProcAddress(dll->dll, "GameStart");
+    pfn_GameEnd = (GameEnd_t *)GetProcAddress(dll->dll, "GameEnd");
     pfn_GameLoop = (GameLoop_t *)GetProcAddress(dll->dll, "GameLoop");
     sLogSetCallback((sLogCallback_t *)GetProcAddress(dll->dll, "ConsoleLogMessage"));
 }
@@ -120,7 +122,7 @@ void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     fclose(file);
 }
 
-// TODO : Handle UTF8
+// @TODO : Handle UTF8
 void Win32Log(const char *message, u8 level) {
     unsigned long charsWritten;
 
@@ -158,15 +160,16 @@ void Win32HandleKeyboardMessages(WPARAM wParam, LPARAM lParam, Input *input) {
     u32 scancode = (lParam >> 16) & 0x7F;
     bool is_down = !(lParam & (1 << 31));
 
-    // Non ascii letters are not handled and given to the keyboard manager
-    if(!input->read_text_input || wParam < 0) {
-        input->keyboard[scancode] = is_down;
+    //sLog("%x", scancode);
 
-        if(scancode == SCANCODE_ARRET_DEFIL) {
-            DBG_keep_console_open = true;
-            sLog("Console will stay open");
-        }
-    } else if(is_down) {
+    input->keyboard[scancode] = is_down;
+
+    if(scancode == SCANCODE_ARRET_DEFIL) {
+        DBG_keep_console_open = true;
+        sLog("Console will stay open");
+    }
+
+    if(is_down && input->read_text_input) {
         input->text_input = wParam;
     }
 }
@@ -205,6 +208,8 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
 }
 
 i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, INT cmd_show) {
+    DEBUG_Begin();
+
     AllocConsole();
 
     stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
@@ -219,18 +224,18 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     platform_api.ReadWholeFile = &PlatformReadWholeFile;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
     platform_api.RequestExit = &PlatformRequestExit;
+    platform_api.DebugInfo = DEBUG_GetLeakList();
 
     Module game_module = {0};
     Win32LoadModule(&game_module, "game");
     Win32LoadFunctions(&game_module);
 
+    GameData *game_data = sCalloc(1, pfn_GameGetSize());
     renderer = sCalloc(1, pfn_GetRendererSize());
-    pfn_RendererInit(renderer, &platform_api, &global_window);
-
     Input *input = sCalloc(1, sizeof(Input));
 
-    GameData *game_data = sCalloc(1, pfn_GameGetSize());
-    pfn_GameLoad(game_data, renderer, &platform_api); // This allocates game_data, but will be freed on program exit. We don't reallocate it ever.
+    pfn_GameLoad(game_data, renderer, &platform_api);
+    pfn_RendererInit(renderer, &platform_api, &global_window);
 
     ShowWindow(global_window.hwnd, cmd_show);
     SetForegroundWindow(global_window.hwnd);
@@ -294,19 +299,10 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 case WM_SYSKEYDOWN:
                 case WM_KEYUP:
                 case WM_SYSKEYUP:
-                    if(!input->read_text_input) {
-                        Win32HandleKeyboardMessages(msg.wParam, msg.lParam, input);
-                    }
-                    break;
                 case WM_CHAR:
-                    if(input->read_text_input) {
-                        if(msg.wParam >= 0) {
-                            input->text_input = msg.wParam;
-                        } else {
-                            Win32HandleKeyboardMessages(msg.wParam, msg.lParam, input);
-                        }
-                    }
+                    Win32HandleKeyboardMessages(msg.wParam, msg.lParam, input);
                     break;
+
                 case WM_LBUTTONDOWN: input->mouse |= MOUSE_LEFT; break;
                 case WM_LBUTTONUP: input->mouse &= ~MOUSE_LEFT; break;
                 case WM_MBUTTONDOWN: input->mouse |= MOUSE_MIDDLE; break;
@@ -359,16 +355,18 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
 
     sLogSetCallback(&Win32Log);
     pfn_RendererDestroy(renderer);
-    sFree(renderer);
+    pfn_GameEnd(game_data);
 
-    Win32CloseModule(&game_module);
+    sFree(renderer);
     sFree(game_data);
     sFree(input);
 
     DestroyWindow(global_window.hwnd);
     ReleaseDC(global_window.hwnd, global_window.dc);
 
-    DBG_END();
+    DEBUG_End();
+
+    Win32CloseModule(&game_module);
 
     return 0;
 }

@@ -39,6 +39,8 @@ void APIENTRY GLMessageCallback(GLenum source,
         ASSERT(0);
     } else if(severity == GL_DEBUG_SEVERITY_MEDIUM || severity == GL_DEBUG_SEVERITY_LOW) {
         sWarn("GL WARN: %s", message);
+    } else {
+        sTrace("GL: %s", message);
     }
 }
 
@@ -150,7 +152,7 @@ MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     for(u32 m = 0; m < data->meshes_count; ++m) {
         if(data->meshes[m].primitives_count > 1) {
             sWarn("Only 1 primitive supported yet");
-            // TODO
+            // @TODO
         }
         for(u32 p = 0; p < data->meshes[m].primitives_count; p++) {
             cgltf_primitive *prim = &data->meshes[m].primitives[p];
@@ -545,7 +547,6 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
 // Drawing
 
 internal void DrawScene(Renderer *renderer, u32 program) {
-    // Draw bike
     glActiveTexture(GL_TEXTURE1);
 
     PushBuffer *pushb = &renderer->scene_pushbuffer;
@@ -560,7 +561,10 @@ internal void DrawScene(Renderer *renderer, u32 program) {
 
         Mesh *mesh = &renderer->meshes[entry->mesh_handle];
 
+        const u32 color_uniform = glGetUniformLocation(program, "diffuse_color");
+
         glBindTexture(GL_TEXTURE_2D, mesh->diffuse_texture);
+        glUniform3f(color_uniform, entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z);
         glBindVertexArray(mesh->vertex_array);
         glUniformMatrix4fv(glGetUniformLocation(program, "transform"), 1, GL_FALSE, entry->transform->v);
         glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
@@ -591,8 +595,8 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
         PushBufferEntryType *type = (PushBufferEntryType *)(push_buffer->buf + address);
 
         switch(*type) {
-        case PushBufferEntryType_Quad: {
-            PushBufferEntryQuad *entry = (PushBufferEntryQuad *)(push_buffer->buf + address);
+        case PushBufferEntryType_UIQuad: {
+            PushBufferEntryUIQuad *entry = (PushBufferEntryUIQuad *)(push_buffer->buf + address);
 
             const f32 vtx[] = {
                 entry->l,
@@ -618,7 +622,7 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
             glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-            address += sizeof(PushBufferEntryQuad);
+            address += sizeof(PushBufferEntryUIQuad);
             continue;
         }
         case PushBufferEntryType_Text: {
@@ -695,7 +699,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *renderer) {
     PlatformSwapBuffers(renderer);
 
     // Clear pushbuffers
-    renderer->scene_pushbuffer.size = 0; // Maybe we don't need to reset it each frame? do some tests
+    renderer->scene_pushbuffer.size = 0; // @Optimization : Maybe we don't need to reset it each frame? do some tests
     renderer->ui_pushbuffer.size = 0;
 }
 
@@ -742,7 +746,7 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     const Mat4 ortho = mat4_ortho_zoom(1.0f / 1.0f, 100.0f, -600.0f, 600.0f);
     Mat4 look = mat4_look_at(
         (Vec3){0.0f, 0.0f, 0.0f}, vec3_fmul(direction, -1.0f), (Vec3){0.0f, 1.0f, 0.0f});
-    renderer->light_matrix = mat4_mul(&ortho, &look);
+    mat4_mul(&renderer->light_matrix, &ortho, &look);
     renderer->light_dir = direction;
 
     // Update uniforms

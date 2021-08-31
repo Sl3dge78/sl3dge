@@ -12,15 +12,21 @@ void CommandExit(ConsoleArgs *args, GameData *game_data) {
 
 void CommandFreeCam(ConsoleArgs *args, GameData *game_data) {
     game_data->is_free_cam = !game_data->is_free_cam;
+    platform->SetCaptureMouse(!game_data->is_free_cam);
     sLog("Freecam is %s", (game_data->is_free_cam ? "on" : "off"));
 }
 
-void ConsoleInit(Console *console) {
-    console->command_count = 2;
-    console->commands = sCalloc(console->command_count, sizeof(ConsoleCommand));
+void CommandRestart(ConsoleArgs *args, GameData *game_data) {
+    EventPush(&game_data->event_queue, EVENT_TYPE_RESTART);
+    sLog("Reloading the game");
+}
 
+void ConsoleInit(Console *console) {
     console->commands[0] = (ConsoleCommand){"exit", &CommandExit};
     console->commands[1] = (ConsoleCommand){"freecam", &CommandFreeCam};
+    console->commands[2] = (ConsoleCommand){"restart", &CommandRestart};
+
+    console->command_count = ARRAY_SIZE(console->commands);
 }
 
 void ConsoleCallCommand(ConsoleArgs *args, GameData *game_data) {
@@ -41,6 +47,10 @@ void ConsolePushHistory(const char *text, const Vec4 color, Console *console) {
 
     memcpy(&console->command_history[0].command, text, 128);
     memcpy(&console->command_history[0].color, &color, sizeof(Vec4));
+    console->history_size++;
+    if(console->history_size > 32) {
+        console->history_size = 32;
+    }
 }
 
 DLL_EXPORT void ConsoleLogMessage(const char *message, const u8 level) {
@@ -100,7 +110,7 @@ void DrawConsole(Console *console, GameData *game_data) {
         UIPushQuad(global_renderer, 0, console_y - 20, global_renderer->width, 20, (Vec4){0.5f, 0.3f, 0.3f, 0.9f});
         UIPushText(global_renderer, console->current_command, padx, console_y - pady, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
         // Caret
-        UIPushQuad(global_renderer, padx + (console->current_char * 10.5f), console_y - 20, 10, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
+        UIPushQuad(global_renderer, padx + (console->current_char * 10.5f), console_y - 20, 1, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
         u32 line_height = 20;
 
         i32 hist_y = console_y - 20 - pady;
@@ -123,14 +133,10 @@ void InputConsole(Console *console, Input *input, GameData *game_data) {
             }
         } else {
             switch(c) {
-            case(-78): // ²
-                console->console_target = 0;
-                input->read_text_input = false;
-                break;
             case(8): // backspace
                 if(console->current_char > 0) {
-                    console->current_command[console->current_char] = '\0';
                     console->current_char--;
+                    console->current_command[console->current_char] = '\0';
                 }
                 break;
             case(13): // return
@@ -138,13 +144,23 @@ void InputConsole(Console *console, Input *input, GameData *game_data) {
                 ConsoleParseMessage(console->current_command, game_data);
                 memset(console->current_command, '\0', 128);
                 console->current_char = 0;
+                console->history_browser = 0;
                 break;
             default:
-                sLog("%d", c);
+                //sLog("%d", c);
                 break;
             };
         }
 
         input->text_input = '\0';
+    }
+
+    if(input->keyboard[SCANCODE_UP] && !input->old_keyboard[SCANCODE_UP]) {
+        console->history_browser++;
+        if(console->history_browser >= console->history_size) {
+            console->history_browser = 0;
+        }
+        strcpy(console->current_command, console->command_history[console->history_browser].command);
+        console->current_char = strlen(console->current_command);
     }
 }

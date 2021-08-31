@@ -17,7 +17,7 @@ void RendererLoadMaterialsAndTextures(Renderer *context, cgltf_data *data, const
     context->textures_count += data->textures_count;
 
     if(data->textures_count > 0) {
-        // TODO : move that elsewhere, and recreate the pipeline because we have more textures now
+        // @TODO : move that elsewhere, and recreate the pipeline because we have more textures now
         if(context->textures_count > context->textures_capacity) {
             Image *new_buffer =
                 (Image *)sRealloc(context->textures, context->textures_count * sizeof(Image));
@@ -169,7 +169,7 @@ u32 RendererLoadMesh(Renderer *renderer, const char *path) {
     const u32 buffer_size =
         mesh->total_vertex_count * sizeof(Vertex) + mesh->total_index_count * sizeof(u32);
 
-    // TODO : Move that into something like this : RendererLoadGLTF(renderer, data);
+    // @TODO : Move that into something like this : RendererLoadGLTF(renderer, data);
     {
         // Vertex & Index Buffer
         mesh->buffer = (Buffer *)sMalloc(sizeof(Buffer));

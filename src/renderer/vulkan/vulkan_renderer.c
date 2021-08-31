@@ -70,7 +70,7 @@ internal void CreateVkInstance(VkInstance *instance) {
     sFree(all_extensions);
 
     { // Create debug messenger
-        // TODO : Do that only if we're in debug mode
+        // @TODO : Do that only if we're in debug mode
 
         // Get the functions
         VK_LOAD_INSTANCE_FUNC(*instance, vkCreateDebugUtilsMessengerEXT);
@@ -107,7 +107,7 @@ internal void CreateVkPhysicalDevice(VkInstance instance, VkPhysicalDevice *phys
         VkPhysicalDeviceProperties properties;
         vkGetPhysicalDeviceProperties(physical_devices[i], &properties);
     }
-    // TODO : Pick the device according to our specs
+    // @TODO : Pick the device according to our specs
     *physical_device = physical_devices[0];
     sFree(physical_devices);
 }
@@ -139,14 +139,14 @@ internal void GetQueuesId(Renderer *context) {
         if(!(set_flags & 1) && queue_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             context->graphics_queue_id = i;
             set_flags |= 1;
-            // graphics_queue.count = queue_properties[i].queueCount; // TODO : ??
+            // graphics_queue.count = queue_properties[i].queueCount; // @TODO : ??
         }
 
         if(!(set_flags & 2) && queue_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT &&
            !(queue_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
             context->transfer_queue_id = i;
             set_flags |= 2;
-            // transfer_queue.count = queue_properties[i].queueCount; // TODO : ??
+            // transfer_queue.count = queue_properties[i].queueCount; // @TODO : ??
         }
 
         if(!(set_flags & 4)) {
@@ -320,7 +320,7 @@ internal void CreateSwapchain(const Renderer *context, Swapchain *swapchain) {
         extent = surface_capabilities.currentExtent;
     } else {
         ASSERT(0);
-        i32 w = 1280; // TODO
+        i32 w = 1280; // @TODO
         i32 h = 720;
         //SDL_Vulkan_GetDrawableSize(window, &w, &h);
 
@@ -716,7 +716,7 @@ internal void CreateShadowMapRenderGroup(Renderer *renderer, RenderGroup *render
 }
 
 internal void CreateMainRenderGroup(Renderer *renderer, RenderGroup *render_group) {
-    // TODO : Séparer ca en 2. un avec la texture. et un avec le reste. Bind la texture pour chaque primitive si necessaire
+    // @TODO : Séparer ca en 2. un avec la texture. et un avec le reste. Bind la texture pour chaque primitive si necessaire
     render_group->descriptor_set_count = 1;
     render_group->set_layouts = (VkDescriptorSetLayout *)sCalloc(render_group->descriptor_set_count,
                                                                  sizeof(VkDescriptorSetLayout));
@@ -1267,7 +1267,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
             PipelineGetDefaultColorBlendState(1, &color_blend_attachement);
         pipeline_ci.pColorBlendState = &color_blend_state;
 
-        pipeline_ci.pDynamicState = NULL; // TODO: look at this
+        pipeline_ci.pDynamicState = NULL; // @TODO: look at this
         pipeline_ci.layout = render_group->layout;
 
         pipeline_ci.renderPass = render_group->render_pass;
@@ -1275,7 +1275,7 @@ internal void CreateVolumetricRenderGroup(Renderer *renderer, RenderGroup *rende
         pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
         pipeline_ci.basePipelineIndex = 0;
 
-        // TODO: handle pipeline caching
+        // @TODO: handle pipeline caching
         AssertVkResult(vkCreateGraphicsPipelines(
             renderer->device, VK_NULL_HANDLE, 1, &pipeline_ci, NULL, &render_group->pipeline));
 
@@ -1424,7 +1424,7 @@ Renderer *RendererCreate(PlatformWindow *window) {
     vkGetPhysicalDeviceMemoryProperties(renderer->physical_device, &renderer->memory_properties);
     vkGetPhysicalDeviceProperties(renderer->physical_device, &renderer->physical_device_properties);
 
-    // TODO : pick that don't hard code it
+    // @TODO : pick that don't hard code it
     renderer->depth_format = VK_FORMAT_D32_SFLOAT;
 
     // MSAA
@@ -1762,7 +1762,7 @@ void RendererDrawFrame(Renderer *renderer) {
     }
 
     { // Fog
-        // TODO: maybe this doesnt need to be in a separate render group
+        // @TODO: maybe this doesnt need to be in a separate render group
         VkDebugUtilsLabelEXT marker = {
             VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "FOG", {0.0, 0.0, 0.0, 0.0}};
         pfn_vkCmdBeginDebugUtilsLabelEXT(cmd, &marker);

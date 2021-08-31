@@ -7,8 +7,10 @@ in vec2 worldpos;
 
 out vec4 FragColor;
 
-uniform sampler2D shadow_map;
 uniform sampler2D diffuse;
+uniform vec3 diffuse_color;
+
+uniform sampler2D shadow_map;
 uniform vec3 light_dir;
 
 float get_shadow(float bias) {
@@ -38,7 +40,7 @@ float get_shadow(float bias) {
 
 void main() {
     float NdotL = dot(Normal, light_dir);
-    vec3 base_color = texture(diffuse, TexCoord).rgb;
+    vec3 base_color = texture(diffuse, TexCoord).rgb * diffuse_color;
 
     float bias = ( 1 - NdotL) * 0.001;
     float shadow = get_shadow(bias);

@@ -124,7 +124,7 @@ internal i32 FindMemoryType(const VkPhysicalDeviceMemoryProperties *memory_prope
             }
         }
     }
-    ASSERT(0); // TODO: Handle this more cleanly
+    ASSERT(0); // @TODO: Handle this more cleanly
     return -1;
 }
 
@@ -277,7 +277,7 @@ internal void CreateImage(const VkDevice device,
                                                     VK_COMPONENT_SWIZZLE_IDENTITY,
                                                     VK_COMPONENT_SWIZZLE_IDENTITY,
                                                     VK_COMPONENT_SWIZZLE_IDENTITY};
-    // TODO : This is annoying
+    // @TODO : This is annoying
     if(usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
         image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     else
@@ -462,7 +462,7 @@ internal void EndAndExecuteCommandBuffer(const VkDevice device,
     vkFreeCommandBuffers(device, pool, 1, &cmd);
 }
 
-// TODO update only the new textures
+// @TODO update only the new textures
 internal void VulkanUpdateTextureDescriptorSet(VkDevice device,
                                                VkDescriptorSet set,
                                                VkSampler sampler,
