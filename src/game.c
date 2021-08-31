@@ -199,6 +199,20 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     }
 
     // --------------
+    // Event
+    EventType e;
+    while(EventConsume(&game_data->event_queue, &e)) {
+        switch(e) {
+        case(EVENT_TYPE_QUIT): {
+            platform->RequestExit();
+        } break;
+        default:
+
+            break;
+        };
+    }
+
+    // --------------
     // Console
 
     if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {

@@ -5,25 +5,18 @@ struct PlatformWindow;
 typedef struct PlatformWindow PlatformWindow;
 
 typedef void PlatformReadWholeFile_t(const char *path, i32 *file_size, char *dest);
-DLL_EXPORT PlatformReadWholeFile_t PlatformReadWholeFile;
-
 typedef void PlatformGetWindowSize_t(const PlatformWindow *window, u32 *w, u32 *h);
-DLL_EXPORT PlatformGetWindowSize_t PlatformGetWindowSize;
-
 typedef void PlatformReadBinary_t(const char *path, i64 *file_size, u32 *content);
-DLL_EXPORT PlatformReadBinary_t PlatformReadBinary;
-
 typedef void PlatformGetInstanceExtensions_t(u32 *count, const char **extensions);
-DLL_EXPORT PlatformGetInstanceExtensions_t PlatformGetInstanceExtensions;
-
 typedef void PlatformSetCaptureMouse_t(bool val);
-DLL_EXPORT PlatformSetCaptureMouse_t PlatformSetCaptureMouse;
+typedef void PlatformRequestExit_t();
 
 typedef struct PlatformAPI {
     PlatformReadBinary_t *ReadBinary;
     PlatformReadWholeFile_t *ReadWholeFile;
     PlatformGetWindowSize_t *GetWindowSize;
     PlatformSetCaptureMouse_t *SetCaptureMouse;
+    PlatformRequestExit_t *RequestExit;
 } PlatformAPI;
 
 #define MOUSE_LEFT 1

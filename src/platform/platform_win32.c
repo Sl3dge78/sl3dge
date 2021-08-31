@@ -16,7 +16,6 @@
 
 #include "game_api.h"
 #include "renderer/renderer_api.h"
-#include "event.c"
 
 typedef struct ShaderCode {
     const char *spv_path;
@@ -30,6 +29,7 @@ global bool mouse_captured; // TODO this probably shouldn't be a global
 global Renderer *renderer;  //Global to have it in the window proc
 global PlatformWindow global_window;
 global PlatformAPI platform_api;
+global bool running;
 
 /* FUNCTIONS */
 void Win32GameLoadFunctions(Module *dll) {
@@ -51,6 +51,10 @@ void Win32RendererLoadFunctions(Module *dll) {
 void Win32LoadFunctions(Module *dll) {
     Win32GameLoadFunctions(dll);
     Win32RendererLoadFunctions(dll);
+}
+
+void PlatformRequestExit() {
+    running = false;
 }
 
 i64 PlatformGetTicks() {
@@ -214,6 +218,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
     platform_api.ReadWholeFile = &PlatformReadWholeFile;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
+    platform_api.RequestExit = &PlatformRequestExit;
 
     Module game_module = {0};
     Win32LoadModule(&game_module, "game");
@@ -231,7 +236,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     SetForegroundWindow(global_window.hwnd);
     pfn_GameStart(game_data);
 
-    bool running = true;
+    running = true;
     f32 delta_time = 0;
     i64 frame_start = PlatformGetTicks();
     sLog("Running");
@@ -320,19 +325,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
                 sError("WIN32 : Message error");
             }
         }
-        /* TODO
-        EventType e;
-        while(EventConsume(&game_data->event_queue, &e)) {
-            switch(e) {
-            case(EVENT_TYPE_QUIT):
-                running = false;
-                break;
-            default:
 
-                break;
-            };
-        }
-*/
         pfn_GameLoop(delta_time, game_data, input);
         pfn_RendererDrawFrame(renderer);
 
