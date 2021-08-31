@@ -208,7 +208,7 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
 }
 
 i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, INT cmd_show) {
-    DEBUG_Begin();
+    Leak_Begin();
 
     AllocConsole();
 
@@ -224,7 +224,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     platform_api.ReadWholeFile = &PlatformReadWholeFile;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
     platform_api.RequestExit = &PlatformRequestExit;
-    platform_api.DebugInfo = DEBUG_GetLeakList();
+    platform_api.DebugInfo = Leak_GetList();
 
     Module game_module = {0};
     Win32LoadModule(&game_module, "game");
@@ -364,7 +364,7 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     DestroyWindow(global_window.hwnd);
     ReleaseDC(global_window.hwnd, global_window.dc);
 
-    DEBUG_End();
+    Leak_End();
 
     Win32CloseModule(&game_module);
 

@@ -33,7 +33,7 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
     ConsoleInit(&game_data->console);
     global_console = &game_data->console;
 
-    DEBUG_SetLeakList(platform_api->DebugInfo);
+    Leak_SetList(platform_api->DebugInfo);
 }
 
 /// This is called ONCE before the first frame
