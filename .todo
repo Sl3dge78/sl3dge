@@ -3,7 +3,6 @@ GAME:
     MAJOR:
     BACKLOG:
         - Create a testbed scene. And use it to develop stuff
-            - Flat
             - Add NPCs
             - Add buildings
             - ...

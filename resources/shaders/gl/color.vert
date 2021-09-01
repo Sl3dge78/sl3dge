@@ -20,4 +20,5 @@ void main() {
     TexCoord = aTexCoord;
     shadow_map_texcoord = light_matrix * pos;
     gl_Position =  projection * view * pos;
+    //gl_Position =  light_matrix * vec4(aPos, 1.0);
 }

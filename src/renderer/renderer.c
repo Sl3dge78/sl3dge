@@ -53,11 +53,26 @@ internal void UIPushText(Renderer *renderer, const char *text, const u32 x, cons
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
-    entry->text = text;
+    char *saved = sCalloc(128, sizeof(char));
+    StringCopyLength(saved, text, 128);
+    entry->text = saved;
     entry->x = x;
     entry->y = y;
     entry->colour = color;
     push_buffer->size += sizeof(PushBufferEntryText);
+}
+
+internal void UIPushTexture(Renderer *renderer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h) {
+    PushBuffer *push_buffer = &renderer->ui_pushbuffer;
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryTexture) < push_buffer->max_size);
+    PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_Texture;
+    entry->l = x;
+    entry->t = y;
+    entry->r = w + x;
+    entry->b = h + y;
+    entry->texture = texture;
+    push_buffer->size += sizeof(PushBufferEntryTexture);
 }
 
 /// Adds a mesh to the scene draw calls

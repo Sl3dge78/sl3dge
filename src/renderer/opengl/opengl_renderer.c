@@ -277,8 +277,10 @@ internal void CreateShadowmapRenderPass(PlatformAPI *platform_api, ShadowmapRend
         GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 2048, 2048, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    Vec4 border_color = {1.0f, 1.0f, 1.0f, 1.0f};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, (f32 *)&border_color);
 
     glGenFramebuffers(1, &pass->framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
@@ -497,6 +499,9 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
 
         // Load ui shader
         renderer->ui_program = CreateProgram(platform_api, "ui");
+        glUseProgram(renderer->ui_program);
+        glUniform1i(glGetUniformLocation(renderer->ui_program, "alpha_map"), 0);
+        glUniform1i(glGetUniformLocation(renderer->ui_program, "color_texture"), 1);
 
         // Load white texture
         glGenTextures(1, &renderer->white_texture);
@@ -586,7 +591,7 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glUseProgram(renderer->ui_program);
-    glActiveTexture(GL_TEXTURE0);
+
     glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
     glBindVertexArray(renderer->ui_vertex_array);
     const u32 color_uniform = glGetUniformLocation(renderer->ui_program, "color");
@@ -618,7 +623,11 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
             };
             glUniform4f(
                 color_uniform, entry->colour.x, entry->colour.y, entry->colour.z, entry->colour.w);
+            glActiveTexture(GL_TEXTURE0); // Alpha map
             glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+            glActiveTexture(GL_TEXTURE1); // Color map
+            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+
             glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
@@ -626,7 +635,10 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
             continue;
         }
         case PushBufferEntryType_Text: {
+            glActiveTexture(GL_TEXTURE0); // Alpha map
             glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
+            glActiveTexture(GL_TEXTURE1); // Color map
+            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
 
             PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + address);
             const char *txt = entry->text;
@@ -667,10 +679,47 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
                 }
                 txt++;
             }
-
+            sFree(entry->text);
             address += sizeof(PushBufferEntryText);
             continue;
         } break;
+        case PushBufferEntryType_Texture: {
+            PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + address);
+
+            const f32 vtx[] = {
+                entry->l,
+                entry->t,
+                0.0f,
+                1.0f, // UL
+                entry->r,
+                entry->t,
+                1.0f,
+                1.0f, // UR
+                entry->l,
+                entry->b,
+                0.0f,
+                0.0f, // LL
+                entry->r,
+                entry->b,
+                1.0f,
+                0.0f, // LR
+            };
+            glUniform4f(
+                color_uniform, 1.0f, 1.0f, 1.0f, 1.0f);
+            //glBindTexture(GL_TEXTURE_2D, entry->texture);
+            glActiveTexture(GL_TEXTURE0); // Alpha map
+            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+            glActiveTexture(GL_TEXTURE1); // Color map
+            glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            glActiveTexture(GL_TEXTURE1); // Color map
+            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+
+            address += sizeof(PushBufferEntryTexture);
+            continue;
+        }
         default: {
             ASSERT(0);
         }
@@ -722,8 +771,8 @@ DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_a
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
 }
 
-void RendererSetCamera(Renderer *renderer, const Mat4 *view) {
-    renderer->camera_pos = mat4_get_translation(view);
+void RendererSetCamera(Renderer *renderer, const Mat4 *view, const Vec3 pos) {
+    renderer->camera_pos = pos;
     renderer->camera_view = *view;
     mat4_inverse(&renderer->camera_view, &renderer->camera_view_inverse);
 
@@ -743,9 +792,10 @@ void RendererSetCamera(Renderer *renderer, const Mat4 *view) {
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
-    const Mat4 ortho = mat4_ortho_zoom(1.0f / 1.0f, 100.0f, -600.0f, 600.0f);
-    Mat4 look = mat4_look_at(
-        (Vec3){0.0f, 0.0f, 0.0f}, vec3_fmul(direction, -1.0f), (Vec3){0.0f, 1.0f, 0.0f});
+    const Mat4 ortho = mat4_ortho_zoom_gl(1.0f, 10.0f, -100.0f, 100.0f);
+    Mat4 look = mat4_look_at(vec3_add(direction, renderer->camera_pos),
+                             renderer->camera_pos,
+                             (Vec3){0.0f, 1.0f, 0.0f});
     mat4_mul(&renderer->light_matrix, &ortho, &look);
     renderer->light_dir = direction;
 

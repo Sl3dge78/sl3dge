@@ -21,11 +21,14 @@ typedef struct GameData {
     bool is_free_cam;
     Camera camera;
 
-    Vec3 light_pos;
+    Vec3 light_dir;
     f32 cos;
 
     MeshHandle floor;
     Mat4 floor_xform;
+
+    MeshHandle npc;
+    Mat4 npc_xform;
 
 } GameData;
 

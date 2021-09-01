@@ -17,8 +17,6 @@ global PlatformAPI *platform;
 u32 GameGetSize() {
     return sizeof(GameData);
 }
-void FreecamMovement(GameData *game_data, Input *input) {
-}
 
 // ---------------
 // Exported functions
@@ -29,7 +27,7 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
     platform = platform_api;
 
     GLLoadFunctions();
-    sLogSetCallback(&ConsoleLogMessage);
+
     ConsoleInit(&game_data->console);
     global_console = &game_data->console;
 
@@ -38,17 +36,25 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
 
 /// This is called ONCE before the first frame
 void GameStart(GameData *game_data) {
-    game_data->light_pos = (Vec3){1.0f, 1.0f, 0.0f};
+    sLogSetCallback(&ConsoleLogMessage);
+    game_data->light_dir = (Vec3){1.0f, 1.0f, 0.0f};
     game_data->camera.position = (Vec3){0.0f, 1.8f, 0.0f};
-    RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+    game_data->cos = 0;
+    RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_dir, -1.0)));
 
     platform->SetCaptureMouse(true);
 
     game_data->floor = LoadQuad(global_renderer);
     game_data->floor_xform = mat4_identity();
     mat4_scaleby(&game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
+
+    game_data->npc = LoadCube(global_renderer);
+    game_data->npc_xform = mat4_identity();
+    mat4_scaleby(&game_data->npc_xform, (Vec3){1.0f, 2.0f, 1.0f});
+    mat4_translate(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
 }
 
+/// Do deallocation here
 void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
 }
@@ -108,7 +114,7 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
 
     Mat4 cam = mat4_look_at(vec3_add(forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f});
 
-    RendererSetCamera(global_renderer, &cam);
+    RendererSetCamera(global_renderer, &cam, camera->position);
 }
 
 // Called every frame
@@ -136,26 +142,26 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         // Move the sun
         if(input->keyboard[SCANCODE_P]) {
             game_data->cos += delta_time;
-            game_data->light_pos.x = cos(game_data->cos);
-            game_data->light_pos.y = sin(game_data->cos);
+            game_data->light_dir.x = cos(game_data->cos);
+            game_data->light_dir.y = sin(game_data->cos);
 
-            if(game_data->cos > PI) {
+            if(game_data->cos > 2.0f * PI) {
                 game_data->cos = 0.0f;
             }
             RendererSetSunDirection(
-                global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+                global_renderer, game_data->light_dir);
         }
 
         if(input->keyboard[SCANCODE_O]) {
             game_data->cos -= delta_time;
-            game_data->light_pos.x = cos(game_data->cos);
-            game_data->light_pos.y = sin(game_data->cos);
+            game_data->light_dir.x = cos(game_data->cos);
+            game_data->light_dir.y = sin(game_data->cos);
             if(game_data->cos < 0.0f) {
-                game_data->cos = PI;
+                game_data->cos = 2.0f * PI;
             }
 
             RendererSetSunDirection(
-                global_renderer, vec3_normalize(vec3_fmul(game_data->light_pos, -1.0)));
+                global_renderer, game_data->light_dir);
         }
     }
 
@@ -180,12 +186,22 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // -------------
     // Drawing
 
+    UIPushTexture(global_renderer, 0, 0, 0, 100, 100);
+    char value[32];
+    sprintf(value, "%f", game_data->cos);
+    UIPushText(global_renderer, value, 0, 120, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
+    sprintf(value, "%f %f %f", game_data->light_dir.x, game_data->light_dir.y, game_data->light_dir.z);
+    UIPushText(global_renderer, value, 0, 140, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
+
     DrawConsole(&game_data->console, game_data);
 
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
+    PushMesh(global_renderer, game_data->npc, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+
+    RendererSetSunDirection(global_renderer, game_data->light_dir);
 }
 
-// @Clean Just in case
+// @Clean - Just in case
 /*else {
         if(input->keyboard[SCANCODE_A]) {
             //game_data->bike_dir -= delta_time;
