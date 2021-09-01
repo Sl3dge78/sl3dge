@@ -37,7 +37,7 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
 /// This is called ONCE before the first frame
 void GameStart(GameData *game_data) {
     sLogSetCallback(&ConsoleLogMessage);
-    game_data->light_dir = (Vec3){1.0f, 1.0f, 0.0f};
+    game_data->light_dir = (Vec3){0.67f, -0.67f, 0.1f};
     game_data->camera.position = (Vec3){0.0f, 1.8f, 0.0f};
     game_data->cos = 0;
     RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_dir, -1.0)));
@@ -185,13 +185,6 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
 
     // -------------
     // Drawing
-
-    UIPushTexture(global_renderer, 0, 0, 0, 100, 100);
-    char value[32];
-    sprintf(value, "%f", game_data->cos);
-    UIPushText(global_renderer, value, 0, 120, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
-    sprintf(value, "%f %f %f", game_data->light_dir.x, game_data->light_dir.y, game_data->light_dir.z);
-    UIPushText(global_renderer, value, 0, 140, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
 
     DrawConsole(&game_data->console, game_data);
 

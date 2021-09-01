@@ -62,6 +62,22 @@ internal void UIPushText(Renderer *renderer, const char *text, const u32 x, cons
     push_buffer->size += sizeof(PushBufferEntryText);
 }
 
+internal void UIPushFmt(Renderer *renderer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...) {
+    PushBuffer *push_buffer = &renderer->ui_pushbuffer;
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
+    PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_Text;
+    entry->text = sCalloc(128, sizeof(char));
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(entry->text, 128, fmt, ap);
+    va_end(ap);
+    entry->x = x;
+    entry->y = y;
+    entry->colour = color;
+    push_buffer->size += sizeof(PushBufferEntryText);
+}
+
 internal void UIPushTexture(Renderer *renderer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h) {
     PushBuffer *push_buffer = &renderer->ui_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntryTexture) < push_buffer->max_size);

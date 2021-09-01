@@ -706,11 +706,10 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
             };
             glUniform4f(
                 color_uniform, 1.0f, 1.0f, 1.0f, 1.0f);
-            //glBindTexture(GL_TEXTURE_2D, entry->texture);
             glActiveTexture(GL_TEXTURE0); // Alpha map
             glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
             glActiveTexture(GL_TEXTURE1); // Color map
-            glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
+            glBindTexture(GL_TEXTURE_2D, entry->texture);
             glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
