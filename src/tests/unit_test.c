@@ -2,8 +2,10 @@
 #include <sl3dge-utils/sl3dge.h>
 
 #include <stdio.h>
+#include "collision.h"
 
 void TestHuffman() {
+    // @Test This test code isn't valid anymore
     sLog("HUFFMAN");
     u32 source[] = {3, 3, 3, 3, 3, 2, 4, 4};
     u32 expected[] = {0b010, 0b011, 0b100, 0b101, 0b110, 0b00, 0b1110, 0b1111};
@@ -13,8 +15,6 @@ void TestHuffman() {
     for(u32 i = 0; i < ARRAY_SIZE(expected); ++i) {
         TEST_EQUALS(out[i], expected[i], "%X");
     }
-
-    /* @Test This test code isn't valid anymore
     u8 code[] = {0b00011010, 0b01111111};
     u32 decoded[] = {0, 4, 5, 7, 6};
     PNG_DataStream stream = {};
@@ -25,7 +25,8 @@ void TestHuffman() {
         result[i] = HuffmanDecode(&stream, expected, source, ARRAY_SIZE(source));
         TEST_EQUALS(result[i], decoded[i], "%X");
     }
-    */
+
+    sLog("");
 }
 
 void TestVec3() {
@@ -62,6 +63,7 @@ void TestVec3() {
         result = vec3_fmul(test_3, 2.0f);
         length = vec3_length(result);
         TEST_EQUALS(length, 2.0f, "%.2f");
+        sLog("");
     }
 }
 
@@ -76,25 +78,24 @@ void TestMat() {
     TEST_EQUALS(scale.x, result.x, "%.2f");
     TEST_EQUALS(scale.y, result.y, "%.2f");
     TEST_EQUALS(scale.y, result.y, "%.2f");
-
-    mat4_translate(&mat, (Vec3){1.0f, 5.0f, -5.0f});
-    TEST_EQUALS(IsPointInBoundingBox((Vec3){0.0f, 0.0f, -5.0f}, &mat), 1, "%d");
-    TEST_EQUALS(IsPointInBoundingBox((Vec3){1.0f, 3.0f, -5.0f}, &mat), 1, "%d");
-    TEST_EQUALS(IsPointInBoundingBox((Vec3){-1.0f, 0.0f, -5.0f}, &mat), 0, "%d");
-    TEST_EQUALS(IsPointInBoundingBox((Vec3){0.0f, 0.0f, -0.0f}, &mat), 0, "%d");
+    sLog("");
 }
 
 int main(const int argc, const char *argv[]) {
     Leak_Begin();
     TEST_BEGIN();
+    sLogLevel(LOG_LEVEL_LOG);
+
     TestVec3();
 
     u8 byte = 0b10110001;
     u8 result = swap_u8(byte);
     TEST_EQUALS(result, 0b10001101, "%X");
 
-    TestHuffman();
+    //TestHuffman();
     TestMat();
+
+    TESTCOLLISION();
 
     TEST_END();
     Leak_End();

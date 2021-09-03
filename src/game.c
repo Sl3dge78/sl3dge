@@ -13,6 +13,8 @@ global PlatformAPI *platform;
 #include "console.c"
 #include "event.c"
 
+#include "collision.h"
+
 u32 GameGetSize() {
     return sizeof(GameData);
 }
@@ -47,10 +49,10 @@ void GameStart(GameData *game_data) {
     game_data->floor_xform = mat4_identity();
     mat4_scaleby(&game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
 
-    game_data->npc = LoadCube(global_renderer);
+    game_data->box = LoadCube(global_renderer);
     game_data->npc_xform = mat4_identity();
     mat4_scaleby(&game_data->npc_xform, (Vec3){1.0f, 2.0f, 1.0f});
-    mat4_translate(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
+    mat4_translateby(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
 
     game_data->interact_sphere_diameter = 1.0f;
 }
@@ -118,25 +120,6 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     RendererSetCamera(global_renderer, &cam, camera->position);
 }
 
-// p : World position of the test
-// m : Matrix defining the bounding box
-// Returns : true if the point is in the bounding box
-bool IsPointInBoundingBox(const Vec3 p, const Mat4 *m) {
-    // We'll first transform the point by the inverse bb matrix to do our calculations in normalized space
-    Mat4 inv;
-    mat4_inverse(m, &inv);
-
-    Vec3 t = mat4_mul_vec3(&inv, p);
-
-    // The bounding box has sides of size 1 centered on 0, so each side goes from -0.5 to 0.5 except Z
-    if(t.x < -0.5f || t.x > 0.5f ||
-       t.y < 0.0f || t.y > 1.0f ||
-       t.z < -0.5f || t.z > 0.5f)
-        return false;
-    else
-        return true;
-}
-
 // Called every frame
 void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // ----------
@@ -163,10 +146,11 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
 
         game_data->debug = mat4_identity();
-        mat4_translate(&game_data->debug, game_data->interact_sphere_pos);
+        mat4_translateby(&game_data->debug, game_data->interact_sphere_pos);
         mat4_scaleby(&game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
         if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
-            if(IsPointInBoundingBox(game_data->interact_sphere_pos, &game_data->npc_xform)) {
+            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, &game_data->npc_xform)) {
+                mat4_translateby(&game_data->npc_xform, (Vec3){0.5f, 0.0f, 0.0f});
             }
         }
 
@@ -220,8 +204,8 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     DrawConsole(&game_data->console, game_data);
 
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
-    PushMesh(global_renderer, game_data->npc, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushMesh(global_renderer, game_data->npc, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
+    PushMesh(global_renderer, game_data->box, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushMesh(global_renderer, game_data->box, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
 
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

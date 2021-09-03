@@ -26,9 +26,9 @@ typedef struct GameData {
     f32 cos;
 
     MeshHandle floor;
-    Mat4 floor_xform;
+    MeshHandle box;
 
-    MeshHandle npc;
+    Mat4 floor_xform;
     Mat4 npc_xform;
 
     Vec3 interact_sphere_pos;
