@@ -117,15 +117,25 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
 
     RendererSetCamera(global_renderer, &cam, camera->position);
 }
-#if 0
+
 // p : World position of the test
 // m : Matrix defining the bounding box
 // Returns : true if the point is in the bounding box
 bool IsPointInBoundingBox(const Vec3 p, const Mat4 *m) {
-    Vec3 bbt = mat4_get_translation(m);
-    Vec3 bbs = mat4_get_scale(m);
+    // We'll first transform the point by the inverse bb matrix to do our calculations in normalized space
+    Mat4 inv;
+    mat4_inverse(m, &inv);
+
+    Vec3 t = mat4_mul_vec3(&inv, p);
+
+    // The bounding box has sides of size 1 centered on 0, so each side goes from -0.5 to 0.5 except Z
+    if(t.x < -0.5f || t.x > 0.5f ||
+       t.y < 0.0f || t.y > 1.0f ||
+       t.z < -0.5f || t.z > 0.5f)
+        return false;
+    else
+        return true;
 }
-#endif
 
 // Called every frame
 void GameLoop(float delta_time, GameData *game_data, Input *input) {
@@ -151,6 +161,14 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
 
         // Interact sphere
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
+
+        game_data->debug = mat4_identity();
+        mat4_translate(&game_data->debug, game_data->interact_sphere_pos);
+        mat4_scaleby(&game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
+        if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
+            if(IsPointInBoundingBox(game_data->interact_sphere_pos, &game_data->npc_xform)) {
+            }
+        }
 
         // Move the sun
         if(input->keyboard[SCANCODE_P]) {
@@ -203,6 +221,7 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
 
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->npc, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushMesh(global_renderer, game_data->npc, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
 
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

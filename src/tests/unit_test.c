@@ -76,6 +76,12 @@ void TestMat() {
     TEST_EQUALS(scale.x, result.x, "%.2f");
     TEST_EQUALS(scale.y, result.y, "%.2f");
     TEST_EQUALS(scale.y, result.y, "%.2f");
+
+    mat4_translate(&mat, (Vec3){1.0f, 5.0f, -5.0f});
+    TEST_EQUALS(IsPointInBoundingBox((Vec3){0.0f, 0.0f, -5.0f}, &mat), 1, "%d");
+    TEST_EQUALS(IsPointInBoundingBox((Vec3){1.0f, 3.0f, -5.0f}, &mat), 1, "%d");
+    TEST_EQUALS(IsPointInBoundingBox((Vec3){-1.0f, 0.0f, -5.0f}, &mat), 0, "%d");
+    TEST_EQUALS(IsPointInBoundingBox((Vec3){0.0f, 0.0f, -0.0f}, &mat), 0, "%d");
 }
 
 int main(const int argc, const char *argv[]) {

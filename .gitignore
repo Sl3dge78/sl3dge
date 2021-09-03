@@ -9,3 +9,4 @@ tmp/
 compile_commands.json
 game_build.json
 .vscode/settings.json
+vulkan.code-workspace
