@@ -8,8 +8,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#define SL3DGE_IMPLEMENTATION
-#define LEAK_TEST
 #include <sl3dge-utils/sl3dge.h>
 
 #include "platform.h"

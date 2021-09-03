@@ -6,3 +6,6 @@ bin
 *.spv
 tmp/
 *.4coder
+compile_commands.json
+game_build.json
+.vscode/settings.json

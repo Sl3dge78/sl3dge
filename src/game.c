@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define SL3DGE_IMPLEMENTATION
 #include <sl3dge-utils/sl3dge.h>
 
 #include "game.h"
@@ -52,6 +51,8 @@ void GameStart(GameData *game_data) {
     game_data->npc_xform = mat4_identity();
     mat4_scaleby(&game_data->npc_xform, (Vec3){1.0f, 2.0f, 1.0f});
     mat4_translate(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
+
+    game_data->interact_sphere_diameter = 1.0f;
 }
 
 /// Do deallocation here
@@ -72,8 +73,8 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
         }
     }
 
-    Vec3 forward = spherical_to_carthesian(camera->spherical_coordinates);
-    Vec3 right = vec3_cross(forward, (Vec3){0.0f, 1.0f, 0.0f});
+    camera->forward = spherical_to_carthesian(camera->spherical_coordinates);
+    Vec3 right = vec3_cross(camera->forward, (Vec3){0.0f, 1.0f, 0.0f});
 
     // --------------
     // Move
@@ -86,10 +87,10 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     }
 
     if(input->keyboard[SCANCODE_W]) {
-        movement = vec3_add(movement, vec3_fmul(forward, move_speed));
+        movement = vec3_add(movement, vec3_fmul(camera->forward, move_speed));
     }
     if(input->keyboard[SCANCODE_S]) {
-        movement = vec3_add(movement, vec3_fmul(forward, -move_speed));
+        movement = vec3_add(movement, vec3_fmul(camera->forward, -move_speed));
     }
     if(input->keyboard[SCANCODE_A]) {
         movement = vec3_add(movement, vec3_fmul(right, -move_speed));
@@ -112,10 +113,19 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
         camera->position.y = 1.8f;
     }
 
-    Mat4 cam = mat4_look_at(vec3_add(forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f});
+    Mat4 cam = mat4_look_at(vec3_add(camera->forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f});
 
     RendererSetCamera(global_renderer, &cam, camera->position);
 }
+#if 0
+// p : World position of the test
+// m : Matrix defining the bounding box
+// Returns : true if the point is in the bounding box
+bool IsPointInBoundingBox(const Vec3 p, const Mat4 *m) {
+    Vec3 bbt = mat4_get_translation(m);
+    Vec3 bbs = mat4_get_scale(m);
+}
+#endif
 
 // Called every frame
 void GameLoop(float delta_time, GameData *game_data, Input *input) {
@@ -138,6 +148,9 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         InputConsole(&game_data->console, input, game_data);
     } else {
         FPSCamera(&game_data->camera, input, game_data->is_free_cam);
+
+        // Interact sphere
+        game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
 
         // Move the sun
         if(input->keyboard[SCANCODE_P]) {

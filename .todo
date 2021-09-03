@@ -6,6 +6,9 @@ GAME:
             - Add NPCs
             - Add buildings
             - ...
+        - Interact with objects
+            > Press button
+            > If looking at object & close to player activate it
     IMPROVEMENTS:
     IDEAS:
         - Stat based combat

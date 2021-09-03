@@ -3,17 +3,18 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**",
-                "D:/Guigui/Work/Prog/_include/**",
-                "${env:VULKAN_SDK}/include/**"
+                "D:/Guigui/Work/Prog/vulkan/src/**",
+                "D:/Guigui/Work/Prog/_include/**"
             ],
             "defines": [
                 "_DEBUG",
                 "DEBUG"
             ],
             "compilerPath": "D:\\Program Files\\LLVM\\bin\\clang.exe",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "clang-x64"
+            "cStandard": "c17",
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true
+            }
         }
     ],
     "version": 4

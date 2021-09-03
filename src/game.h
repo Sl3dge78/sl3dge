@@ -11,6 +11,7 @@
 typedef struct Camera {
     Vec3 position;
     Vec2f spherical_coordinates;
+    Vec3 forward;
 } Camera;
 
 typedef struct GameData {
@@ -29,6 +30,9 @@ typedef struct GameData {
 
     MeshHandle npc;
     Mat4 npc_xform;
+
+    Vec3 interact_sphere_pos;
+    f32 interact_sphere_diameter;
 
 } GameData;
 

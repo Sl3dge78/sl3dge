@@ -14,6 +14,7 @@ void TestHuffman() {
         TEST_EQUALS(out[i], expected[i], "%X");
     }
 
+    /* @Test This test code isn't valid anymore
     u8 code[] = {0b00011010, 0b01111111};
     u32 decoded[] = {0, 4, 5, 7, 6};
     PNG_DataStream stream = {};
@@ -24,6 +25,7 @@ void TestHuffman() {
         result[i] = HuffmanDecode(&stream, expected, source, ARRAY_SIZE(source));
         TEST_EQUALS(result[i], decoded[i], "%X");
     }
+    */
 }
 
 void TestVec3() {
@@ -63,17 +65,33 @@ void TestVec3() {
     }
 }
 
+void TestMat() {
+    sLog("MAT");
+
+    Vec3 scale = (Vec3){2.3f, 5.6f, 0.4f};
+    Mat4 mat = mat4_identity();
+    mat4_scaleby(&mat, scale);
+
+    Vec3 result = mat4_get_scale(&mat);
+    TEST_EQUALS(scale.x, result.x, "%.2f");
+    TEST_EQUALS(scale.y, result.y, "%.2f");
+    TEST_EQUALS(scale.y, result.y, "%.2f");
+}
+
 int main(const int argc, const char *argv[]) {
+    Leak_Begin();
     TEST_BEGIN();
-    //TestVec3();
+    TestVec3();
 
     u8 byte = 0b10110001;
     u8 result = swap_u8(byte);
     TEST_EQUALS(result, 0b10001101, "%X");
 
     TestHuffman();
+    TestMat();
 
     TEST_END();
+    Leak_End();
 
     return 0;
 }
