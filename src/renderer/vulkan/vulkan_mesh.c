@@ -271,8 +271,8 @@ MeshInstance RendererInstantiateMesh(Renderer *renderer, u32 mesh_id) {
     u32 instance_id = mesh->instance_count++;
     mesh->instance_transforms[instance_id] = mat4_identity();
     result.transform = &mesh->instance_transforms[instance_id];
-    mat4_translate(&mesh->instance_transforms[instance_id],
-                   (Vec3){(f32)instance_id * 20.f, 0.f, 0.f});
+    mat4_translateby(&mesh->instance_transforms[instance_id],
+                     (Vec3){(f32)instance_id * 20.f, 0.f, 0.f});
     return result;
 }
 

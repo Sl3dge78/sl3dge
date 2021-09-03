@@ -4,11 +4,9 @@ GAME:
     BACKLOG:
         - Create a testbed scene. And use it to develop stuff
             - Add NPCs
+                - Dialog
             - Add buildings
             - ...
-        - Interact with objects
-            > Press button
-            > If looking at object & close to player activate it
     IMPROVEMENTS:
     IDEAS:
         - Stat based combat

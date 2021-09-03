@@ -33,7 +33,12 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "presentation": {
+                "hidden": false,
+                "group": "",
+                "order": 1
+            },
         }
     ]
 }
