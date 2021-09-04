@@ -283,7 +283,7 @@ void RendererSetCamera(Renderer *renderer, const Vec3 position, const Vec3 forwa
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
-    const Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 20.0f, -600.0f, 600.0f);
+    const Mat4 a = mat4_ortho_zoom(1.0f / 1.0f, 1.0f, -100.0f, 100.0f);
     Mat4 b = mat4_look_at(
         (Vec3){0.0f, 0.0f, 0.0f}, vec3_fmul(direction, -1.0f), (Vec3){0.0f, 1.0f, 0.0f});
 

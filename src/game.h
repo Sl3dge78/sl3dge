@@ -27,6 +27,7 @@ typedef struct GameData {
 
     MeshHandle floor;
     MeshHandle box;
+    MeshHandle character;
 
     Mat4 floor_xform;
     Mat4 npc_xform;

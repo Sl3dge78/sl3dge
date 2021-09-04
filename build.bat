@@ -17,6 +17,15 @@ PUSHD tmp\
 DEL /Q *.pdb 2> NUL
 POPD
 
+SET module_name=game
+
+ECHO Building %module_name% module
+clang %args% %include_path%  %rdr_arg% -shared src/game.c -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib
+IF !ERRORLEVEL! == 0 (
+    ECHO a > bin/%module_name%.meta
+    ECHO BUILD OK
+)
+
 ECHO Building win32.exe
 clang %args% %include_path%  src/platform/platform_win32.c -o bin/win32.exe  %linker_options% %libs% -lShell32.lib -lUser32.lib -Xlinker -SUBSYSTEM:WINDOWS -Xlinker -PDB:tmp/win32.pdb
 IF !ERRORLEVEL! == 0 (
@@ -32,14 +41,7 @@ REM     ECHO a > bin/%module_name%.meta
 REM     ECHO BUILD OK
 REM )
 
-SET module_name=game
 
-ECHO Building %module_name% module
-clang %args% %include_path%  %rdr_arg% -shared src/game.c -o bin/%module_name%.dll %linker_options% %libs% -Xlinker -PDB:tmp/%module_name%_%timestamp%.pdb -Xlinker -IMPLIB:tmp/%module_name%.lib
-IF !ERRORLEVEL! == 0 (
-    ECHO a > bin/%module_name%.meta
-    ECHO BUILD OK
-)
 
 SET end_time=%TIME%
 ECHO ----

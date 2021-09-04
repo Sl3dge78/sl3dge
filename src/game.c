@@ -39,19 +39,20 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
 void GameStart(GameData *game_data) {
     sLogSetCallback(&ConsoleLogMessage);
     game_data->light_dir = (Vec3){0.67f, -0.67f, 0.1f};
-    game_data->camera.position = (Vec3){0.0f, 1.8f, 0.0f};
+    game_data->camera.position = (Vec3){0.0f, 1.7f, 0.0f};
     game_data->cos = 0;
     RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_dir, -1.0)));
 
     platform->SetCaptureMouse(true);
+    game_data->box = RendererLoadCube(global_renderer);
 
-    game_data->floor = LoadQuad(global_renderer);
+    game_data->character = RendererLoadMesh(global_renderer, "resources/3d/character/character.gltf");
+
+    game_data->floor = RendererLoadQuad(global_renderer);
     game_data->floor_xform = mat4_identity();
     mat4_scaleby(&game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
 
-    game_data->box = LoadCube(global_renderer);
     game_data->npc_xform = mat4_identity();
-    mat4_scaleby(&game_data->npc_xform, (Vec3){1.0f, 2.0f, 1.0f});
     mat4_translateby(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
 
     game_data->interact_sphere_diameter = 1.0f;
@@ -112,7 +113,7 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     camera->position = vec3_add(camera->position, movement);
 
     if(!is_free_cam) {
-        camera->position.y = 1.8f;
+        camera->position.y = 1.7f;
     }
 
     Mat4 cam = mat4_look_at(vec3_add(camera->forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f});
@@ -150,7 +151,7 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         mat4_scaleby(&game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
         if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
             if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, &game_data->npc_xform)) {
-                mat4_translateby(&game_data->npc_xform, (Vec3){0.5f, 0.0f, 0.0f});
+                mat4_rotate_euler(&game_data->npc_xform, (Vec3){0.0f, 1.0f, 0.0f});
             }
         }
 
@@ -207,7 +208,7 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     DrawConsole(&game_data->console, game_data);
 
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
-    PushMesh(global_renderer, game_data->box, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushMesh(global_renderer, game_data->character, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
     PushMesh(global_renderer, game_data->box, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
 
     RendererSetSunDirection(global_renderer, game_data->light_dir);

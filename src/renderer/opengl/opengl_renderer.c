@@ -187,35 +187,39 @@ MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     glEnableVertexAttribArray(2);
 
     // Textures
-    for(u32 i = 0; i < data->textures_count; ++i) {
-        char *image_path = data->textures[i].image->uri;
-        char full_image_path[256] = {0};
-        strcat_s(full_image_path, 256, directory);
-        strcat_s(full_image_path, 256, image_path);
+    if(data->textures_count > 0) {
+        for(u32 i = 0; i < data->textures_count; ++i) {
+            char *image_path = data->textures[i].image->uri;
+            char full_image_path[256] = {0};
+            strcat_s(full_image_path, 256, directory);
+            strcat_s(full_image_path, 256, image_path);
 
-        PNG_Image *image = sLoadImage(full_image_path);
-        u32 texture;
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glObjectLabel(GL_TEXTURE, texture, -1, "NAME");
-        glTexImage2D(GL_TEXTURE_2D,
-                     0,
-                     GL_RGBA,
-                     image->width,
-                     image->height,
-                     0,
-                     GL_RGBA,
-                     GL_UNSIGNED_BYTE,
-                     image->pixels);
-        sDestroyImage(image);
+            PNG_Image *image = sLoadImage(full_image_path);
+            u32 texture;
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glObjectLabel(GL_TEXTURE, texture, -1, "NAME");
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         GL_RGBA,
+                         image->width,
+                         image->height,
+                         0,
+                         GL_RGBA,
+                         GL_UNSIGNED_BYTE,
+                         image->pixels);
+            sDestroyImage(image);
 
-        if(data->textures[i].type == cgltf_texture_type_base_color) {
-            mesh->diffuse_texture = texture;
+            if(data->textures[i].type == cgltf_texture_type_base_color) {
+                mesh->diffuse_texture = texture;
+            }
         }
+    } else {
+        mesh->diffuse_texture = renderer->white_texture;
     }
 
     cgltf_free(data);

@@ -6,7 +6,7 @@
 #include "renderer/opengl/opengl_renderer.c"
 #endif
 
-MeshHandle LoadQuad(Renderer *renderer) {
+MeshHandle RendererLoadQuad(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
@@ -17,7 +17,7 @@ MeshHandle LoadQuad(Renderer *renderer) {
     return RendererLoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
-MeshHandle LoadCube(Renderer *renderer) {
+MeshHandle RendererLoadCube(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
