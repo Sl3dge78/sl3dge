@@ -4,7 +4,8 @@
 
 enum event_type {
     EVENT_TYPE_QUIT,
-    EVENT_TYPE_RESTART
+    EVENT_TYPE_RESTART,
+    EVENT_TYPE_RELOADSHADERS,
 };
 
 typedef u32 EventType;

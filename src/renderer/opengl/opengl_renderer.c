@@ -358,6 +358,12 @@ internal void BeginColorRenderPass(Renderer *renderer, ColorRenderPass *pass) {
     // Shadowmap
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
+
+    // Camera proj
+    glUniformMatrix4fv(glGetUniformLocation(renderer->color_pass.program, "projection"), 1, GL_FALSE, renderer->camera_proj.v);
+    glUniformMatrix4fv(glGetUniformLocation(renderer->color_pass.program, "view"), 1, GL_FALSE, renderer->camera_view.v);
+    glUniform3f(glGetUniformLocation(renderer->color_pass.program, "light_dir"), renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
+    glUniformMatrix4fv(glGetUniformLocation(renderer->color_pass.program, "light_matrix"), 1, GL_FALSE, renderer->light_matrix.v);
 }
 
 // --------------
@@ -386,6 +392,9 @@ internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass
     glUseProgram(pass->program);
     glUniformMatrix4fv(
         glGetUniformLocation(pass->program, "cam_view"), 1, GL_FALSE, renderer->camera_view.v);
+
+    glUniformMatrix4fv(glGetUniformLocation(renderer->vol_pass.program, "proj_inverse"), 1, GL_FALSE, renderer->camera_proj_inverse.v);
+
     glUniformMatrix4fv(glGetUniformLocation(pass->program, "view_inverse"),
                        1,
                        GL_FALSE,
@@ -410,19 +419,6 @@ void UpdateCameraProj(Renderer *renderer) {
     renderer->camera_proj =
         mat4_perspective_gl(90.0f, (f32)renderer->width / (f32)renderer->height, 0.1f, 100000.0f);
     mat4_inverse(&renderer->camera_proj, &renderer->camera_proj_inverse);
-
-    // Init uniforms
-    glUseProgram(renderer->color_pass.program);
-    u32 loc = glGetUniformLocation(renderer->color_pass.program, "projection");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj.v);
-
-    glUseProgram(renderer->vol_pass.program);
-    loc = glGetUniformLocation(renderer->vol_pass.program, "proj_inverse");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_proj_inverse.v);
-
-    glUseProgram(renderer->ui_program);
-    const Mat4 ortho = mat4_ortho_gl(0, renderer->height, 0, renderer->width, -1, 1);
-    glUniformMatrix4fv(glGetUniformLocation(renderer->ui_program, "proj"), 1, GL_FALSE, ortho.v);
 }
 
 DLL_EXPORT u32 GetRendererSize() {
@@ -591,6 +587,8 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glUseProgram(renderer->ui_program);
+    const Mat4 ortho = mat4_ortho_gl(0, renderer->height, 0, renderer->width, -1, 1);
+    glUniformMatrix4fv(glGetUniformLocation(renderer->ui_program, "proj"), 1, GL_FALSE, ortho.v);
 
     glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
     glBindVertexArray(renderer->ui_vertex_array);
@@ -760,14 +758,17 @@ DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_a
     DestroyColorRenderPass(&renderer->color_pass);
     CreateColorRenderPass(platform_api, renderer->width, renderer->height, &renderer->color_pass);
     UpdateCameraProj(renderer);
+}
 
-    glUseProgram(renderer->color_pass.program);
-    u32 loc = glGetUniformLocation(renderer->color_pass.program, "view");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_view.v);
-    loc = glGetUniformLocation(renderer->color_pass.program, "light_dir");
-    glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
-    loc = glGetUniformLocation(renderer->color_pass.program, "light_matrix");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
+void RendererReloadShaders(Renderer *renderer, PlatformAPI *platform_api) {
+    DestroyColorRenderPass(&renderer->color_pass);
+    CreateColorRenderPass(platform_api, renderer->width, renderer->height, &renderer->color_pass);
+
+    DestroyShadowmapRenderPass(&renderer->shadowmap_pass);
+    CreateShadowmapRenderPass(platform_api, &renderer->shadowmap_pass);
+
+    DestroyVolumetricRenderPass(&renderer->vol_pass);
+    CreateVolumetricRenderPass(platform_api, &renderer->vol_pass);
 }
 
 void RendererSetCamera(Renderer *renderer, const Mat4 *view, const Vec3 pos) {
@@ -791,7 +792,7 @@ void RendererSetCamera(Renderer *renderer, const Mat4 *view, const Vec3 pos) {
 }
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
-    const Mat4 ortho = mat4_ortho_zoom_gl(1.0f, 10.0f, -100.0f, 100.0f);
+    const Mat4 ortho = mat4_ortho_zoom_gl(1.0f, 10.0f, -10.0f, 10.0f);
     Mat4 look = mat4_look_at(vec3_add(direction, renderer->camera_pos),
                              renderer->camera_pos,
                              (Vec3){0.0f, 1.0f, 0.0f});

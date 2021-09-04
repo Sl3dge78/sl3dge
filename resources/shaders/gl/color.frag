@@ -29,7 +29,7 @@ float get_shadow(float bias) {
         for(int y = -samples; y <= samples; ++y) {
             vec2 uv = proj_coords.xy + vec2(x, y) * tex_dim; 
             float closest_depth = texture(shadow_map, uv).r;
-            shadow += closest_depth > current_depth - bias ? 1.0 : 0.0;
+            shadow += closest_depth > current_depth - bias ? 1.0 : 0.1;
             count ++;
         }
     }
@@ -43,7 +43,7 @@ void main() {
     float NdotL = dot(Normal, light_dir);
     vec3 base_color = texture(diffuse, TexCoord).rgb * diffuse_color;
 
-    float bias = ( 1 - NdotL) * 0.001;
+    float bias = ( 1 - NdotL) * 0.005;
     float shadow = get_shadow(bias);
 
     FragColor = vec4(shadow * base_color, 1.0);

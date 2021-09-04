@@ -192,6 +192,9 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         case(EVENT_TYPE_RESTART): {
             GameStart(game_data);
         } break;
+        case(EVENT_TYPE_RELOADSHADERS): {
+            RendererReloadShaders(global_renderer, platform);
+        } break;
         default:
 
             break;
