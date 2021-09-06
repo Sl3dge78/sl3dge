@@ -26,6 +26,7 @@
 #include "renderer/renderer.h"
 #include "renderer/opengl/opengl_renderer.h"
 #include "renderer/gltf.c"
+#include "renderer/opengl/mesh.c"
 
 void APIENTRY GLMessageCallback(GLenum source,
                                 GLenum type,
@@ -106,168 +107,6 @@ internal u32 CreateProgram(PlatformAPI *platform, const char *name) {
 
 // --------------
 // Mesh
-
-internal Mesh *GetNewMesh(Renderer *renderer) {
-    if(renderer->mesh_count == renderer->mesh_capacity) {
-        u32 new_capacity = renderer->mesh_capacity * 2;
-        void *ptr = sRealloc(renderer->meshes, sizeof(Mesh) * new_capacity);
-        ASSERT(ptr);
-        if(ptr) {
-            renderer->meshes = (Mesh *)ptr;
-        }
-    }
-
-    return &renderer->meshes[renderer->mesh_count];
-}
-
-MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
-    sLog("Loading Mesh...");
-
-    Mesh *mesh = GetNewMesh(renderer);
-
-    char directory[128] = {0};
-    const char *last_sep = strrchr(path, '/');
-    u32 size = last_sep - path;
-    strncpy_s(directory, ARRAY_SIZE(directory), path, size);
-    directory[size] = '/';
-    directory[size + 1] = '\0';
-
-    cgltf_data *data;
-    cgltf_options options = {0};
-    cgltf_result result = cgltf_parse_file(&options, path, &data);
-    if(result != cgltf_result_success) {
-        sError("Error reading mesh");
-        ASSERT(0);
-    }
-
-    cgltf_load_buffers(&options, data, path);
-
-    // Vertex & Index Buffer
-    glGenBuffers(1, &mesh->vertex_buffer);
-    glGenBuffers(1, &mesh->index_buffer);
-    glGenVertexArrays(1, &mesh->vertex_array);
-
-    glBindVertexArray(mesh->vertex_array);
-    u32 i = 0;
-    for(u32 m = 0; m < data->meshes_count; ++m) {
-        if(data->meshes[m].primitives_count > 1) {
-            sWarn("Only 1 primitive supported yet");
-            // @TODO
-        }
-        for(u32 p = 0; p < data->meshes[m].primitives_count; p++) {
-            cgltf_primitive *prim = &data->meshes[m].primitives[p];
-            mesh->index_count = data->meshes[m].primitives[p].indices->count;
-            u32 index_buffer_size = 0;
-            void *index_data = GLTFGetIndexBuffer(prim, &index_buffer_size);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_buffer_size, index_data, GL_STATIC_DRAW);
-            sFree(index_data);
-
-            mesh->vertex_count = (u32)prim->attributes[0].data->count;
-            u32 vertex_buffer_size = 0;
-            void *vertex_data = GLTFGetVertexBuffer(prim, &vertex_buffer_size);
-
-            glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
-            glBufferData(GL_ARRAY_BUFFER, vertex_buffer_size, vertex_data, GL_STATIC_DRAW);
-            sFree(vertex_data);
-            ++i;
-        }
-    }
-
-    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, "GLTF VTX BUFFER");
-    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GLTF IDX BUFFER");
-    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GLTF ARRAY BUFFER");
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(
-        1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
-    glEnableVertexAttribArray(2);
-
-    // Textures
-    if(data->textures_count > 0) {
-        for(u32 i = 0; i < data->textures_count; ++i) {
-            char *image_path = data->textures[i].image->uri;
-            char full_image_path[256] = {0};
-            strcat_s(full_image_path, 256, directory);
-            strcat_s(full_image_path, 256, image_path);
-
-            PNG_Image *image = sLoadImage(full_image_path);
-            u32 texture;
-            glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glObjectLabel(GL_TEXTURE, texture, -1, "NAME");
-            glTexImage2D(GL_TEXTURE_2D,
-                         0,
-                         GL_RGBA,
-                         image->width,
-                         image->height,
-                         0,
-                         GL_RGBA,
-                         GL_UNSIGNED_BYTE,
-                         image->pixels);
-            sDestroyImage(image);
-
-            if(data->textures[i].type == cgltf_texture_type_base_color) {
-                mesh->diffuse_texture = texture;
-            }
-        }
-    } else {
-        mesh->diffuse_texture = renderer->white_texture;
-    }
-
-    cgltf_free(data);
-
-    sLog("Loading done");
-
-    return renderer->mesh_count++;
-}
-
-MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
-    Mesh *mesh = GetNewMesh(renderer);
-
-    mesh->index_count = index_count;
-    mesh->vertex_count = vertex_count;
-
-    // Vertex & Index Buffer
-    glGenBuffers(1, &mesh->vertex_buffer);
-    glGenBuffers(1, &mesh->index_buffer);
-    glGenVertexArrays(1, &mesh->vertex_array);
-    glBindVertexArray(mesh->vertex_array);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(u32), indices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(Vertex), vertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(
-        1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
-    glEnableVertexAttribArray(2);
-
-    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, "GEN VTX BUFFER");
-    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GEN IDX BUFFER");
-    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GEN ARRAY BUFFER");
-
-    mesh->diffuse_texture = renderer->white_texture;
-
-    return renderer->mesh_count++;
-}
-
-void RendererDestroyMesh(Mesh *mesh) {
-    glDeleteBuffers(1, &mesh->index_buffer);
-    glDeleteBuffers(1, &mesh->vertex_buffer);
-}
 
 // ---------------
 // Shadowmap
@@ -543,7 +382,7 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
 
     // Meshes
     for(u32 i = 0; i < renderer->mesh_count; i++) {
-        RendererDestroyMesh(&renderer->meshes[i]);
+        RendererDestroyMesh(renderer, &renderer->meshes[i]);
     }
     sFree(renderer->meshes);
 }

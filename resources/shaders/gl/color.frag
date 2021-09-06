@@ -21,7 +21,7 @@ float get_shadow(float bias) {
     float current_depth = proj_coords.z;
 
     vec2 tex_dim = 1.0 / textureSize(shadow_map, 0);
-    float scale = 1.0;
+    float scale = 2.0;
     int samples = int(scale);
     int count = 0;
 

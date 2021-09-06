@@ -16,6 +16,14 @@ typedef struct Vertex {
     Vec2 uv;
 } Vertex;
 
+typedef struct SkinnedVertex {
+    Vec3 pos;
+    Vec3 normal;
+    Vec2 uv;
+    u16 joints[4];
+    f32 weights[4];
+} SkinnedVertex;
+
 typedef u32 MeshHandle;
 
 // -----------

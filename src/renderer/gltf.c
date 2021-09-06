@@ -24,8 +24,10 @@ GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst
     };
     switch(acc->type) {
     case cgltf_type_scalar: break;
+    case cgltf_type_vec4: size *= 4; break;
     case cgltf_type_vec3: size *= 3; break;
     case cgltf_type_vec2: size *= 2; break;
+    case cgltf_type_mat4: size *= 4 * 4; break;
     default:
         sError("Unsupported type : %d", acc->type);
         ASSERT(0);
@@ -94,6 +96,39 @@ void *GLTFGetVertexBuffer(cgltf_primitive *prim, u32 *size) {
     }
     return result;
 }
+
+void *GLTFGetSkinnedVertexBuffer(cgltf_primitive *prim, u32 *size) {
+    SkinnedVertex *result = sCalloc(prim->attributes[0].data->count, sizeof(SkinnedVertex));
+    *size = prim->attributes[0].data->count * sizeof(SkinnedVertex);
+    for(u32 a = 0; a < prim->attributes_count; ++a) {
+        switch(prim->attributes[a].type) {
+        case cgltf_attribute_type_position: {
+            GLTFCopyAccessor(
+                prim->attributes[a].data, result, offsetof(SkinnedVertex, pos), sizeof(SkinnedVertex));
+        } break;
+
+        case cgltf_attribute_type_normal: {
+            GLTFCopyAccessor(
+                prim->attributes[a].data, result, offsetof(SkinnedVertex, normal), sizeof(SkinnedVertex));
+        } break;
+        case cgltf_attribute_type_texcoord: {
+            GLTFCopyAccessor(
+                prim->attributes[a].data, result, offsetof(SkinnedVertex, uv), sizeof(SkinnedVertex));
+        } break;
+        case cgltf_attribute_type_joints: {
+            GLTFCopyAccessor(prim->attributes[a].data, result, offsetof(SkinnedVertex, joints), sizeof(SkinnedVertex));
+        } break;
+        case cgltf_attribute_type_weights: {
+            GLTFCopyAccessor(prim->attributes[a].data, result, offsetof(SkinnedVertex, weights), sizeof(SkinnedVertex));
+        } break;
+        default: {
+            continue;
+        }
+        }
+    }
+    return result;
+}
+
 /* // @TODO this is vulkan specific
 void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim,
                                   Primitive *primitive,

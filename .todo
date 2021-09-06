@@ -8,6 +8,7 @@ GAME:
             - Add buildings
             - ...
     IMPROVEMENTS:
+        - Log to the console AND the game
     IDEAS:
         - Stat based combat
         - Dialogues
@@ -15,6 +16,19 @@ GAME:
 
 OPENGL RENDERER :
     CRITICAL:
+        - Skinned meshes
+            - Load vertex data
+                / Load Joint and Weight data OK
+                - Test that the gpu got it well!
+            / Load node (joints) data OK
+                / Matrices OK
+            - Draw skeleton for debug!!
+            - Calculate deformation herarchy
+            - Do a new vertex shader
+            - Send it all to the gpu
+            - ???
+            - It works!!?
+            - Cleanuppppppp (freeeeee)
     MAJOR:
         - Handle multiple primitives in single gltf
     BACKLOG:

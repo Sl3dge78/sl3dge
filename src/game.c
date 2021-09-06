@@ -54,8 +54,15 @@ void GameStart(GameData *game_data) {
 
     game_data->npc_xform = mat4_identity();
     mat4_translateby(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
+    game_data->npc2_xform = mat4_identity();
 
     game_data->interact_sphere_diameter = 1.0f;
+
+    SkinnedMesh mesh = {0};
+    RendererLoadSkinnedMesh(global_renderer, "resources/models/gltf_samples/SimpleSkin/glTF/SimpleSkin.gltf", &mesh);
+    game_data->simple_skinning_root = mat4_identity();
+    game_data->bone_1 = mat4_identity();
+    game_data->bone_2 = mat4_identity();
 }
 
 /// Do deallocation here
@@ -77,7 +84,9 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     }
 
     camera->forward = spherical_to_carthesian(camera->spherical_coordinates);
-    Vec3 right = vec3_cross(camera->forward, (Vec3){0.0f, 1.0f, 0.0f});
+
+    Vec3 flat_forward = vec3_normalize((Vec3){camera->forward.x, 0.0f, camera->forward.z});
+    Vec3 right = vec3_cross(flat_forward, (Vec3){0.0f, 1.0f, 0.0f});
 
     // --------------
     // Move
@@ -90,10 +99,10 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     }
 
     if(input->keyboard[SCANCODE_W]) {
-        movement = vec3_add(movement, vec3_fmul(camera->forward, move_speed));
+        movement = vec3_add(movement, vec3_fmul(flat_forward, move_speed));
     }
     if(input->keyboard[SCANCODE_S]) {
-        movement = vec3_add(movement, vec3_fmul(camera->forward, -move_speed));
+        movement = vec3_add(movement, vec3_fmul(flat_forward, -move_speed));
     }
     if(input->keyboard[SCANCODE_A]) {
         movement = vec3_add(movement, vec3_fmul(right, -move_speed));
@@ -209,7 +218,9 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
 
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->character, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushMesh(global_renderer, game_data->box, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
+    //PushMesh(global_renderer, game_data->character, &game_data->npc2_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushMesh(global_renderer, game_data->simple_skinning, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
+    //PushMesh(global_renderer, game_data->box, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
 
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

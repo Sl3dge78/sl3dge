@@ -17,6 +17,16 @@ typedef struct Mesh {
     u32 diffuse_texture;
 } Mesh;
 
+typedef struct SkinnedMesh {
+    MeshHandle mesh;
+    u32 joint_count;
+    Mat4 *joints;
+    i32 *joint_parents;
+    u32 *joint_children_count;
+    u32 **joint_children;
+    Mat4 *inverse_bind_matrices;
+} SkinnedMesh;
+
 typedef struct ShadowmapRenderPass {
     u32 framebuffer;
     u32 texture;
