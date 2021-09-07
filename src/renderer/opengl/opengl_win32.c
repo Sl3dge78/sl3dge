@@ -1,4 +1,4 @@
-#include <sl3dge-utils/sl3dge.h>
+#include "utils/sl3dge.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -57,7 +57,7 @@ void PlatformCreateorUpdateOpenGLContext(Renderer *renderer, PlatformWindow *win
         wglDeleteContext(window->opengl_rc);
         window->opengl_rc = 0;
     }
-
+    
     PIXELFORMATDESCRIPTOR desired_pixel_fmt = {0};
     desired_pixel_fmt.nSize = sizeof(PIXELFORMATDESCRIPTOR);
     desired_pixel_fmt.nVersion = 1;
@@ -65,34 +65,34 @@ void PlatformCreateorUpdateOpenGLContext(Renderer *renderer, PlatformWindow *win
     desired_pixel_fmt.cColorBits = 32;
     desired_pixel_fmt.cAlphaBits = 8;
     desired_pixel_fmt.iLayerType = PFD_MAIN_PLANE;
-
+    
     i32 suggested_pixel_fmt_id = ChoosePixelFormat(window->dc, &desired_pixel_fmt);
     PIXELFORMATDESCRIPTOR suggested_pixel_fmt;
     DescribePixelFormat(
-        window->dc, suggested_pixel_fmt_id, sizeof(PIXELFORMATDESCRIPTOR), &suggested_pixel_fmt);
+                        window->dc, suggested_pixel_fmt_id, sizeof(PIXELFORMATDESCRIPTOR), &suggested_pixel_fmt);
     SetPixelFormat(window->dc, suggested_pixel_fmt_id, &suggested_pixel_fmt);
-
+    
     HGLRC temp_rc = wglCreateContext(window->dc);
     if(!wglMakeCurrent(window->dc, temp_rc)) {
         DWORD error = GetLastError();
         sError("Unable to init opengl %d", error);
     }
-
+    
     i32 version_major = 0;
     glGetIntegerv(GL_MAJOR_VERSION, &version_major);
     i32 version_minor = 0;
     glGetIntegerv(GL_MINOR_VERSION, &version_minor);
     sLog("OpenGL V%d.%d", version_major, version_minor);
-
+    
     i32 attribs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB,
-                     version_major,
-                     WGL_CONTEXT_MINOR_VERSION_ARB,
-                     version_minor,
-                     WGL_CONTEXT_FLAGS_ARB,
-                     WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
-                     WGL_CONTEXT_PROFILE_MASK_ARB,
-                     WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-                     0};
+        version_major,
+        WGL_CONTEXT_MINOR_VERSION_ARB,
+        version_minor,
+        WGL_CONTEXT_FLAGS_ARB,
+        WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+        WGL_CONTEXT_PROFILE_MASK_ARB,
+        WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+        0};
     PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB = NULL;
     wglCreateContextAttribsARB =
         (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");

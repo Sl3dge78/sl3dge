@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sl3dge-utils/sl3dge.h>
+#include "utils/sl3dge.h"
 
 enum event_type {
     EVENT_TYPE_QUIT,

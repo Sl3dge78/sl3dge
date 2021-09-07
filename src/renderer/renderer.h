@@ -1,7 +1,6 @@
-#ifndef RENDERER_H
-#define RENDERER_H
+#pragma once
 
-#include <sl3dge-utils/sl3dge.h>
+#include "utils/sl3dge.h"
 
 #include "platform/platform.h"
 #include "renderer/renderer_api.h"
@@ -26,6 +25,16 @@ typedef struct SkinnedVertex {
 
 typedef u32 MeshHandle;
 
+typedef struct SkinnedMesh {
+    MeshHandle mesh;
+    u32 joint_count;
+    Mat4 *joints;
+    i32 *joint_parents;
+    u32 *joint_children_count;
+    u32 **joint_children;
+    Mat4 *inverse_bind_matrices;
+} SkinnedMesh;
+
 // -----------
 // Push Buffer
 
@@ -40,6 +49,7 @@ typedef enum PushBufferEntryType {
     PushBufferEntryType_Text,
     PushBufferEntryType_Mesh,
     PushBufferEntryType_Texture,
+    PushBufferEntryType_Bone,
 } PushBufferEntryType;
 
 typedef struct PushBufferEntryUIQuad {
@@ -62,6 +72,11 @@ typedef struct PushBufferEntryMesh {
     Vec3 diffuse_color;
 } PushBufferEntryMesh;
 
+typedef struct PushBufferEntryBone {
+    PushBufferEntryType type;
+    Vec3 line[2];
+} PushBufferEntryBone;
+
 typedef struct PushBufferEntryTexture {
     PushBufferEntryType type;
     u32 l, t, r, b;
@@ -78,4 +93,3 @@ internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32
 internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color);
 internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform, Vec3 diffuse_color);
 
-#endif

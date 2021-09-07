@@ -7,8 +7,8 @@ REM SET rdr_arg=-DRENDERER_VULKAN -I %VULKAN_SDK%\include -L %VULKAN_SDK%\lib -l
 SET rdr_arg=-DRENDERER_OPENGL -lOpenGL32.lib -lGdi32.lib
 
 SET args= -std=c17 -D__WIN32__ -g -DDEBUG -D_DEBUG -debug -D_CRT_SECURE_NO_WARNINGS -Werror -Wall -Wno-unused-function -Wgnu-empty-initializer
-SET include_path=-I D:\Guigui\Work\Prog\_include\  -I src/
-SET linker_options=-L D:\Guigui\Work\Prog\_lib -Xlinker -incremental:no
+SET include_path=-I include/ -I src/
+SET linker_options=-Xlinker -incremental:no
 SET libs=
 
 SET start_time=%TIME%

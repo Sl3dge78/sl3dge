@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <sl3dge-utils/sl3dge.h>
+#include "utils/sl3dge.h"
 
 #include "game.h"
 #include "platform/platform.h"
@@ -26,12 +26,12 @@ u32 GameGetSize() {
 void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
     global_renderer = renderer;
     platform = platform_api;
-
+    
     GLLoadFunctions();
-
+    
     ConsoleInit(&game_data->console);
     global_console = &game_data->console;
-
+    
     Leak_SetList(platform_api->DebugInfo);
 }
 
@@ -42,27 +42,25 @@ void GameStart(GameData *game_data) {
     game_data->camera.position = (Vec3){0.0f, 1.7f, 0.0f};
     game_data->cos = 0;
     RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_dir, -1.0)));
-
+    
     platform->SetCaptureMouse(true);
     game_data->box = RendererLoadCube(global_renderer);
-
+    
     game_data->character = RendererLoadMesh(global_renderer, "resources/3d/character/character.gltf");
-
+    
     game_data->floor = RendererLoadQuad(global_renderer);
     game_data->floor_xform = mat4_identity();
     mat4_scaleby(&game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
-
+    
     game_data->npc_xform = mat4_identity();
     mat4_translateby(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
     game_data->npc2_xform = mat4_identity();
-
+    
     game_data->interact_sphere_diameter = 1.0f;
-
-    SkinnedMesh mesh = {0};
-    RendererLoadSkinnedMesh(global_renderer, "resources/models/gltf_samples/SimpleSkin/glTF/SimpleSkin.gltf", &mesh);
+    
+    RendererLoadSkinnedMesh(global_renderer, "resources/models/gltf_samples/SimpleSkin/glTF/SimpleSkin.gltf", &game_data->skinned_mesh);
+    game_data->simple_skinning = game_data->skinned_mesh.mesh;
     game_data->simple_skinning_root = mat4_identity();
-    game_data->bone_1 = mat4_identity();
-    game_data->bone_2 = mat4_identity();
 }
 
 /// Do deallocation here
@@ -72,7 +70,7 @@ void GameEnd(GameData *game_data) {
 
 void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     f32 look_speed = 0.01f;
-
+    
     if(input->mouse_delta_x != 0) {
         camera->spherical_coordinates.x += look_speed * input->mouse_delta_x;
     }
@@ -82,22 +80,22 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
             camera->spherical_coordinates.y = new_rot;
         }
     }
-
+    
     camera->forward = spherical_to_carthesian(camera->spherical_coordinates);
-
+    
     Vec3 flat_forward = vec3_normalize((Vec3){camera->forward.x, 0.0f, camera->forward.z});
     Vec3 right = vec3_cross(flat_forward, (Vec3){0.0f, 1.0f, 0.0f});
-
+    
     // --------------
     // Move
-
+    
     f32 move_speed = 0.1f;
     Vec3 movement = {0};
-
+    
     if(input->keyboard[SCANCODE_LSHIFT]) {
         move_speed *= 5.0f;
     }
-
+    
     if(input->keyboard[SCANCODE_W]) {
         movement = vec3_add(movement, vec3_fmul(flat_forward, move_speed));
     }
@@ -118,15 +116,15 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
             movement.y += move_speed;
         }
     }
-
+    
     camera->position = vec3_add(camera->position, movement);
-
+    
     if(!is_free_cam) {
         camera->position.y = 1.7f;
     }
-
+    
     Mat4 cam = mat4_look_at(vec3_add(camera->forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f});
-
+    
     RendererSetCamera(global_renderer, &cam, camera->position);
 }
 
@@ -134,7 +132,8 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
 void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // ----------
     // Input
-
+    
+    // Console
     if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
         if(game_data->console.console_target <= 0) { // Console is closed, open it
             game_data->console.console_target = 300;
@@ -146,15 +145,15 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
             platform->SetCaptureMouse(true);
         }
     }
-
+    
     if(game_data->console.console_open) {
         InputConsole(&game_data->console, input, game_data);
     } else {
         FPSCamera(&game_data->camera, input, game_data->is_free_cam);
-
+        
         // Interact sphere
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
-
+        
         game_data->debug = mat4_identity();
         mat4_translateby(&game_data->debug, game_data->interact_sphere_pos);
         mat4_scaleby(&game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
@@ -163,20 +162,20 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
                 mat4_rotate_euler(&game_data->npc_xform, (Vec3){0.0f, 1.0f, 0.0f});
             }
         }
-
+        
         // Move the sun
         if(input->keyboard[SCANCODE_P]) {
             game_data->cos += delta_time;
             game_data->light_dir.x = cos(game_data->cos);
             game_data->light_dir.y = sin(game_data->cos);
-
+            
             if(game_data->cos > 2.0f * PI) {
                 game_data->cos = 0.0f;
             }
             RendererSetSunDirection(
-                global_renderer, game_data->light_dir);
+                                    global_renderer, game_data->light_dir);
         }
-
+        
         if(input->keyboard[SCANCODE_O]) {
             game_data->cos -= delta_time;
             game_data->light_dir.x = cos(game_data->cos);
@@ -184,44 +183,56 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
             if(game_data->cos < 0.0f) {
                 game_data->cos = 2.0f * PI;
             }
-
+            
             RendererSetSunDirection(
-                global_renderer, game_data->light_dir);
+                                    global_renderer, game_data->light_dir);
+        }
+        
+        if(input->keyboard[SCANCODE_Y]) {
+            Vec3 translation = mat4_get_translation(&game_data->skinned_mesh.joints[0]);
+            game_data->skinned_mesh.joints[0] = trs_to_mat4(translation, (Vec3) {90.f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+        }
+        if(input->keyboard[SCANCODE_U]) {
+            Vec3 translation = mat4_get_translation(&game_data->skinned_mesh.joints[1]);
+            game_data->skinned_mesh.joints[1] = trs_to_mat4(translation, (Vec3) {90.f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
         }
     }
-
+    
     // --------------
     // Event
-
+    
     EventType e;
     while(EventConsume(&game_data->event_queue, &e)) {
         switch(e) {
-        case(EVENT_TYPE_QUIT): {
-            platform->RequestExit();
-        } break;
-        case(EVENT_TYPE_RESTART): {
-            GameStart(game_data);
-        } break;
-        case(EVENT_TYPE_RELOADSHADERS): {
-            RendererReloadShaders(global_renderer, platform);
-        } break;
-        default:
-
+            case(EVENT_TYPE_QUIT): {
+                platform->RequestExit();
+            } break;
+            case(EVENT_TYPE_RESTART): {
+                GameStart(game_data);
+            } break;
+            case(EVENT_TYPE_RELOADSHADERS): {
+                RendererReloadShaders(global_renderer, platform);
+            } break;
+            default:
+            
             break;
         };
     }
-
+    
     // -------------
     // Drawing
-
+    
     DrawConsole(&game_data->console, game_data);
-
+    
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->character, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
     //PushMesh(global_renderer, game_data->character, &game_data->npc2_xform, (Vec3){1.0f, 1.0f, 1.0f});
     PushMesh(global_renderer, game_data->simple_skinning, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     //PushMesh(global_renderer, game_data->box, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
-
+    
+    PushBone(global_renderer, &game_data->skinned_mesh.joints[0], &game_data->skinned_mesh.joints[1]);
+    PushBone(global_renderer, &game_data->skinned_mesh.joints[0], 0);
+    
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }
 

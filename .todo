@@ -16,11 +16,11 @@ GAME:
 
 OPENGL RENDERER :
     CRITICAL:
-        - Skinned meshes
+        - Skinned meshes https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md
             - Load vertex data
-                / Load Joint and Weight data OK
+                / Load Joint and Weight data 
                 - Test that the gpu got it well!
-            / Load node (joints) data OK
+            / Load node (joints) data 
                 / Matrices OK
             - Draw skeleton for debug!!
             - Calculate deformation herarchy

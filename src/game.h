@@ -1,7 +1,7 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include <sl3dge-utils/sl3dge.h>
+#include "utils/sl3dge.h"
 
 #include "game_api.h"
 #include "renderer/renderer.h"
@@ -18,30 +18,29 @@ typedef struct GameData {
     // System stuff
     Console console;
     EventQueue event_queue;
-
+    
     bool is_free_cam;
     Camera camera;
-
+    
     Vec3 light_dir;
     f32 cos;
-
+    
     MeshHandle floor;
     MeshHandle box;
     MeshHandle character;
-
+    
     Mat4 floor_xform;
     Mat4 npc_xform;
     Mat4 npc2_xform;
-
+    
     Vec3 interact_sphere_pos;
     f32 interact_sphere_diameter;
     Mat4 debug;
-
+    
     MeshHandle simple_skinning;
     Mat4 simple_skinning_root;
-    Mat4 bone_1;
-    Mat4 bone_2;
-
+    SkinnedMesh skinned_mesh;
+    
 } GameData;
 
 DLL_EXPORT GameGetSize_t GameGetSize;

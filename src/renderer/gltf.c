@@ -1,7 +1,7 @@
-#include <sl3dge-utils/sl3dge.h>
+#include "utils/sl3dge.h"
 
 #define CGLTF_IMPLEMENTATION
-#include <cgltf/cgltf.h>
+#include <cgltf.h>
 
 #include "renderer/renderer.h"
 
@@ -10,32 +10,32 @@ GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst
     const cgltf_buffer_view *view = acc->buffer_view;
     char *buf = (char *)view->buffer->data + view->offset + acc->offset;
     const u32 stride = acc->stride;
-
+    
     size_t size = 0;
     switch(acc->component_type) {
-    case cgltf_component_type_r_16u: size = sizeof(u16); break;
-    case cgltf_component_type_r_32u: size = sizeof(u32); break;
-    case cgltf_component_type_r_32f: size = sizeof(f32); break;
-    case cgltf_component_type_r_8u: size = sizeof(u8); break;
-    default:
+        case cgltf_component_type_r_16u: size = sizeof(u16); break;
+        case cgltf_component_type_r_32u: size = sizeof(u32); break;
+        case cgltf_component_type_r_32f: size = sizeof(f32); break;
+        case cgltf_component_type_r_8u: size = sizeof(u8); break;
+        default:
         sError("Unsupported component type : %d", acc->component_type);
         ASSERT(0);
         break;
     };
     switch(acc->type) {
-    case cgltf_type_scalar: break;
-    case cgltf_type_vec4: size *= 4; break;
-    case cgltf_type_vec3: size *= 3; break;
-    case cgltf_type_vec2: size *= 2; break;
-    case cgltf_type_mat4: size *= 4 * 4; break;
-    default:
+        case cgltf_type_scalar: break;
+        case cgltf_type_vec4: size *= 4; break;
+        case cgltf_type_vec3: size *= 3; break;
+        case cgltf_type_vec2: size *= 2; break;
+        case cgltf_type_mat4: size *= 4 * 4; break;
+        default:
         sError("Unsupported type : %d", acc->type);
         ASSERT(0);
         break;
     };
-
+    
     dst = (void *)((char *)dst + offset);
-
+    
     for(u32 i = 0; i < acc->count; i++) {
         memcpy(dst, buf, size);
         buf += stride;
@@ -60,7 +60,7 @@ inline u32 GLTFGetMaterialID(cgltf_material *mat) {
 inline u32 GLTFGetTextureID(cgltf_texture *texture) {
     if(!texture)
         return UINT_MAX;
-
+    
     return texture->id;
 }
 
@@ -76,22 +76,22 @@ void *GLTFGetVertexBuffer(cgltf_primitive *prim, u32 *size) {
     *size = prim->attributes[0].data->count * sizeof(Vertex);
     for(u32 a = 0; a < prim->attributes_count; ++a) {
         switch(prim->attributes[a].type) {
-        case cgltf_attribute_type_position: {
-            GLTFCopyAccessor(
-                prim->attributes[a].data, result, offsetof(Vertex, pos), sizeof(Vertex));
-        } break;
-
-        case cgltf_attribute_type_normal: {
-            GLTFCopyAccessor(
-                prim->attributes[a].data, result, offsetof(Vertex, normal), sizeof(Vertex));
-        } break;
-        case cgltf_attribute_type_texcoord: {
-            GLTFCopyAccessor(
-                prim->attributes[a].data, result, offsetof(Vertex, uv), sizeof(Vertex));
-        } break;
-        default: {
-            continue;
-        }
+            case cgltf_attribute_type_position: {
+                GLTFCopyAccessor(
+                                 prim->attributes[a].data, result, offsetof(Vertex, pos), sizeof(Vertex));
+            } break;
+            
+            case cgltf_attribute_type_normal: {
+                GLTFCopyAccessor(
+                                 prim->attributes[a].data, result, offsetof(Vertex, normal), sizeof(Vertex));
+            } break;
+            case cgltf_attribute_type_texcoord: {
+                GLTFCopyAccessor(
+                                 prim->attributes[a].data, result, offsetof(Vertex, uv), sizeof(Vertex));
+            } break;
+            default: {
+                continue;
+            }
         }
     }
     return result;
@@ -102,28 +102,28 @@ void *GLTFGetSkinnedVertexBuffer(cgltf_primitive *prim, u32 *size) {
     *size = prim->attributes[0].data->count * sizeof(SkinnedVertex);
     for(u32 a = 0; a < prim->attributes_count; ++a) {
         switch(prim->attributes[a].type) {
-        case cgltf_attribute_type_position: {
-            GLTFCopyAccessor(
-                prim->attributes[a].data, result, offsetof(SkinnedVertex, pos), sizeof(SkinnedVertex));
-        } break;
-
-        case cgltf_attribute_type_normal: {
-            GLTFCopyAccessor(
-                prim->attributes[a].data, result, offsetof(SkinnedVertex, normal), sizeof(SkinnedVertex));
-        } break;
-        case cgltf_attribute_type_texcoord: {
-            GLTFCopyAccessor(
-                prim->attributes[a].data, result, offsetof(SkinnedVertex, uv), sizeof(SkinnedVertex));
-        } break;
-        case cgltf_attribute_type_joints: {
-            GLTFCopyAccessor(prim->attributes[a].data, result, offsetof(SkinnedVertex, joints), sizeof(SkinnedVertex));
-        } break;
-        case cgltf_attribute_type_weights: {
-            GLTFCopyAccessor(prim->attributes[a].data, result, offsetof(SkinnedVertex, weights), sizeof(SkinnedVertex));
-        } break;
-        default: {
-            continue;
-        }
+            case cgltf_attribute_type_position: {
+                GLTFCopyAccessor(
+                                 prim->attributes[a].data, result, offsetof(SkinnedVertex, pos), sizeof(SkinnedVertex));
+            } break;
+            
+            case cgltf_attribute_type_normal: {
+                GLTFCopyAccessor(
+                                 prim->attributes[a].data, result, offsetof(SkinnedVertex, normal), sizeof(SkinnedVertex));
+            } break;
+            case cgltf_attribute_type_texcoord: {
+                GLTFCopyAccessor(
+                                 prim->attributes[a].data, result, offsetof(SkinnedVertex, uv), sizeof(SkinnedVertex));
+            } break;
+            case cgltf_attribute_type_joints: {
+                GLTFCopyAccessor(prim->attributes[a].data, result, offsetof(SkinnedVertex, joints), sizeof(SkinnedVertex));
+            } break;
+            case cgltf_attribute_type_weights: {
+                GLTFCopyAccessor(prim->attributes[a].data, result, offsetof(SkinnedVertex, weights), sizeof(SkinnedVertex));
+            } break;
+            default: {
+                continue;
+            }
         }
     }
     return result;
@@ -208,7 +208,7 @@ void GLTFGetNodeTransform(const cgltf_node *node, Mat4 *transform) {
         Vec3 t = {node->translation[0], node->translation[1], node->translation[2]};
         Quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]};
         Vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
-
+        
         trs_quat_to_mat4(transform, &t, &r, &s);
     }
 }
@@ -217,33 +217,33 @@ void GLTFLoadTransforms(cgltf_data *data, Mat4 *transforms) {
     for(u32 i = 0; i < data->nodes_count; i++) {
         transforms[i] = mat4_identity();
         cgltf_node *node = &data->nodes[i];
-
+        
         GLTFGetNodeTransform(node, &transforms[i]);
-
+        
         cgltf_node *parent = node->parent;
-
+        
         while(parent) {
             Mat4 pm = {0};
             GLTFGetNodeTransform(parent, &pm);
-
+            
             for(u32 j = 0; j < 4; ++j) {
                 float l0 = transforms[i].m[j][0];
                 float l1 = transforms[i].m[j][1];
                 float l2 = transforms[i].m[j][2];
-
+                
                 float r0 = l0 * pm.v[0] + l1 * pm.v[4] + l2 * pm.v[8];
                 float r1 = l0 * pm.v[1] + l1 * pm.v[5] + l2 * pm.v[9];
                 float r2 = l0 * pm.v[2] + l1 * pm.v[6] + l2 * pm.v[10];
-
+                
                 transforms[i].m[j][0] = r0;
                 transforms[i].m[j][1] = r1;
                 transforms[i].m[j][2] = r2;
             }
-
+            
             transforms[i].m[3][0] += pm.m[3][0];
             transforms[i].m[3][1] += pm.m[3][1];
             transforms[i].m[3][2] += pm.m[3][2];
-
+            
             parent = parent->parent;
         }
     }

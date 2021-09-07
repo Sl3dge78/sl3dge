@@ -1,5 +1,5 @@
 //#pragma once
-#include <sl3dge-utils/sl3dge.h>
+#include "utils/sl3dge.h"
 
 typedef struct Renderer Renderer;
 

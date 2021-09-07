@@ -18,10 +18,10 @@
 #endif
 
 #define STB_TRUETYPE_IMPLEMENTATION
-#include <stb/stb_truetype.h>
+#include <stb_truetype.h>
 
-#include <sl3dge-utils/sl3dge.h>
-#include <cgltf/cgltf.h>
+#include "utils/sl3dge.h"
+#include <cgltf.h>
 
 #include "renderer/renderer.h"
 #include "renderer/opengl/opengl_renderer.h"
@@ -48,51 +48,51 @@ void APIENTRY GLMessageCallback(GLenum source,
 // ---------------
 // Programs & shaders
 
-internal bool CheckShaderCompilation(u32 shader) {
+internal bool CheckShaderCompilation(u32 shader, const char *path) {
     i32 result;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &result);
     if(!result) {
         char log[512];
         glGetShaderInfoLog(shader, 512, NULL, log);
-        sError("Unable to compile shader:\n%s", log);
+        sError("Unable to compile shader: %s\n%s", path, log);
     }
     return result;
 }
 
-internal u32 CreateAndCompileShader(GLenum type, const char *code) {
+internal u32 CreateAndCompileShader(GLenum type, const char *code, const char *path) {
     u32 result = glCreateShader(type);
     glShaderSource(result, 1, &code, NULL);
     glCompileShader(result);
-    ASSERT(CheckShaderCompilation(result));
+    ASSERT(CheckShaderCompilation(result, path));
     return result;
 }
 
 internal u32 CreateProgram(PlatformAPI *platform, const char *name) {
     u32 result = glCreateProgram();
     char buffer[128] = {0};
-
+    
     snprintf(buffer, 128, "resources/shaders/gl/%s.vert", name);
-
+    
     i32 file_size = 0;
     platform->ReadWholeFile(buffer, &file_size, NULL);
     char *vtx_code = sCalloc(file_size, sizeof(char));
     platform->ReadWholeFile(buffer, &file_size, vtx_code);
-
+    
     ASSERT(vtx_code != NULL); // Vertex shaders are mandatory
-    u32 vtx_shader = CreateAndCompileShader(GL_VERTEX_SHADER, vtx_code);
+    u32 vtx_shader = CreateAndCompileShader(GL_VERTEX_SHADER, vtx_code, buffer);
     sFree(vtx_code);
     glAttachShader(result, vtx_shader);
-
+    
     snprintf(buffer, 128, "resources/shaders/gl/%s.frag", name);
     platform->ReadWholeFile(buffer, &file_size, NULL);
     char *frag_code = sCalloc(file_size, sizeof(char));
     platform->ReadWholeFile(buffer, &file_size, frag_code);
-
+    
     u32 frag_shader = 0;
     if(frag_code == NULL) {
         sLog("No fragment shader for %s", name);
     } else {
-        u32 frag_shader = CreateAndCompileShader(GL_FRAGMENT_SHADER, frag_code);
+        u32 frag_shader = CreateAndCompileShader(GL_FRAGMENT_SHADER, frag_code, buffer);
         sFree(frag_code);
         glAttachShader(result, frag_shader);
     }
@@ -113,18 +113,18 @@ internal u32 CreateProgram(PlatformAPI *platform, const char *name) {
 
 internal void CreateShadowmapRenderPass(PlatformAPI *platform_api, ShadowmapRenderPass *pass) {
     pass->program = CreateProgram(platform_api, "shadow");
-
+    
     glGenTextures(1, &pass->texture);
     glBindTexture(GL_TEXTURE_2D, pass->texture);
     glTexImage2D(
-        GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 2048, 2048, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                 GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 2048, 2048, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     Vec4 border_color = {1.0f, 1.0f, 1.0f, 1.0f};
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, (f32 *)&border_color);
-
+    
     glGenFramebuffers(1, &pass->framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
     glObjectLabel(GL_FRAMEBUFFER, pass->framebuffer, -1, "Shadowmap framebuffer");
@@ -142,7 +142,7 @@ internal void BeginShadowmapRenderPass(ShadowmapRenderPass *pass) {
     glViewport(0, 0, 2048, 2048);
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
     glClear(GL_DEPTH_BUFFER_BIT);
-
+    
     glUseProgram(pass->program);
 }
 
@@ -154,11 +154,11 @@ internal void CreateColorRenderPass(PlatformAPI *platform_api, const u32 width, 
     glUseProgram(pass->program);
     glUniform1i(glGetUniformLocation(pass->program, "shadow_map"), 0);
     glUniform1i(glGetUniformLocation(pass->program, "diffuse"), 1);
-
+    
     glGenFramebuffers(1, &pass->framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
     glObjectLabel(GL_FRAMEBUFFER, pass->framebuffer, -1, "Color framebuffer");
-
+    
     // Color attachment
     glGenTextures(1, &pass->render_target);
     glBindTexture(GL_TEXTURE_2D, pass->render_target);
@@ -166,13 +166,13 @@ internal void CreateColorRenderPass(PlatformAPI *platform_api, const u32 width, 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(
-        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pass->render_target, 0);
-
+                           GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pass->render_target, 0);
+    
     // Depth attachment
     glGenTextures(1, &pass->depthmap);
     glBindTexture(GL_TEXTURE_2D, pass->depthmap);
     glTexImage2D(
-        GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                 GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -191,17 +191,17 @@ internal void DestroyColorRenderPass(ColorRenderPass *pass) {
 internal void BeginColorRenderPass(Renderer *renderer, ColorRenderPass *pass) {
     glEnable(GL_DEPTH_TEST);
     glViewport(0, 0, renderer->width, renderer->height);
-
+    
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
     glClearColor(0.43f, 0.77f, 0.91f, 0.0f);
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
+    
     glUseProgram(pass->program);
-
+    
     // Shadowmap
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
-
+    
     // Camera proj
     glUniformMatrix4fv(glGetUniformLocation(renderer->color_pass.program, "projection"), 1, GL_FALSE, renderer->camera_proj.v);
     glUniformMatrix4fv(glGetUniformLocation(renderer->color_pass.program, "view"), 1, GL_FALSE, renderer->camera_view.v);
@@ -214,7 +214,7 @@ internal void BeginColorRenderPass(Renderer *renderer, ColorRenderPass *pass) {
 
 internal void CreateVolumetricRenderPass(PlatformAPI *platform_api, VolumetricRenderPass *pass) {
     pass->program = CreateProgram(platform_api, "volumetric");
-
+    
     glUseProgram(pass->program);
     glUniform1i(glGetUniformLocation(pass->program, "shadow_map"), 0);
     glUniform1i(glGetUniformLocation(pass->program, "depth_map"), 1);
@@ -231,13 +231,13 @@ internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass
     glDisable(GL_BLEND);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-
+    
     glUseProgram(pass->program);
     glUniformMatrix4fv(
-        glGetUniformLocation(pass->program, "cam_view"), 1, GL_FALSE, renderer->camera_view.v);
-
+                       glGetUniformLocation(pass->program, "cam_view"), 1, GL_FALSE, renderer->camera_view.v);
+    
     glUniformMatrix4fv(glGetUniformLocation(renderer->vol_pass.program, "proj_inverse"), 1, GL_FALSE, renderer->camera_proj_inverse.v);
-
+    
     glUniformMatrix4fv(glGetUniformLocation(pass->program, "view_inverse"),
                        1,
                        GL_FALSE,
@@ -246,7 +246,7 @@ internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass
                 renderer->camera_pos.x,
                 renderer->camera_pos.y,
                 renderer->camera_pos.z);
-
+    
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
     glActiveTexture(GL_TEXTURE1);
@@ -273,22 +273,22 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     renderer->window = window;
     PlatformCreateorUpdateOpenGLContext(renderer, window);
     GLLoadFunctions();
-
+    
     // Global init
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(GLMessageCallback, 0);
     glDisable(GL_CULL_FACE);
-
+    
     // Meshes
     renderer->mesh_count = 0;
     renderer->mesh_capacity = 8;
     renderer->meshes = sCalloc(renderer->mesh_capacity, sizeof(Mesh));
-
+    
     // Render passes
     CreateShadowmapRenderPass(platform_api, &renderer->shadowmap_pass);
     CreateColorRenderPass(platform_api, window->w, window->h, &renderer->color_pass);
     CreateVolumetricRenderPass(platform_api, &renderer->vol_pass);
-
+    
     // Screen quad
     glGenVertexArrays(1, &renderer->screen_quad);
     glBindVertexArray(renderer->screen_quad);
@@ -300,32 +300,32 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
     glEnableVertexAttribArray(1);
-
+    
     { // UI
         // Init push buffer
         renderer->ui_pushbuffer.size = 0;
         renderer->ui_pushbuffer.max_size = sizeof(PushBufferEntryText) * 256;
         renderer->ui_pushbuffer.buf = sCalloc(renderer->ui_pushbuffer.max_size, 1);
-
+        
         // Load font
         unsigned char *ttf_buffer = sCalloc(1 << 20, sizeof(unsigned char));
         FILE *f = fopen("resources/font/LiberationMono-Regular.ttf", "rb");
         ASSERT(f);
         fread(ttf_buffer, 1, 1 << 20, f);
         fclose(f);
-
+        
         unsigned char *temp_bmp = sCalloc(512 * 512, sizeof(unsigned char));
         renderer->char_data = sCalloc(96, sizeof(stbtt_bakedchar));
-
+        
         stbtt_BakeFontBitmap(ttf_buffer, 0, 20.0f, temp_bmp, 512, 512, 32, 96, renderer->char_data);
-
+        
         sFree(ttf_buffer);
         glGenTextures(1, &renderer->glyphs_texture);
         glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 512, 512, 0, GL_RED, GL_UNSIGNED_BYTE, temp_bmp);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         sFree(temp_bmp);
-
+        
         // Init glyph array
         glGenVertexArrays(1, &renderer->ui_vertex_array);
         glBindVertexArray(renderer->ui_vertex_array);
@@ -335,29 +335,37 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), (void *)(2 * sizeof(f32)));
         glEnableVertexAttribArray(1);
-
+        
         // Load ui shader
         renderer->ui_program = CreateProgram(platform_api, "ui");
         glUseProgram(renderer->ui_program);
         glUniform1i(glGetUniformLocation(renderer->ui_program, "alpha_map"), 0);
         glUniform1i(glGetUniformLocation(renderer->ui_program, "color_texture"), 1);
-
+        
         // Load white texture
         glGenTextures(1, &renderer->white_texture);
         glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
         u8 *white = sCalloc(4 * 4 * 3, sizeof(u8));
         memset(white, 255, 4 * 4 * 3 * sizeof(u8));
-
+        
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 4, 4, 0, GL_RGB, GL_UNSIGNED_BYTE, white);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         sFree(white);
     }
-
+    
     { // Scene
         renderer->scene_pushbuffer.size = 0;
         renderer->scene_pushbuffer.max_size = sizeof(PushBufferEntryMesh) * 70;
         renderer->scene_pushbuffer.buf = sCalloc(renderer->scene_pushbuffer.max_size, 1);
+    }
+    
+    { // Debug 
+        renderer->line_program = CreateProgram(platform_api, "bone");
+        renderer->debug_pushbuffer.size = 0;
+        renderer->debug_pushbuffer.max_size = sizeof(PushBufferEntryBone) * 20;
+        renderer->debug_pushbuffer.buf = sCalloc(renderer->debug_pushbuffer.max_size, 1);
+        
     }
     UpdateCameraProj(renderer);
 }
@@ -366,20 +374,21 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     // UI
     sFree(renderer->ui_pushbuffer.buf);
     sFree(renderer->scene_pushbuffer.buf);
-
+    sFree(renderer->debug_pushbuffer.buf);
+    
     sFree(renderer->char_data);
     glDeleteTextures(1, &renderer->white_texture);
     glDeleteTextures(1, &renderer->glyphs_texture);
-
+    
     // Render passes
     DestroyShadowmapRenderPass(&renderer->shadowmap_pass);
     DestroyColorRenderPass(&renderer->color_pass);
     DestroyVolumetricRenderPass(&renderer->vol_pass);
-
+    
     // Screen quad
     glDeleteVertexArrays(1, &renderer->screen_quad_vbuffer);
     glDeleteBuffers(1, &renderer->screen_quad);
-
+    
     // Meshes
     for(u32 i = 0; i < renderer->mesh_count; i++) {
         RendererDestroyMesh(renderer, &renderer->meshes[i]);
@@ -392,27 +401,27 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
 
 internal void DrawScene(Renderer *renderer, u32 program) {
     glActiveTexture(GL_TEXTURE1);
-
+    
     PushBuffer *pushb = &renderer->scene_pushbuffer;
     if(pushb->size == 0)
         return;
-
+    
     for(u32 address = 0; address < pushb->size;) {
         PushBufferEntryType *type = (PushBufferEntryType *)(pushb->buf + address);
-
+        
         ASSERT(*type == PushBufferEntryType_Mesh); // Only meshes for now
         PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(pushb->buf + address);
-
+        
         Mesh *mesh = &renderer->meshes[entry->mesh_handle];
-
+        
         const u32 color_uniform = glGetUniformLocation(program, "diffuse_color");
-
+        
         glBindTexture(GL_TEXTURE_2D, mesh->diffuse_texture);
         glUniform3f(color_uniform, entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z);
         glBindVertexArray(mesh->vertex_array);
         glUniformMatrix4fv(glGetUniformLocation(program, "transform"), 1, GL_FALSE, entry->transform->v);
         glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
-
+        
         address += sizeof(PushBufferEntryMesh);
     }
 }
@@ -428,141 +437,180 @@ internal void DrawUI(Renderer *renderer, PushBuffer *push_buffer) {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
+    
     glUseProgram(renderer->ui_program);
     const Mat4 ortho = mat4_ortho_gl(0, renderer->height, 0, renderer->width, -1, 1);
     glUniformMatrix4fv(glGetUniformLocation(renderer->ui_program, "proj"), 1, GL_FALSE, ortho.v);
-
+    
     glBindBuffer(GL_ARRAY_BUFFER, renderer->ui_vertex_buffer);
     glBindVertexArray(renderer->ui_vertex_array);
     const u32 color_uniform = glGetUniformLocation(renderer->ui_program, "color");
-
+    
     for(u32 address = 0; address < push_buffer->size;) {
         PushBufferEntryType *type = (PushBufferEntryType *)(push_buffer->buf + address);
-
+        
         switch(*type) {
-        case PushBufferEntryType_UIQuad: {
-            PushBufferEntryUIQuad *entry = (PushBufferEntryUIQuad *)(push_buffer->buf + address);
-
-            const f32 vtx[] = {
-                entry->l,
-                entry->t,
-                0.0f,
-                1.0f, // UL
-                entry->r,
-                entry->t,
-                1.0f,
-                1.0f, // UR
-                entry->l,
-                entry->b,
-                0.0f,
-                0.0f, // LL
-                entry->r,
-                entry->b,
-                1.0f,
-                0.0f, // LR
-            };
-            glUniform4f(
-                color_uniform, entry->colour.x, entry->colour.y, entry->colour.z, entry->colour.w);
-            glActiveTexture(GL_TEXTURE0); // Alpha map
-            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-            glActiveTexture(GL_TEXTURE1); // Color map
-            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-
-            glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-            address += sizeof(PushBufferEntryUIQuad);
-            continue;
-        }
-        case PushBufferEntryType_Text: {
-            glActiveTexture(GL_TEXTURE0); // Alpha map
-            glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
-            glActiveTexture(GL_TEXTURE1); // Color map
-            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-
-            PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + address);
-            const char *txt = entry->text;
-            f32 x = (f32)entry->x;
-            f32 y = (f32)entry->y;
-
-            while(*txt) {
-                if(*txt >= 32 && *txt <= 127) {
-                    stbtt_aligned_quad q;
-                    stbtt_GetBakedQuad(renderer->char_data, 512, 512, *txt - 32, &x, &y, &q, 1);
-
-                    f32 vtx[] = {
-                        q.x0,
-                        q.y0,
-                        q.s0,
-                        q.t0, // 0, 0
-                        q.x1,
-                        q.y0,
-                        q.s1,
-                        q.t0, // 1, 0
-                        q.x0,
-                        q.y1,
-                        q.s0,
-                        q.t1, // 0, 1
-                        q.x1,
-                        q.y1,
-                        q.s1,
-                        q.t1, // 1, 1
-                    };
-
-                    glUniform4f(color_uniform,
-                                entry->colour.x,
-                                entry->colour.y,
-                                entry->colour.z,
-                                entry->colour.w);
-                    glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), vtx, GL_DYNAMIC_DRAW);
-                    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-                }
-                txt++;
+            case PushBufferEntryType_UIQuad: {
+                PushBufferEntryUIQuad *entry = (PushBufferEntryUIQuad *)(push_buffer->buf + address);
+                
+                const f32 vtx[] = {
+                    entry->l,
+                    entry->t,
+                    0.0f,
+                    1.0f, // UL
+                    entry->r,
+                    entry->t,
+                    1.0f,
+                    1.0f, // UR
+                    entry->l,
+                    entry->b,
+                    0.0f,
+                    0.0f, // LL
+                    entry->r,
+                    entry->b,
+                    1.0f,
+                    0.0f, // LR
+                };
+                glUniform4f(
+                            color_uniform, entry->colour.x, entry->colour.y, entry->colour.z, entry->colour.w);
+                glActiveTexture(GL_TEXTURE0); // Alpha map
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+                glActiveTexture(GL_TEXTURE1); // Color map
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+                
+                glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                
+                address += sizeof(PushBufferEntryUIQuad);
+                continue;
             }
-            sFree(entry->text);
-            address += sizeof(PushBufferEntryText);
-            continue;
-        } break;
-        case PushBufferEntryType_Texture: {
-            PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + address);
-
-            const f32 vtx[] = {
-                entry->l,
-                entry->t,
-                0.0f,
-                1.0f, // UL
-                entry->r,
-                entry->t,
-                1.0f,
-                1.0f, // UR
-                entry->l,
-                entry->b,
-                0.0f,
-                0.0f, // LL
-                entry->r,
-                entry->b,
-                1.0f,
-                0.0f, // LR
-            };
-            glUniform4f(
-                color_uniform, 1.0f, 1.0f, 1.0f, 1.0f);
-            glActiveTexture(GL_TEXTURE0); // Alpha map
-            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-            glActiveTexture(GL_TEXTURE1); // Color map
-            glBindTexture(GL_TEXTURE_2D, entry->texture);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-            glActiveTexture(GL_TEXTURE1); // Color map
-            glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-
-            address += sizeof(PushBufferEntryTexture);
-            continue;
+            case PushBufferEntryType_Text: {
+                glActiveTexture(GL_TEXTURE0); // Alpha map
+                glBindTexture(GL_TEXTURE_2D, renderer->glyphs_texture);
+                glActiveTexture(GL_TEXTURE1); // Color map
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+                
+                PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + address);
+                const char *txt = entry->text;
+                f32 x = (f32)entry->x;
+                f32 y = (f32)entry->y;
+                
+                while(*txt) {
+                    if(*txt >= 32 && *txt <= 127) {
+                        stbtt_aligned_quad q;
+                        stbtt_GetBakedQuad(renderer->char_data, 512, 512, *txt - 32, &x, &y, &q, 1);
+                        
+                        f32 vtx[] = {
+                            q.x0,
+                            q.y0,
+                            q.s0,
+                            q.t0, // 0, 0
+                            q.x1,
+                            q.y0,
+                            q.s1,
+                            q.t0, // 1, 0
+                            q.x0,
+                            q.y1,
+                            q.s0,
+                            q.t1, // 0, 1
+                            q.x1,
+                            q.y1,
+                            q.s1,
+                            q.t1, // 1, 1
+                        };
+                        
+                        glUniform4f(color_uniform,
+                                    entry->colour.x,
+                                    entry->colour.y,
+                                    entry->colour.z,
+                                    entry->colour.w);
+                        glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), vtx, GL_DYNAMIC_DRAW);
+                        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                    }
+                    txt++;
+                }
+                sFree(entry->text);
+                address += sizeof(PushBufferEntryText);
+                continue;
+            } break;
+            case PushBufferEntryType_Texture: {
+                PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + address);
+                
+                const f32 vtx[] = {
+                    entry->l,
+                    entry->t,
+                    0.0f,
+                    1.0f, // UL
+                    entry->r,
+                    entry->t,
+                    1.0f,
+                    1.0f, // UR
+                    entry->l,
+                    entry->b,
+                    0.0f,
+                    0.0f, // LL
+                    entry->r,
+                    entry->b,
+                    1.0f,
+                    0.0f, // LR
+                };
+                glUniform4f(
+                            color_uniform, 1.0f, 1.0f, 1.0f, 1.0f);
+                glActiveTexture(GL_TEXTURE0); // Alpha map
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+                glActiveTexture(GL_TEXTURE1); // Color map
+                glBindTexture(GL_TEXTURE_2D, entry->texture);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), &vtx, GL_DYNAMIC_DRAW);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+                
+                glActiveTexture(GL_TEXTURE1); // Color map
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+                
+                address += sizeof(PushBufferEntryTexture);
+                continue;
+            }
+            default: {
+                ASSERT(0);
+            }
         }
-        default: {
-            ASSERT(0);
-        }
+    }
+}
+
+internal void DrawDebug(Renderer *renderer, PushBuffer *push_buffer) {
+    
+    glUseProgram(renderer->line_program);
+    
+    glUniformMatrix4fv(glGetUniformLocation(renderer->line_program, "projection"), 1, GL_FALSE, renderer->camera_proj.v);
+    glUniformMatrix4fv(glGetUniformLocation(renderer->line_program, "view"), 1, GL_FALSE, renderer->camera_view.v);
+    
+    PushBuffer *pushb = &renderer->debug_pushbuffer;
+    if(pushb->size == 0)
+        return;
+    
+    for(u32 address = 0; address < pushb->size;) {
+        PushBufferEntryType *type = (PushBufferEntryType *)(pushb->buf + address);
+        
+        switch (*type) {
+            case PushBufferEntryType_Bone: {
+                PushBufferEntryBone *entry = (PushBufferEntryBone *)(pushb->buf + address);
+                u32 vao;
+                u32 vbo;
+                glGenVertexArrays(1, &vao);
+                glBindVertexArray(vao);
+                glGenBuffers(1, &vbo);
+                glBindBuffer(GL_ARRAY_BUFFER, vbo);
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(f32), 0);
+                glEnableVertexAttribArray(0);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(entry->line), &entry->line, GL_STREAM_DRAW);
+                glDrawArrays(GL_LINES, 0, 2);
+                glDeleteBuffers(1, &vbo);
+                glDeleteVertexArrays(1, &vao);
+                address += sizeof(PushBufferEntryBone);
+                continue;
+            } break;
+            default :{
+                ASSERT(0);
+            } break;
         }
     }
 }
@@ -572,32 +620,35 @@ DLL_EXPORT void RendererDrawFrame(Renderer *renderer) {
     // Shadow map
     BeginShadowmapRenderPass(&renderer->shadowmap_pass);
     DrawScene(renderer, renderer->shadowmap_pass.program);
-
+    
     // ------------------
     // Color pass
     BeginColorRenderPass(renderer, &renderer->color_pass);
     DrawScene(renderer, renderer->color_pass.program);
-
+    
     // ---------------
     // Post process
     BeginVolumetricRenderPass(renderer, &renderer->vol_pass);
     DrawScreenQuad(renderer);
-
+    
+    DrawDebug(renderer, &renderer->debug_pushbuffer);
+    
     DrawUI(renderer, &renderer->ui_pushbuffer);
-
+    
     PlatformSwapBuffers(renderer);
-
+    
     // Clear pushbuffers
     renderer->scene_pushbuffer.size = 0; // @Optimization : Maybe we don't need to reset it each frame? do some tests
     renderer->ui_pushbuffer.size = 0;
+    renderer->debug_pushbuffer.size = 0;
 }
 
 DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_api, const u32 width, const u32 height) {
     sLog("Update window!");
-
+    
     renderer->width = width;
     renderer->height = height;
-
+    
     DestroyColorRenderPass(&renderer->color_pass);
     CreateColorRenderPass(platform_api, renderer->width, renderer->height, &renderer->color_pass);
     UpdateCameraProj(renderer);
@@ -606,10 +657,10 @@ DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_a
 void RendererReloadShaders(Renderer *renderer, PlatformAPI *platform_api) {
     DestroyColorRenderPass(&renderer->color_pass);
     CreateColorRenderPass(platform_api, renderer->width, renderer->height, &renderer->color_pass);
-
+    
     DestroyShadowmapRenderPass(&renderer->shadowmap_pass);
     CreateShadowmapRenderPass(platform_api, &renderer->shadowmap_pass);
-
+    
     DestroyVolumetricRenderPass(&renderer->vol_pass);
     CreateVolumetricRenderPass(platform_api, &renderer->vol_pass);
 }
@@ -618,14 +669,14 @@ void RendererSetCamera(Renderer *renderer, const Mat4 *view, const Vec3 pos) {
     renderer->camera_pos = pos;
     renderer->camera_view = *view;
     mat4_inverse(&renderer->camera_view, &renderer->camera_view_inverse);
-
+    
     // Update uniforms
-
+    
     // Color pass
     glUseProgram(renderer->color_pass.program);
     u32 loc = glGetUniformLocation(renderer->color_pass.program, "view");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->camera_view.v);
-
+    
     // Volumetric pass
     glUseProgram(renderer->vol_pass.program);
     loc = glGetUniformLocation(renderer->vol_pass.program, "view_inverse");
@@ -641,20 +692,20 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
                              (Vec3){0.0f, 1.0f, 0.0f});
     mat4_mul(&renderer->light_matrix, &ortho, &look);
     renderer->light_dir = direction;
-
+    
     // Update uniforms
     // Shadowmap
     glUseProgram(renderer->shadowmap_pass.program);
     u32 loc = glGetUniformLocation(renderer->shadowmap_pass.program, "light_matrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
-
+    
     // Color pass
     glUseProgram(renderer->color_pass.program);
     loc = glGetUniformLocation(renderer->color_pass.program, "light_dir");
     glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
     loc = glGetUniformLocation(renderer->color_pass.program, "light_matrix");
     glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix.v);
-
+    
     // Volumetric
     glUseProgram(renderer->vol_pass.program);
     loc = glGetUniformLocation(renderer->vol_pass.program, "light_dir");
