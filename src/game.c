@@ -58,7 +58,7 @@ void GameStart(GameData *game_data) {
     
     game_data->interact_sphere_diameter = 1.0f;
     
-    RendererLoadSkinnedMesh(global_renderer, "resources/models/gltf_samples/SimpleSkin/glTF/SimpleSkin.gltf", &game_data->skinned_mesh);
+    RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf", &game_data->skinned_mesh);
     game_data->simple_skinning = game_data->skinned_mesh.mesh;
     game_data->simple_skinning_root = mat4_identity();
 }
@@ -230,8 +230,13 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     PushMesh(global_renderer, game_data->simple_skinning, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     //PushMesh(global_renderer, game_data->box, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
     
-    PushBone(global_renderer, &game_data->skinned_mesh.joints[0], &game_data->skinned_mesh.joints[1]);
-    PushBone(global_renderer, &game_data->skinned_mesh.joints[0], 0);
+    Mat4 prev_mat = game_data->simple_skinning_root;
+    for (u32 i = 0; i < 4; i++) {
+        Mat4 mat;
+        mat4_mul(&mat, &prev_mat, &game_data->skinned_mesh.joints[i]);
+        PushBone(global_renderer, &mat);
+        prev_mat = mat;
+    }
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

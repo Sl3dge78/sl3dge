@@ -106,19 +106,18 @@ internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform, Vec
 }
 
 /// Adds a bone to the scene draw calls
-/// If child is null, draw a bone of length of 1
-internal void PushBone(Renderer *renderer, Mat4 *parent, Mat4 *child) {
+/// The matrix needs to be local
+internal void PushBone(Renderer *renderer, Mat4 *bone_matrix) {
     PushBuffer *push_buffer = &renderer->debug_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntryBone) < push_buffer->max_size);
     PushBufferEntryBone *entry = (PushBufferEntryBone *)(push_buffer->buf + push_buffer->size);
     
     entry->type = PushBufferEntryType_Bone;
-    entry->line[0] = mat4_mul_vec3(parent, (Vec3){0.0f, 0.0f, 0.0f});
-    if(child)
-        entry->line[1] = mat4_mul_vec3(child, (Vec3){0.0f, 0.0f, 0.0f});
-    else {
-        entry->line[1] = mat4_mul_vec3(parent, (Vec3){0.0f, 1.0f, 0.0f});
-    }
+    entry->line[0] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.0f, 0.0f});
+    entry->line[1] = mat4_mul_vec3(bone_matrix, (Vec3){0.1f, 0.0f, 0.0f});
+    entry->line[2] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.1f, 0.0f});
+    entry->line[3] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.0f, 0.1f});
+    
     push_buffer->size += sizeof(PushBufferEntryBone);
     
 }

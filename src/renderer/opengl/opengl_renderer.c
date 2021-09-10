@@ -592,6 +592,7 @@ internal void DrawDebug(Renderer *renderer, PushBuffer *push_buffer) {
         
         switch (*type) {
             case PushBufferEntryType_Bone: {
+                
                 PushBufferEntryBone *entry = (PushBufferEntryBone *)(pushb->buf + address);
                 u32 vao;
                 u32 vbo;
@@ -599,10 +600,36 @@ internal void DrawDebug(Renderer *renderer, PushBuffer *push_buffer) {
                 glBindVertexArray(vao);
                 glGenBuffers(1, &vbo);
                 glBindBuffer(GL_ARRAY_BUFFER, vbo);
-                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(f32), 0);
+                
+                u32 stride = sizeof(Vec3) + sizeof(Vec3);
+                
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, 0);
                 glEnableVertexAttribArray(0);
-                glBufferData(GL_ARRAY_BUFFER, sizeof(entry->line), &entry->line, GL_STREAM_DRAW);
-                glDrawArrays(GL_LINES, 0, 2);
+                glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *)(sizeof(Vec3)));
+                glEnableVertexAttribArray(1);
+                
+                const Vec3 r = (Vec3){1.0f, 0.0F, 0.0F};
+                const Vec3 g = (Vec3){0.0f, 1.0F, 0.0F};
+                const Vec3 b = (Vec3){0.0f, 0.0F, 1.0F};
+                
+                Vec3 buf[] = {
+                    entry->line[0],
+                    r,
+                    entry->line[1],
+                    r,
+                    entry->line[0],
+                    g,
+                    entry->line[2],
+                    g,
+                    entry->line[0],
+                    b,
+                    entry->line[3],
+                    b
+                };
+                
+                glBufferData(GL_ARRAY_BUFFER, sizeof(buf), &buf, GL_STREAM_DRAW);
+                
+                glDrawArrays(GL_LINES, 0, 6);
                 glDeleteBuffers(1, &vbo);
                 glDeleteVertexArrays(1, &vao);
                 address += sizeof(PushBufferEntryBone);

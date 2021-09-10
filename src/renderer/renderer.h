@@ -74,7 +74,7 @@ typedef struct PushBufferEntryMesh {
 
 typedef struct PushBufferEntryBone {
     PushBufferEntryType type;
-    Vec3 line[2];
+    Vec3 line[4]; // 0 = bone origin, 1 = X axis, 2 = Y axis, 3 = Z axis
 } PushBufferEntryBone;
 
 typedef struct PushBufferEntryTexture {
