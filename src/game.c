@@ -226,9 +226,8 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->character, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    //PushMesh(global_renderer, game_data->character, &game_data->npc2_xform, (Vec3){1.0f, 1.0f, 1.0f});
     PushMesh(global_renderer, game_data->simple_skinning, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
-    //PushMesh(global_renderer, game_data->box, &game_data->debug, (Vec3){1.0f, 0.25f, 0.25f});
+    PushSkinnedMesh(global_renderer, game_data->skinned_mesh, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     
     Mat4 prev_mat = game_data->simple_skinning_root;
     for (u32 i = 0; i < 4; i++) {

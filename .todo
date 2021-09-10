@@ -1,39 +1,82 @@
-GAME:
-    CRITICAL:
-    MAJOR:
-    BACKLOG:
-        - Create a testbed scene. And use it to develop stuff
-            - Add NPCs
-                - Dialog
-            - Add buildings
-            - ...
-    IMPROVEMENTS:
-        - Log to the console AND the game
-    IDEAS:
-        - Stat based combat
-        - Dialogues
-        - Quest tree
+-- ENGINE --
 
-OPENGL RENDERER :
-    CRITICAL:
-        - Skinned meshes https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md
-            - Load vertex data
-                / Load Joint and Weight data 
-                - Test that the gpu got it well!
-            / Load node (joints) data 
-                / Matrices OK
-            - Draw skeleton for debug!!
-            - Calculate deformation herarchy
-            - Do a new vertex shader
-            - Send it all to the gpu
-            - ???
-            - It works!!?
-            - Cleanuppppppp (freeeeee)
-    MAJOR:
-        - Handle multiple primitives in single gltf
-    BACKLOG:
-    IMPROVEMENTS:
-    IDEAS:
+TODO
+	P0
+		[ ] Cleanup utils (especially sMath)
+			[ ] Make a quick reference of functions
+	P1
+		[ ] Animations
+		[ ] Volumetric clouds
+		[ ] Sky diffraction
+	P2
+		[ ] Log to the console AND the game
+		[ ] Figure out multithreading
+		[ ] Memory allocator?
+		[ ] Profiling
+        [ ] Handle multiple primitives in single gltf
+
+--------
+DOING
+	[ ] Skinned meshes https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md
+        [X] Load vertex data
+        [X] Load node (joints) data 
+        [X] Draw skeleton for debug!!
+        [X] Calculate deformation herarchy
+        [X] Shader
+			[ ] Use program pipelines to avoid having 50 programs 
+				> https://www.khronos.org/opengl/wiki/Shader_Compilation#Separate_programs
+			[ ] The shadow.vert and color.vert could probably be merged into a single "static.vert"
+			[ ] Make skinned.vert
+		[ ] Send it all to the gpu
+		[ ] ???
+		[ ] It works!!?
+		[ ] Cleanuppppppp (freeeeee)
+			[ ] Rethink architecture
+--------
+DONE
+
+
+--------        
+
+-- GAME DESIGN --
+
+TODO
+	[ ] Dialog
+	[ ] NPC Schedules
+	[ ] Combat v0.1
+	[ ] Buildings & Interiors
+	[ ] Quests
+
+--------
+DOING
+
+
+
+--------
+DONE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-----
 
 VULKAN RENDERER:
     CRITICAL:
@@ -87,13 +130,3 @@ VULKAN RENDERER:
     IMPROVEMENTS:
     IDEAS:
         - This is our last dependency. It looks super annoying to handle.
-
-WIN32 :
-    CRITICAL:
-        - FTIME TRACE HOW DOES IT WORK
-    MAJOR:
-    BACKLOG:
-        - Figure out multithreading
-    IMPROVEMENTS:
-    IDEAS:
-        - Should I make my own memory allocator?
