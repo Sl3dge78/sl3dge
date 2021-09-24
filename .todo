@@ -2,12 +2,18 @@
 
 TODO
 	P0
-		[ ] Cleanup utils (especially sMath)
+		[ ] Cleanup utils (especially sMath, sometimes the result is in the args, sometimes not)
 			[ ] Make a quick reference of functions
+		[ ] Shader refactoring
+			[ ] Load all shader uniform locations at the start
+			[ ] Use pipelines for the other shaders
+
 	P1
 		[ ] Animations
-		[ ] Volumetric clouds
 		[ ] Sky diffraction
+		[ ] Volumetric clouds
+		[ ] Audio
+
 	P2
 		[ ] Log to the console AND the game
 		[ ] Figure out multithreading
@@ -17,21 +23,22 @@ TODO
 
 --------
 DOING
+
 	[ ] Skinned meshes https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md
         [X] Load vertex data
         [X] Load node (joints) data 
         [X] Draw skeleton for debug!!
         [X] Calculate deformation herarchy
         [X] Shader
-			[ ] Use program pipelines to avoid having 50 programs 
+			[X] Use program pipelines to avoid having 50 programs 
 				> https://www.khronos.org/opengl/wiki/Shader_Compilation#Separate_programs
-			[ ] The shadow.vert and color.vert could probably be merged into a single "static.vert"
+			[X] The shadow.vert and color.vert could probably be merged into a single "static.vert"
 			[ ] Make skinned.vert
-		[ ] Send it all to the gpu
 		[ ] ???
 		[ ] It works!!?
-		[ ] Cleanuppppppp (freeeeee)
-			[ ] Rethink architecture
+		[ ] Cleanuppppppp (mem leaks)
+			[ ] Rethink architecture?
+
 --------
 DONE
 
@@ -42,6 +49,7 @@ DONE
 
 TODO
 	[ ] Dialog
+		[ ] Beep beeps à la Phoenix Wright
 	[ ] NPC Schedules
 	[ ] Combat v0.1
 	[ ] Buildings & Interiors
