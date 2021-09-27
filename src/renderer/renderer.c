@@ -48,6 +48,7 @@ internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32
     push_buffer->size += sizeof(PushBufferEntryUIQuad);
 }
 
+// TODO(Guigui): Maybe remove the memallocs ??
 internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color) {
     PushBuffer *push_buffer = &renderer->ui_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
@@ -105,9 +106,21 @@ internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform, Vec
     push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
+internal void PushSkinnedMesh(Renderer *renderer, SkinnedMeshHandle mesh, Mat4 *xform, Vec3 diffuse_color) {
+    PushBuffer *push_buffer = &renderer->scene_pushbuffer;
+    ASSERT(push_buffer->size + sizeof(PushBufferEntrySkinnedMesh) < push_buffer->max_size);
+    PushBufferEntrySkinnedMesh *entry = (PushBufferEntrySkinnedMesh *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_SkinnedMesh;
+    entry->mesh_handle = mesh;
+    entry->transform = xform;
+    entry->diffuse_color = diffuse_color;
+    
+    push_buffer->size += sizeof(PushBufferEntrySkinnedMesh);
+}
+
 /// Adds a bone to the scene draw calls
 /// The matrix needs to be local
-internal void PushBone(Renderer *renderer, Mat4 *bone_matrix) {
+internal void PushBone(Renderer *renderer, Mat4 bone_matrix) {
     PushBuffer *push_buffer = &renderer->debug_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntryBone) < push_buffer->max_size);
     PushBufferEntryBone *entry = (PushBufferEntryBone *)(push_buffer->buf + push_buffer->size);

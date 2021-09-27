@@ -53,10 +53,14 @@ typedef struct Renderer {
     u32 screen_quad_vbuffer;
     
     PushBuffer scene_pushbuffer;
-    //Mesh moto;
+    
     Mesh *meshes;
     u32 mesh_capacity;
     u32 mesh_count;
+    
+    SkinnedMesh *skinned_meshes;
+    u32 skinned_mesh_capacity;
+    u32 skinned_mesh_count;
     
     // Uniform data
     Mat4 camera_proj;
@@ -84,7 +88,7 @@ typedef struct Renderer {
     stbtt_bakedchar *char_data;
     
     u32 static_mesh_vtx_shader;
-    //u32 skinned_mesh_vtx_shader; TODO
+    u32 skinned_mesh_vtx_shader;
     
     u32 color_fragment_shader;
     

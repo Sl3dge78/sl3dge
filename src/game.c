@@ -49,18 +49,17 @@ void GameStart(GameData *game_data) {
     game_data->character = RendererLoadMesh(global_renderer, "resources/3d/character/character.gltf");
     
     game_data->floor = RendererLoadQuad(global_renderer);
-    game_data->floor_xform = mat4_identity();
-    mat4_scaleby(&game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
+    mat4_identity(game_data->floor_xform);
+    mat4_scaleby(game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
     
-    game_data->npc_xform = mat4_identity();
-    mat4_translateby(&game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
-    game_data->npc2_xform = mat4_identity();
+    mat4_identity(game_data->npc_xform);
+    mat4_translateby(game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
+    mat4_identity(game_data->npc2_xform);
     
     game_data->interact_sphere_diameter = 1.0f;
     
-    RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf", &game_data->skinned_mesh);
-    game_data->simple_skinning = game_data->skinned_mesh.mesh;
-    game_data->simple_skinning_root = mat4_identity();
+    game_data->skinned_mesh = RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf");
+    mat4_identity(game_data->simple_skinning_root);
 }
 
 /// Do deallocation here
@@ -123,9 +122,10 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
         camera->position.y = 1.7f;
     }
     
-    Mat4 cam = mat4_look_at(vec3_add(camera->forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f});
+    Mat4 cam;
+    mat4_look_at(vec3_add(camera->forward, camera->position), camera->position, (Vec3){0.0f, 1.0f, 0.0f}, cam);
     
-    RendererSetCamera(global_renderer, &cam, camera->position);
+    RendererSetCamera(global_renderer, cam, camera->position);
 }
 
 // Called every frame
@@ -154,12 +154,12 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         // Interact sphere
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
         
-        game_data->debug = mat4_identity();
-        mat4_translateby(&game_data->debug, game_data->interact_sphere_pos);
-        mat4_scaleby(&game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
+        mat4_identity(game_data->debug);
+        mat4_translateby(game_data->debug, game_data->interact_sphere_pos);
+        mat4_scaleby(game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
         if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
-            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, &game_data->npc_xform)) {
-                mat4_rotate_euler(&game_data->npc_xform, (Vec3){0.0f, 1.0f, 0.0f});
+            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, game_data->npc_xform)) {
+                mat4_rotate_euler(game_data->npc_xform, (Vec3){0.0f, 1.0f, 0.0f});
             }
         }
         
@@ -189,12 +189,12 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         }
         
         if(input->keyboard[SCANCODE_Y]) {
-            Vec3 translation = mat4_get_translation(&game_data->skinned_mesh.joints[0]);
-            game_data->skinned_mesh.joints[0] = trs_to_mat4(translation, (Vec3) {90.f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+            Vec3 translation = mat4_get_translation(game_data->skinned_mesh->joints[2]);
+            trs_to_mat4(translation, (Vec3) {0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f}, game_data->skinned_mesh->joints[2]);
         }
         if(input->keyboard[SCANCODE_U]) {
-            Vec3 translation = mat4_get_translation(&game_data->skinned_mesh.joints[1]);
-            game_data->skinned_mesh.joints[1] = trs_to_mat4(translation, (Vec3) {90.f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f});
+            Vec3 translation = mat4_get_translation(game_data->skinned_mesh->joints[2]);
+            trs_to_mat4(translation, (Vec3) {90.f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f}, game_data->skinned_mesh->joints[2]);
         }
     }
     
@@ -226,15 +226,11 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->character, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushMesh(global_renderer, game_data->simple_skinning, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
-    //PushSkinnedMesh(global_renderer, game_data->skinned_mesh, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
+    // PushMesh(global_renderer, game_data->simple_skinning, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
+    PushSkinnedMesh(global_renderer, game_data->skinned_mesh, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     
-    Mat4 prev_mat = game_data->simple_skinning_root;
     for (u32 i = 0; i < 4; i++) {
-        Mat4 mat;
-        mat4_mul(&mat, &prev_mat, &game_data->skinned_mesh.joints[i]);
-        PushBone(global_renderer, &mat);
-        prev_mat = mat;
+        PushBone(global_renderer, game_data->skinned_mesh->global_joint_mats[i]);
     }
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);

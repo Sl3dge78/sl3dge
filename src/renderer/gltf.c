@@ -201,7 +201,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
     }
 }
 */
-void GLTFGetNodeTransform(const cgltf_node *node, Mat4 *transform) {
+void GLTFGetNodeTransform(const cgltf_node *node, Mat4 transform) {
     if(node->has_matrix) {
         memcpy(transform, node->matrix, sizeof(Mat4));
     } else {
@@ -215,34 +215,34 @@ void GLTFGetNodeTransform(const cgltf_node *node, Mat4 *transform) {
 
 void GLTFLoadTransforms(cgltf_data *data, Mat4 *transforms) {
     for(u32 i = 0; i < data->nodes_count; i++) {
-        transforms[i] = mat4_identity();
+        mat4_identity(transforms[i]);
         cgltf_node *node = &data->nodes[i];
         
-        GLTFGetNodeTransform(node, &transforms[i]);
+        GLTFGetNodeTransform(node, transforms[i]);
         
         cgltf_node *parent = node->parent;
         
         while(parent) {
             Mat4 pm = {0};
-            GLTFGetNodeTransform(parent, &pm);
+            GLTFGetNodeTransform(parent, pm);
             
             for(u32 j = 0; j < 4; ++j) {
-                float l0 = transforms[i].m[j][0];
-                float l1 = transforms[i].m[j][1];
-                float l2 = transforms[i].m[j][2];
+                float l0 = transforms[i][j*4+0];
+                float l1 = transforms[i][j*4+1];
+                float l2 = transforms[i][j*4+2];
                 
-                float r0 = l0 * pm.v[0] + l1 * pm.v[4] + l2 * pm.v[8];
-                float r1 = l0 * pm.v[1] + l1 * pm.v[5] + l2 * pm.v[9];
-                float r2 = l0 * pm.v[2] + l1 * pm.v[6] + l2 * pm.v[10];
+                float r0 = l0 * pm[0] + l1 * pm[4] + l2 * pm[8];
+                float r1 = l0 * pm[1] + l1 * pm[5] + l2 * pm[9];
+                float r2 = l0 * pm[2] + l1 * pm[6] + l2 * pm[10];
                 
-                transforms[i].m[j][0] = r0;
-                transforms[i].m[j][1] = r1;
-                transforms[i].m[j][2] = r2;
+                transforms[i][j*4+0] = r0;
+                transforms[i][j*4+1] = r1;
+                transforms[i][j*4+2] = r2;
             }
             
-            transforms[i].m[3][0] += pm.m[3][0];
-            transforms[i].m[3][1] += pm.m[3][1];
-            transforms[i].m[3][2] += pm.m[3][2];
+            transforms[i][12] += pm[12];
+            transforms[i][13] += pm[13];
+            transforms[i][14] += pm[14];
             
             parent = parent->parent;
         }

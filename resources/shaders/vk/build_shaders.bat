@@ -1,6 +1,5 @@
 @echo off
 
-pushd resources\shaders\
 del /Q *.spv
 for %%v in (*.frag *.vert *.rchit *.rgen *.rmiss) do (
     echo %%v
@@ -9,10 +8,8 @@ for %%v in (*.frag *.vert *.rchit *.rgen *.rmiss) do (
 
 echo a > shaders.meta
 echo Shaders built successfully!
-popd
 exit -b 0
 
 :error
 echo Error(s) building shaders.
-popd
 exit -b 1

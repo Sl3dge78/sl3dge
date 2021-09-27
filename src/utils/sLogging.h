@@ -29,9 +29,9 @@
 
 #define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
 #define BYTE_TO_BINARY(byte)                                                                       \
-    (byte & 0x80 ? '1' : '0'), (byte & 0x40 ? '1' : '0'), (byte & 0x20 ? '1' : '0'),               \
-        (byte & 0x10 ? '1' : '0'), (byte & 0x08 ? '1' : '0'), (byte & 0x04 ? '1' : '0'),           \
-        (byte & 0x02 ? '1' : '0'), (byte & 0x01 ? '1' : '0')
+(byte & 0x80 ? '1' : '0'), (byte & 0x40 ? '1' : '0'), (byte & 0x20 ? '1' : '0'),               \
+(byte & 0x10 ? '1' : '0'), (byte & 0x08 ? '1' : '0'), (byte & 0x04 ? '1' : '0'),           \
+(byte & 0x02 ? '1' : '0'), (byte & 0x01 ? '1' : '0')
 
 typedef enum LogLevel {
     LOG_LEVEL_TRACE,
@@ -94,7 +94,7 @@ void sLogOutputLine(u8 level, const char *fmt, ...) {
     char buffer[MAX_LOG_LENGTH];
     vsnprintf(buffer, MAX_LOG_LENGTH, fmt, args);
     va_end(args);
-
+    
     strncat(buffer, "\n\0", 2);
     callback(buffer, level);
 }
@@ -107,9 +107,9 @@ void sLogOutput(u8 level, const char *fmt, ...) {
     char buffer[MAX_LOG_LENGTH];
     vsnprintf(buffer, MAX_LOG_LENGTH, fmt, args);
     va_end(args);
-
+    
     strncat(buffer, "\0", 1);
-
+    
     callback(buffer, level);
 }
 
@@ -119,10 +119,10 @@ void sLogSetColor(enum LogColor color) {
 
 void DefaultLogSetColor(enum LogColor color) {
     switch(color) {
-    case(LOG_COLOR_WHITE): printf("\033[0m"); break;
-    case(LOG_COLOR_RED): printf("\033[0;31m"); break;
-    case(LOG_COLOR_YELLOW): printf("\033[0;33m"); break;
-    case(LOG_COLOR_GREY): printf("\033[1;30m"); break;
-    case(LOG_COLOR_GREEN): printf("\033[0;32m"); break;
+        case(LOG_COLOR_WHITE): printf("\033[0m"); break;
+        case(LOG_COLOR_RED): printf("\033[0;31m"); break;
+        case(LOG_COLOR_YELLOW): printf("\033[0;33m"); break;
+        case(LOG_COLOR_GREY): printf("\033[1;30m"); break;
+        case(LOG_COLOR_GREEN): printf("\033[0;32m"); break;
     }
 }

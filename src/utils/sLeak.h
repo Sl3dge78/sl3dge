@@ -32,26 +32,26 @@ int main() {
 #include <stdlib.h>
 
 #define ASSERT(expression)                                                                         \
-    if(!(expression)) {                                                                            \
-        __builtin_trap();                                                                          \
-    }
+if(!(expression)) {                                                                            \
+__builtin_trap();                                                                          \
+}
 
 #define ASSERT_MSG(expression, msg)                                                                \
-    if(!(expression)) {                                                                            \
-        sError(msg);                                                                               \
-        __builtin_trap();                                                                          \
-    }
+if(!(expression)) {                                                                            \
+sError(msg);                                                                               \
+__builtin_trap();                                                                          \
+}
 
 #define HANG(expression)                                                                           \
-    if(!(expression))                                                                              \
-        while(1)                                                                                   \
-            ;
+if(!(expression))                                                                              \
+while(1)                                                                                   \
+;
 
 #define HANG_MSG(expression, msg)                                                                  \
-    if(!(expression))                                                                              \
-        sError(msg);                                                                               \
-    while(1)                                                                                       \
-        ;
+if(!(expression))                                                                              \
+sError(msg);                                                                               \
+while(1)                                                                                       \
+;
 
 global bool DBG_keep_console_open;
 
@@ -90,13 +90,14 @@ void Leak_SetList(void *in_list) {
 
 internal void add_memory_info(void *ptr, size_t size, const char *filename, u32 line) {
     MemoryLeak *leak = (MemoryLeak *)malloc(sizeof(MemoryLeak));
-
+    
     leak->info.ptr = ptr;
     leak->info.size = size;
     leak->info.file = filename;
     leak->info.line = line;
     leak->next = NULL;
-
+    //sLog("Allocation 0x%p, %s:%d", ptr, filename, line);
+    
     if(list->array_start == NULL) {
         list->array_start = leak;
         list->array_end = leak;
@@ -108,16 +109,16 @@ internal void add_memory_info(void *ptr, size_t size, const char *filename, u32 
 
 internal void delete_memory_info(void *ptr) {
     ASSERT_MSG(list->array_start, "Attempting to free a nullptr!");
-
+    
     // Si c'est le premier dans la liste
     if(list->array_start->info.ptr == ptr) {
         MemoryLeak *leak = list->array_start;
         list->array_start = list->array_start->next;
-
+        
         free(leak);
         return;
     }
-
+    
     // Sinon
     for(MemoryLeak *leak = list->array_start; leak != NULL; leak = leak->next) {
         MemoryLeak *next_leak = leak->next;
@@ -128,7 +129,7 @@ internal void delete_memory_info(void *ptr) {
             sWarn("Attempting to free a nullptr!");
             return;
         }
-
+        
         if(next_leak->info.ptr == ptr) { // Si il faut supprimer le suivant
             if(list->array_end == next_leak) {
                 leak->next = NULL;
@@ -145,13 +146,13 @@ internal void delete_memory_info(void *ptr) {
 internal void clear_array() {
     MemoryLeak *leak = list->array_start;
     MemoryLeak *to_delete = list->array_start;
-
+    
     while(leak != NULL) {
         leak = leak->next;
         free(to_delete);
         to_delete = leak;
     }
-
+    
     free(list);
 }
 
@@ -176,19 +177,21 @@ void *_realloc(void *ptr, size_t new_size, const char *filename, u32 line) {
     if(new_ptr != NULL) {
         if(ptr != NULL)
             delete_memory_info(ptr);
-
+        
         add_memory_info(new_ptr, new_size, filename, line);
     }
     return new_ptr;
 }
 
 void _free(void *ptr) {
+    ASSERT_MSG(ptr, "Attempting to free ptr 0x0");
+    //sLog("Freed %p", ptr);
     delete_memory_info(ptr);
     free(ptr);
 }
 
 void _free_verbose(void *ptr, const char *string) {
-    sLog("Freed %s", string);
+    sLog("Freed %p %s", ptr, string);
     delete_memory_info(ptr);
     free(ptr);
 }
@@ -209,7 +212,7 @@ internal bool DumpMemoryLeaks() {
 
 void Leak_End() {
     DBG_keep_console_open |= DumpMemoryLeaks();
-
+    
     if(DBG_keep_console_open) {
         system("pause");
     }

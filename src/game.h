@@ -39,7 +39,7 @@ typedef struct GameData {
     
     MeshHandle simple_skinning;
     Mat4 simple_skinning_root;
-    SkinnedMesh skinned_mesh;
+    SkinnedMeshHandle skinned_mesh;
     
 } GameData;
 

@@ -31,7 +31,7 @@ void ConsoleInit(Console *console) {
     console->commands[1] = (ConsoleCommand){"freecam", &CommandFreeCam};
     console->commands[2] = (ConsoleCommand){"restart", &CommandRestart};
     console->commands[3] = (ConsoleCommand){"reload_shaders", &CommandReloadShaders};
-
+    
     console->command_count = ARRAY_SIZE(console->commands);
 }
 
@@ -50,7 +50,7 @@ void ConsolePushHistory(const char *text, const Vec4 color, Console *console) {
     for(u32 i = 31; i > 0; i--) {
         memcpy(&console->command_history[i], &console->command_history[i - 1], sizeof(ConsoleHistoryEntry));
     }
-
+    
     memcpy(&console->command_history[0].command, text, 128);
     memcpy(&console->command_history[0].color, &color, sizeof(Vec4));
     console->history_size++;
@@ -63,24 +63,25 @@ DLL_EXPORT void ConsoleLogMessage(const char *message, const u8 level) {
     if(global_console) {
         Vec4 color;
         switch(level) {
-        case(LOG_LEVEL_TRACE): color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; break;
-        case(LOG_LEVEL_LOG): color = (Vec4){0.85f, 0.85f, 0.85f, 1.0f}; break;
-        case(LOG_LEVEL_WARN): color = (Vec4){235.f / 255.f, 195.f / 255.f, 52.f / 255.f, 1.0f}; break;
-        case(LOG_LEVEL_ERROR): color = (Vec4){235.f / 255.f, 70.f / 255.f, 52.f / 255.f, 1.0f}; break;
+            case(LOG_LEVEL_TRACE): color = (Vec4){0.5f, 0.5f, 0.5f, 1.0f}; break;
+            case(LOG_LEVEL_LOG): color = (Vec4){0.85f, 0.85f, 0.85f, 1.0f}; break;
+            case(LOG_LEVEL_WARN): color = (Vec4){235.f / 255.f, 195.f / 255.f, 52.f / 255.f, 1.0f}; break;
+            case(LOG_LEVEL_ERROR): color = (Vec4){235.f / 255.f, 70.f / 255.f, 52.f / 255.f, 1.0f}; break;
         };
-
+        
         ConsolePushHistory(message, color, global_console);
     }
+    OutputDebugString(message);
 }
 
 internal void ConsoleParseMessage(const char *message, GameData *game_data) {
     // TEMPORARY : 5 args max
-
+    
     const char *head = message;
     u32 length = strlen(message);
-
+    
     length -= StringEatSpaces(&head, length);
-
+    
     ConsoleArgs args;
     //char args[5][64];
     u32 argc = 0;
@@ -96,7 +97,7 @@ internal void ConsoleParseMessage(const char *message, GameData *game_data) {
             argc++;
         }
     }
-
+    
     ConsoleCallCommand(&args, game_data);
 }
 
@@ -118,7 +119,7 @@ void DrawConsole(Console *console, GameData *game_data) {
         // Caret
         UIPushQuad(global_renderer, padx + (console->current_char * 10.5f), console_y - 20, 1, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
         u32 line_height = 20;
-
+        
         i32 hist_y = console_y - 20 - pady;
         u32 i = 0;
         while(hist_y > 0) {
@@ -139,28 +140,28 @@ void InputConsole(Console *console, Input *input, GameData *game_data) {
             }
         } else {
             switch(c) {
-            case(8): // backspace
+                case(8): // backspace
                 if(console->current_char > 0) {
                     console->current_char--;
                     console->current_command[console->current_char] = '\0';
                 }
                 break;
-            case(13): // return
+                case(13): // return
                 ConsoleLogMessage(console->current_command, LOG_LEVEL_LOG);
                 ConsoleParseMessage(console->current_command, game_data);
                 memset(console->current_command, '\0', 128);
                 console->current_char = 0;
                 console->history_browser = 0;
                 break;
-            default:
+                default:
                 //sLog("%d", c);
                 break;
             };
         }
-
+        
         input->text_input = '\0';
     }
-
+    
     if(input->keyboard[SCANCODE_UP] && !input->old_keyboard[SCANCODE_UP]) {
         console->history_browser++;
         if(console->history_browser >= console->history_size) {

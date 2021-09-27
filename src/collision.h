@@ -5,12 +5,12 @@
 // p : World position of the test
 // m : Matrix defining the bounding box
 // Returns : true if the point is in the bounding box
-bool IsPointInBoundingBox(const Vec3 p, const Mat4 *m) {
+bool IsPointInBoundingBox(const Vec3 p, const Mat4 m) {
     // We'll first transform the point by the inverse bb matrix to do our calculations in normalized space
     Mat4 inv;
-    mat4_inverse(m, &inv);
+    mat4_inverse(m, inv);
     
-    Vec3 t = mat4_mul_vec3(&inv, p);
+    Vec3 t = mat4_mul_vec3(inv, p);
     
     // The bounding box has sides of size 1 centered on 0, so each side goes from -0.5 to 0.5 except Z
     if(t.x < -0.5f || t.x > 0.5f ||
@@ -36,13 +36,13 @@ bool IsLineIntersectingPlane(const Vec3 l1, const Vec3 l2, const Vec3 plane_pos,
     return dot1 * dot2 <= 0;
 }
 
-bool IsLineIntersectingBoundingBox(const Vec3 l1, const Vec3 l2, const Mat4 *m) {
+bool IsLineIntersectingBoundingBox(const Vec3 l1, const Vec3 l2, const Mat4 m) {
     // Transform the line into the bb coord system
     Mat4 inv;
-    mat4_inverse(m, &inv);
+    mat4_inverse(m, inv);
     
-    Vec3 lb1 = mat4_mul_vec3(&inv, l1);
-    Vec3 lb2 = mat4_mul_vec3(&inv, l2);
+    Vec3 lb1 = mat4_mul_vec3(inv, l1);
+    Vec3 lb2 = mat4_mul_vec3(inv, l2);
     
     Vec3 r_org = lb1;
     Vec3 r_dir = vec3_sub(lb2, lb1);

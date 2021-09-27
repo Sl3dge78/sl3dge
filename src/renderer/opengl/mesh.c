@@ -3,15 +3,39 @@
 // Returns a mesh pointer and keeps ownership
 internal Mesh *GetNewMesh(Renderer *renderer) {
     if(renderer->mesh_count == renderer->mesh_capacity) {
-        u32 new_capacity = renderer->mesh_capacity * 2;
+        u32 new_capacity;
+        if (renderer->mesh_capacity <= 0) 
+            new_capacity = 1;
+        else {
+            new_capacity = renderer->mesh_capacity * 2;
+        }
         void *ptr = sRealloc(renderer->meshes, sizeof(Mesh) * new_capacity);
         ASSERT(ptr);
         if(ptr) {
             renderer->meshes = (Mesh *)ptr;
         }
     }
-    
-    return &renderer->meshes[renderer->mesh_count];
+    renderer->mesh_count ++;
+    return &renderer->meshes[renderer->mesh_count-1];
+}
+
+// Returns a mesh pointer and keeps ownership
+internal SkinnedMesh *GetNewSkinnedMesh(Renderer *renderer) {
+    u32 new_capacity;
+    if(renderer->skinned_mesh_count == renderer->skinned_mesh_capacity) {
+        if(renderer->skinned_mesh_capacity <= 0) {
+            new_capacity = 1;
+        } else {
+            new_capacity = renderer->skinned_mesh_capacity * 2;
+        }
+        void *ptr = sRealloc(renderer->skinned_meshes, sizeof(SkinnedMesh) * new_capacity);
+        ASSERT(ptr);
+        if(ptr) {
+            renderer->skinned_meshes = (SkinnedMesh *)ptr;
+        }
+    }
+    renderer->skinned_mesh_count ++;
+    return &renderer->skinned_meshes[renderer->skinned_mesh_count-1];
 }
 
 internal void LoadVtxAndIdxBuffers(Mesh *mesh, cgltf_data *data) {
@@ -60,7 +84,7 @@ internal void LoadVtxAndIdxBuffers(Mesh *mesh, cgltf_data *data) {
     glEnableVertexAttribArray(2);
 }
 
-internal void LoadTextures(Mesh *mesh, cgltf_data *data, const u32 default_texture, const char *directory) {
+internal void LoadTextures(u32 *dest, cgltf_data *data, const u32 default_texture, const char *directory) {
     // Textures
     if(data->textures_count > 0) {
         for(u32 i = 0; i < data->textures_count; ++i) {
@@ -90,15 +114,15 @@ internal void LoadTextures(Mesh *mesh, cgltf_data *data, const u32 default_textu
                              image->pixels);
                 sDestroyImage(image);
                 
-                mesh->diffuse_texture = texture;
+                *dest = texture;
             }
         }
     } else {
-        mesh->diffuse_texture = default_texture;
+        *dest = default_texture;
     }
 }
 
-internal void LoadSkinnedVtxAndIdxBuffers(Mesh *mesh, cgltf_data *data) {
+internal void LoadSkinnedVtxAndIdxBuffers(SkinnedMesh *mesh, cgltf_data *data) {
     // Vertex & Index Buffer
     glGenBuffers(1, &mesh->vertex_buffer);
     glGenBuffers(1, &mesh->index_buffer);
@@ -142,7 +166,7 @@ internal void LoadSkinnedVtxAndIdxBuffers(Mesh *mesh, cgltf_data *data) {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(SkinnedVertex), (void *)offsetof(SkinnedVertex, uv));
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 4, GL_UNSIGNED_SHORT, GL_FALSE, sizeof(SkinnedVertex), (void *)offsetof(SkinnedVertex, joints));
+    glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(SkinnedVertex), (void *)offsetof(SkinnedVertex, joints));
     glEnableVertexAttribArray(3);
     glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(SkinnedVertex), (void *)offsetof(SkinnedVertex, weights));
     glEnableVertexAttribArray(4);
@@ -152,38 +176,42 @@ internal void LoadSkin(SkinnedMesh *mesh, cgltf_data *data) {
     ASSERT_MSG(data->skins_count == 1, "No or multiple skins to load");
     cgltf_skin *skin = data->skins;
     
+    ASSERT_MSG(skin->joints_count < 10, "More than 10 bones in mesh, this isn't supported");
+    
     for(u32 i = 0; i < skin->joints_count; i++) {
-        skin->joints[i]->id = i;
+        skin->joints[i]->id = i+1;
     }
     
     mesh->joint_count = skin->joints_count;
     mesh->joints = sCalloc(skin->joints_count, sizeof(Mat4));
+    mesh->global_joint_mats = sCalloc(skin->joints_count, sizeof(Mat4));
     mesh->joint_parents = sCalloc(skin->joints_count, sizeof(u32));
-    mesh->joint_children = sCalloc(skin->joints_count, sizeof(u32));
+    mesh->joint_children = sCalloc(skin->joints_count, sizeof(u32 *));
     mesh->joint_children_count = sCalloc(skin->joints_count, sizeof(u32));
     for(u32 i = 0; i < skin->joints_count; i++) {
-        GLTFGetNodeTransform(skin->joints[i], &mesh->joints[i]);
-        if(skin->joints[i]->parent)
-            mesh->joint_parents[i] = skin->joints[i]->parent->id;
+        GLTFGetNodeTransform(skin->joints[i], mesh->joints[i]);
+        if(skin->joints[i]->parent && skin->joints[i]->parent->id != 0)
+            mesh->joint_parents[i] = skin->joints[i]->parent->id-1;
         else
             mesh->joint_parents[i] = -1;
         
         if(skin->joints[i]->children_count > 0) {
             mesh->joint_children_count[i] = skin->joints[i]->children_count;
-            mesh->joint_children[i] = sCalloc(skin->joints[i]->children_count, sizeof(u32 *));
+            mesh->joint_children[i] = sCalloc(skin->joints[i]->children_count, sizeof(u32));
             for(u32 j = 0; j < skin->joints[i]->children_count; j++) {
                 mesh->joint_children[i][j] = skin->joints[i]->children[j]->id;
             }
         }
     }
+    ASSERT(skin->inverse_bind_matrices->count > 0);
     mesh->inverse_bind_matrices = sCalloc(skin->inverse_bind_matrices->count, sizeof(Mat4));
     GLTFCopyAccessor(skin->inverse_bind_matrices, mesh->inverse_bind_matrices, 0, sizeof(Mat4));
 }
 
-void RendererLoadSkinnedMesh(Renderer *renderer, const char *path, SkinnedMesh *skinned_mesh) {
+SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) {
     sLog("Loading Mesh...");
     
-    Mesh *mesh = GetNewMesh(renderer);
+    SkinnedMesh *mesh = GetNewSkinnedMesh(renderer);
     
     char directory[128] = {0};
     const char *last_sep = strrchr(path, '/');
@@ -203,24 +231,29 @@ void RendererLoadSkinnedMesh(Renderer *renderer, const char *path, SkinnedMesh *
     cgltf_load_buffers(&options, data, path);
     
     LoadSkinnedVtxAndIdxBuffers(mesh, data);
-    LoadSkin(skinned_mesh, data);
-    LoadTextures(mesh, data, renderer->white_texture, directory);
+    LoadSkin(mesh, data);
+    LoadTextures(&mesh->diffuse_texture, data, renderer->white_texture, directory);
     
     cgltf_free(data);
     
     sLog("Loading done");
-    
-    skinned_mesh->mesh = renderer->mesh_count++;
+    return mesh;
 }
 
 // @Leak : We're not freeing the mesh data
-void RendererDestroySkinnedMesh(Renderer *renderer, SkinnedMesh *skinned_mesh) {
-    sFree(skinned_mesh->joints);
-    sFree(skinned_mesh->joint_parents);
-    for(u32 i = 0; i < skinned_mesh->joint_count; i++) {
-        sFree(skinned_mesh->joint_children[i]);
+void RendererDestroySkinnedMesh(Renderer *renderer, SkinnedMesh *mesh) {
+    sFree(mesh->inverse_bind_matrices);
+    
+    for(u32 i = 0; i < mesh->joint_count; i++) {
+        if(mesh->joint_children_count[i] > 0) {
+            sFree(mesh->joint_children[i]);
+        }
     }
-    sFree(skinned_mesh->joint_children);
+    sFree(mesh->joint_children_count);
+    sFree(mesh->joint_children);
+    sFree(mesh->joint_parents);
+    sFree(mesh->joints);
+    sFree(mesh->global_joint_mats);
 }
 
 MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
@@ -246,13 +279,13 @@ MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     cgltf_load_buffers(&options, data, path);
     
     LoadVtxAndIdxBuffers(mesh, data);
-    LoadTextures(mesh, data, renderer->white_texture, directory);
+    LoadTextures(&mesh->diffuse_texture, data, renderer->white_texture, directory);
     
     cgltf_free(data);
     
     sLog("Loading done");
     
-    return renderer->mesh_count++;
+    return renderer->mesh_count-1;
 }
 
 MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
@@ -287,7 +320,7 @@ MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertic
     
     mesh->diffuse_texture = renderer->white_texture;
     
-    return renderer->mesh_count++;
+    return renderer->mesh_count-1;
 }
 
 // @TODO @LEAK : This doesn't really work and creates leaks!! Mesh could store the amount of textures it has ? Find another way to do this pleasssseeeee

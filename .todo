@@ -7,6 +7,7 @@ TODO
 		[ ] Shader refactoring
 			[ ] Load all shader uniform locations at the start
 			[ ] Use pipelines for the other shaders
+		[ ] Mesh refactoring
 
 	P1
 		[ ] Animations
@@ -33,9 +34,9 @@ DOING
 			[X] Use program pipelines to avoid having 50 programs 
 				> https://www.khronos.org/opengl/wiki/Shader_Compilation#Separate_programs
 			[X] The shadow.vert and color.vert could probably be merged into a single "static.vert"
-			[ ] Make skinned.vert
-		[ ] ???
-		[ ] It works!!?
+			[X] Make skinned.vert
+		[X] ???
+		[X] It works!!?
 		[ ] Cleanuppppppp (mem leaks)
 			[ ] Rethink architecture?
 
