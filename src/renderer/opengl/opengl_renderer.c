@@ -482,7 +482,7 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                 SkinnedMeshHandle mesh = entry->mesh_handle;
                 
                 glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, renderer->skinned_mesh_vtx_shader);
-                glBindTexture(GL_TEXTURE_2D, mesh->diffuse_texture);
+                glBindTexture(GL_TEXTURE_2D, mesh->mesh.diffuse_texture);
                 glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
                 
                 glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "transform"), 1, GL_FALSE, *entry->transform);
@@ -500,17 +500,17 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                     } else if (mesh->joint_parents[i] < i) { // We already calculated the global xform of the parent
                         parent_global_xform = &mesh->global_joint_mats[mesh->joint_parents[i]];
                     } else { // We need to calculate it
-                        ASSERT(0); // TODO
+                        ASSERT(0); // @TODO
                     }
                     Mat4 tmp;
-                    mat4_mul(mesh->global_joint_mats[i], *parent_global_xform, mesh->joints[i]); // Global Transform
-                    mat4_mul(tmp,  mesh->global_joint_mats[i],mesh->inverse_bind_matrices[i]); // Inverse Bind Matrix
-                    mat4_mul(joint_mats[i], mesh_inverse, tmp);
+                    mat4_mul(*parent_global_xform, mesh->joints[i], mesh->global_joint_mats[i]); // Global Transform
+                    mat4_mul(mesh->global_joint_mats[i],mesh->inverse_bind_matrices[i], tmp); // Inverse Bind Matrix
+                    mat4_mul(mesh_inverse, tmp, joint_mats[i]);
                 }
                 glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "joint_matrices"), mesh->joint_count, GL_FALSE, (f32*)joint_mats);
                 
-                glBindVertexArray(mesh->vertex_array);
-                glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
+                glBindVertexArray(mesh->mesh.vertex_array);
+                glDrawElements(GL_TRIANGLES, mesh->mesh.index_count, GL_UNSIGNED_INT, 0);
                 sFree(joint_mats);
                 
                 address += sizeof(PushBufferEntrySkinnedMesh);
@@ -744,7 +744,7 @@ internal void DrawDebug(Renderer *renderer, PushBuffer *push_buffer) {
 DLL_EXPORT void RendererDrawFrame(Renderer *renderer) {
     // ------------------
     // Uniforms
-    mat4_mul(renderer->camera_vp, renderer->camera_proj, renderer->camera_view);
+    mat4_mul(renderer->camera_proj, renderer->camera_view, renderer->camera_vp);
     glProgramUniformMatrix4fv(renderer->static_mesh_vtx_shader, glGetUniformLocation(renderer->static_mesh_vtx_shader, "light_matrix"), 1, GL_FALSE, renderer->light_matrix);
     glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "light_matrix"), 1, GL_FALSE, renderer->light_matrix);
     glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "light_dir"),renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z); 
@@ -826,7 +826,7 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     mat4_look_at(vec3_add(direction, renderer->camera_pos),
                  renderer->camera_pos,
                  (Vec3){0.0f, 1.0f, 0.0f}, look);
-    mat4_mul(renderer->light_matrix, ortho, look);
+    mat4_mul(ortho, look, renderer->light_matrix);
     renderer->light_dir = direction;
     
     // Update uniforms

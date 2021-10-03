@@ -23,9 +23,7 @@ typedef struct SkinnedVertex {
     f32 weights[4];
 } SkinnedVertex;
 
-typedef u32 MeshHandle;
-
-typedef struct SkinnedMesh {
+typedef struct Mesh {
     u32 vertex_array;
     u32 vertex_buffer;
     u32 index_buffer;
@@ -33,6 +31,12 @@ typedef struct SkinnedMesh {
     u32 vertex_count;
     u32 index_count;
     u32 diffuse_texture;
+} Mesh;
+
+typedef u32 MeshHandle;
+
+typedef struct SkinnedMesh {
+    Mesh mesh;
     
     u32 joint_count;
     Mat4 *joints;

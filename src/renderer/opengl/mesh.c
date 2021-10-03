@@ -122,8 +122,9 @@ internal void LoadTextures(u32 *dest, cgltf_data *data, const u32 default_textur
     }
 }
 
-internal void LoadSkinnedVtxAndIdxBuffers(SkinnedMesh *mesh, cgltf_data *data) {
+internal void LoadSkinnedVtxAndIdxBuffers(SkinnedMesh *skinned_mesh, cgltf_data *data) {
     // Vertex & Index Buffer
+    Mesh *mesh = &skinned_mesh->mesh;
     glGenBuffers(1, &mesh->vertex_buffer);
     glGenBuffers(1, &mesh->index_buffer);
     glGenVertexArrays(1, &mesh->vertex_array);
@@ -208,54 +209,6 @@ internal void LoadSkin(SkinnedMesh *mesh, cgltf_data *data) {
     GLTFCopyAccessor(skin->inverse_bind_matrices, mesh->inverse_bind_matrices, 0, sizeof(Mat4));
 }
 
-SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) {
-    sLog("Loading Mesh...");
-    
-    SkinnedMesh *mesh = GetNewSkinnedMesh(renderer);
-    
-    char directory[128] = {0};
-    const char *last_sep = strrchr(path, '/');
-    u32 size = last_sep - path;
-    strncpy_s(directory, ARRAY_SIZE(directory), path, size);
-    directory[size] = '/';
-    directory[size + 1] = '\0';
-    
-    cgltf_data *data;
-    cgltf_options options = {0};
-    cgltf_result result = cgltf_parse_file(&options, path, &data);
-    if(result != cgltf_result_success) {
-        sError("Error reading mesh");
-        ASSERT(0);
-    }
-    
-    cgltf_load_buffers(&options, data, path);
-    
-    LoadSkinnedVtxAndIdxBuffers(mesh, data);
-    LoadSkin(mesh, data);
-    LoadTextures(&mesh->diffuse_texture, data, renderer->white_texture, directory);
-    
-    cgltf_free(data);
-    
-    sLog("Loading done");
-    return mesh;
-}
-
-// @Leak : We're not freeing the mesh data
-void RendererDestroySkinnedMesh(Renderer *renderer, SkinnedMesh *mesh) {
-    sFree(mesh->inverse_bind_matrices);
-    
-    for(u32 i = 0; i < mesh->joint_count; i++) {
-        if(mesh->joint_children_count[i] > 0) {
-            sFree(mesh->joint_children[i]);
-        }
-    }
-    sFree(mesh->joint_children_count);
-    sFree(mesh->joint_children);
-    sFree(mesh->joint_parents);
-    sFree(mesh->joints);
-    sFree(mesh->global_joint_mats);
-}
-
 MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     sLog("Loading Mesh...");
     
@@ -323,10 +276,59 @@ MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertic
     return renderer->mesh_count-1;
 }
 
-// @TODO @LEAK : This doesn't really work and creates leaks!! Mesh could store the amount of textures it has ? Find another way to do this pleasssseeeee
+SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) {
+    sLog("Loading Mesh...");
+    
+    SkinnedMesh *mesh = GetNewSkinnedMesh(renderer);
+    
+    char directory[128] = {0};
+    const char *last_sep = strrchr(path, '/');
+    u32 size = last_sep - path;
+    strncpy_s(directory, ARRAY_SIZE(directory), path, size);
+    directory[size] = '/';
+    directory[size + 1] = '\0';
+    
+    cgltf_data *data;
+    cgltf_options options = {0};
+    cgltf_result result = cgltf_parse_file(&options, path, &data);
+    if(result != cgltf_result_success) {
+        sError("Error reading mesh");
+        ASSERT(0);
+    }
+    
+    cgltf_load_buffers(&options, data, path);
+    
+    LoadSkinnedVtxAndIdxBuffers(mesh, data);
+    LoadSkin(mesh, data);
+    LoadTextures(&mesh->mesh.diffuse_texture, data, renderer->white_texture, directory);
+    
+    cgltf_free(data);
+    
+    sLog("Loading done");
+    return mesh;
+}
+
 void RendererDestroyMesh(Renderer *renderer, Mesh *mesh) {
     glDeleteBuffers(1, &mesh->index_buffer);
     glDeleteBuffers(1, &mesh->vertex_buffer);
     if(mesh->diffuse_texture != renderer->white_texture)
         glDeleteTextures(1, &mesh->diffuse_texture);
+}
+
+void RendererDestroySkinnedMesh(Renderer *renderer, SkinnedMesh *mesh) {
+    sFree(mesh->inverse_bind_matrices);
+    
+    for(u32 i = 0; i < mesh->joint_count; i++) {
+        if(mesh->joint_children_count[i] > 0) {
+            sFree(mesh->joint_children[i]);
+        }
+    }
+    sFree(mesh->joint_children_count);
+    sFree(mesh->joint_children);
+    sFree(mesh->joint_parents);
+    sFree(mesh->joints);
+    sFree(mesh->global_joint_mats);
+    
+    RendererDestroyMesh(renderer, &mesh->mesh);
+    
 }

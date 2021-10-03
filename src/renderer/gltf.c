@@ -5,8 +5,7 @@
 
 #include "renderer/renderer.h"
 
-internal void
-GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst_stride) {
+internal void GLTFCopyAccessor(cgltf_accessor *acc, void *dst, const u32 offset, const u32 dst_stride) {
     const cgltf_buffer_view *view = acc->buffer_view;
     char *buf = (char *)view->buffer->data + view->offset + acc->offset;
     const u32 stride = acc->stride;
@@ -209,7 +208,7 @@ void GLTFGetNodeTransform(const cgltf_node *node, Mat4 transform) {
         Quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]};
         Vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
         
-        trs_quat_to_mat4(transform, &t, &r, &s);
+        trs_quat_to_mat4(&t, &r, &s, transform);
     }
 }
 

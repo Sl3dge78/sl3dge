@@ -45,12 +45,42 @@ typedef struct Quat {
 
 typedef f32 Mat4[16];
 
-/*
-typedef union Mat4 {
-    f32 v[16];
-    f32 m[4][4];
-} Mat4;
-*/
+// --------
+// DECLARATIONS
+void mat4_identity(f32 *result);
+void mat4_perspective(const float fov,const float aspect_ratio,const float near_,const float far_, f32 *result);
+void mat4_perspective_gl(const f32 fov, const f32 aspect_ratio, const f32 znear, const f32 zfar, f32 *result);
+void mat4_ortho(const float t,const float b,const float l,const float r,const float znear,const float zfar, f32 *result);
+void mat4_ortho_gl(const float t,const float b,const float l,const float r,const float znear,const float zfar,f32 *result);
+void mat4_ortho_zoom(float ratio, float zoom, float n, float f, f32 *result);
+void mat4_ortho_zoom_gl(float ratio, float zoom, float n, float f, f32 *result);
+void mat4_look_at(const Vec3 target, const Vec3 eye, const Vec3 up, f32 *mat);
+
+void trs_quat_to_mat4(const Vec3 *t, const Quat *r, const Vec3 *s, f32 *restrict dst);
+void trs_to_mat4(const Vec3 t, const Vec3 r, const Vec3 s, f32 *result);
+
+void mat4_transpose(Mat4 *restrict mat);
+void mat4_mul(const f32 *restrict const a, const f32 *restrict const b, f32 *result);
+Vec4 mat4_mul_vec4(const f32 *restrict const mat, const Vec4 vec);
+Vec3 mat4_mul_vec3(const f32 *const mat, const Vec3 vec);
+void mat4_inverse(const f32 *const restrict m, f32 *out);
+
+Vec3 mat4_get_translation(const Mat4 mat);
+inline void mat4_translateby(f32 *mat, const Vec3 vec);
+inline void mat4_set_position(f32 *mat, const Vec3 vec);
+
+void mat4_rotation_x(f32 *mat, const float radians);
+void mat4_rotation_y(f32 *mat, const float radians);
+void mat4_rotation_z(f32 *mat, const float radians);
+void mat4_rotate_euler(f32 *restrict mat, const Vec3 euler);
+
+Vec3 mat4_get_scale(const Mat4 *mat);
+void mat4_scaleby(f32 *restrict dst, const Vec3 s);
+
+void mat4_print(const f32 *const mat);
+
+// -----------
+// Bit operations
 
 u32 aligned_size(const u32 value, const u32 alignment) {
     return (value + alignment - 1) & ~(alignment - 1);
@@ -82,6 +112,7 @@ u8 swap_u8(u8 val) {
 }
 
 // =====================================================
+// VEC 2
 
 inline void vec2f_print(const Vec2f v) {
     sLog("%f, %f", v.x, v.y);
@@ -123,6 +154,8 @@ static inline f32 vec2f_distance(const Vec2f a, const Vec2f b) {
 }
 
 // =====================================================
+// VEC 3
+
 
 /// Y up
 inline Vec3 spherical_to_carthesian(const Vec2f v) {
@@ -190,38 +223,6 @@ float vec3_dot(const Vec3 a, const Vec3 b) {
 
 // =====================================================
 
-void mat4_print(const f32 *const mat) {
-    sLog("\n%#.3f, %#.3f, %#.3f, %#.3f\n%#.3f, %#.3f, %#.3f, %#.3f\n%#.3f, "
-         "%#.3f, %#.3f, %#.3f\n%#.3f, %#.3f, %#.3f, %#.3f",
-         mat[0],
-         mat[1],
-         mat[2],
-         mat[3],
-         mat[4],
-         mat[5],
-         mat[6],
-         mat[7],
-         mat[8],
-         mat[9],
-         mat[10],
-         mat[11],
-         mat[12],
-         mat[13],
-         mat[14],
-         mat[15]);
-}
-
-void mat4_mul(f32 *result, const f32 *restrict const a, const f32 *restrict const b) {
-    memset(result, 0, 16*sizeof(f32));
-    
-    for(u32 i = 0; i < 4; i++) {
-        for(u32 j = 0; j < 4; j++) {
-            for(u32 k = 0; k < 4; k++) {
-                result[j * 4 + i] += (a[k * 4 + i] * b[j * 4 + k]);
-            }
-        }
-    }
-}
 
 void mat4_identity(f32 *result) {
     memset(result, 0, 16*sizeof(f32));
@@ -231,24 +232,7 @@ void mat4_identity(f32 *result) {
     result[15] = 1.0f;
 }
 
-void mat4_transpose(Mat4 *restrict mat) {
-    Mat4 tmp = {0};
-    
-    for(u32 c = 0; c < 4; c++) {
-        for(u32 r = 0; r < 4; r++) {
-            tmp[c * 4 + r] = *mat[r * 4 + c];
-        }
-    }
-    
-    for(u32 i = 0; i < 16; i++) {
-        *mat[i] = tmp[i];
-    }
-}
-
-void mat4_perspective(const float fov,
-                      const float aspect_ratio,
-                      const float near_,
-                      const float far_, f32 *result) {
+void mat4_perspective(const float fov,const float aspect_ratio,const float near_,const float far_, f32 *result) {
     memset(result, 0, 16*sizeof(f32));
     
     const f32 tan_theta_2 = tan(radians(fov) * 0.5f);
@@ -273,12 +257,7 @@ void mat4_perspective_gl(const f32 fov, const f32 aspect_ratio, const f32 znear,
     result[15] = 0.0f;
 }
 
-void mat4_ortho(const float t,
-                const float b,
-                const float l,
-                const float r,
-                const float znear,
-                const float zfar, f32 *result) {
+void mat4_ortho(const float t,const float b,const float l,const float r,const float znear,const float zfar, f32 *result) {
     memset(result, 0, 16*sizeof(f32));
     
     result[0] = 2.0f / (r - l);
@@ -290,12 +269,7 @@ void mat4_ortho(const float t,
     result[15] = 1.0f;
 }
 
-void mat4_ortho_gl(const float t,
-                   const float b,
-                   const float l,
-                   const float r,
-                   const float znear,
-                   const float zfar, f32 *result) {
+void mat4_ortho_gl(const float t,const float b,const float l,const float r,const float znear,const float zfar,f32 *result) {
     memset(result, 0, 16*sizeof(f32));
     
     result[0] = 2.0f / (r - l);
@@ -346,71 +320,6 @@ void mat4_ortho_zoom_gl(float ratio, float zoom, float n, float f, f32 *result) 
     result[15] = 1.0f;
 }
 
-inline void mat4_translateby(f32 *mat, const Vec3 vec) {
-    mat[12] += vec.x;
-    mat[13] += vec.y;
-    mat[14] += vec.z;
-}
-
-inline void mat4_set_position(f32 *mat, const Vec3 vec) {
-    mat[12] = vec.x;
-    mat[13] = vec.y;
-    mat[14] = vec.z;
-}
-
-void mat4_rotation_x(f32 *mat, const float radians) {
-    mat[0] = 1.0f;
-    mat[5] = cos(radians);
-    mat[6] = -sin(radians);
-    mat[9] = sin(radians);
-    mat[10] = cos(radians);
-    mat[15] = 1.0f;
-}
-
-void mat4_rotation_y(f32 *mat, const float radians) {
-    mat[0] = cos(radians);
-    mat[2] = sin(radians);
-    mat[5] = 1.0f;
-    mat[8] = -sin(radians);
-    mat[10] = cos(radians);
-    mat[15] = 1.0f;
-}
-
-void mat4_rotation_z(f32 *mat, const float radians) {
-    mat[0] = cos(radians);
-    mat[1] = -sin(radians);
-    mat[4] = sin(radians);
-    mat[1*4+1] = cos(radians);
-    mat[2*4+2] = 1.0f;
-    mat[3*4+3] = 1.0f;
-}
-
-void mat4_rotate_euler(f32 *restrict mat, const Vec3 euler) {
-    const float cx = cos(euler.x);
-    const float sx = sin(euler.x);
-    const float cy = cos(euler.y);
-    const float sy = sin(euler.y);
-    const float cz = cos(euler.z);
-    const float sz = sin(euler.z);
-    
-    const float t01 = -sz * cx;
-    const float t02 = sz * sx;
-    const float t11 = cz * cx;
-    const float t12 = cz * -sx;
-    
-    mat[0] = cz * cy + t02 * -sy;
-    mat[1] = t01;
-    mat[2] = cz * sy + t02 * cy;
-    
-    mat[1*4+0] = sz * cy + t12 * -sy;
-    mat[1*4+1] = t11;
-    mat[1*4+2] = sz * sy + t12 * cy;
-    
-    mat[2*4+0] = cx * -sy;
-    mat[2*4+1] = sx;
-    mat[2*4+2] = cx * cy;
-}
-
 void mat4_look_at(const Vec3 target, const Vec3 eye, const Vec3 up, f32 *mat) {
     Vec3 z_axis = vec3_normalize(vec3_sub(eye, target));
     Vec3 x_axis = vec3_normalize(vec3_cross(up, z_axis));
@@ -437,7 +346,7 @@ void mat4_look_at(const Vec3 target, const Vec3 eye, const Vec3 up, f32 *mat) {
     mat[15] = 1.0f;
 }
 
-void trs_quat_to_mat4(f32 *restrict dst, const Vec3 *t, const Quat *r, const Vec3 *s) {
+void trs_quat_to_mat4(const Vec3 *t, const Quat *r, const Vec3 *s, f32 *restrict dst) {
     const float sqx = 2.0f * r->x * r->x;
     const float sqy = 2.0f * r->y * r->y;
     const float sqz = 2.0f * r->z * r->z;
@@ -473,23 +382,55 @@ void trs_quat_to_mat4(f32 *restrict dst, const Vec3 *t, const Quat *r, const Vec
     dst[15] = 1.0f;
 }
 
-void mat4_scaleby(f32 *restrict dst, const Vec3 s) {
-    dst[0] *= s.x;
-    dst[1] *= s.x;
-    dst[2] *= s.x;
-    dst[4] *= s.y;
-    dst[5] *= s.y;
-    dst[6] *= s.y;
-    dst[8] *= s.z;
-    dst[9] *= s.z;
-    dst[10] *= s.z;
-}
-
 void trs_to_mat4(const Vec3 t, const Vec3 r, const Vec3 s, f32 *result) {
     mat4_identity(result);
     mat4_translateby(result, t);
     mat4_rotate_euler(result, r);
     mat4_scaleby(result, s);
+}
+
+void mat4_transpose(Mat4 *restrict mat) {
+    Mat4 tmp = {0};
+    
+    for(u32 c = 0; c < 4; c++) {
+        for(u32 r = 0; r < 4; r++) {
+            tmp[c * 4 + r] = *mat[r * 4 + c];
+        }
+    }
+    
+    for(u32 i = 0; i < 16; i++) {
+        *mat[i] = tmp[i];
+    }
+}
+
+void mat4_mul(const f32 *restrict const a, const f32 *restrict const b, f32 *result) {
+    memset(result, 0, 16*sizeof(f32));
+    
+    for(u32 i = 0; i < 4; i++) {
+        for(u32 j = 0; j < 4; j++) {
+            for(u32 k = 0; k < 4; k++) {
+                result[j * 4 + i] += (a[k * 4 + i] * b[j * 4 + k]);
+            }
+        }
+    }
+}
+
+Vec4 mat4_mul_vec4(const f32 *restrict const mat, const Vec4 vec) {
+    Vec4 result = {0};
+    result.x = vec.x * mat[0] + vec.y * mat[4] + vec.z * mat[8] + vec.w * mat[12];
+    result.y = vec.x * mat[1] + vec.y * mat[5] + vec.z * mat[9] + vec.w * mat[13];
+    result.z = vec.x * mat[2] + vec.y * mat[6] + vec.z * mat[10] + vec.w * mat[14];
+    result.w = vec.x * mat[3] + vec.y * mat[7] + vec.z * mat[11] + vec.w * mat[15];
+    return result;
+}
+
+// This assumes that w == 1
+Vec3 mat4_mul_vec3(const f32 *const mat, const Vec3 vec) {
+    Vec3 result = {0};
+    result.x = vec.x * mat[0] + vec.y * mat[4] + vec.z * mat[8] + mat[12];
+    result.y = vec.x * mat[1] + vec.y * mat[5] + vec.z * mat[9] + mat[13];
+    result.z = vec.x * mat[2] + vec.y * mat[6] + vec.z * mat[10] + mat[14];
+    return result;
 }
 
 void mat4_inverse(const f32 *const restrict m, f32 *out) {
@@ -579,6 +520,71 @@ Vec3 mat4_get_translation(const Mat4 mat) {
     return result;
 }
 
+inline void mat4_translateby(f32 *mat, const Vec3 vec) {
+    mat[12] += vec.x;
+    mat[13] += vec.y;
+    mat[14] += vec.z;
+}
+
+inline void mat4_set_position(f32 *mat, const Vec3 vec) {
+    mat[12] = vec.x;
+    mat[13] = vec.y;
+    mat[14] = vec.z;
+}
+
+void mat4_rotation_x(f32 *mat, const float radians) {
+    mat[0] = 1.0f;
+    mat[5] = cos(radians);
+    mat[6] = -sin(radians);
+    mat[9] = sin(radians);
+    mat[10] = cos(radians);
+    mat[15] = 1.0f;
+}
+
+void mat4_rotation_y(f32 *mat, const float radians) {
+    mat[0] = cos(radians);
+    mat[2] = sin(radians);
+    mat[5] = 1.0f;
+    mat[8] = -sin(radians);
+    mat[10] = cos(radians);
+    mat[15] = 1.0f;
+}
+
+void mat4_rotation_z(f32 *mat, const float radians) {
+    mat[0] = cos(radians);
+    mat[1] = -sin(radians);
+    mat[4] = sin(radians);
+    mat[1*4+1] = cos(radians);
+    mat[2*4+2] = 1.0f;
+    mat[3*4+3] = 1.0f;
+}
+
+void mat4_rotate_euler(f32 *restrict mat, const Vec3 euler) {
+    const float cx = cos(euler.x);
+    const float sx = sin(euler.x);
+    const float cy = cos(euler.y);
+    const float sy = sin(euler.y);
+    const float cz = cos(euler.z);
+    const float sz = sin(euler.z);
+    
+    const float t01 = -sz * cx;
+    const float t02 = sz * sx;
+    const float t11 = cz * cx;
+    const float t12 = cz * -sx;
+    
+    mat[0] = cz * cy + t02 * -sy;
+    mat[1] = t01;
+    mat[2] = cz * sy + t02 * cy;
+    
+    mat[1*4+0] = sz * cy + t12 * -sy;
+    mat[1*4+1] = t11;
+    mat[1*4+2] = sz * sy + t12 * cy;
+    
+    mat[2*4+0] = cx * -sy;
+    mat[2*4+1] = sx;
+    mat[2*4+2] = cx * cy;
+}
+
 Vec3 mat4_get_scale(const Mat4 *mat) {
     // To get the scale we need the length of the vectors of the first three lines.
     // @Optimize
@@ -589,22 +595,37 @@ Vec3 mat4_get_scale(const Mat4 *mat) {
     return (Vec3){vec3_length(x), vec3_length(y), vec3_length(z)};
 }
 
-Vec4 mat4_mul_vec4(const f32 *restrict const mat, const Vec4 vec) {
-    Vec4 result = {0};
-    result.x = vec.x * mat[0] + vec.y * mat[4] + vec.z * mat[8] + vec.w * mat[12];
-    result.y = vec.x * mat[1] + vec.y * mat[5] + vec.z * mat[9] + vec.w * mat[13];
-    result.z = vec.x * mat[2] + vec.y * mat[6] + vec.z * mat[10] + vec.w * mat[14];
-    result.w = vec.x * mat[3] + vec.y * mat[7] + vec.z * mat[11] + vec.w * mat[15];
-    return result;
+void mat4_scaleby(f32 *restrict dst, const Vec3 s) {
+    dst[0] *= s.x;
+    dst[1] *= s.x;
+    dst[2] *= s.x;
+    dst[4] *= s.y;
+    dst[5] *= s.y;
+    dst[6] *= s.y;
+    dst[8] *= s.z;
+    dst[9] *= s.z;
+    dst[10] *= s.z;
 }
 
-// This assumes that w == 1
-Vec3 mat4_mul_vec3(const f32 *const mat, const Vec3 vec) {
-    Vec3 result = {0};
-    result.x = vec.x * mat[0] + vec.y * mat[4] + vec.z * mat[8] + mat[12];
-    result.y = vec.x * mat[1] + vec.y * mat[5] + vec.z * mat[9] + mat[13];
-    result.z = vec.x * mat[2] + vec.y * mat[6] + vec.z * mat[10] + mat[14];
-    return result;
+void mat4_print(const f32 *const mat) {
+    sLog("\n%#.3f, %#.3f, %#.3f, %#.3f\n%#.3f, %#.3f, %#.3f, %#.3f\n%#.3f, "
+         "%#.3f, %#.3f, %#.3f\n%#.3f, %#.3f, %#.3f, %#.3f",
+         mat[0],
+         mat[1],
+         mat[2],
+         mat[3],
+         mat[4],
+         mat[5],
+         mat[6],
+         mat[7],
+         mat[8],
+         mat[9],
+         mat[10],
+         mat[11],
+         mat[12],
+         mat[13],
+         mat[14],
+         mat[15]);
 }
 
 // =====================================================

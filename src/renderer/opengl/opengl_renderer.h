@@ -7,16 +7,6 @@
 #include "platform/platform.h"
 #include "renderer/renderer.h"
 
-typedef struct Mesh {
-    u32 vertex_array;
-    u32 vertex_buffer;
-    u32 index_buffer;
-    
-    u32 vertex_count;
-    u32 index_count;
-    u32 diffuse_texture;
-} Mesh;
-
 typedef struct ShadowmapRenderPass {
     u32 framebuffer;
     u32 texture;
