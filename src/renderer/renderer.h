@@ -83,14 +83,14 @@ typedef struct PushBufferEntryText {
 typedef struct PushBufferEntryMesh {
     PushBufferEntryType type;
     MeshHandle mesh_handle;
-    Mat4 *transform;
+    Transform *transform;
     Vec3 diffuse_color;
 } PushBufferEntryMesh;
 
 typedef struct PushBufferEntrySkinnedMesh {
     PushBufferEntryType type;
     SkinnedMeshHandle mesh_handle;
-    Mat4 *transform;
+    Transform *transform;
     Vec3 diffuse_color;
 } PushBufferEntrySkinnedMesh;
 
@@ -113,6 +113,6 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
 
 internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
 internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color);
-internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform, Vec3 diffuse_color);
-internal void PushSkinnedMesh(Renderer *renderer, SkinnedMeshHandle mesh, Mat4 *transform, Vec3 diffuse_color);
+internal void PushMesh(Renderer *renderer, MeshHandle mesh, Transform *transform, Vec3 diffuse_color);
+internal void PushSkinnedMesh(Renderer *renderer, SkinnedMeshHandle mesh, Transform *transform, Vec3 diffuse_color);
 

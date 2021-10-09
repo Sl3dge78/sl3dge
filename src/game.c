@@ -19,6 +19,7 @@ u32 GameGetSize() {
     return sizeof(GameData);
 }
 
+
 // ---------------
 // Exported functions
 
@@ -49,17 +50,16 @@ void GameStart(GameData *game_data) {
     game_data->character = RendererLoadMesh(global_renderer, "resources/3d/character/character.gltf");
     
     game_data->floor = RendererLoadQuad(global_renderer);
-    mat4_identity(game_data->floor_xform);
-    mat4_scaleby(game_data->floor_xform, (Vec3){100.0f, 1.0f, 100.0f});
+    TransformIdentity(&game_data->floor_xform);
+    game_data->floor_xform.scale = (Vec3){100.0f, 1.0f, 100.0f};
     
-    mat4_identity(game_data->npc_xform);
-    mat4_translateby(game_data->npc_xform, (Vec3){0.0f, 0.0f, 5.0f});
-    mat4_identity(game_data->npc2_xform);
+    TransformIdentity(&game_data->npc_xform);
+    game_data->npc_xform.translation.z = 5.0f;
     
     game_data->interact_sphere_diameter = 1.0f;
     
     game_data->skinned_mesh = RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf");
-    mat4_identity(game_data->simple_skinning_root);
+    TransformIdentity(&game_data->simple_skinning_root);
 }
 
 /// Do deallocation here
@@ -158,8 +158,8 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         mat4_translateby(game_data->debug, game_data->interact_sphere_pos);
         mat4_scaleby(game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
         if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
-            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, game_data->npc_xform)) {
-                mat4_rotate_euler(game_data->npc_xform, (Vec3){0.0f, 1.0f, 0.0f});
+            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, &game_data->npc_xform)) {
+                game_data->npc_xform.rotation.y += 1.0f;
             }
         }
         

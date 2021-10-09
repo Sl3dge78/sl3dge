@@ -94,7 +94,7 @@ internal void UIPushTexture(Renderer *renderer, const u32 texture, const u32 x, 
 
 /// Adds a mesh to the scene draw calls
 /// The transform pointer needs to be alive until drawing happens
-internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform, Vec3 diffuse_color) {
+internal void PushMesh(Renderer *renderer, MeshHandle mesh, Transform *transform, Vec3 diffuse_color) {
     PushBuffer *push_buffer = &renderer->scene_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntryMesh) < push_buffer->max_size);
     PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
@@ -106,7 +106,7 @@ internal void PushMesh(Renderer *renderer, MeshHandle mesh, Mat4 *transform, Vec
     push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
-internal void PushSkinnedMesh(Renderer *renderer, SkinnedMeshHandle mesh, Mat4 *xform, Vec3 diffuse_color) {
+internal void PushSkinnedMesh(Renderer *renderer, SkinnedMeshHandle mesh, Transform *xform, Vec3 diffuse_color) {
     PushBuffer *push_buffer = &renderer->scene_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntrySkinnedMesh) < push_buffer->max_size);
     PushBufferEntrySkinnedMesh *entry = (PushBufferEntrySkinnedMesh *)(push_buffer->buf + push_buffer->size);

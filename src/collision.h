@@ -36,8 +36,11 @@ bool IsLineIntersectingPlane(const Vec3 l1, const Vec3 l2, const Vec3 plane_pos,
     return dot1 * dot2 <= 0;
 }
 
-bool IsLineIntersectingBoundingBox(const Vec3 l1, const Vec3 l2, const Mat4 m) {
+bool IsLineIntersectingBoundingBox(const Vec3 l1, const Vec3 l2, const Transform *xform) {
     // Transform the line into the bb coord system
+    Mat4 m;
+    TransformToMat4(xform, &m);
+    
     Mat4 inv;
     mat4_inverse(m, inv);
     

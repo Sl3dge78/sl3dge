@@ -472,7 +472,10 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                 glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
                 
                 glBindVertexArray(mesh->vertex_array);
-                glProgramUniformMatrix4fv(renderer->static_mesh_vtx_shader, glGetUniformLocation(renderer->static_mesh_vtx_shader, "transform"), 1, GL_FALSE, *entry->transform);
+                
+                Mat4 mat;
+                TransformToMat4(entry->transform, &mat);
+                glProgramUniformMatrix4fv(renderer->static_mesh_vtx_shader, glGetUniformLocation(renderer->static_mesh_vtx_shader, "transform"), 1, GL_FALSE, mat);
                 glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
                 
                 address += sizeof(PushBufferEntryMesh);
@@ -485,18 +488,20 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                 glBindTexture(GL_TEXTURE_2D, mesh->mesh.diffuse_texture);
                 glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
                 
-                glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "transform"), 1, GL_FALSE, *entry->transform);
+                Mat4 mesh_transform;
+                TransformToMat4(entry->transform, &mesh_transform);
+                glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "transform"), 1, GL_FALSE, mesh_transform);
                 
                 // Calculate bone xforms
                 Mat4 *joint_mats = sCalloc(mesh->joint_count, sizeof(Mat4));
                 
                 Mat4 mesh_inverse;
-                mat4_inverse(*entry->transform, mesh_inverse);
+                mat4_inverse(mesh_transform, mesh_inverse);
                 for(u32 i = 0; i < mesh->joint_count; i++) {
                     
                     Mat4 *parent_global_xform;
                     if(mesh->joint_parents[i] == -1) { // No parent
-                        parent_global_xform = entry->transform;
+                        parent_global_xform = &mesh_transform;
                     } else if (mesh->joint_parents[i] < i) { // We already calculated the global xform of the parent
                         parent_global_xform = &mesh->global_joint_mats[mesh->joint_parents[i]];
                     } else { // We need to calculate it

@@ -43,6 +43,12 @@ typedef struct Quat {
     f32 w;
 } Quat;
 
+typedef struct Transform {
+    Vec3 translation;
+    Quat rotation;
+    Vec3 scale;
+} Transform;
+
 typedef f32 Mat4[16];
 
 // --------
@@ -56,7 +62,7 @@ void mat4_ortho_zoom(float ratio, float zoom, float n, float f, f32 *result);
 void mat4_ortho_zoom_gl(float ratio, float zoom, float n, float f, f32 *result);
 void mat4_look_at(const Vec3 target, const Vec3 eye, const Vec3 up, f32 *mat);
 
-void trs_quat_to_mat4(const Vec3 *t, const Quat *r, const Vec3 *s, f32 *restrict dst);
+inline void trs_quat_to_mat4(const Vec3 *t, const Quat *r, const Vec3 *s, f32 *restrict dst);
 void trs_to_mat4(const Vec3 t, const Vec3 r, const Vec3 s, f32 *result);
 
 void mat4_transpose(Mat4 *restrict mat);
@@ -346,7 +352,7 @@ void mat4_look_at(const Vec3 target, const Vec3 eye, const Vec3 up, f32 *mat) {
     mat[15] = 1.0f;
 }
 
-void trs_quat_to_mat4(const Vec3 *t, const Quat *r, const Vec3 *s, f32 *restrict dst) {
+inline void trs_quat_to_mat4(const Vec3 *t, const Quat *r, const Vec3 *s, f32 *restrict dst) {
     const float sqx = 2.0f * r->x * r->x;
     const float sqy = 2.0f * r->y * r->y;
     const float sqz = 2.0f * r->z * r->z;
@@ -666,4 +672,15 @@ void quat_to_mat4(f32 *dst, const Quat *q) {
     dst[13] = 0.0f;
     dst[14] = 0.0f;
     dst[15] = 1.0f;
+}
+
+
+inline void TransformIdentity(Transform *xform) {
+    xform->translation = (Vec3){0, 0, 0};
+    xform->rotation = (Quat){0, 0, 0, 1};
+    xform->scale = (Vec3){1, 1, 1};
+}
+
+inline void TransformToMat4(const Transform *xform, Mat4* mat) {
+    trs_quat_to_mat4(&xform->translation, &xform->rotation, &xform->scale, (f32 *)mat);
 }
