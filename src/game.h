@@ -29,14 +29,14 @@ typedef struct GameData {
     MeshHandle box;
     MeshHandle character;
     
-    Transform floor_xform;
-    Transform npc_xform;
+    Transform *floor_xform;
+    Transform *npc_xform;
     
     Vec3 interact_sphere_pos;
     f32 interact_sphere_diameter;
     
     MeshHandle simple_skinning;
-    Transform simple_skinning_root;
+    Transform *simple_skinning_root;
     SkinnedMeshHandle skinned_mesh;
     
 } GameData;

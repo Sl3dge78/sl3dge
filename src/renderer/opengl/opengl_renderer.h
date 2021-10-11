@@ -52,6 +52,10 @@ typedef struct Renderer {
     u32 skinned_mesh_capacity;
     u32 skinned_mesh_count;
     
+    Transform *transforms;
+    u32 transform_capacity;
+    u32 transform_count;
+    
     // Uniform data
     Mat4 camera_proj;
     Mat4 camera_proj_inverse;

@@ -50,16 +50,16 @@ void GameStart(GameData *game_data) {
     game_data->character = RendererLoadMesh(global_renderer, "resources/3d/character/character.gltf");
     
     game_data->floor = RendererLoadQuad(global_renderer);
-    TransformIdentity(&game_data->floor_xform);
-    game_data->floor_xform.scale = (Vec3){100.0f, 1.0f, 100.0f};
+    game_data->floor_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->floor_xform->scale = (Vec3){100.0f, 1.0f, 100.0f};
     
-    TransformIdentity(&game_data->npc_xform);
-    game_data->npc_xform.translation.z = 5.0f;
+    game_data->npc_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->npc_xform->translation.z = 5.0f;
     
     game_data->interact_sphere_diameter = 1.0f;
     
     game_data->skinned_mesh = RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf");
-    TransformIdentity(&game_data->simple_skinning_root);
+    game_data->simple_skinning_root = RendererAllocateTransforms(global_renderer, 1);
 }
 
 /// Do deallocation here
@@ -155,8 +155,8 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
         
         if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
-            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, &game_data->npc_xform)) {
-                game_data->npc_xform.rotation.y += 1.0f;
+            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, game_data->npc_xform)) {
+                game_data->npc_xform->rotation.y += 1.0f;
             }
         }
         
@@ -181,8 +181,7 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
                 game_data->cos = 2.0f * PI;
             }
             
-            RendererSetSunDirection(
-                                    global_renderer, game_data->light_dir);
+            RendererSetSunDirection(global_renderer, game_data->light_dir);
         }
         
         if(input->keyboard[SCANCODE_Y]) {
@@ -190,7 +189,6 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         }
         if(input->keyboard[SCANCODE_U]) {
             game_data->skinned_mesh->joints[2].rotation = quat_from_axis((Vec3){1.0f, 0.0f, 0.0f}, 90.f);
-            
         }
     }
     
@@ -220,9 +218,9 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     DrawConsole(&game_data->console, game_data);
     
-    PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
-    PushMesh(global_renderer, game_data->character, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushSkinnedMesh(global_renderer, game_data->skinned_mesh, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
+    PushMesh(global_renderer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
+    PushMesh(global_renderer, game_data->character, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushSkinnedMesh(global_renderer, game_data->skinned_mesh, game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     
     for (u32 i = 0; i < 4; i++) {
         PushBone(global_renderer, game_data->skinned_mesh->global_joint_mats[i]);

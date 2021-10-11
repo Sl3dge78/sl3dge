@@ -173,7 +173,7 @@ internal void LoadSkinnedVtxAndIdxBuffers(SkinnedMesh *skinned_mesh, cgltf_data 
     glEnableVertexAttribArray(4);
 }
 
-internal void LoadSkin(SkinnedMesh *mesh, cgltf_data *data) {
+internal void LoadSkin(Renderer *renderer, SkinnedMesh *mesh, cgltf_data *data) {
     ASSERT_MSG(data->skins_count == 1, "No or multiple skins to load");
     cgltf_skin *skin = data->skins;
     
@@ -184,7 +184,7 @@ internal void LoadSkin(SkinnedMesh *mesh, cgltf_data *data) {
     }
     
     mesh->joint_count = skin->joints_count;
-    mesh->joints = sCalloc(skin->joints_count, sizeof(Transform));
+    mesh->joints = RendererAllocateTransforms(renderer, skin->joints_count);
     mesh->global_joint_mats = sCalloc(skin->joints_count, sizeof(Mat4));
     mesh->joint_parents = sCalloc(skin->joints_count, sizeof(u32));
     mesh->joint_children = sCalloc(skin->joints_count, sizeof(u32 *));
@@ -299,7 +299,7 @@ SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) 
     cgltf_load_buffers(&options, data, path);
     
     LoadSkinnedVtxAndIdxBuffers(mesh, data);
-    LoadSkin(mesh, data);
+    LoadSkin(renderer, mesh, data);
     LoadTextures(&mesh->mesh.diffuse_texture, data, renderer->white_texture, directory);
     
     cgltf_free(data);
@@ -326,7 +326,6 @@ void RendererDestroySkinnedMesh(Renderer *renderer, SkinnedMesh *mesh) {
     sFree(mesh->joint_children_count);
     sFree(mesh->joint_children);
     sFree(mesh->joint_parents);
-    sFree(mesh->joints);
     sFree(mesh->global_joint_mats);
     
     RendererDestroyMesh(renderer, &mesh->mesh);

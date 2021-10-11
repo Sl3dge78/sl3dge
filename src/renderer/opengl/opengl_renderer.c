@@ -305,7 +305,7 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     glDebugMessageCallback(GLMessageCallback, 0);
     glDisable(GL_CULL_FACE);
     
-    // Meshes
+    // Arrays
     renderer->mesh_count = 0;
     renderer->mesh_capacity = 8;
     renderer->meshes = sCalloc(renderer->mesh_capacity, sizeof(Mesh));
@@ -313,6 +313,10 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     renderer->skinned_mesh_count = 0;
     renderer->skinned_mesh_capacity = 8;
     renderer->skinned_meshes = sCalloc(renderer->mesh_capacity, sizeof(SkinnedMesh));
+    
+    renderer->transform_count = 0;
+    renderer->transform_capacity = 16;
+    renderer->transforms = sCalloc(renderer->transform_capacity, sizeof(Transform));
     
     // Shaders
     renderer->static_mesh_vtx_shader = CreateSeparableProgram(platform_api,"resources/shaders/gl/static_mesh.vert", GL_VERTEX_SHADER);
@@ -448,6 +452,8 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
         RendererDestroySkinnedMesh(renderer, &renderer->skinned_meshes[i]);
     }
     sFree(renderer->skinned_meshes);
+    
+    sFree(renderer->transforms);
 }
 
 // -------------

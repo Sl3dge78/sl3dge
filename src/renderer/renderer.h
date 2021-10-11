@@ -108,6 +108,9 @@ typedef struct PushBufferEntryTexture {
 // Game functions
 MeshHandle RendererLoadMesh(Renderer *renderer, const char *path);
 MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
+
+Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count);
+
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
 

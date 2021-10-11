@@ -35,6 +35,21 @@ MeshHandle RendererLoadCube(Renderer *renderer) {
     return RendererLoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
+Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count) {
+    u32 new_xform_count = count + renderer->transform_count;
+    while(renderer->transform_capacity < new_xform_count) {
+        renderer->transform_capacity *= 2;
+        Transform *ptr = sRealloc(renderer->transforms, renderer->transform_capacity);
+        ASSERT(ptr);
+        renderer->transforms = ptr;
+    }
+    
+    Transform *result = &renderer->transforms[renderer->transform_count];
+    renderer->transform_count = new_xform_count;
+    TransformIdentity(result);
+    return (result);
+}
+
 internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
     PushBuffer *push_buffer = &renderer->ui_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntryUIQuad) < push_buffer->max_size);
