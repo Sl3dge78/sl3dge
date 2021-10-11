@@ -2,19 +2,32 @@
 
 TODO
 	P0
+
 		[ ] Shader refactoring
 			[ ] Load all shader uniform locations at the start
-			[ ] Use pipelines for the other shaders
-		[ ] Mesh refactoring
+			[ ] Use pipelines for the other shaders?
+		[ ] Renderer refactoring > Do this if you're bored
+			[ ] just move functions around, create new files, delete others and stop worrying about that legacy of vulkan. 
 
 	P1
 		[ ] Animations
+			[X] Store transforms as TRS
+			[ ] Link an animation to a property
+			[ ] Make it move!
 		[ ] Sky diffraction
 		[ ] Volumetric clouds
 		[ ] Audio
 
 	P2
+		[ ] Figure out how to handle freeing meshes/transforms from our dyntables
+			[ ] Flag some spaces as free, maybe have a table that lists all the free spots.
+			[ ] Make it cleanup itself on its own
 		[ ] Figure out multithreading
+		[ ] Fix hot reloading
+			[ ] Basically we need to store what was loaded and reload it. 
+			[ ] Restructure the two big structs (GameData & Renderer)
+				[ ] Renderer fetches what it needs from GameData upon reload. 
+				[ ] Everything is stored as ptrs in GameData so we need to overwrite these guys upon reloading
 		[ ] Memory allocator?
 		[ ] Profiling
         [ ] Handle multiple primitives in single gltf
@@ -29,6 +42,7 @@ DONE
 	[X] Log to the console AND the game
 	[X] Skinned meshes
 	[X] Cleanup utils
+	[X] Transforms
 
 --------        
 

@@ -32,13 +32,14 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
     
     ConsoleInit(&game_data->console);
     global_console = &game_data->console;
+    sLogSetCallback(&ConsoleLogMessage);
     
     Leak_SetList(platform_api->DebugInfo);
 }
 
 /// This is called ONCE before the first frame
 void GameStart(GameData *game_data) {
-    sLogSetCallback(&ConsoleLogMessage);
+    
     game_data->light_dir = (Vec3){0.67f, -0.67f, 0.1f};
     game_data->camera.position = (Vec3){0.0f, 1.7f, 0.0f};
     game_data->cos = 0;

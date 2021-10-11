@@ -208,7 +208,7 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
 i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, INT cmd_show) {
     Leak_Begin();
     
-    AllocConsole();
+    //AllocConsole();
     
     stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
     sLogSetCallback(&Win32Log);
@@ -251,15 +251,20 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             frame_start = time;
         }
         
-        { // Hot Reloading
+#if 0
+        { 
+            // Hot Reloading
             if(Win32ShouldReloadModule(&game_module)) {
+                pfn_RendererDestroy(renderer);
                 Win32CloseModule(&game_module);
                 Win32LoadModule(&game_module, "game");
                 Win32LoadFunctions(&game_module);
                 pfn_GameLoad(game_data, renderer, &platform_api);
+                pfn_RendererInit(renderer, &platform_api, &global_window);
                 sLog("Game code reloaded");
             }
         }
+#endif
         
         RECT window_size;
         GetClientRect(global_window.hwnd, &window_size);

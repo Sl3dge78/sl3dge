@@ -210,7 +210,7 @@ internal void LoadSkin(Renderer *renderer, SkinnedMesh *mesh, cgltf_data *data) 
 }
 
 MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
-    sLog("Loading Mesh...");
+    sLog("LOAD - Mesh - %s", path);
     
     Mesh *mesh = GetNewMesh(renderer);
     
@@ -236,12 +236,11 @@ MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     
     cgltf_free(data);
     
-    sLog("Loading done");
-    
     return renderer->mesh_count-1;
 }
 
 MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
+    sLog("LOAD - Vertices - Vertices: %d, Indices: %d", vertex_count, index_count);
     Mesh *mesh = GetNewMesh(renderer);
     
     mesh->index_count = index_count;
@@ -277,7 +276,7 @@ MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertic
 }
 
 SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) {
-    sLog("Loading Mesh...");
+    sLog("LOAD - SkinnedMesh - %s", path);
     
     SkinnedMesh *mesh = GetNewSkinnedMesh(renderer);
     
@@ -304,7 +303,6 @@ SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) 
     
     cgltf_free(data);
     
-    sLog("Loading done");
     return mesh;
 }
 
