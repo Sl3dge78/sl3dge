@@ -154,9 +154,6 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         // Interact sphere
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
         
-        mat4_identity(game_data->debug);
-        mat4_translateby(game_data->debug, game_data->interact_sphere_pos);
-        mat4_scaleby(game_data->debug, (Vec3){0.1f, 0.1f, 0.1f});
         if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
             if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, &game_data->npc_xform)) {
                 game_data->npc_xform.rotation.y += 1.0f;
@@ -189,12 +186,11 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         }
         
         if(input->keyboard[SCANCODE_Y]) {
-            Vec3 translation = mat4_get_translation(game_data->skinned_mesh->joints[2]);
-            trs_to_mat4(translation, (Vec3) {0.0f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f}, game_data->skinned_mesh->joints[2]);
+            game_data->skinned_mesh->joints[2].rotation = quat_identity();
         }
         if(input->keyboard[SCANCODE_U]) {
-            Vec3 translation = mat4_get_translation(game_data->skinned_mesh->joints[2]);
-            trs_to_mat4(translation, (Vec3) {90.f, 0.0f, 0.0f}, (Vec3){1.0f, 1.0f, 1.0f}, game_data->skinned_mesh->joints[2]);
+            game_data->skinned_mesh->joints[2].rotation = quat_from_axis((Vec3){1.0f, 0.0f, 0.0f}, 90.f);
+            
         }
     }
     
@@ -226,7 +222,6 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     PushMesh(global_renderer, game_data->floor, &game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->character, &game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    // PushMesh(global_renderer, game_data->simple_skinning, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     PushSkinnedMesh(global_renderer, game_data->skinned_mesh, &game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     
     for (u32 i = 0; i < 4; i++) {

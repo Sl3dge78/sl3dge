@@ -80,7 +80,7 @@ void mat4_rotation_y(f32 *mat, const float radians);
 void mat4_rotation_z(f32 *mat, const float radians);
 void mat4_rotate_euler(f32 *restrict mat, const Vec3 euler);
 
-Vec3 mat4_get_scale(const Mat4 *mat);
+Vec3 mat4_get_scale(const f32 *mat);
 void mat4_scaleby(f32 *restrict dst, const Vec3 s);
 
 void mat4_print(const f32 *const mat);
@@ -211,6 +211,13 @@ Vec3 vec3_normalize(const Vec3 v) {
     f32 length = vec3_length(v);
     Vec3 result = {v.x / length, v.y / length, v.z / length};
     return result;
+}
+
+void vec3_normalize2(const Vec3 v, Vec3 *result) {
+    f32 length = vec3_length(v);
+    result->x = v.x / length;
+    result->y = v.y / length;
+    result->z = v.z / length;
 }
 
 Vec3 vec3_cross(const Vec3 a, const Vec3 b) {
@@ -591,7 +598,7 @@ void mat4_rotate_euler(f32 *restrict mat, const Vec3 euler) {
     mat[2*4+2] = cx * cy;
 }
 
-Vec3 mat4_get_scale(const Mat4 *mat) {
+Vec3 mat4_get_scale(const f32 *mat) {
     // To get the scale we need the length of the vectors of the first three lines.
     // @Optimize
     Vec3 x = *(Vec3 *)&mat[0];
@@ -636,6 +643,47 @@ void mat4_print(const f32 *const mat) {
 
 // =====================================================
 
+Quat mat4_get_rotation(f32 *mat) {
+    
+    Mat4 src;
+    memcpy(src, mat, sizeof(Mat4));
+    /*
+    vec3_normalize2(*(Vec3 *)&mat[0], (Vec3 *)&src[0]);
+    vec3_normalize2(*(Vec3 *)&mat[4], (Vec3 *)&src[4]);
+    vec3_normalize2(*(Vec3 *)&mat[8], (Vec3 *)&src[8]);
+    
+    // We have normalized the matrix, onward to calculation
+*/
+    Quat result;
+    f32 tr = src[0] + src[5] + src[10];
+    if(tr > 0) {
+        f32 S = sqrt(tr+1.0f) * 2.0f;
+        result.w = 0.25 * S;
+        result.x = (src[9] - src[6]) / S;
+        result.y = (src[3] - src[8]) / S;
+        result.z = (src[4] - src[1]) / S;
+    } else if(src[0] > src[5] && src[0] > src[10]) {
+        f32 S = sqrt(1.0 + src[0] - src[5] - src[10]) * 2.0f;
+        result.w = (src[9] - src[6]) / S;
+        result.x = 0.25 * S;
+        result.y = (src[4] + src[1]) / S;
+        result.z = (src[3] + src[8]) / S;
+    } else if(src[5] > src[10]) {
+        f32 S = sqrt(1.0f + src[5] - src[0] - src[10]) * 2.0f;
+        result.w = (src[3] - src[8]) / S;
+        result.x = (src[4] + src[1]) / S;
+        result.y = 0.25 * S;
+        result.z = (src[9] + src[6]) / S;
+    } else {
+        f32 S = sqrt(1.0 + src[10] - src[0] - src[5]) * 2.0f;
+        result.w = (src[4] + src[1]) / S;
+        result.y = (src[9] - src[6]) / S;
+        result.x = (src[3] + src[8]) / S;
+        result.z = 0.25 * S;
+    }
+    return result;
+}
+
 void quat_to_mat4(f32 *dst, const Quat *q) {
     const float sqx = 2.0f * q->x * q->x;
     const float sqy = 2.0f * q->y * q->y;
@@ -674,6 +722,19 @@ void quat_to_mat4(f32 *dst, const Quat *q) {
     dst[15] = 1.0f;
 }
 
+Quat quat_from_axis(const Vec3 axis, const f32 angle) {
+    Quat result;
+    f32 sine = sin(angle/2.0f);
+    result.x = axis.x * sine;
+    result.y = axis.y * sine;
+    result.z = axis.z * sine;
+    result.w = cos(angle / 2.0f);
+    return (result);
+}
+
+Quat quat_identity() {
+    return (Quat){0.0f, 0.0f, 0.0f, 1.0f};
+}
 
 inline void TransformIdentity(Transform *xform) {
     xform->translation = (Vec3){0, 0, 0};
@@ -683,4 +744,11 @@ inline void TransformIdentity(Transform *xform) {
 
 inline void TransformToMat4(const Transform *xform, Mat4* mat) {
     trs_quat_to_mat4(&xform->translation, &xform->rotation, &xform->scale, (f32 *)mat);
+}
+
+// @Optimize, we do stuff in double when doing this
+inline void Mat4ToTransform(const Mat4 *mat, Transform *xform) {
+    xform->translation = mat4_get_translation((f32 *)mat);
+    xform->rotation = mat4_get_rotation((f32 *)mat);
+    xform->scale = mat4_get_scale((f32 *)mat);
 }

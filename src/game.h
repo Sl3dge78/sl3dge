@@ -34,7 +34,6 @@ typedef struct GameData {
     
     Vec3 interact_sphere_pos;
     f32 interact_sphere_diameter;
-    Mat4 debug;
     
     MeshHandle simple_skinning;
     Transform simple_skinning_root;

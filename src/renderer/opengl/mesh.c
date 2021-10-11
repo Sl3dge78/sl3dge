@@ -184,13 +184,13 @@ internal void LoadSkin(SkinnedMesh *mesh, cgltf_data *data) {
     }
     
     mesh->joint_count = skin->joints_count;
-    mesh->joints = sCalloc(skin->joints_count, sizeof(Mat4));
+    mesh->joints = sCalloc(skin->joints_count, sizeof(Transform));
     mesh->global_joint_mats = sCalloc(skin->joints_count, sizeof(Mat4));
     mesh->joint_parents = sCalloc(skin->joints_count, sizeof(u32));
     mesh->joint_children = sCalloc(skin->joints_count, sizeof(u32 *));
     mesh->joint_children_count = sCalloc(skin->joints_count, sizeof(u32));
     for(u32 i = 0; i < skin->joints_count; i++) {
-        GLTFGetNodeTransform(skin->joints[i], mesh->joints[i]);
+        GLTFGetNodeTransform(skin->joints[i], &mesh->joints[i]);
         if(skin->joints[i]->parent && skin->joints[i]->parent->id != 0)
             mesh->joint_parents[i] = skin->joints[i]->parent->id-1;
         else

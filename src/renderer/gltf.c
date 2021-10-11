@@ -200,30 +200,28 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
     }
 }
 */
-void GLTFGetNodeTransform(const cgltf_node *node, Mat4 transform) {
+void GLTFGetNodeTransform(const cgltf_node *node, Transform *transform) {
     if(node->has_matrix) {
-        memcpy(transform, node->matrix, sizeof(Mat4));
+        Mat4ToTransform((Mat4 *)node->matrix, transform);
     } else {
-        Vec3 t = {node->translation[0], node->translation[1], node->translation[2]};
-        Quat r = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]};
-        Vec3 s = {node->scale[0], node->scale[1], node->scale[2]};
-        
-        trs_quat_to_mat4(&t, &r, &s, transform);
+        transform->translation = *(Vec3 *)(&node->translation);
+        transform->rotation = *(Quat *)(&node->rotation);
+        transform->scale = *(Vec3 *)(&node->scale);
     }
 }
-
-void GLTFLoadTransforms(cgltf_data *data, Mat4 *transforms) {
+/*
+void GLTFLoadTransforms(cgltf_data *data, Transform *transforms) {
     for(u32 i = 0; i < data->nodes_count; i++) {
-        mat4_identity(transforms[i]);
+        TransformIdentity(&transforms[i]);
         cgltf_node *node = &data->nodes[i];
         
-        GLTFGetNodeTransform(node, transforms[i]);
+        GLTFGetNodeTransform(node, &transforms[i]);
         
         cgltf_node *parent = node->parent;
         
         while(parent) {
-            Mat4 pm = {0};
-            GLTFGetNodeTransform(parent, pm);
+            Transform pm = {0};
+            GLTFGetNodeTransform(parent, &pm);
             
             for(u32 j = 0; j < 4; ++j) {
                 float l0 = transforms[i][j*4+0];
@@ -247,3 +245,4 @@ void GLTFLoadTransforms(cgltf_data *data, Mat4 *transforms) {
         }
     }
 }
+*/

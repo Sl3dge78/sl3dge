@@ -508,7 +508,8 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                         ASSERT(0); // @TODO
                     }
                     Mat4 tmp;
-                    mat4_mul(*parent_global_xform, mesh->joints[i], mesh->global_joint_mats[i]); // Global Transform
+                    TransformToMat4(&mesh->joints[i], &tmp);
+                    mat4_mul(*parent_global_xform, tmp, mesh->global_joint_mats[i]); // Global Transform
                     mat4_mul(mesh->global_joint_mats[i],mesh->inverse_bind_matrices[i], tmp); // Inverse Bind Matrix
                     mat4_mul(mesh_inverse, tmp, joint_mats[i]);
                 }

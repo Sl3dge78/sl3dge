@@ -39,7 +39,7 @@ typedef struct SkinnedMesh {
     Mesh mesh;
     
     u32 joint_count;
-    Mat4 *joints;
+    Transform *joints;
     Mat4 *global_joint_mats;
     i32 *joint_parents;
     u32 *joint_children_count;
