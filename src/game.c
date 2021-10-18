@@ -219,6 +219,9 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     DrawConsole(&game_data->console, game_data);
     
+    game_data->npc_xform->rotation = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, Lerp(0.0f, 6.28f, game_data->test_lerp));
+    game_data->test_lerp = fmod(game_data->test_lerp + delta_time, 1.0f);
+    
     PushMesh(global_renderer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->character, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
     PushSkinnedMesh(global_renderer, game_data->skinned_mesh, game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});

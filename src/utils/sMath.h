@@ -752,3 +752,9 @@ inline void Mat4ToTransform(const Mat4 *mat, Transform *xform) {
     xform->rotation = mat4_get_rotation((f32 *)mat);
     xform->scale = mat4_get_scale((f32 *)mat);
 }
+
+// =================================
+
+inline f32 Lerp(f32 a, f32 b, f32 t) {
+    return a + (t * (b - a));
+}

@@ -39,6 +39,8 @@ typedef struct GameData {
     Transform *simple_skinning_root;
     SkinnedMeshHandle skinned_mesh;
     
+    f32 test_lerp;
+    
 } GameData;
 
 DLL_EXPORT GameGetSize_t GameGetSize;

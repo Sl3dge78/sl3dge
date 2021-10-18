@@ -12,6 +12,8 @@ TODO
 	P1
 		[ ] Animations
 			[X] Store transforms as TRS
+			[X] Lerp
+			[ ] Animate a property by hand
 			[ ] Link an animation to a property
 			[ ] Make it move!
 		[ ] Sky diffraction
