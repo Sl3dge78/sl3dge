@@ -13,9 +13,10 @@ TODO
 		[ ] Animations
 			[X] Store transforms as TRS
 			[X] Lerp
-			[ ] Animate a property by hand
+			[X] Animate a property by hand
+			[X] Animation struct
 			[ ] Link an animation to a property
-			[ ] Make it move!
+			[ ] Load it from file
 		[ ] Sky diffraction
 		[ ] Volumetric clouds
 		[ ] Audio

@@ -53,6 +53,16 @@ typedef f32 Mat4[16];
 
 // --------
 // DECLARATIONS
+
+
+// --------
+// GENERAL
+
+inline f32 lerp(f32 a, f32 b, f32 t);
+
+// --------
+// MAT4
+
 void mat4_identity(f32 *result);
 void mat4_perspective(const float fov,const float aspect_ratio,const float near_,const float far_, f32 *result);
 void mat4_perspective_gl(const f32 fov, const f32 aspect_ratio, const f32 znear, const f32 zfar, f32 *result);
@@ -84,6 +94,25 @@ Vec3 mat4_get_scale(const f32 *mat);
 void mat4_scaleby(f32 *restrict dst, const Vec3 s);
 
 void mat4_print(const f32 *const mat);
+
+// --------
+// QUAT
+
+
+Quat mat4_get_rotation(f32 *mat);
+void quat_to_mat4(f32 *dst, const Quat *q);
+Quat quat_from_axis(const Vec3 axis, const f32 angle);
+Quat quat_identity();
+inline Quat quat_normalize(Quat q);
+Quat quat_nlerp(const Quat a, const Quat b, const f32 t);
+Quat quat_slerp(const Quat, const Quat, const f32);
+
+// --------
+// TRANSFORM
+
+inline void transform_identity(Transform *xform) ;
+inline void transform_to_mat4(const Transform *xform, Mat4* mat);
+inline void mat4_to_transform(const Mat4 *mat, Transform *xform) ;
 
 // -----------
 // Bit operations
@@ -230,8 +259,18 @@ Vec3 vec3_cross(const Vec3 a, const Vec3 b) {
     return result;
 }
 
-float vec3_dot(const Vec3 a, const Vec3 b) {
+f32 vec3_dot(const Vec3 a, const Vec3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+// @Optimize: simd would be great here
+inline Vec3 vec3_lerp(const Vec3 a, const Vec3 b, const f32 t) {
+    Vec3 result;
+    result.x = lerp(a.x, b.x, t);
+    result.y = lerp(a.y, b.y, t);
+    result.z = lerp(a.z, b.z, t);
+    
+    return (result);
 }
 
 // =====================================================
@@ -736,18 +775,62 @@ Quat quat_identity() {
     return (Quat){0.0f, 0.0f, 0.0f, 1.0f};
 }
 
-inline void TransformIdentity(Transform *xform) {
+inline Quat quat_normalize(Quat q) {
+    Quat result;
+    f32 length = sqrt(q.x * q.x +  q.y * q.y + q.z * q.z + q.w * q.w);
+    result.x = q.x / length;
+    result.y = q.y / length;
+    result.z = q.z / length;
+    result.w = q.w / length;
+    return (result);
+}
+
+Quat quat_nlerp(const Quat a, const Quat b, const f32 t) {
+    Quat result;
+    result.x = lerp(a.x, b.x, t);
+    result.y = lerp(a.y, b.y, t);
+    result.z = lerp(a.z, b.z, t);
+    result.w = lerp(a.w, b.w, t);
+    return (quat_normalize(result));
+}
+
+Quat quat_slerp(const Quat a, const Quat b, const f32 t) {
+    f32 dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+    
+    f32 theta = (f32) acos(dot);
+	if (theta<0.0) theta=-theta;
+	
+	f32 st =  sin(theta);
+	f32 sut = (float) sin(t*theta);
+	f32 sout = (float) sin((1-t)*theta);
+	f32 coeff1 = sout/st;
+	f32 coeff2 = sut/st;
+    
+    Quat result;
+    
+	result.x = coeff1*a.x + coeff2*b.x;
+	result.y = coeff1*a.y + coeff2*b.y;
+	result.z = coeff1*a.z + coeff2*b.z;
+	result.w = coeff1*a.w + coeff2*b.w;
+    
+	return(quat_normalize(result));
+}
+
+// --------
+// TRANSFORM
+
+inline void transform_identity(Transform *xform) {
     xform->translation = (Vec3){0, 0, 0};
     xform->rotation = (Quat){0, 0, 0, 1};
     xform->scale = (Vec3){1, 1, 1};
 }
 
-inline void TransformToMat4(const Transform *xform, Mat4* mat) {
+inline void transform_to_mat4(const Transform *xform, Mat4* mat) {
     trs_quat_to_mat4(&xform->translation, &xform->rotation, &xform->scale, (f32 *)mat);
 }
 
 // @Optimize, we do stuff in double when doing this
-inline void Mat4ToTransform(const Mat4 *mat, Transform *xform) {
+inline void mat4_to_transform(const Mat4 *mat, Transform *xform) {
     xform->translation = mat4_get_translation((f32 *)mat);
     xform->rotation = mat4_get_rotation((f32 *)mat);
     xform->scale = mat4_get_scale((f32 *)mat);
@@ -755,6 +838,6 @@ inline void Mat4ToTransform(const Mat4 *mat, Transform *xform) {
 
 // =================================
 
-inline f32 Lerp(f32 a, f32 b, f32 t) {
+inline f32 lerp(f32 a, f32 b, f32 t) {
     return a + (t * (b - a));
 }

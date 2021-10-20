@@ -202,7 +202,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
 */
 void GLTFGetNodeTransform(const cgltf_node *node, Transform *transform) {
     if(node->has_matrix) {
-        Mat4ToTransform((Mat4 *)node->matrix, transform);
+        mat4_to_transform((Mat4 *)node->matrix, transform);
     } else {
         transform->translation = *(Vec3 *)(&node->translation);
         transform->rotation = *(Quat *)(&node->rotation);

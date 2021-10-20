@@ -14,6 +14,13 @@ typedef struct Camera {
     Vec3 forward;
 } Camera;
 
+typedef struct Animation {
+    u32 key_count;
+    f32 length;
+    f32 *key_times;
+    Quat *quat_keys;
+} Animation;
+
 typedef struct GameData {
     // System stuff
     Console console;
@@ -39,7 +46,8 @@ typedef struct GameData {
     Transform *simple_skinning_root;
     SkinnedMeshHandle skinned_mesh;
     
-    f32 test_lerp;
+    f32 anim_time;
+    Animation anim;
     
 } GameData;
 

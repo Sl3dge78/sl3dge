@@ -46,7 +46,7 @@ Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count) {
     
     Transform *result = &renderer->transforms[renderer->transform_count];
     renderer->transform_count = new_xform_count;
-    TransformIdentity(result);
+    transform_identity(result);
     return (result);
 }
 

@@ -480,7 +480,7 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                 glBindVertexArray(mesh->vertex_array);
                 
                 Mat4 mat;
-                TransformToMat4(entry->transform, &mat);
+                transform_to_mat4(entry->transform, &mat);
                 glProgramUniformMatrix4fv(renderer->static_mesh_vtx_shader, glGetUniformLocation(renderer->static_mesh_vtx_shader, "transform"), 1, GL_FALSE, mat);
                 glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
                 
@@ -495,7 +495,7 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                 glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
                 
                 Mat4 mesh_transform;
-                TransformToMat4(entry->transform, &mesh_transform);
+                transform_to_mat4(entry->transform, &mesh_transform);
                 glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "transform"), 1, GL_FALSE, mesh_transform);
                 
                 // Calculate bone xforms
@@ -514,7 +514,7 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                         ASSERT(0); // @TODO
                     }
                     Mat4 tmp;
-                    TransformToMat4(&mesh->joints[i], &tmp);
+                    transform_to_mat4(&mesh->joints[i], &tmp);
                     mat4_mul(*parent_global_xform, tmp, mesh->global_joint_mats[i]); // Global Transform
                     mat4_mul(mesh->global_joint_mats[i],mesh->inverse_bind_matrices[i], tmp); // Inverse Bind Matrix
                     mat4_mul(mesh_inverse, tmp, joint_mats[i]);
