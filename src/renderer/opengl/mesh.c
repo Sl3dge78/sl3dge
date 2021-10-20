@@ -209,6 +209,17 @@ internal void LoadSkin(Renderer *renderer, SkinnedMesh *mesh, cgltf_data *data) 
     GLTFCopyAccessor(skin->inverse_bind_matrices, mesh->inverse_bind_matrices, 0, sizeof(Mat4));
 }
 
+internal void LoadAnimation(cgltf_animation *src, SkinnedMesh *mesh, Animation *result) {
+    //result->track_count = src->channels_count;
+    
+    
+    //AnimationTrack track;
+    for(u32 i = 0; i < src->channels_count; i++) {
+        //cgltf_animation_channel *channel = &src->channels[i];
+        
+    }
+}
+
 MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     sLog("LOAD - Mesh - %s", path);
     
@@ -300,7 +311,10 @@ SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) 
     LoadSkinnedVtxAndIdxBuffers(mesh, data);
     LoadSkin(renderer, mesh, data);
     LoadTextures(&mesh->mesh.diffuse_texture, data, renderer->white_texture, directory);
-    
+    if(data->animations_count > 0) {
+        Animation animation;
+        LoadAnimation(&data->animations[0], mesh, &animation);
+    }
     cgltf_free(data);
     
     return mesh;

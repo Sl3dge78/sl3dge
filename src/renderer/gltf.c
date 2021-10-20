@@ -128,6 +128,16 @@ void *GLTFGetSkinnedVertexBuffer(cgltf_primitive *prim, u32 *size) {
     return result;
 }
 
+void GLTFGetNodeTransform(const cgltf_node *node, Transform *transform) {
+    if(node->has_matrix) {
+        mat4_to_transform((Mat4 *)node->matrix, transform);
+    } else {
+        transform->translation = *(Vec3 *)(&node->translation);
+        transform->rotation = *(Quat *)(&node->rotation);
+        transform->scale = *(Vec3 *)(&node->scale);
+    }
+}
+
 /* // @TODO this is vulkan specific
 void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim,
                                   Primitive *primitive,
@@ -200,15 +210,7 @@ void GLTFLoadMaterialBuffer(cgltf_data *data, Material *buffer) {
     }
 }
 */
-void GLTFGetNodeTransform(const cgltf_node *node, Transform *transform) {
-    if(node->has_matrix) {
-        mat4_to_transform((Mat4 *)node->matrix, transform);
-    } else {
-        transform->translation = *(Vec3 *)(&node->translation);
-        transform->rotation = *(Quat *)(&node->rotation);
-        transform->scale = *(Vec3 *)(&node->scale);
-    }
-}
+
 /*
 void GLTFLoadTransforms(cgltf_data *data, Transform *transforms) {
     for(u32 i = 0; i < data->nodes_count; i++) {

@@ -64,50 +64,58 @@ void GameStart(GameData *game_data) {
     
     
     game_data->anim_time = 0.0f;
+    
     {
         Animation *a = &game_data->anim;
-        a->type = ANIM_TYPE_QUATERNION;
-        a->key_count = 3;
-        a->key_times = sCalloc(a->key_count, sizeof(f32));
-        Quat *keys = sCalloc(a->key_count, sizeof(Quat));
+        a->track_count = 2;
+        a->tracks = sCalloc(a->track_count, sizeof(AnimationTrack));
+        {
+            a->tracks[0].type = ANIM_TYPE_QUATERNION;
+            a->tracks[0].key_count = 3;
+            a->tracks[0].key_times = sCalloc(a->tracks[0].key_count, sizeof(f32));
+            
+            Quat *keys = sCalloc(a->tracks[0].key_count, sizeof(Quat));
+            
+            keys[0] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 0.0f);
+            a->tracks[0].key_times[0] = 0.0f;
+            keys[1] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 1.14f);
+            a->tracks[0].key_times[1] = 1.0f;
+            keys[2] = quat_from_axis((Vec3){0.5f,0.0f,0.5f}, -3.14f);
+            a->tracks[0].key_times[2] = 3.0f;
+            a->tracks[0].keys = keys;
+            a->tracks[0].target = &game_data->skinned_mesh->joints[1].rotation;
+            a->length = a->tracks[0].key_times[a->tracks[0].key_count - 1];
+        }
+        {
+            a->tracks[1].type = ANIM_TYPE_VEC3;
+            a->tracks[1].key_count = 3;
+            a->tracks[1].key_times = sCalloc(a->tracks[1].key_count, sizeof(f32));
+            
+            Vec3 * keys = sCalloc(a->tracks[1].key_count, sizeof(Vec3));
+            keys[0] = (Vec3){0.0f,0.0f,1.0f};
+            a->tracks[1].key_times[0] = 0.0f;
+            keys[1] = (Vec3){0.0f,0.0f,2.0f};
+            a->tracks[1].key_times[1] = 1.0f;
+            keys[2] = (Vec3){0.0f,1.0f,1.0f};
+            a->tracks[1].key_times[2] = 2.0f;
+            a->tracks[1].keys = keys;
+            a->tracks[1].target = &game_data->skinned_mesh->joints[0].translation;
+            if (a->length < a->tracks[1].key_times[a->tracks[1].key_count - 1]) 
+                a->length = a->tracks[1].key_times[a->tracks[1].key_count - 1];
+        }
         
-        keys[0] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 0.0f);
-        a->key_times[0] = 0.0f;
-        keys[1] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 1.14f);
-        a->key_times[1] = 1.0f;
-        keys[2] = quat_from_axis((Vec3){0.5f,0.0f,0.5f}, -3.14f);
-        a->key_times[2] = 2.0f;
-        a->keys = keys;
-        
-        a->length = a->key_times[a->key_count - 1];
-    }
-    {
-        Animation *a = &game_data->anim_t;
-        a->type = ANIM_TYPE_VEC3;
-        a->key_count = 3;
-        a->key_times = sCalloc(a->key_count, sizeof(f32));
-        Vec3 *keys = sCalloc(a->key_count, sizeof(Vec3));
-        
-        keys[0] = (Vec3){0.0f,0.0f,1.0f};
-        a->key_times[0] = 0.0f;
-        keys[1] = (Vec3){0.0f,0.0f,2.0f};
-        a->key_times[1] = 1.0f;
-        keys[2] = (Vec3){0.0f,1.0f,1.0f};
-        a->key_times[2] = 2.0f;
-        a->keys = keys;
-        
-        a->length = a->key_times[a->key_count - 1];
     }
 }
 
 /// Do deallocation here
 void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
-    sFree(game_data->anim.key_times);
-    sFree(game_data->anim.keys);
     
-    sFree(game_data->anim_t.key_times);
-    sFree(game_data->anim_t.keys);
+    for(u32 i = 0; i < game_data->anim.track_count; i++) {
+        sFree(game_data->anim.tracks[i].key_times);
+        sFree(game_data->anim.tracks[i].keys);
+    }
+    sFree(game_data->anim.tracks);
 }
 
 void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
@@ -174,38 +182,58 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
 
 void AnimationEvaluate(Animation *a, f32 time, void *target) {
     
-    u32 key_1 = 0; u32 key_2 = 0;
-    
     // clamp time
     if (time > a->length)
         time = a->length;
     
-    for(u32 i = 0; i < a->key_count; i ++) {
-        if(time > a->key_times[i] && time < a->key_times[i + 1]) {
-            key_1 = i;
-            key_2 = i + 1;
-            
-            break;
+    for(u32 i = 0; i < a->track_count; i++) {
+        AnimationTrack *track = &a->tracks[i];
+        
+        u32 key_1 = 0; u32 key_2 = 0;
+        if(time > track->key_times[track->key_count - 1]) {
+            key_1 = key_2 = track->key_count - 1;
+        }
+        else {
+            for(u32 i = 0; i < track->key_count; i ++) {
+                if(time > track->key_times[i] && time < track->key_times[i + 1]) {
+                    key_1 = i;
+                    key_2 = i + 1;
+                    
+                    break;
+                }
+            }
+        }
+        
+        f32 time_between_keys = track->key_times[key_2] - track->key_times[key_1];
+        f32 rel_t = time - track->key_times[key_1];
+        f32 norm_t = rel_t / time_between_keys;
+        
+        switch(track->type) {
+            case ANIM_TYPE_QUATERNION : {
+                Quat *keys = (Quat *)track->keys;
+                if(key_1 == key_2) {
+                    *(Quat*)track->target = keys[key_2];
+                } else {
+                    *(Quat*)track->target = quat_slerp(keys[key_1], keys[key_2], norm_t);
+                }
+            } break;
+            case ANIM_TYPE_VEC3 : {
+                Vec3 *keys = (Vec3 *)track->keys;
+                if(key_1 == key_2) {
+                    *(Vec3 *)track->target = keys[key_2];
+                } else {
+                    *(Vec3 *)track->target = vec3_lerp(keys[key_1], keys[key_2], norm_t);
+                }
+            } break;
+            /* TODO(Guigui): 
+            case ANIM_TYPE_FLOAT : {
+                } break;
+            case ANIM_TYPE_TRANSFORM : {
+                } break;
+    */
+            default : ASSERT(0); break;
         }
     }
-    ASSERT(key_1 != key_2);
-    
-    f32 time_between_keys = a->key_times[key_2] - a->key_times[key_1];
-    f32 rel_t = time - a->key_times[key_1];
-    f32 norm_t = rel_t / time_between_keys;
-    
-    switch(a->type) {
-        case ANIM_TYPE_QUATERNION : {
-            Quat *keys = (Quat *)a->keys;
-            *(Quat*)target = quat_slerp(keys[key_1], keys[key_2], norm_t);
-        } break;
-        case ANIM_TYPE_VEC3 : {
-            Vec3 *keys = (Vec3 *)a->keys;
-            *(Vec3 *)target = vec3_lerp(keys[key_1], keys[key_2], norm_t);
-        } break;
-        default : ASSERT(0); break;
-    }
-    
 }
 
 // Called every frame

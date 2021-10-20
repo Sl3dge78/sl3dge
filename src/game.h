@@ -21,12 +21,18 @@ typedef enum AnimationType {
     ANIM_TYPE_TRANSFORM,
 } AnimationType;
 
-typedef struct Animation {
+typedef struct AnimationTrack {
     AnimationType type;
     u32 key_count;
-    f32 length;
     f32 *key_times;
     void *keys;
+    void *target;
+} AnimationTrack;
+
+typedef struct Animation {
+    f32 length;
+    u32 track_count;
+    AnimationTrack *tracks;
 } Animation;
 
 typedef struct GameData {
