@@ -62,20 +62,39 @@ void GameStart(GameData *game_data) {
     game_data->skinned_mesh = RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf");
     game_data->simple_skinning_root = RendererAllocateTransforms(global_renderer, 1);
     
+    
+    game_data->anim_time = 0.0f;
     {
-        game_data->anim_time = 0.0f;
-        
         Animation *a = &game_data->anim;
+        a->type = ANIM_TYPE_QUATERNION;
         a->key_count = 3;
         a->key_times = sCalloc(a->key_count, sizeof(f32));
-        a->quat_keys = sCalloc(a->key_count, sizeof(Quat));
+        Quat *keys = sCalloc(a->key_count, sizeof(Quat));
         
-        a->quat_keys[0] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 0.0f);
+        keys[0] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 0.0f);
         a->key_times[0] = 0.0f;
-        a->quat_keys[1] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 1.14f);
+        keys[1] = quat_from_axis((Vec3){0.0f,0.0f,1.0f}, 1.14f);
         a->key_times[1] = 1.0f;
-        a->quat_keys[2] = quat_from_axis((Vec3){0.5f,0.0f,0.5f}, -3.14f);
+        keys[2] = quat_from_axis((Vec3){0.5f,0.0f,0.5f}, -3.14f);
         a->key_times[2] = 2.0f;
+        a->keys = keys;
+        
+        a->length = a->key_times[a->key_count - 1];
+    }
+    {
+        Animation *a = &game_data->anim_t;
+        a->type = ANIM_TYPE_VEC3;
+        a->key_count = 3;
+        a->key_times = sCalloc(a->key_count, sizeof(f32));
+        Vec3 *keys = sCalloc(a->key_count, sizeof(Vec3));
+        
+        keys[0] = (Vec3){0.0f,0.0f,1.0f};
+        a->key_times[0] = 0.0f;
+        keys[1] = (Vec3){0.0f,0.0f,2.0f};
+        a->key_times[1] = 1.0f;
+        keys[2] = (Vec3){0.0f,1.0f,1.0f};
+        a->key_times[2] = 2.0f;
+        a->keys = keys;
         
         a->length = a->key_times[a->key_count - 1];
     }
@@ -85,7 +104,10 @@ void GameStart(GameData *game_data) {
 void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
     sFree(game_data->anim.key_times);
-    sFree(game_data->anim.quat_keys);
+    sFree(game_data->anim.keys);
+    
+    sFree(game_data->anim_t.key_times);
+    sFree(game_data->anim_t.keys);
 }
 
 void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
@@ -150,7 +172,7 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
 }
 
 
-Quat AnimationEvaluate(Animation *a, f32 time) {
+void AnimationEvaluate(Animation *a, f32 time, void *target) {
     
     u32 key_1 = 0; u32 key_2 = 0;
     
@@ -172,7 +194,18 @@ Quat AnimationEvaluate(Animation *a, f32 time) {
     f32 rel_t = time - a->key_times[key_1];
     f32 norm_t = rel_t / time_between_keys;
     
-    return(quat_slerp(a->quat_keys[key_1], a->quat_keys[key_2], norm_t));
+    switch(a->type) {
+        case ANIM_TYPE_QUATERNION : {
+            Quat *keys = (Quat *)a->keys;
+            *(Quat*)target = quat_slerp(keys[key_1], keys[key_2], norm_t);
+        } break;
+        case ANIM_TYPE_VEC3 : {
+            Vec3 *keys = (Vec3 *)a->keys;
+            *(Vec3 *)target = vec3_lerp(keys[key_1], keys[key_2], norm_t);
+        } break;
+        default : ASSERT(0); break;
+    }
+    
 }
 
 // Called every frame
@@ -267,7 +300,8 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     { // Animation
         
         game_data->anim_time = fmod(game_data->anim_time + delta_time, game_data->anim.length);
-        game_data->skinned_mesh->joints[2].rotation = AnimationEvaluate(&game_data->anim, game_data->anim_time);
+        AnimationEvaluate(&game_data->anim, game_data->anim_time, &game_data->skinned_mesh->joints[2].rotation);
+        AnimationEvaluate(&game_data->anim_t, game_data->anim_time, &game_data->skinned_mesh->joints[0].translation);
     }
     
     PushMesh(global_renderer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});

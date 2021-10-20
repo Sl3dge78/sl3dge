@@ -14,11 +14,19 @@ typedef struct Camera {
     Vec3 forward;
 } Camera;
 
+typedef enum AnimationType {
+    ANIM_TYPE_QUATERNION,
+    ANIM_TYPE_VEC3,
+    ANIM_TYPE_FLOAT,
+    ANIM_TYPE_TRANSFORM,
+} AnimationType;
+
 typedef struct Animation {
+    AnimationType type;
     u32 key_count;
     f32 length;
     f32 *key_times;
-    Quat *quat_keys;
+    void *keys;
 } Animation;
 
 typedef struct GameData {
@@ -48,6 +56,7 @@ typedef struct GameData {
     
     f32 anim_time;
     Animation anim;
+    Animation anim_t;
     
 } GameData;
 
