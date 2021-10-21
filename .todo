@@ -15,8 +15,9 @@ TODO
 			[X] Lerp
 			[X] Animate a property by hand
 			[X] Animation struct
-			[ ] Link an animation to a property
-			[ ] Load it from file
+			[X] Link an animation to a property
+			[X] Load it from file
+			[ ] Test with character
 		[ ] Sky diffraction
 		[ ] Volumetric clouds
 		[ ] Audio

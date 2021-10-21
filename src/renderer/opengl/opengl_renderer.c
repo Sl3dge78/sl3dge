@@ -23,10 +23,12 @@
 #include "utils/sl3dge.h"
 #include <cgltf.h>
 
+#include "renderer/gltf.c"
 #include "renderer/renderer.h"
 #include "renderer/opengl/opengl_renderer.h"
-#include "renderer/gltf.c"
+#include "renderer/animation.c"
 #include "renderer/opengl/mesh.c"
+
 
 void APIENTRY GLMessageCallback(GLenum source,
                                 GLenum type,

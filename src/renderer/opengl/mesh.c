@@ -1,5 +1,3 @@
-
-
 // Returns a mesh pointer and keeps ownership
 internal Mesh *GetNewMesh(Renderer *renderer) {
     if(renderer->mesh_count == renderer->mesh_capacity) {
@@ -209,17 +207,6 @@ internal void LoadSkin(Renderer *renderer, SkinnedMesh *mesh, cgltf_data *data) 
     GLTFCopyAccessor(skin->inverse_bind_matrices, mesh->inverse_bind_matrices, 0, sizeof(Mat4));
 }
 
-internal void LoadAnimation(cgltf_animation *src, SkinnedMesh *mesh, Animation *result) {
-    //result->track_count = src->channels_count;
-    
-    
-    //AnimationTrack track;
-    for(u32 i = 0; i < src->channels_count; i++) {
-        //cgltf_animation_channel *channel = &src->channels[i];
-        
-    }
-}
-
 MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
     sLog("LOAD - Mesh - %s", path);
     
@@ -286,7 +273,7 @@ MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertic
     return renderer->mesh_count-1;
 }
 
-SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) {
+SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path, Animation *animation) {
     sLog("LOAD - SkinnedMesh - %s", path);
     
     SkinnedMesh *mesh = GetNewSkinnedMesh(renderer);
@@ -312,8 +299,7 @@ SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path) 
     LoadSkin(renderer, mesh, data);
     LoadTextures(&mesh->mesh.diffuse_texture, data, renderer->white_texture, directory);
     if(data->animations_count > 0) {
-        Animation animation;
-        LoadAnimation(&data->animations[0], mesh, &animation);
+        LoadAnimation(&data->animations[0], mesh, animation);
     }
     cgltf_free(data);
     

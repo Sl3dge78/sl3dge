@@ -49,6 +49,30 @@ typedef struct SkinnedMesh {
 
 typedef SkinnedMesh *SkinnedMeshHandle;
 
+// --------
+// Animation
+
+typedef enum AnimationType {
+    ANIM_TYPE_QUATERNION,
+    ANIM_TYPE_VEC3,
+    ANIM_TYPE_FLOAT,
+    ANIM_TYPE_TRANSFORM,
+} AnimationType;
+
+typedef struct AnimationTrack {
+    AnimationType type;
+    u32 key_count;
+    f32 *key_times;
+    void *keys;
+    void *target;
+} AnimationTrack;
+
+typedef struct Animation {
+    f32 length;
+    u32 track_count;
+    AnimationTrack *tracks;
+} Animation;
+
 // -----------
 // Push Buffer
 

@@ -797,6 +797,10 @@ Quat quat_nlerp(const Quat a, const Quat b, const f32 t) {
 Quat quat_slerp(const Quat a, const Quat b, const f32 t) {
     f32 dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
     
+    if(dot == 1) { // This means that the two quaternions are identical. So return either one.
+        return a;
+    }
+    
     f32 theta = (f32) acos(dot);
 	if (theta<0.0) theta=-theta;
 	
