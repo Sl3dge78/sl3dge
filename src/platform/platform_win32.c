@@ -16,6 +16,8 @@
 #include "game_api.h"
 #include "renderer/renderer_api.h"
 
+#include "utils/sJson.c"
+
 typedef struct ShaderCode {
     const char *spv_path;
     FILETIME last_write_time;
@@ -212,6 +214,9 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     
     stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
     sLogSetCallback(&Win32Log);
+    
+    LoadGLTF("resources/Cube.gltf");
+    return 0;
     
     if(!Win32CreateWindow(instance, &global_window)) {
         return -1;

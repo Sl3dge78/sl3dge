@@ -9,12 +9,12 @@ i32 StringFindFirstChar(const char *string, const u32 length, const char c) {
         if(string[i] == c)
             return i;
     }
-
+    
     return -1;
 }
 
 // Looks for the first non space character into string
-// Modifies the string to point at the first char and returs the amount of chars
+// Modifies the string to point at the first char and returns the amount of chars
 // eaten
 i32 StringEatSpaces(const char **string, const u32 length) {
     i32 nb = 0;

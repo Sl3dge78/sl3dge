@@ -3,6 +3,21 @@
 TODO
 	P0
 
+		[ ] Refactor mesh loading
+			[ ] Make our own gltf parser
+				[X] Open file
+				[X] Accessors
+				[X] Buffer Views
+				[X] Buffers
+				[X] Images
+				[ ] Materials
+				[ ] Meshes
+					[ ] Primitives
+				[ ] Nodes
+				[ ] Textures
+				[ ] Scene
+			[ ] Give flags to a function? A struct with all possible results and it fills it based on the flags
+
 		[ ] Shader refactoring
 			[ ] Load all shader uniform locations at the start
 			[ ] Use pipelines for the other shaders?
@@ -10,17 +25,10 @@ TODO
 			[ ] just move functions around, create new files, delete others and stop worrying about that legacy of vulkan. 
 
 	P1
-		[ ] Animations
-			[X] Store transforms as TRS
-			[X] Lerp
-			[X] Animate a property by hand
-			[X] Animation struct
-			[X] Link an animation to a property
-			[X] Load it from file
-			[ ] Test with character
+		[ ] Skin & Animate the character
 		[ ] Sky diffraction
 		[ ] Volumetric clouds
-		[ ] Audio
+		[ ] Audio	
 
 	P2
 		[ ] Figure out how to handle freeing meshes/transforms from our dyntables
@@ -47,6 +55,7 @@ DONE
 	[X] Skinned meshes
 	[X] Cleanup utils
 	[X] Transforms
+	[X] Animations
 
 --------        
 
