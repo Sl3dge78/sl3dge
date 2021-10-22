@@ -46,9 +46,8 @@ void GameStart(GameData *game_data) {
     RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_dir, -1.0)));
     
     platform->SetCaptureMouse(true);
-    game_data->box = RendererLoadCube(global_renderer);
     
-    game_data->character = RendererLoadMesh(global_renderer, "resources/3d/character/character.gltf");
+    LoadFromGLTF("resources/3d/character/character.gltf", global_renderer, platform, &game_data->character, 0, 0);
     
     game_data->floor = RendererLoadQuad(global_renderer);
     game_data->floor_xform = RendererAllocateTransforms(global_renderer, 1);
@@ -59,13 +58,14 @@ void GameStart(GameData *game_data) {
     
     game_data->interact_sphere_diameter = 1.0f;
     
+#if 0
     game_data->skinned_mesh = RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf", &game_data->anim);
     game_data->simple_skinning_root = RendererAllocateTransforms(global_renderer, 1);
     
     
     game_data->anim_time = 0.0f;
     
-    /*
+    
     {
         Animation *a = &game_data->anim;
         a->track_count = 2;
@@ -106,14 +106,14 @@ void GameStart(GameData *game_data) {
         }
         
     }
-    */
+#endif
 }
 
 /// Do deallocation here
 void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
     
-    DestroyAnimation(&game_data->anim);
+    //DestroyAnimation(&game_data->anim);
 }
 
 void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
@@ -266,60 +266,22 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // Drawing
     
     DrawConsole(&game_data->console, game_data);
+#if 0
     { // Animation
-        
         game_data->anim_time = fmod(game_data->anim_time + delta_time, game_data->anim.length);
         AnimationEvaluate(&game_data->anim, game_data->anim_time);
     }
+#endif
     
     PushMesh(global_renderer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(global_renderer, game_data->character, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushSkinnedMesh(global_renderer, game_data->skinned_mesh, game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     
+#if 0
+    PushSkinnedMesh(global_renderer, game_data->skinned_mesh, game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     for (u32 i = 0; i < 4; i++) {
         PushBone(global_renderer, game_data->skinned_mesh->global_joint_mats[i]);
     }
+#endif
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }
-
-// @Clean - Kept just in case
-/*else {
-        if(input->keyboard[SCANCODE_A]) {
-            //game_data->bike_dir -= delta_time;
-            game_data->bank_angle -= delta_time * 1.5f;
-            if(game_data->bank_angle < -0.5f) {
-                game_data->bank_angle = -0.5f;
-            }
-            game_data->bike_x -= delta_time * 50.0f;
-        }
-        if(input->keyboard[SCANCODE_D]) {
-            //game_data->bike_dir += delta_time;
-            game_data->bank_angle += delta_time * 1.5f;
-            if(game_data->bank_angle > 0.5f) {
-                game_data->bank_angle = 0.5f;
-            }
-            game_data->bike_x += delta_time * 50.0f;
-        }
-
-        if(game_data->bank_angle < 0) {
-            game_data->bank_angle += delta_time;
-        } else if(game_data->bank_angle > 0) {
-            game_data->bank_angle -= delta_time;
-        }
-
-        game_data->bike_forward.x = -sin(game_data->bike_dir - 3.14f);
-        game_data->bike_forward.z = cos(game_data->bike_dir - 3.14f);
-
-        game_data->moto_xform = trs_to_mat4((Vec3){game_data->bike_x, 0.0f, 0.0f}, (Vec3){0.0f, game_data->bike_dir, game_data->bank_angle}, (Vec3){1.0f, 1.0f, 1.0f});
-
-        Vec3 flat_forward = vec3_normalize(game_data->bike_forward);
-        Vec3 offset_z = vec3_fmul(flat_forward, -60.f);
-        Vec3 offset_y = {0.0f, 50.f, 0.f};
-        Vec3 offset = vec3_add(offset_z, offset_y);
-        offset.x += game_data->bike_x;
-
-        Mat4 cam_xform = mat4_look_at(vec3_add(game_data->bike_forward, offset), offset, (Vec3){0.0f, 1.0f, 0.0f});
-
-        RendererSetCamera(global_renderer, &cam_xform);
-    }*/

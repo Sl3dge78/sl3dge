@@ -1,4 +1,5 @@
-internal Mesh *RendererGetNewMesh(Renderer *renderer) {
+// Returns a mesh pointer and keeps ownership
+internal Mesh *GetNewMesh(Renderer *renderer) {
     if(renderer->mesh_count == renderer->mesh_capacity) {
         u32 new_capacity;
         if (renderer->mesh_capacity <= 0) 
@@ -15,152 +16,6 @@ internal Mesh *RendererGetNewMesh(Renderer *renderer) {
     renderer->mesh_count ++;
     return &renderer->meshes[renderer->mesh_count-1];
 }
-
-MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
-    sLog("LOAD - Vertices - Vertices: %d, Indices: %d", vertex_count, index_count);
-    Mesh *mesh = RendererGetNewMesh(renderer);
-    
-    mesh->index_count = index_count;
-    mesh->vertex_count = vertex_count;
-    
-    // Vertex & Index Buffer
-    glGenBuffers(1, &mesh->vertex_buffer);
-    glGenBuffers(1, &mesh->index_buffer);
-    glGenVertexArrays(1, &mesh->vertex_array);
-    glBindVertexArray(mesh->vertex_array);
-    
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(u32), indices, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
-    glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(Vertex), vertices, GL_STATIC_DRAW);
-    
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(
-                          1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
-    glEnableVertexAttribArray(2);
-    
-    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, "GEN VTX BUFFER");
-    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GEN IDX BUFFER");
-    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GEN ARRAY BUFFER");
-    
-    return renderer->mesh_count-1;
-}
-
-internal void LoadVertexBuffers(Mesh *mesh, const GLTF *gltf) {
-    
-    // Vertex & Index Buffer
-    glGenBuffers(1, &mesh->vertex_buffer);
-    glGenBuffers(1, &mesh->index_buffer);
-    glGenVertexArrays(1, &mesh->vertex_array);
-    
-    glBindVertexArray(mesh->vertex_array);
-    for(u32 m = 0; m < gltf->mesh_count; ++m) {
-        if(gltf->meshes[m].primitive_count > 1) {
-            sWarn("Only 1 primitive supported yet");
-            // @TODO
-        }
-        
-        GLTFPrimitive *prim = &gltf->meshes[m].primitives[0];
-        
-        // Indices
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
-        GLTFAccessor *indices_acc = &gltf->accessors[prim->indices];
-        u32 index_buffer_size = indices_acc->count * sizeof(u32);
-        mesh->index_count = indices_acc->count;
-        u32 *index_data = sCalloc(indices_acc->count, sizeof(u32));
-        GLTFCopyAccessor(gltf, prim->indices, index_data, 0, sizeof(u32));
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_buffer_size, index_data, GL_STATIC_DRAW);
-        sFree(index_data);
-        
-        // Vertices
-        // We're doing some offsets shenanigans, so we need to make sure that the offsets of Vertex are identical in SkinnedVertex
-        ASSERT(offsetof(Vertex, pos) == offsetof(SkinnedVertex, pos));
-        ASSERT(offsetof(Vertex, uv) == offsetof(SkinnedVertex, uv));
-        ASSERT(offsetof(Vertex, normal) == offsetof(SkinnedVertex, normal));
-        
-        glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
-        mesh->vertex_count = (u32)gltf->accessors[prim->position].count;
-        u32 vertex_buffer_size;
-        void *vertex_data;
-        u32 vertex_size;
-        if(prim->attributes_set & PRIMITIVE_SKINNED) {
-            vertex_data = sCalloc(mesh->vertex_count, sizeof(SkinnedVertex));
-            vertex_buffer_size = mesh->vertex_count * sizeof(SkinnedVertex);
-            vertex_size = sizeof(SkinnedVertex);
-        } else {
-            vertex_data = sCalloc(mesh->vertex_count, sizeof(Vertex));
-            vertex_buffer_size =  mesh->vertex_count * sizeof(Vertex);
-            vertex_size = sizeof(Vertex);
-        }
-        
-        if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_POSITION) {
-            GLTFCopyAccessor(gltf, prim->position, vertex_data, offsetof(Vertex, pos), vertex_size);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(Vertex, pos));
-            glEnableVertexAttribArray(0);
-        }
-        if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_NORMAL) {
-            GLTFCopyAccessor(gltf, prim->normal, vertex_data, offsetof(Vertex, normal), vertex_size);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(Vertex, normal));
-            glEnableVertexAttribArray(1);
-        } 
-        if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_TEXCOORD_0) {
-            GLTFCopyAccessor(gltf, prim->texcoord_0, vertex_data, offsetof(Vertex, uv), vertex_size);
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(Vertex, uv));
-            glEnableVertexAttribArray(2);
-        } 
-        if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_JOINTS_0) {
-            GLTFCopyAccessor(gltf, prim->texcoord_0, vertex_data, offsetof(SkinnedVertex, joints), vertex_size);
-            glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, joints));
-            glEnableVertexAttribArray(3);
-        } 
-        if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_WEIGHTS_0) {
-            GLTFCopyAccessor(gltf, prim->texcoord_0, vertex_data, offsetof(SkinnedVertex, weights), vertex_size);
-            glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, weights));
-            glEnableVertexAttribArray(4);
-        } 
-        
-        glBufferData(GL_ARRAY_BUFFER, vertex_buffer_size, vertex_data, GL_STATIC_DRAW);
-        sFree(vertex_data);
-    }
-    
-    char buf[64] = {0};
-    strcat(buf, gltf->path);
-    u32 i = strlen(buf);
-    strcat(buf, " Vertex buffer");
-    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, buf);
-    buf[i] = '\0';
-    strcat(buf, " Index buffer");
-    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, buf);
-    buf[i] = '\0';
-    strcat(buf, " Array buffer");
-    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, buf);
-    
-}
-
-void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh_handle, SkinnedMeshHandle *skinned_mesh, Animation *animation) {
-    GLTF *gltf = LoadGLTF(path, platform);
-    if(mesh_handle != NULL) {
-        sLog("LOAD - Mesh - %s", gltf->path);
-        Mesh *mesh = RendererGetNewMesh(renderer);
-        LoadVertexBuffers(mesh, gltf);
-        *mesh_handle = renderer->mesh_count-1;
-    }
-    DestroyGLTF(gltf);
-}
-
-void RendererDestroyMesh(Renderer *renderer, Mesh *mesh) {
-    glDeleteBuffers(1, &mesh->index_buffer);
-    glDeleteBuffers(1, &mesh->vertex_buffer);
-}
-
-
-
-// Returns a mesh pointer and keeps ownership
-#if 0
 
 // Returns a mesh pointer and keeps ownership
 internal SkinnedMesh *GetNewSkinnedMesh(Renderer *renderer) {
@@ -179,6 +34,52 @@ internal SkinnedMesh *GetNewSkinnedMesh(Renderer *renderer) {
     }
     renderer->skinned_mesh_count ++;
     return &renderer->skinned_meshes[renderer->skinned_mesh_count-1];
+}
+
+internal void LoadVtxAndIdxBuffers(Mesh *mesh, cgltf_data *data) {
+    // Vertex & Index Buffer
+    glGenBuffers(1, &mesh->vertex_buffer);
+    glGenBuffers(1, &mesh->index_buffer);
+    glGenVertexArrays(1, &mesh->vertex_array);
+    
+    glBindVertexArray(mesh->vertex_array);
+    u32 i = 0;
+    for(u32 m = 0; m < data->meshes_count; ++m) {
+        if(data->meshes[m].primitives_count > 1) {
+            sWarn("Only 1 primitive supported yet");
+            // @TODO
+        }
+        for(u32 p = 0; p < data->meshes[m].primitives_count; p++) {
+            cgltf_primitive *prim = &data->meshes[m].primitives[p];
+            mesh->index_count = data->meshes[m].primitives[p].indices->count;
+            u32 index_buffer_size = 0;
+            void *index_data = GLTFGetIndexBuffer(prim, &index_buffer_size);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_buffer_size, index_data, GL_STATIC_DRAW);
+            sFree(index_data);
+            
+            mesh->vertex_count = (u32)prim->attributes[0].data->count;
+            u32 vertex_buffer_size = 0;
+            void *vertex_data = GLTFGetVertexBuffer(prim, &vertex_buffer_size);
+            
+            glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
+            glBufferData(GL_ARRAY_BUFFER, vertex_buffer_size, vertex_data, GL_STATIC_DRAW);
+            sFree(vertex_data);
+            ++i;
+        }
+    }
+    
+    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, "GLTF VTX BUFFER");
+    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GLTF IDX BUFFER");
+    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GLTF ARRAY BUFFER");
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+                          1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(2);
 }
 
 internal void LoadTextures(u32 *dest, cgltf_data *data, const u32 default_texture, const char *directory) {
@@ -306,6 +207,72 @@ internal void LoadSkin(Renderer *renderer, SkinnedMesh *mesh, cgltf_data *data) 
     GLTFCopyAccessor(skin->inverse_bind_matrices, mesh->inverse_bind_matrices, 0, sizeof(Mat4));
 }
 
+MeshHandle RendererLoadMesh(Renderer *renderer, const char *path) {
+    sLog("LOAD - Mesh - %s", path);
+    
+    Mesh *mesh = GetNewMesh(renderer);
+    
+    char directory[128] = {0};
+    const char *last_sep = strrchr(path, '/');
+    u32 size = last_sep - path;
+    strncpy_s(directory, ARRAY_SIZE(directory), path, size);
+    directory[size] = '/';
+    directory[size + 1] = '\0';
+    
+    cgltf_data *data;
+    cgltf_options options = {0};
+    cgltf_result result = cgltf_parse_file(&options, path, &data);
+    if(result != cgltf_result_success) {
+        sError("Error reading mesh");
+        ASSERT(0);
+    }
+    
+    cgltf_load_buffers(&options, data, path);
+    
+    LoadVtxAndIdxBuffers(mesh, data);
+    LoadTextures(&mesh->diffuse_texture, data, renderer->white_texture, directory);
+    
+    cgltf_free(data);
+    
+    return renderer->mesh_count-1;
+}
+
+MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
+    sLog("LOAD - Vertices - Vertices: %d, Indices: %d", vertex_count, index_count);
+    Mesh *mesh = GetNewMesh(renderer);
+    
+    mesh->index_count = index_count;
+    mesh->vertex_count = vertex_count;
+    
+    // Vertex & Index Buffer
+    glGenBuffers(1, &mesh->vertex_buffer);
+    glGenBuffers(1, &mesh->index_buffer);
+    glGenVertexArrays(1, &mesh->vertex_array);
+    glBindVertexArray(mesh->vertex_array);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->index_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(u32), indices, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, mesh->vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(Vertex), vertices, GL_STATIC_DRAW);
+    
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, pos));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(
+                          1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, normal));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, uv));
+    glEnableVertexAttribArray(2);
+    
+    glObjectLabel(GL_BUFFER, mesh->vertex_buffer, -1, "GEN VTX BUFFER");
+    glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GEN IDX BUFFER");
+    glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GEN ARRAY BUFFER");
+    
+    mesh->diffuse_texture = renderer->white_texture;
+    
+    return renderer->mesh_count-1;
+}
+
 SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path, Animation *animation) {
     sLog("LOAD - SkinnedMesh - %s", path);
     
@@ -339,6 +306,13 @@ SkinnedMeshHandle RendererLoadSkinnedMesh(Renderer *renderer, const char *path, 
     return mesh;
 }
 
+void RendererDestroyMesh(Renderer *renderer, Mesh *mesh) {
+    glDeleteBuffers(1, &mesh->index_buffer);
+    glDeleteBuffers(1, &mesh->vertex_buffer);
+    if(mesh->diffuse_texture != renderer->white_texture)
+        glDeleteTextures(1, &mesh->diffuse_texture);
+}
+
 void RendererDestroySkinnedMesh(Renderer *renderer, SkinnedMesh *mesh) {
     sFree(mesh->inverse_bind_matrices);
     
@@ -355,5 +329,3 @@ void RendererDestroySkinnedMesh(Renderer *renderer, SkinnedMesh *mesh) {
     RendererDestroyMesh(renderer, &mesh->mesh);
     
 }
-
-#endif

@@ -21,14 +21,13 @@
 #include <stb_truetype.h>
 
 #include "utils/sl3dge.h"
-#include <cgltf.h>
 
-#include "renderer/gltf.c"
 #include "renderer/renderer.h"
 #include "renderer/opengl/opengl_renderer.h"
-#include "renderer/animation.c"
-#include "renderer/opengl/mesh.c"
+#include "utils/sGltf.c"
 
+//#include "renderer/animation.c"
+#include "renderer/opengl/mesh.c"
 
 void APIENTRY GLMessageCallback(GLenum source,
                                 GLenum type,
@@ -450,10 +449,13 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
         RendererDestroyMesh(renderer, &renderer->meshes[i]);
     }
     sFree(renderer->meshes);
+    /*
     for(u32 i = 0; i < renderer->skinned_mesh_count; i++) {
         RendererDestroySkinnedMesh(renderer, &renderer->skinned_meshes[i]);
     }
+*/
     sFree(renderer->skinned_meshes);
+    
     
     sFree(renderer->transforms);
 }
@@ -476,14 +478,14 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                 
                 Mesh *mesh = &renderer->meshes[entry->mesh_handle];
                 glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, renderer->static_mesh_vtx_shader);
-                glBindTexture(GL_TEXTURE_2D, mesh->diffuse_texture);
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
                 glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
-                
-                glBindVertexArray(mesh->vertex_array);
                 
                 Mat4 mat;
                 transform_to_mat4(entry->transform, &mat);
                 glProgramUniformMatrix4fv(renderer->static_mesh_vtx_shader, glGetUniformLocation(renderer->static_mesh_vtx_shader, "transform"), 1, GL_FALSE, mat);
+                
+                glBindVertexArray(mesh->vertex_array);
                 glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
                 
                 address += sizeof(PushBufferEntryMesh);
@@ -493,7 +495,8 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
                 SkinnedMeshHandle mesh = entry->mesh_handle;
                 
                 glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, renderer->skinned_mesh_vtx_shader);
-                glBindTexture(GL_TEXTURE_2D, mesh->mesh.diffuse_texture);
+                //glBindTexture(GL_TEXTURE_2D, mesh->mesh.diffuse_texture);
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
                 glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
                 
                 Mat4 mesh_transform;

@@ -3,21 +3,6 @@
 TODO
 	P0
 
-		[ ] Refactor mesh loading
-			[ ] Make our own gltf parser
-				[X] Open file
-				[X] Accessors
-				[X] Buffer Views
-				[X] Buffers
-				[X] Images
-				[ ] Materials
-				[ ] Meshes
-					[ ] Primitives
-				[ ] Nodes
-				[ ] Textures
-				[ ] Scene
-			[ ] Give flags to a function? A struct with all possible results and it fills it based on the flags
-
 		[ ] Shader refactoring
 			[ ] Load all shader uniform locations at the start
 			[ ] Use pipelines for the other shaders?
@@ -46,7 +31,29 @@ TODO
 
 --------
 DOING
-
+	
+	[ ] Refactor mesh loading
+		[ ] Make our own gltf parser
+			[X] Open file
+			[X] Accessors
+			[X] Buffer Views
+			[X] Buffers
+			[X] Meshes
+				[X] Primitives
+			[ ] Nodes
+			[ ] Skins
+			[ ] Animations
+			[X] Images
+			[ ] Materials
+			[ ] Textures
+			[ ] Scene
+		[ ] Import in engine
+			[X] Mesh
+			[ ] Nodes
+			[ ] Skin
+			[ ] Animations
+			[ ] Material
+		[ ] Give flags to a function? A struct with all possible results and it fills it based on the flags
 
 --------
 DONE

@@ -30,7 +30,6 @@ typedef struct Mesh {
     
     u32 vertex_count;
     u32 index_count;
-    u32 diffuse_texture;
 } Mesh;
 
 typedef u32 MeshHandle;

@@ -16,8 +16,6 @@
 #include "game_api.h"
 #include "renderer/renderer_api.h"
 
-#include "utils/sJson.c"
-
 typedef struct ShaderCode {
     const char *spv_path;
     FILETIME last_write_time;
@@ -82,8 +80,8 @@ void PlatformReadWholeFile(const char *path, i32 *file_size, char *dest) {
     FILE *file;
     fopen_s(&file, path, "r");
     if(!file) {
-        sError(0, "Unable to open file");
-        sError(0, path);
+        sError("Unable to open file");
+        sError(path);
         return;
     }
     if(dest == NULL) {
@@ -105,8 +103,8 @@ void PlatformReadBinary(const char *path, i64 *file_size, u32 *result) {
     FILE *file;
     fopen_s(&file, path, "rb");
     if(!file) {
-        sError(0, "Unable to open file");
-        sError(0, path);
+        sError("Unable to open file");
+        sError(path);
     }
     // Get the size
     fseek(file, 0, SEEK_END);
@@ -214,9 +212,6 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     
     stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
     sLogSetCallback(&Win32Log);
-    
-    LoadGLTF("resources/Cube.gltf");
-    return 0;
     
     if(!Win32CreateWindow(instance, &global_window)) {
         return -1;

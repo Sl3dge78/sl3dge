@@ -26,7 +26,6 @@ typedef struct GameData {
     f32 cos;
     
     MeshHandle floor;
-    MeshHandle box;
     MeshHandle character;
     
     Transform *floor_xform;
