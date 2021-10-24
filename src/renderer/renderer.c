@@ -50,6 +50,11 @@ Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count) {
     return (result);
 }
 
+void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms) {
+    // TODO(Guigui): 
+    return;
+}
+
 internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
     PushBuffer *push_buffer = &renderer->ui_pushbuffer;
     ASSERT(push_buffer->size + sizeof(PushBufferEntryUIQuad) < push_buffer->max_size);
@@ -114,23 +119,24 @@ internal void PushMesh(Renderer *renderer, MeshHandle mesh, Transform *transform
     ASSERT(push_buffer->size + sizeof(PushBufferEntryMesh) < push_buffer->max_size);
     PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Mesh;
-    entry->mesh_handle = mesh;
+    entry->mesh = mesh;
     entry->transform = transform;
     entry->diffuse_color = diffuse_color;
     
     push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
-internal void PushSkinnedMesh(Renderer *renderer, SkinnedMeshHandle mesh, Transform *xform, Vec3 diffuse_color) {
+internal void PushSkin(Renderer *renderer, MeshHandle mesh, SkinHandle skin, Transform *xform, Vec3 diffuse_color) {
     PushBuffer *push_buffer = &renderer->scene_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntrySkinnedMesh) < push_buffer->max_size);
-    PushBufferEntrySkinnedMesh *entry = (PushBufferEntrySkinnedMesh *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_SkinnedMesh;
-    entry->mesh_handle = mesh;
+    ASSERT(push_buffer->size + sizeof(PushBufferEntrySkin) < push_buffer->max_size);
+    PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_Skin;
+    entry->mesh = mesh;
+    entry->skin = skin;
     entry->transform = xform;
     entry->diffuse_color = diffuse_color;
     
-    push_buffer->size += sizeof(PushBufferEntrySkinnedMesh);
+    push_buffer->size += sizeof(PushBufferEntrySkin);
 }
 
 /// Adds a bone to the scene draw calls

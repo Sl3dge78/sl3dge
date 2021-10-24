@@ -47,7 +47,8 @@ void GameStart(GameData *game_data) {
     
     platform->SetCaptureMouse(true);
     
-    LoadFromGLTF("resources/3d/character/character.gltf", global_renderer, platform, &game_data->character, 0, 0);
+    //LoadFromGLTF("resources/3d/character/character.gltf", global_renderer, platform, &game_data->character, 0, 0);
+    LoadFromGLTF("resources/3d/skintest.gltf", global_renderer, platform, &game_data->cylinder_mesh, &game_data->cylinder_skin, 0);
     
     game_data->floor = RendererLoadQuad(global_renderer);
     game_data->floor_xform = RendererAllocateTransforms(global_renderer, 1);
@@ -56,13 +57,12 @@ void GameStart(GameData *game_data) {
     game_data->npc_xform = RendererAllocateTransforms(global_renderer, 1);
     game_data->npc_xform->translation.z = 5.0f;
     
+    game_data->cylinder_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->cylinder_xform->translation.x = 0.0f;
+    
     game_data->interact_sphere_diameter = 1.0f;
     
 #if 0
-    game_data->skinned_mesh = RendererLoadSkinnedMesh(global_renderer, "resources/3d/skintest.gltf", &game_data->anim);
-    game_data->simple_skinning_root = RendererAllocateTransforms(global_renderer, 1);
-    
-    
     game_data->anim_time = 0.0f;
     
     
@@ -234,10 +234,10 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         }
         
         if(input->keyboard[SCANCODE_Y]) {
-            game_data->skinned_mesh->joints[2].rotation = quat_identity();
+            game_data->cylinder_skin->joints[2].rotation = quat_identity();
         }
         if(input->keyboard[SCANCODE_U]) {
-            game_data->skinned_mesh->joints[2].rotation = quat_from_axis((Vec3){1.0f, 0.0f, 0.0f}, 90.f);
+            game_data->cylinder_skin->joints[2].rotation = quat_from_axis((Vec3){1.0f, 0.0f, 0.0f}, 90.f);
         }
     }
     
@@ -274,14 +274,13 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
 #endif
     
     PushMesh(global_renderer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
-    PushMesh(global_renderer, game_data->character, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    //PushMesh(global_renderer, game_data->cylinder_mesh, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushSkin(global_renderer, game_data->cylinder_mesh, game_data->cylinder_skin, game_data->cylinder_xform, (Vec3){1.0f, 1.0f, 1.0f});
     
-#if 0
-    PushSkinnedMesh(global_renderer, game_data->skinned_mesh, game_data->simple_skinning_root, (Vec3){1.0f, 1.0f, 1.0f});
     for (u32 i = 0; i < 4; i++) {
-        PushBone(global_renderer, game_data->skinned_mesh->global_joint_mats[i]);
+        PushBone(global_renderer, game_data->cylinder_skin->global_joint_mats[i]);
     }
-#endif
+    
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

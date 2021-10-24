@@ -2,7 +2,7 @@
 
 TODO
 	P0
-
+		[ ] Renderer destroy transform
 		[ ] Shader refactoring
 			[ ] Load all shader uniform locations at the start
 			[ ] Use pipelines for the other shaders?
@@ -14,6 +14,7 @@ TODO
 		[ ] Sky diffraction
 		[ ] Volumetric clouds
 		[ ] Audio	
+		[ ] Once we have a full scene graph: Flagging as dirty should add the node in a special array that wiil compute the global matrices for it and its' children
 
 	P2
 		[ ] Figure out how to handle freeing meshes/transforms from our dyntables

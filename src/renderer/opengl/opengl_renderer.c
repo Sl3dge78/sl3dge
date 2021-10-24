@@ -311,9 +311,9 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     renderer->mesh_capacity = 8;
     renderer->meshes = sCalloc(renderer->mesh_capacity, sizeof(Mesh));
     
-    renderer->skinned_mesh_count = 0;
-    renderer->skinned_mesh_capacity = 8;
-    renderer->skinned_meshes = sCalloc(renderer->mesh_capacity, sizeof(SkinnedMesh));
+    renderer->skin_count = 0;
+    renderer->skin_capacity = 8;
+    renderer->skins = sCalloc(renderer->skin_capacity, sizeof(Skin));
     
     renderer->transform_count = 0;
     renderer->transform_capacity = 16;
@@ -446,15 +446,15 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     
     // Meshes
     for(u32 i = 0; i < renderer->mesh_count; i++) {
-        RendererDestroyMesh(renderer, &renderer->meshes[i]);
+        RendererDestroyMesh(&renderer->meshes[i]);
     }
     sFree(renderer->meshes);
-    /*
-    for(u32 i = 0; i < renderer->skinned_mesh_count; i++) {
-        RendererDestroySkinnedMesh(renderer, &renderer->skinned_meshes[i]);
+    
+    for(u32 i = 0; i < renderer->skin_count; i++) {
+        RendererDestroySkin(renderer, &renderer->skins[i]);
     }
-*/
-    sFree(renderer->skinned_meshes);
+    
+    sFree(renderer->skins);
     
     
     sFree(renderer->transforms);
@@ -462,6 +462,26 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
 
 // -------------
 // Drawing
+
+internal void DrawMesh(const u32 pipeline, const u32 vtx_shader, const u32 frag_shader, const Mesh *mesh, const Mat4 xform, const Vec3 color) {
+    glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, vtx_shader);
+    glProgramUniform3f(frag_shader, glGetUniformLocation(frag_shader, "diffuse_color"), color.x, color.y, color.z); 
+    
+    glProgramUniformMatrix4fv(vtx_shader, glGetUniformLocation(vtx_shader, "transform"), 1, GL_FALSE, xform);
+    
+    glBindVertexArray(mesh->vertex_array);
+    glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
+}
+
+internal void CalcChildXform(u32 joint, Skin *skin) {
+    for(u32 i = 0; i < skin->joint_child_count[joint]; i++) {
+        u32 child = skin->joint_children[joint][i];
+        Mat4 tmp;
+        transform_to_mat4(&skin->joints[child], &tmp);
+        mat4_mul(skin->global_joint_mats[joint], tmp, skin->global_joint_mats[child]);
+        CalcChildXform(child, skin);
+    }
+}
 
 internal void DrawScene(Renderer *renderer, const u32 pipeline) {
     glActiveTexture(GL_TEXTURE1);
@@ -476,61 +496,55 @@ internal void DrawScene(Renderer *renderer, const u32 pipeline) {
             case PushBufferEntryType_Mesh: {
                 PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(pushb->buf + address);
                 
-                Mesh *mesh = &renderer->meshes[entry->mesh_handle];
-                glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, renderer->static_mesh_vtx_shader);
-                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-                glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
-                
                 Mat4 mat;
                 transform_to_mat4(entry->transform, &mat);
-                glProgramUniformMatrix4fv(renderer->static_mesh_vtx_shader, glGetUniformLocation(renderer->static_mesh_vtx_shader, "transform"), 1, GL_FALSE, mat);
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
                 
-                glBindVertexArray(mesh->vertex_array);
-                glDrawElements(GL_TRIANGLES, mesh->index_count, GL_UNSIGNED_INT, 0);
+                DrawMesh(pipeline, renderer->static_mesh_vtx_shader, renderer->color_fragment_shader, entry->mesh, mat, entry->diffuse_color);
                 
                 address += sizeof(PushBufferEntryMesh);
             } break;
-            case PushBufferEntryType_SkinnedMesh: {
-                PushBufferEntrySkinnedMesh *entry = (PushBufferEntrySkinnedMesh *)(pushb->buf + address);
-                SkinnedMeshHandle mesh = entry->mesh_handle;
-                
-                glUseProgramStages(pipeline, GL_VERTEX_SHADER_BIT, renderer->skinned_mesh_vtx_shader);
-                //glBindTexture(GL_TEXTURE_2D, mesh->mesh.diffuse_texture);
-                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-                glProgramUniform3f(renderer->color_fragment_shader, glGetUniformLocation(renderer->color_fragment_shader, "diffuse_color"), entry->diffuse_color.x, entry->diffuse_color.y, entry->diffuse_color.z); 
+            case PushBufferEntryType_Skin: {
+                PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(pushb->buf + address);
                 
                 Mat4 mesh_transform;
                 transform_to_mat4(entry->transform, &mesh_transform);
-                glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "transform"), 1, GL_FALSE, mesh_transform);
+                
+                // Skin calc
+                SkinHandle skin = entry->skin;
                 
                 // Calculate bone xforms
-                Mat4 *joint_mats = sCalloc(mesh->joint_count, sizeof(Mat4));
+                Mat4 *joint_mats = sCalloc(skin->joint_count, sizeof(Mat4));
                 
                 Mat4 mesh_inverse;
                 mat4_inverse(mesh_transform, mesh_inverse);
-                for(u32 i = 0; i < mesh->joint_count; i++) {
-                    
-                    Mat4 *parent_global_xform;
-                    if(mesh->joint_parents[i] == -1) { // No parent
-                        parent_global_xform = &mesh_transform;
-                    } else if (mesh->joint_parents[i] < i) { // We already calculated the global xform of the parent
-                        parent_global_xform = &mesh->global_joint_mats[mesh->joint_parents[i]];
-                    } else { // We need to calculate it
-                        ASSERT(0); // @TODO
+                
+                u32 root = 0;
+                for(u32 i = 0; i < skin->joint_count; i++){
+                    if(skin->joint_parents[i] == -1) {
+                        root = i;
+                        break;
                     }
-                    Mat4 tmp;
-                    transform_to_mat4(&mesh->joints[i], &tmp);
-                    mat4_mul(*parent_global_xform, tmp, mesh->global_joint_mats[i]); // Global Transform
-                    mat4_mul(mesh->global_joint_mats[i],mesh->inverse_bind_matrices[i], tmp); // Inverse Bind Matrix
+                }
+                
+                Mat4 tmp;
+                transform_to_mat4(&skin->joints[root], &tmp);
+                mat4_mul(mesh_transform, tmp, skin->global_joint_mats[root]);
+                CalcChildXform(root, skin);
+                
+                for(u32 i = 0; i < skin->joint_count; i++) {
+                    mat4_mul(skin->global_joint_mats[i], skin->inverse_bind_matrices[i], tmp); // Inverse Bind Matrix
                     mat4_mul(mesh_inverse, tmp, joint_mats[i]);
                 }
-                glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "joint_matrices"), mesh->joint_count, GL_FALSE, (f32*)joint_mats);
                 
-                glBindVertexArray(mesh->mesh.vertex_array);
-                glDrawElements(GL_TRIANGLES, mesh->mesh.index_count, GL_UNSIGNED_INT, 0);
+                glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "joint_matrices"), skin->joint_count, GL_FALSE, (f32*)joint_mats);
+                
+                // Mesh
+                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+                DrawMesh(pipeline, renderer->skinned_mesh_vtx_shader, renderer->color_fragment_shader, entry->mesh, mesh_transform, entry->diffuse_color);
                 sFree(joint_mats);
                 
-                address += sizeof(PushBufferEntrySkinnedMesh);
+                address += sizeof(PushBufferEntrySkin);
             } break;
             default : {
                 ASSERT(0);

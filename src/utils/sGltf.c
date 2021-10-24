@@ -42,7 +42,7 @@ typedef enum GLTFPrimitiveAttributesFlags {
     PRIMITIVE_ATTRIBUTE_JOINTS_0 = 1 << 3,
     PRIMITIVE_ATTRIBUTE_WEIGHTS_0 = 1 << 4,
     
-    PRIMITIVE_SKINNED = PRIMITIVE_ATTRIBUTE_POSITION | PRIMITIVE_ATTRIBUTE_JOINTS_0 | PRIMITIVE_ATTRIBUTE_WEIGHTS_0,
+    PRIMITIVE_SKINNED = PRIMITIVE_ATTRIBUTE_JOINTS_0 | PRIMITIVE_ATTRIBUTE_WEIGHTS_0,
 } GLTFPrimitiveAttributesFlags;
 
 typedef struct GLTFPrimitive {
@@ -53,6 +53,8 @@ typedef struct GLTFPrimitive {
     u32 position;
     u32 normal;
     u32 texcoord_0;
+    u32 joints_0;
+    u32 weights_0;
     
     u32 material;
     u32 mode;
@@ -64,6 +66,25 @@ typedef struct GLTFMesh {
     u32 primitive_count;
     GLTFPrimitive *primitives;
 } GLTFMesh;
+
+typedef struct GLTFSkin {
+    u32 inverse_bind_matrices;
+    
+    u32 joint_count;
+    u32 *joints;
+    
+    char *name;
+} GLTFSkin;
+
+typedef struct GLTFNode {
+    char *name;
+    
+    Transform xform;
+    
+    u32 child_count;
+    u32 *children;
+    
+} GLTFNode;
 
 typedef struct GLTF {
     const char* path;
@@ -82,6 +103,13 @@ typedef struct GLTF {
     
     u32 mesh_count;
     GLTFMesh *meshes;
+    
+    u32 skin_count;
+    GLTFSkin *skins;
+    
+    u32 node_count;
+    GLTFNode *nodes;
+    
 } GLTF;
 
 void Base64Decode(u32 size, char *src, char *dst) {
@@ -130,10 +158,11 @@ u32 JsonCountArray(char *ptr) {
     while(parse) {
         switch(*ptr++)  {
             case '{' : {
-                if(depth == 0) 
-                    count++;
-                
                 depth++;
+            } break;
+            case ',' : {
+                if(depth == 0) 
+                    count ++;
             } break;
             case '}' : {
                 depth --;
@@ -145,7 +174,7 @@ u32 JsonCountArray(char *ptr) {
             
         }
     }
-    return (count);
+    return (count+1);
 }
 
 char *JsonEatColon(char *ptr) {
@@ -181,6 +210,11 @@ char *JsonParseString(char *ptr, char *dst) {
 char *JsonParseU32(char *ptr, u32 *dst){
     sscanf(ptr, "%d", dst);
     while(*ptr >= '0' && *ptr <= '9') ptr++;
+    return ptr;
+}
+char *JsonParseF32(char *ptr, f32 *dst){
+    sscanf(ptr, "%f", dst);
+    while((*ptr >= '0' && *ptr <= '9') || *ptr == '-' || *ptr == '.' || *ptr == 'e') ptr++;
     return ptr;
 }
 
@@ -255,9 +289,14 @@ char *GLTFParseAccessors(char *ptr, GLTFAccessor **accessors, u32 *count) {
                     acc->type = GLTF_ACCESSOR_TYPE_VEC4;
                 } else if(strcmp(type, "VEC2") == 0) {
                     acc->type = GLTF_ACCESSOR_TYPE_VEC2;
+                } else if(strcmp(type, "MAT4") == 0) {
+                    acc->type = GLTF_ACCESSOR_TYPE_MAT4;
+                } else {
+                    sWarn("JSON: Unread accessor \"%s\" : \"%s\"", key, type);
+                    ptr = JsonSkipValue(ptr);
                 }
             } else {
-                sTrace("JSON: Unread value %s", key);
+                sTrace("JSON: Unread accessor value \"%s\"", key);
                 ptr = JsonSkipValue(ptr);
             }
             if(*ptr == ',')
@@ -488,6 +527,12 @@ char *GLTFParsePrimitives(char *ptr, GLTFPrimitive **primitives, u32 *count) {
                     } else if(strcmp(attr, "TEXCOORD_0") == 0) {
                         ptr = JsonParseU32(ptr, &prim->texcoord_0);
                         prim->attributes_set |= PRIMITIVE_ATTRIBUTE_TEXCOORD_0;
+                    } else if(strcmp(attr, "JOINTS_0") == 0) {
+                        ptr = JsonParseU32(ptr, &prim->joints_0);
+                        prim->attributes_set |= PRIMITIVE_ATTRIBUTE_JOINTS_0;
+                    } else if(strcmp(attr, "WEIGHTS_0") == 0) {
+                        ptr = JsonParseU32(ptr, &prim->weights_0);
+                        prim->attributes_set |= PRIMITIVE_ATTRIBUTE_WEIGHTS_0;
                     } else {
                         sTrace("JSON: Unread value %s", attr);
                         ptr = JsonSkipValue(ptr);
@@ -569,6 +614,169 @@ char *GLTFParseMeshes(char *ptr, GLTFMesh **meshes, u32 *count) {
     
     sTrace("GLTF: Read %d Buffers", array_count);
     return (ptr);
+}
+
+
+char *GLTFParseSkins(char *ptr, GLTFSkin **skins, u32 *count) {
+    sTrace("GLTF: Reading Skins");
+    u32 array_count = JsonCountArray(ptr);
+    *count = array_count;
+    *skins = sCalloc(array_count, sizeof(GLTFSkin));
+    ptr++; // '['
+    ptr = EatSpaces(ptr);
+    
+    for(u32 i = 0; i < array_count; i++) {
+        ASSERT(*ptr == '{');
+        ptr++;
+        ptr = EatSpaces(ptr);
+        GLTFSkin *skin = &(*skins)[i];
+        
+        for(;;) {
+            if(*ptr == '}') {
+                ptr++; // '}'
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                break;
+            }
+            
+            char key[32];
+            ptr = JsonParseString(ptr, key);
+            ptr = JsonEatColon(ptr);
+            if(strcmp(key, "inverseBindMatrices") == 0) {
+                ptr = JsonParseU32(ptr, &skin->inverse_bind_matrices);
+            } else if(strcmp(key, "name") == 0) {
+                u32 length = JsonGetStringLength(ptr);
+                skin->name = sCalloc(length, sizeof(char));
+                ptr = JsonParseString(ptr, skin->name);
+            } else if(strcmp(key, "joints") == 0) {
+                skin->joint_count = JsonCountArray(ptr);
+                skin->joints = sCalloc(skin->joint_count, sizeof(u32));
+                ptr++; // '['
+                ptr = EatSpaces(ptr);
+                for(u32 j = 0; j < skin->joint_count; j++) {
+                    ptr = JsonParseU32(ptr, &skin->joints[j]);
+                    if(*ptr == ',')
+                        ptr++;
+                    ptr = EatSpaces(ptr);
+                }
+                ASSERT(*ptr == ']');
+                ptr++;
+            } else {
+                sTrace("JSON: Unread value %s", key);
+                ptr = JsonSkipValue(ptr);
+            }
+            if(*ptr == ',')
+                ptr++;
+            ptr = EatSpaces(ptr);
+        }
+    }
+    
+    ASSERT(*ptr == ']');
+    ptr++;
+    
+    sTrace("GLTF: Read %d Skins", array_count);
+    return (ptr);
+}
+
+char *GLTFParseNodes(char *ptr, GLTFNode **nodes, u32 *count) {
+    sTrace("GLTF: Reading Nodes");
+    u32 array_count = JsonCountArray(ptr);
+    *count = array_count;
+    *nodes = sCalloc(array_count, sizeof(GLTFNode));
+    ptr++; // '['
+    ptr = EatSpaces(ptr);
+    
+    for(u32 i = 0; i < array_count; i++) {
+        ASSERT(*ptr == '{');
+        ptr++;
+        ptr = EatSpaces(ptr);
+        GLTFNode *node = &(*nodes)[i];
+        transform_identity(&node->xform);
+        
+        for(;;) {
+            if(*ptr == '}') {
+                ptr++; // '}'
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                break;
+            }
+            
+            char key[32];
+            ptr = JsonParseString(ptr, key);
+            ptr = JsonEatColon(ptr);
+            
+            if(strcmp(key, "name") == 0) {
+                u32 length = JsonGetStringLength(ptr);
+                node->name = sCalloc(length, sizeof(char));
+                ptr = JsonParseString(ptr, node->name);
+            } else if(strcmp(key, "children") == 0) {
+                node->child_count = JsonCountArray(ptr);
+                node->children = sCalloc(node->child_count, sizeof(u32));
+                ptr ++; // '['
+                for(u32 j = 0; j < node->child_count; j++) {
+                    ptr = EatSpaces(ptr);
+                    ptr = JsonParseU32(ptr, &node->children[j]);
+                    if(*ptr == ',')
+                        ptr++;
+                }
+                ptr = EatSpaces(ptr);
+                ASSERT(*ptr == ']');
+                ptr++;
+            } else if(strcmp(key, "rotation") == 0) {
+                ptr ++; // '['
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseF32(ptr, &node->xform.rotation.x);
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseF32(ptr, &node->xform.rotation.y);
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseF32(ptr, &node->xform.rotation.z);
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseF32(ptr, &node->xform.rotation.w);
+                ptr = EatSpaces(ptr);
+                ASSERT(*ptr == ']');
+                ptr++;
+                
+            } else if(strcmp(key, "translation") == 0) {
+                ptr ++; // '['
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseF32(ptr, &node->xform.translation.x);
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseF32(ptr, &node->xform.translation.y);
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseF32(ptr, &node->xform.translation.z);
+                ptr = EatSpaces(ptr);
+                ASSERT(*ptr == ']');
+                ptr++;
+            } else {
+                sTrace("JSON: Unread value %s", key);
+                ptr = JsonSkipValue(ptr);
+            }
+            if(*ptr == ',')
+                ptr++;
+            ptr = EatSpaces(ptr);
+        }
+    }
+    
+    ASSERT(*ptr == ']');
+    ptr++;
+    
+    sTrace("GLTF: Read %d Nodes", array_count);
+    return (ptr);
+}
+
+u32 GLTFGetBoneIDFromNode(const GLTF *gltf, const u32 node_id) {
+    
+    for(u32 i = 0; i < gltf->skins[0].joint_count; ++i) {
+        if(gltf->skins[0].joints[i] == node_id)
+            return (i);
+    }
+    ASSERT(0);
+    return 0;
 }
 
 void GLTFCopyAccessor(const GLTF *gltf, const u32 acc_id, void *dst, const u32 offset, const u32 dst_stride) {
@@ -665,6 +873,10 @@ GLTF *LoadGLTF(const char *path, PlatformAPI *platform) {
                         ptr = GLTFParseImages(ptr, &gltf->images, &gltf->image_count);
                     else if (strcmp(key, "meshes") == 0)
                         ptr = GLTFParseMeshes(ptr, &gltf->meshes, &gltf->mesh_count);
+                    else if (strcmp(key, "skins") == 0)
+                        ptr = GLTFParseSkins(ptr, &gltf->skins, &gltf->skin_count);
+                    else if (strcmp(key, "nodes") == 0)
+                        ptr = GLTFParseNodes(ptr, &gltf->nodes, &gltf->node_count);
                     else  {
                         sTrace("JSON: Unread value %s", key);
                         ptr = JsonSkipValue(ptr);
@@ -697,17 +909,37 @@ void DestroyGLTF(GLTF *gltf) {
     }
     sFree(gltf->buffers);
     
-    if(gltf->image_count > 0){
+    if(gltf->image_count > 0) {
         for(u32 i = 0; i < gltf->image_count; i++) {
             sFree(gltf->images[i].uri);
         }
         sFree(gltf->images);
     }
     
-    for(u32 i = 0; i < gltf->mesh_count; i++) {
-        sFree(gltf->meshes[i].primitives);
-        sFree(gltf->meshes[i].name);
+    if(gltf->mesh_count > 0) { 
+        for(u32 i = 0; i < gltf->mesh_count; i++) {
+            sFree(gltf->meshes[i].primitives);
+            sFree(gltf->meshes[i].name);
+        }
+        sFree(gltf->meshes);
     }
-    sFree(gltf->meshes);
+    
+    if(gltf->skin_count > 0) {
+        for(u32 i = 0; i < gltf->skin_count; i++) {
+            sFree(gltf->skins[i].joints);
+            sFree(gltf->skins[i].name);
+        }
+        sFree(gltf->skins);
+    } 
+    
+    if(gltf->node_count > 0) {
+        for(u32 i = 0; i < gltf->node_count; i++) {
+            sFree(gltf->nodes[i].name);
+            if(gltf->nodes[i].child_count > 0)
+                sFree(gltf->nodes[i].children);
+        }
+        sFree(gltf->nodes);
+    } 
+    
     sFree(gltf);
 }

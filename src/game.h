@@ -36,7 +36,10 @@ typedef struct GameData {
     
     MeshHandle simple_skinning;
     Transform *simple_skinning_root;
-    SkinnedMeshHandle skinned_mesh;
+    
+    Transform *cylinder_xform;
+    MeshHandle cylinder_mesh;
+    SkinHandle cylinder_skin;
     
     f32 anim_time;
     Animation anim;

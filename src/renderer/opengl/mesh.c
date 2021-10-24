@@ -1,4 +1,4 @@
-internal Mesh *RendererGetNewMesh(Renderer *renderer) {
+internal MeshHandle RendererGetNewMesh(Renderer *renderer) {
     if(renderer->mesh_count == renderer->mesh_capacity) {
         u32 new_capacity;
         if (renderer->mesh_capacity <= 0) 
@@ -14,6 +14,24 @@ internal Mesh *RendererGetNewMesh(Renderer *renderer) {
     }
     renderer->mesh_count ++;
     return &renderer->meshes[renderer->mesh_count-1];
+}
+
+internal SkinHandle RendererGetNewSkin(Renderer *renderer) {
+    if(renderer->skin_count == renderer->skin_capacity) {
+        u32 new_capacity;
+        if (renderer->skin_capacity <= 0) 
+            new_capacity = 1;
+        else {
+            new_capacity = renderer->skin_capacity * 2;
+        }
+        void *ptr = sRealloc(renderer->skins, sizeof(Skin) * new_capacity);
+        ASSERT(ptr);
+        if(ptr) {
+            renderer->skins = (Skin *)ptr;
+        }
+    }
+    renderer->skin_count ++;
+    return &renderer->skins[renderer->skin_count-1];
 }
 
 MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
@@ -47,7 +65,7 @@ MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertic
     glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GEN IDX BUFFER");
     glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GEN ARRAY BUFFER");
     
-    return renderer->mesh_count-1;
+    return mesh;
 }
 
 internal void LoadVertexBuffers(Mesh *mesh, const GLTF *gltf) {
@@ -98,32 +116,35 @@ internal void LoadVertexBuffers(Mesh *mesh, const GLTF *gltf) {
         }
         
         if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_POSITION) {
-            GLTFCopyAccessor(gltf, prim->position, vertex_data, offsetof(Vertex, pos), vertex_size);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(Vertex, pos));
+            GLTFCopyAccessor(gltf, prim->position, vertex_data, offsetof(SkinnedVertex, pos), vertex_size);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, pos));
             glEnableVertexAttribArray(0);
         }
         if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_NORMAL) {
-            GLTFCopyAccessor(gltf, prim->normal, vertex_data, offsetof(Vertex, normal), vertex_size);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(Vertex, normal));
+            GLTFCopyAccessor(gltf, prim->normal, vertex_data, offsetof(SkinnedVertex, normal), vertex_size);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, normal));
             glEnableVertexAttribArray(1);
         } 
         if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_TEXCOORD_0) {
-            GLTFCopyAccessor(gltf, prim->texcoord_0, vertex_data, offsetof(Vertex, uv), vertex_size);
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(Vertex, uv));
+            GLTFCopyAccessor(gltf, prim->texcoord_0, vertex_data, offsetof(SkinnedVertex, uv), vertex_size);
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, uv));
             glEnableVertexAttribArray(2);
         } 
         if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_JOINTS_0) {
-            GLTFCopyAccessor(gltf, prim->texcoord_0, vertex_data, offsetof(SkinnedVertex, joints), vertex_size);
-            glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, joints));
+            GLTFCopyAccessor(gltf, prim->joints_0, vertex_data, offsetof(SkinnedVertex, joints), vertex_size);
+            glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, joints));
             glEnableVertexAttribArray(3);
         } 
         if(prim->attributes_set & PRIMITIVE_ATTRIBUTE_WEIGHTS_0) {
-            GLTFCopyAccessor(gltf, prim->texcoord_0, vertex_data, offsetof(SkinnedVertex, weights), vertex_size);
+            GLTFCopyAccessor(gltf, prim->weights_0, vertex_data, offsetof(SkinnedVertex, weights), vertex_size);
             glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, vertex_size, (void *)offsetof(SkinnedVertex, weights));
             glEnableVertexAttribArray(4);
         } 
-        
         glBufferData(GL_ARRAY_BUFFER, vertex_buffer_size, vertex_data, GL_STATIC_DRAW);
+        
+        // SkinnedVertex *a = (SkinnedVertex *)vertex_data;
+        // glBufferData(GL_ARRAY_BUFFER, vertex_buffer_size, (void*)a, GL_STATIC_DRAW);
+        
         sFree(vertex_data);
     }
     
@@ -141,20 +162,76 @@ internal void LoadVertexBuffers(Mesh *mesh, const GLTF *gltf) {
     
 }
 
-void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh_handle, SkinnedMeshHandle *skinned_mesh, Animation *animation) {
-    GLTF *gltf = LoadGLTF(path, platform);
-    if(mesh_handle != NULL) {
-        sLog("LOAD - Mesh - %s", gltf->path);
-        Mesh *mesh = RendererGetNewMesh(renderer);
-        LoadVertexBuffers(mesh, gltf);
-        *mesh_handle = renderer->mesh_count-1;
+void LoadSkin(Renderer *renderer, SkinHandle skin, GLTF *gltf) {
+    
+    ASSERT_MSG(gltf->skin_count == 1, "ASSERT: More than one skin in gltf, this isn't handled yet.");
+    GLTFSkin *src_skin = &gltf->skins[0];
+    
+    skin->joint_count = src_skin->joint_count;
+    skin->inverse_bind_matrices = sCalloc(skin->joint_count, sizeof(Mat4));
+    GLTFCopyAccessor(gltf, src_skin->inverse_bind_matrices, skin->inverse_bind_matrices, 0, sizeof(Mat4));
+    
+    skin->joints = RendererAllocateTransforms(renderer, skin->joint_count);
+    skin->global_joint_mats = sCalloc(skin->joint_count, sizeof(Mat4));
+    
+    skin->joint_child_count = sCalloc(skin->joint_count, sizeof(u32));
+    skin->joint_children = sCalloc(skin->joint_count, sizeof(u32 *));
+    
+    skin->joint_parents = sCalloc(skin->joint_count, sizeof(u32));
+    
+    for(u32 i = 0; i < skin->joint_count; ++i) {
+        GLTFNode *node = &gltf->nodes[src_skin->joints[i]];
+        
+        skin->joints[i] = node->xform;
+        skin->joint_child_count[i] = node->child_count;
+        skin->joint_parents[i] = -1;
+        if(node->child_count > 0) {
+            skin->joint_children[i] = sCalloc(node->child_count, sizeof(u32));
+            for(u32 j = 0; j < skin->joint_child_count[i]; ++j) {
+                u32 child_id = GLTFGetBoneIDFromNode(gltf, node->children[j]);
+                skin->joint_children[i][j] = child_id;
+                skin->joint_parents[child_id] = i; 
+            }
+        }
     }
+}
+
+void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinHandle *skin, Animation *animation) {
+    GLTF *gltf = LoadGLTF(path, platform);
+    
+    if(mesh != NULL) {
+        sLog("LOAD - Mesh - %s", gltf->path);
+        *mesh = RendererGetNewMesh(renderer);
+        LoadVertexBuffers(*mesh, gltf);
+    }
+    
+    if(skin != NULL) {
+        sLog("LOAD - SKIN - %s", gltf->path);
+        *skin = RendererGetNewSkin(renderer);
+        LoadSkin(renderer, *skin, gltf);
+    }
+    
     DestroyGLTF(gltf);
 }
 
-void RendererDestroyMesh(Renderer *renderer, Mesh *mesh) {
+void RendererDestroyMesh(MeshHandle mesh) {
     glDeleteBuffers(1, &mesh->index_buffer);
     glDeleteBuffers(1, &mesh->vertex_buffer);
+}
+
+void RendererDestroySkin(Renderer *renderer, SkinHandle skin) {
+    
+    for(u32 i = 0; i < skin->joint_count; i++) {
+        if(skin->joint_child_count[i] > 0) {
+            sFree(skin->joint_children[i]);
+        }
+    }
+    sFree(skin->joint_parents);
+    sFree(skin->joint_children);
+    sFree(skin->joint_child_count);
+    sFree(skin->global_joint_mats);
+    RendererDestroyTransforms(renderer, skin->joint_count, skin->joints);
+    sFree(skin->inverse_bind_matrices);
 }
 
 

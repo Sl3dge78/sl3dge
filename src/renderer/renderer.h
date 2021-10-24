@@ -32,21 +32,22 @@ typedef struct Mesh {
     u32 index_count;
 } Mesh;
 
-typedef u32 MeshHandle;
+typedef Mesh *MeshHandle;
 
-typedef struct SkinnedMesh {
-    Mesh mesh;
-    
+typedef struct Skin {
     u32 joint_count;
+    
     Transform *joints;
     Mat4 *global_joint_mats;
+    
     i32 *joint_parents;
-    u32 *joint_children_count;
+    
+    u32 *joint_child_count;
     u32 **joint_children;
     Mat4 *inverse_bind_matrices;
-} SkinnedMesh;
+} Skin;
 
-typedef SkinnedMesh *SkinnedMeshHandle;
+typedef Skin *SkinHandle;
 
 // --------
 // Animation
@@ -85,7 +86,7 @@ typedef enum PushBufferEntryType {
     PushBufferEntryType_UIQuad,
     PushBufferEntryType_Text,
     PushBufferEntryType_Mesh,
-    PushBufferEntryType_SkinnedMesh,
+    PushBufferEntryType_Skin,
     PushBufferEntryType_Texture,
     PushBufferEntryType_Bone,
 } PushBufferEntryType;
@@ -105,17 +106,18 @@ typedef struct PushBufferEntryText {
 
 typedef struct PushBufferEntryMesh {
     PushBufferEntryType type;
-    MeshHandle mesh_handle;
+    MeshHandle mesh;
     Transform *transform;
     Vec3 diffuse_color;
 } PushBufferEntryMesh;
 
-typedef struct PushBufferEntrySkinnedMesh {
+typedef struct PushBufferEntrySkin {
     PushBufferEntryType type;
-    SkinnedMeshHandle mesh_handle;
+    MeshHandle mesh;
+    SkinHandle skin;
     Transform *transform;
     Vec3 diffuse_color;
-} PushBufferEntrySkinnedMesh;
+} PushBufferEntrySkin;
 
 typedef struct PushBufferEntryBone {
     PushBufferEntryType type;
@@ -133,6 +135,7 @@ MeshHandle RendererLoadMesh(Renderer *renderer, const char *path);
 MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
 
 Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count);
+void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
 
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
@@ -140,5 +143,5 @@ void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
 internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
 internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color);
 internal void PushMesh(Renderer *renderer, MeshHandle mesh, Transform *transform, Vec3 diffuse_color);
-internal void PushSkinnedMesh(Renderer *renderer, SkinnedMeshHandle mesh, Transform *transform, Vec3 diffuse_color);
+internal void PushSkin(Renderer *renderer, MeshHandle mesh, SkinHandle skin, Transform *transform, Vec3 diffuse_color);
 

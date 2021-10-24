@@ -48,9 +48,9 @@ typedef struct Renderer {
     u32 mesh_capacity;
     u32 mesh_count;
     
-    SkinnedMesh *skinned_meshes;
-    u32 skinned_mesh_capacity;
-    u32 skinned_mesh_count;
+    Skin *skins;
+    u32 skin_capacity;
+    u32 skin_count;
     
     Transform *transforms;
     u32 transform_capacity;
