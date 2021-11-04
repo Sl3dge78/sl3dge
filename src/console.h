@@ -26,7 +26,7 @@ typedef struct Console {
     u32 current_char;
     char current_command[128];
     ConsoleHistoryEntry command_history[32];
-    ConsoleCommand commands[4];
+    ConsoleCommand commands[5];
     u32 command_count;
     
     u32 history_browser;

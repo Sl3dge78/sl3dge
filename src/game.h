@@ -45,6 +45,8 @@ typedef struct GameData {
     Animation anim;
     Animation anim_t;
     
+    bool show_shadowmap;
+    
 } GameData;
 
 DLL_EXPORT GameGetSize_t GameGetSize;

@@ -12,7 +12,7 @@ typedef struct ShadowmapRenderPass {
     u32 texture;
     
     u32 pipeline;
-    
+    u32 size;
 } ShadowmapRenderPass;
 
 typedef struct ColorRenderPass {

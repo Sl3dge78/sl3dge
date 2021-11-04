@@ -18,10 +18,13 @@ float get_shadow(float bias) {
     float shadow = 0.0;
     vec3 proj_coords = shadow_map_texcoord.xyz / shadow_map_texcoord.w;
     proj_coords = proj_coords * 0.5 + 0.5;
+	if (proj_coords.x > 1.0 || proj_coords.x < 0.0 || proj_coords.y < 0.0 || proj_coords.y > 1.0) {
+		return 1.0;
+	}
     float current_depth = proj_coords.z;
 
     vec2 tex_dim = 1.0 / textureSize(shadow_map, 0);
-    float scale = 2.0;
+    float scale = 4.0;
     int samples = int(scale);
     int count = 0;
 
@@ -33,17 +36,18 @@ float get_shadow(float bias) {
             count ++;
         }
     }
-        shadow /= count;
-
+	shadow /= count;
 
     return shadow;
 }
 
 void main() {
-    float NdotL = dot(Normal, light_dir);
-    vec3 base_color = texture(diffuse, TexCoord).rgb * diffuse_color;
-
-    float bias = ( 1 - NdotL) * 0.005;
+    float NdotL = dot(-Normal, light_dir);
+	NdotL = clamp(NdotL, 0.0, 1.0);
+    vec3 base_color = texture(diffuse, TexCoord).rgb * diffuse_color * NdotL;
+	
+    float bias = 0.005 * tan(acos(NdotL));
+	bias = clamp(bias, 0.0, 0.01);
     float shadow = get_shadow(bias);
 
     FragColor = vec4(shadow * base_color, 1.0);

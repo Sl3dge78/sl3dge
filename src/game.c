@@ -281,6 +281,8 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
         PushBone(global_renderer, game_data->cylinder_skin->global_joint_mats[i]);
     }
     
+    if(game_data->show_shadowmap)
+        UIPushTexture(global_renderer, global_renderer->shadowmap_pass.texture, 0, 0, 500, 500);
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

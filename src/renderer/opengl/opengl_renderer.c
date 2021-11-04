@@ -139,6 +139,8 @@ internal u32 CreateProgram(PlatformAPI *platform, const char *name) {
 
 internal void CreateShadowmapRenderPass(ShadowmapRenderPass *pass) {
     
+    pass->size = 2048;
+    
     // Static
     glGenProgramPipelines(1, &pass->pipeline);
     glBindProgramPipeline(pass->pipeline);
@@ -146,14 +148,11 @@ internal void CreateShadowmapRenderPass(ShadowmapRenderPass *pass) {
     
     glGenTextures(1, &pass->texture);
     glBindTexture(GL_TEXTURE_2D, pass->texture);
-    glTexImage2D(
-                 GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 2048, 2048, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    Vec4 border_color = {1.0f, 1.0f, 1.0f, 1.0f};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, (f32 *)&border_color);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, pass->size, pass->size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
     glGenFramebuffers(1, &pass->framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
@@ -169,11 +168,12 @@ internal void DestroyShadowmapRenderPass(ShadowmapRenderPass *pass) {
 
 internal void BeginShadowmapRenderPass(ShadowmapRenderPass *pass) {
     glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, 2048, 2048);
+    glViewport(0, 0, pass->size, pass->size);
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
     glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(0);
     glBindProgramPipeline(pass->pipeline);
+    glCullFace(GL_BACK); 
 }
 
 // -------------
