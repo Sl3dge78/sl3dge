@@ -168,6 +168,9 @@ internal void BeginShadowmapRenderPass(ShadowmapRenderPass *pass) {
 
 internal void CreateColorRenderPass(const u32 width, const u32 height, ColorRenderPass *pass, const u32 fragment) {
     
+    pass->width = width;
+    pass->height = height;
+    
     // Static
     glGenProgramPipelines(1, &pass->pipeline);
     glBindProgramPipeline(pass->pipeline);
@@ -185,14 +188,12 @@ internal void CreateColorRenderPass(const u32 width, const u32 height, ColorRend
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(
-                           GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pass->render_target, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pass->render_target, 0);
     
     // Depth attachment
     glGenTextures(1, &pass->depthmap);
     glBindTexture(GL_TEXTURE_2D, pass->depthmap);
-    glTexImage2D(
-                 GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -209,9 +210,9 @@ internal void DestroyColorRenderPass(ColorRenderPass *pass) {
     glDeleteTextures(1, &pass->depthmap);
 }
 
-internal void BeginColorRenderPass(Renderer *renderer, ColorRenderPass *pass) {
+internal void BeginColorRenderPass(OpenGLRenderer *renderer, ColorRenderPass *pass) {
     glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, renderer->width, renderer->height);
+    glViewport(0, 0, pass->width, pass->height);
     
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
     glClearColor(0.43f, 0.77f, 0.91f, 0.0f);
@@ -219,7 +220,7 @@ internal void BeginColorRenderPass(Renderer *renderer, ColorRenderPass *pass) {
     
     // Shadowmap
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, renderer->backend.shadowmap_pass.texture);
+    glBindTexture(GL_TEXTURE_2D, renderer->shadowmap_pass.texture);
     glUseProgram(0);
     glBindProgramPipeline(pass->pipeline);
 }
@@ -248,31 +249,19 @@ internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass
     glClear(GL_COLOR_BUFFER_BIT);
     
     glUseProgram(pass->program);
-    glUniformMatrix4fv(
-                       glGetUniformLocation(pass->program, "cam_view"), 1, GL_FALSE, renderer->camera_view);
-    
-    glUniformMatrix4fv(glGetUniformLocation(renderer->backend.vol_pass.program, "proj_inverse"), 1, GL_FALSE, renderer->camera_proj_inverse);
-    
-    glUniformMatrix4fv(glGetUniformLocation(pass->program, "view_inverse"),
-                       1,
-                       GL_FALSE,
-                       renderer->camera_view_inverse);
-    glUniform3f(glGetUniformLocation(pass->program, "view_pos"),
-                renderer->camera_pos.x,
-                renderer->camera_pos.y,
-                renderer->camera_pos.z);
-    
-    u32 loc = glGetUniformLocation(renderer->backend.vol_pass.program, "light_dir");
-    glUniform3f(loc, renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
-    loc = glGetUniformLocation(renderer->backend.vol_pass.program, "light_matrix");
-    glUniformMatrix4fv(loc, 1, GL_FALSE, renderer->light_matrix);
+    glUniformMatrix4fv(glGetUniformLocation(pass->program, "cam_view"), 1, GL_FALSE, renderer->camera_view);
+    glUniformMatrix4fv(glGetUniformLocation(pass->program, "proj_inverse"), 1, GL_FALSE, renderer->camera_proj_inverse);
+    glUniformMatrix4fv(glGetUniformLocation(pass->program, "view_inverse"), 1, GL_FALSE, renderer->camera_view_inverse);
+    glUniform3f(glGetUniformLocation(pass->program, "view_pos"), renderer->camera_pos.x, renderer->camera_pos.y, renderer->camera_pos.z);
+    glUniform3f(glGetUniformLocation(pass->program, "light_dir"), renderer->light_dir.x, renderer->light_dir.y, renderer->light_dir.z);
+    glUniformMatrix4fv(glGetUniformLocation(pass->program, "light_matrix"), 1, GL_FALSE, renderer->light_matrix);
     
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, renderer->backend.shadowmap_pass.texture);
+    glBindTexture(GL_TEXTURE_2D, renderer->backend->shadowmap_pass.texture);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, renderer->backend.color_pass.depthmap);
+    glBindTexture(GL_TEXTURE_2D, renderer->backend->color_pass.depthmap);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, renderer->backend.color_pass.render_target);
+    glBindTexture(GL_TEXTURE_2D, renderer->backend->color_pass.render_target);
 }
 
 // ---------------
@@ -482,7 +471,7 @@ internal void DrawScreenQuad(OpenGLRenderer *renderer) {
 }
 
 internal void DrawUI(Renderer *frontend, PushBuffer *push_buffer) {
-    OpenGLRenderer *renderer = &frontend->backend;
+    OpenGLRenderer *renderer = frontend->backend;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindVertexArray(0);
     glDisable(GL_DEPTH_TEST);
@@ -696,7 +685,7 @@ internal void DrawDebug(OpenGLRenderer *renderer, PushBuffer *pushb, Mat4 camera
 DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     // ------------------
     // Uniforms
-    OpenGLRenderer *backend = &frontend->backend;
+    OpenGLRenderer *backend = frontend->backend;
     mat4_mul(frontend->camera_proj, frontend->camera_view, frontend->camera_vp);
     glProgramUniformMatrix4fv(backend->static_mesh_vtx_shader, glGetUniformLocation(backend->static_mesh_vtx_shader, "light_matrix"), 1, GL_FALSE, frontend->light_matrix);
     glProgramUniformMatrix4fv(backend->skinned_mesh_vtx_shader, glGetUniformLocation(backend->skinned_mesh_vtx_shader, "light_matrix"), 1, GL_FALSE, frontend->light_matrix);
@@ -711,7 +700,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     
     // ------------------
     // Color pass
-    BeginColorRenderPass(frontend, &backend->color_pass);
+    BeginColorRenderPass(backend, &backend->color_pass);
     glProgramUniformMatrix4fv(backend->static_mesh_vtx_shader, glGetUniformLocation(backend->static_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->camera_vp);
     glProgramUniformMatrix4fv(backend->skinned_mesh_vtx_shader, glGetUniformLocation(backend->skinned_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->camera_vp);
     DrawScene(backend, &frontend->scene_pushbuffer, backend->color_pass.pipeline);
@@ -739,21 +728,21 @@ DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_a
     renderer->width = width;
     renderer->height = height;
     
-    DestroyColorRenderPass(&renderer->backend.color_pass);
-    CreateColorRenderPass(width, height, &renderer->backend.color_pass, renderer->backend.color_fragment_shader);
+    DestroyColorRenderPass(&renderer->backend->color_pass);
+    CreateColorRenderPass(width, height, &renderer->backend->color_pass, renderer->backend->color_fragment_shader);
     UpdateCameraProj(renderer);
 }
 
 void RendererReloadShaders(Renderer *renderer, PlatformAPI *platform_api) {
     // TODO(Guigui): This won't work now. We need to reload the shader programs too
-    DestroyShadowmapRenderPass(&renderer->backend.shadowmap_pass);
-    CreateShadowmapRenderPass(&renderer->backend.shadowmap_pass);
+    DestroyShadowmapRenderPass(&renderer->backend->shadowmap_pass);
+    CreateShadowmapRenderPass(&renderer->backend->shadowmap_pass);
     
-    DestroyColorRenderPass(&renderer->backend.color_pass);
-    CreateColorRenderPass(renderer->width, renderer->height, &renderer->backend.color_pass, renderer->backend.color_fragment_shader);
+    DestroyColorRenderPass(&renderer->backend->color_pass);
+    CreateColorRenderPass(renderer->width, renderer->height, &renderer->backend->color_pass, renderer->backend->color_fragment_shader);
     
-    DestroyVolumetricRenderPass(&renderer->backend.vol_pass);
-    CreateVolumetricRenderPass(platform_api, &renderer->backend.vol_pass);
+    DestroyVolumetricRenderPass(&renderer->backend->vol_pass);
+    CreateVolumetricRenderPass(platform_api, &renderer->backend->vol_pass);
 }
 
 

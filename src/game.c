@@ -7,6 +7,8 @@
 
 #include "utils/sGltf.c"
 
+#include "renderer/pushbuffer.h"
+#include "renderer/renderer.h"
 
 
 #ifdef RENDERER_VULKAN
@@ -14,12 +16,12 @@
 //typedef VulkanRenderer Renderer;
 #elif RENDERER_OPENGL
 #include "renderer/opengl/opengl_renderer.h"
-typedef OpenGLRenderer RendererBackend;
-
-#include "renderer/renderer.h"
 #include "renderer/opengl/opengl_renderer.c"
 #include "renderer/opengl/opengl_mesh.c"
 #endif
+
+#include "renderer/pushbuffer.c"
+
 
 #include "console.h"
 #include "event.h"
@@ -294,16 +296,16 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     }
 #endif
     
-    PushMesh(global_renderer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     //PushMesh(global_renderer, game_data->cylinder_mesh, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushSkin(global_renderer, game_data->cylinder_mesh, game_data->cylinder_skin, game_data->cylinder_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushSkin(&global_renderer->scene_pushbuffer, game_data->cylinder_mesh, game_data->cylinder_skin, game_data->cylinder_xform, (Vec3){1.0f, 1.0f, 1.0f});
     
     for (u32 i = 0; i < 4; i++) {
-        PushBone(global_renderer, game_data->cylinder_skin->global_joint_mats[i]);
+        PushBone(&global_renderer->debug_pushbuffer, game_data->cylinder_skin->global_joint_mats[i]);
     }
     
     if(game_data->show_shadowmap)
-        UIPushTexture(global_renderer, global_renderer->backend.shadowmap_pass.texture, 0, 0, 500, 500);
+        PushUITexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, 0, 500, 500);
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

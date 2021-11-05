@@ -70,12 +70,14 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     
     UpdateCameraProj(renderer);
     
-    BackendRendererInit(&renderer->backend, platform_api, window);
+    renderer->backend = sCalloc(1, sizeof(RendererBackend));
+    BackendRendererInit(renderer->backend, platform_api, window);
 }
 
 DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     
-    BackendRendererDestroy(&renderer->backend);
+    BackendRendererDestroy(renderer->backend);
+    sFree(renderer->backend);
     
     sFree(renderer->ui_pushbuffer.buf);
     sFree(renderer->scene_pushbuffer.buf);
@@ -144,105 +146,4 @@ Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count) {
 void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms) {
     // TODO(Guigui): 
     return;
-}
-
-internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
-    PushBuffer *push_buffer = &renderer->ui_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryUIQuad) < push_buffer->max_size);
-    PushBufferEntryUIQuad *entry = (PushBufferEntryUIQuad *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_UIQuad;
-    entry->l = x;
-    entry->t = y;
-    entry->r = w + x;
-    entry->b = h + y;
-    entry->colour = color;
-    push_buffer->size += sizeof(PushBufferEntryUIQuad);
-}
-
-// TODO(Guigui): Maybe remove the memallocs ??
-internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color) {
-    PushBuffer *push_buffer = &renderer->ui_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
-    PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Text;
-    char *saved = sCalloc(128, sizeof(char));
-    StringCopyLength(saved, text, 128);
-    entry->text = saved;
-    entry->x = x;
-    entry->y = y;
-    entry->colour = color;
-    push_buffer->size += sizeof(PushBufferEntryText);
-}
-
-internal void UIPushFmt(Renderer *renderer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...) {
-    PushBuffer *push_buffer = &renderer->ui_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
-    PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Text;
-    entry->text = sCalloc(128, sizeof(char));
-    va_list ap;
-    va_start(ap, fmt);
-    vsnprintf(entry->text, 128, fmt, ap);
-    va_end(ap);
-    entry->x = x;
-    entry->y = y;
-    entry->colour = color;
-    push_buffer->size += sizeof(PushBufferEntryText);
-}
-
-internal void UIPushTexture(Renderer *renderer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h) {
-    PushBuffer *push_buffer = &renderer->ui_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryTexture) < push_buffer->max_size);
-    PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Texture;
-    entry->l = x;
-    entry->t = y;
-    entry->r = w + x;
-    entry->b = h + y;
-    entry->texture = texture;
-    push_buffer->size += sizeof(PushBufferEntryTexture);
-}
-
-/// Adds a mesh to the scene draw calls
-/// The transform pointer needs to be alive until drawing happens
-internal void PushMesh(Renderer *renderer, MeshHandle mesh, Transform *transform, Vec3 diffuse_color) {
-    PushBuffer *push_buffer = &renderer->scene_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryMesh) < push_buffer->max_size);
-    PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Mesh;
-    entry->mesh = mesh;
-    entry->transform = transform;
-    entry->diffuse_color = diffuse_color;
-    
-    push_buffer->size += sizeof(PushBufferEntryMesh);
-}
-
-internal void PushSkin(Renderer *renderer, MeshHandle mesh, SkinHandle skin, Transform *xform, Vec3 diffuse_color) {
-    PushBuffer *push_buffer = &renderer->scene_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntrySkin) < push_buffer->max_size);
-    PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Skin;
-    entry->mesh = mesh;
-    entry->skin = skin;
-    entry->transform = xform;
-    entry->diffuse_color = diffuse_color;
-    
-    push_buffer->size += sizeof(PushBufferEntrySkin);
-}
-
-/// Adds a bone to the scene draw calls
-/// The matrix needs to be local
-internal void PushBone(Renderer *renderer, Mat4 bone_matrix) {
-    PushBuffer *push_buffer = &renderer->debug_pushbuffer;
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryBone) < push_buffer->max_size);
-    PushBufferEntryBone *entry = (PushBufferEntryBone *)(push_buffer->buf + push_buffer->size);
-    
-    entry->type = PushBufferEntryType_Bone;
-    entry->line[0] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.0f, 0.0f});
-    entry->line[1] = mat4_mul_vec3(bone_matrix, (Vec3){0.1f, 0.0f, 0.0f});
-    entry->line[2] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.1f, 0.0f});
-    entry->line[3] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.0f, 0.1f});
-    
-    push_buffer->size += sizeof(PushBufferEntryBone);
-    
 }

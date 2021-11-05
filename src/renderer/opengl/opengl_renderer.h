@@ -26,7 +26,7 @@ typedef struct VolumetricRenderPass {
     u32 program;
 } VolumetricRenderPass;
 
-typedef struct OpenGLRenderer {
+typedef struct RendererBackend {
     ShadowmapRenderPass shadowmap_pass;
     ColorRenderPass color_pass;
     VolumetricRenderPass vol_pass;
@@ -52,6 +52,8 @@ typedef struct OpenGLRenderer {
     u32 skinned_mesh_vtx_shader;
     
     u32 color_fragment_shader;
-} OpenGLRenderer;
+} RendererBackend;
+
+typedef RendererBackend OpenGLRenderer;
 
 void GLLoadFunctions();

@@ -118,18 +118,18 @@ void DrawConsole(Console *console, GameData *game_data) {
         const u32 padx = 5;
         const u32 pady = 5;
         // History area
-        UIPushQuad(global_renderer, 0, 0, global_renderer->width, console_y - 20, (Vec4){0.1f, 0.1f, 0.1f, 0.8f});
+        PushUIQuad(&global_renderer->ui_pushbuffer, 0, 0, global_renderer->width, console_y - 20, (Vec4){0.1f, 0.1f, 0.1f, 0.8f});
         // Edit area
-        UIPushQuad(global_renderer, 0, console_y - 20, global_renderer->width, 20, (Vec4){0.5f, 0.3f, 0.3f, 0.9f});
-        UIPushText(global_renderer, console->current_command, padx, console_y - pady, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
+        PushUIQuad(&global_renderer->ui_pushbuffer, 0, console_y - 20, global_renderer->width, 20, (Vec4){0.5f, 0.3f, 0.3f, 0.9f});
+        PushUIText(&global_renderer->ui_pushbuffer, console->current_command, padx, console_y - pady, (Vec4){1.0f, 1.0f, 1.0f, 1.0f});
         // Caret
-        UIPushQuad(global_renderer, padx + (console->current_char * 10.5f), console_y - 20, 1, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
+        PushUIQuad(&global_renderer->ui_pushbuffer, padx + (console->current_char * 10.5f), console_y - 20, 1, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
         u32 line_height = 20;
         
         i32 hist_y = console_y - 20 - pady;
         u32 i = 0;
         while(hist_y > 0) {
-            UIPushText(global_renderer, console->command_history[i].command, padx, hist_y, console->command_history[i].color);
+            PushUIText(&global_renderer->ui_pushbuffer, console->command_history[i].command, padx, hist_y, console->command_history[i].color);
             ++i;
             hist_y -= line_height;
         }
