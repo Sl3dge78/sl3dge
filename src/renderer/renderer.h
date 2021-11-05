@@ -1,12 +1,6 @@
 #pragma once
 
-#include "utils/sl3dge.h"
-
-#include "platform/platform.h"
-#include "renderer/renderer_api.h"
-
 // Forward declarations
-typedef struct Renderer Renderer;
 typedef struct GameData GameData;
 
 typedef struct Vertex {
@@ -130,18 +124,66 @@ typedef struct PushBufferEntryTexture {
     u32 texture;
 } PushBufferEntryTexture;
 
+// --------
+// Renderer
+typedef struct Renderer {
+    RendererBackend backend;
+    PlatformWindow *window;
+    
+    u32 width;
+    u32 height;
+    
+    PushBuffer scene_pushbuffer;
+    
+    Mesh *meshes;
+    u32 mesh_capacity;
+    u32 mesh_count;
+    
+    Skin *skins;
+    u32 skin_capacity;
+    u32 skin_count;
+    
+    Transform *transforms;
+    u32 transform_capacity;
+    u32 transform_count;
+    
+    // Uniform data
+    Mat4 camera_proj;
+    Mat4 camera_proj_inverse;
+    Mat4 camera_view;
+    Mat4 camera_view_inverse;
+    Mat4 camera_vp;
+    Vec3 camera_pos;
+    Mat4 light_matrix;
+    Vec3 light_dir;
+    
+    PushBuffer ui_pushbuffer;
+    
+    PushBuffer debug_pushbuffer;
+    
+} Renderer;
+
+void CalcChildXform(u32 joint, Skin *skin);
+void UpdateCameraProj(Renderer *renderer);
+
+Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count);
+void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
+
+/*
 // Game functions
 MeshHandle RendererLoadMesh(Renderer *renderer, const char *path);
 MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
 
 Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count);
-void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
+
 
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
+
 
 internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
 internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color);
 internal void PushMesh(Renderer *renderer, MeshHandle mesh, Transform *transform, Vec3 diffuse_color);
 internal void PushSkin(Renderer *renderer, MeshHandle mesh, SkinHandle skin, Transform *transform, Vec3 diffuse_color);
 
+*/

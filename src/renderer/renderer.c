@@ -1,10 +1,101 @@
-#include "renderer/renderer.h"
 
-#ifdef RENDERER_VULKAN
-#include "renderer/vulkan/vulkan_renderer.c"
-#elif RENDERER_OPENGL
-#include "renderer/opengl/opengl_renderer.c"
-#endif
+void CalcChildXform(u32 joint, Skin *skin) {
+    for(u32 i = 0; i < skin->joint_child_count[joint]; i++) {
+        u32 child = skin->joint_children[joint][i];
+        Mat4 tmp;
+        transform_to_mat4(&skin->joints[child], &tmp);
+        mat4_mul(skin->global_joint_mats[joint], tmp, skin->global_joint_mats[child]);
+        CalcChildXform(child, skin);
+    }
+}
+
+void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
+    Mat4 ortho;
+    mat4_ortho_zoom_gl(1.0f, 10.0f, -10.0f, 10.0f, ortho);
+    Mat4 look;
+    mat4_look_at(vec3_add(direction, renderer->camera_pos),
+                 renderer->camera_pos,
+                 (Vec3){0.0f, 1.0f, 0.0f}, look);
+    mat4_mul(ortho, look, renderer->light_matrix);
+    renderer->light_dir = direction;
+    // Uniforms are updated each frame in RendererDrawFrame
+}
+
+void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos) {
+    renderer->camera_pos = pos;
+    memcpy(renderer->camera_view, view, 16 * sizeof(f32));
+    mat4_inverse(view, renderer->camera_view_inverse);
+}
+
+DLL_EXPORT u32 GetRendererSize() {
+    u32 result = sizeof(Renderer);
+    return result;
+}
+
+void UpdateCameraProj(Renderer *renderer) {
+    mat4_perspective_gl(90.0f, (f32)renderer->width / (f32)renderer->height, 0.1f, 100000.0f, renderer->camera_proj);
+    mat4_inverse(renderer->camera_proj, renderer->camera_proj_inverse);
+}
+
+DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, PlatformWindow *window) {
+    renderer->window = window;
+    
+    // Arrays
+    renderer->mesh_count = 0;
+    renderer->mesh_capacity = 8;
+    renderer->meshes = sCalloc(renderer->mesh_capacity, sizeof(Mesh));
+    
+    renderer->skin_count = 0;
+    renderer->skin_capacity = 8;
+    renderer->skins = sCalloc(renderer->skin_capacity, sizeof(Skin));
+    
+    renderer->transform_count = 0;
+    renderer->transform_capacity = 16;
+    renderer->transforms = sCalloc(renderer->transform_capacity, sizeof(Transform));
+    
+    // Init push buffers
+    renderer->ui_pushbuffer.size = 0;
+    renderer->ui_pushbuffer.max_size = sizeof(PushBufferEntryText) * 256;
+    renderer->ui_pushbuffer.buf = sCalloc(renderer->ui_pushbuffer.max_size, 1);
+    
+    // Scene
+    renderer->scene_pushbuffer.size = 0;
+    renderer->scene_pushbuffer.max_size = sizeof(PushBufferEntryMesh) * 70;
+    renderer->scene_pushbuffer.buf = sCalloc(renderer->scene_pushbuffer.max_size, 1);
+    
+    // Debug 
+    renderer->debug_pushbuffer.size = 0;
+    renderer->debug_pushbuffer.max_size = sizeof(PushBufferEntryBone) * 20;
+    renderer->debug_pushbuffer.buf = sCalloc(renderer->debug_pushbuffer.max_size, 1);
+    
+    UpdateCameraProj(renderer);
+    
+    BackendRendererInit(&renderer->backend, platform_api, window);
+}
+
+DLL_EXPORT void RendererDestroy(Renderer *renderer) {
+    
+    BackendRendererDestroy(&renderer->backend);
+    
+    sFree(renderer->ui_pushbuffer.buf);
+    sFree(renderer->scene_pushbuffer.buf);
+    sFree(renderer->debug_pushbuffer.buf);
+    
+    // Meshes
+    for(u32 i = 0; i < renderer->mesh_count; i++) {
+        RendererDestroyMesh(&renderer->meshes[i]);
+    }
+    sFree(renderer->meshes);
+    
+    for(u32 i = 0; i < renderer->skin_count; i++) {
+        RendererDestroySkin(renderer, &renderer->skins[i]);
+    }
+    
+    sFree(renderer->skins);
+    
+    
+    sFree(renderer->transforms);
+}
 
 MeshHandle RendererLoadQuad(Renderer *renderer) {
     const Vertex vertices[] = {

@@ -1,7 +1,4 @@
 typedef struct GameData GameData;
-typedef struct Renderer Renderer;
-typedef struct Input Input;
-typedef struct PlatformAPI PlatformAPI;
 
 typedef u32 GameGetSize_t();
 GameGetSize_t *pfn_GameGetSize;

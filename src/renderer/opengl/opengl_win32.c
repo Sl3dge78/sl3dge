@@ -64,7 +64,7 @@ void GLLoadFunctions() {
     
 }
 
-void PlatformCreateorUpdateOpenGLContext(Renderer *renderer, PlatformWindow *window) {
+void PlatformCreateorUpdateOpenGLContext(OpenGLRenderer *renderer, PlatformWindow *window) {
     if(window->opengl_rc != 0) {
         wglDeleteContext(window->opengl_rc);
         window->opengl_rc = 0;
@@ -116,6 +116,6 @@ void PlatformCreateorUpdateOpenGLContext(Renderer *renderer, PlatformWindow *win
     wglDeleteContext(temp_rc);
 }
 
-void PlatformSwapBuffers(Renderer *renderer) {
-    SwapBuffers(renderer->window->dc);
+void PlatformSwapBuffers(PlatformWindow *window) {
+    SwapBuffers(window->dc);
 }

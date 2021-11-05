@@ -1,5 +1,3 @@
-// Global includes
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,8 +11,8 @@
 #include "platform.h"
 #include "platform_win32.h"
 
-#include "game_api.h"
 #include "renderer/renderer_api.h"
+#include "game_api.h"
 
 typedef struct ShaderCode {
     const char *spv_path;

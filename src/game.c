@@ -3,9 +3,30 @@
 
 #include "utils/sl3dge.h"
 
-#include "game.h"
 #include "platform/platform.h"
+
+#include "utils/sGltf.c"
+
+
+
+#ifdef RENDERER_VULKAN
+#include "renderer/vulkan/vulkan_renderer.c"
+//typedef VulkanRenderer Renderer;
+#elif RENDERER_OPENGL
+#include "renderer/opengl/opengl_renderer.h"
+typedef OpenGLRenderer RendererBackend;
+
+#include "renderer/renderer.h"
+#include "renderer/opengl/opengl_renderer.c"
+#include "renderer/opengl/opengl_mesh.c"
+#endif
+
+#include "console.h"
+#include "event.h"
+#include "game.h"
+
 #include "renderer/renderer.c"
+
 
 global Renderer *global_renderer;
 global PlatformAPI *platform;
@@ -13,9 +34,9 @@ global PlatformAPI *platform;
 #include "console.c"
 #include "event.c"
 
-#include "collision.h"
+#include "collision.c"
 
-u32 GameGetSize() {
+DLL_EXPORT u32 GameGetSize() {
     return sizeof(GameData);
 }
 
@@ -24,7 +45,7 @@ u32 GameGetSize() {
 // Exported functions
 
 /// This is called when the game is (re)loaded
-void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
+DLL_EXPORT void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
     global_renderer = renderer;
     platform = platform_api;
     
@@ -38,7 +59,7 @@ void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api
 }
 
 /// This is called ONCE before the first frame
-void GameStart(GameData *game_data) {
+DLL_EXPORT void GameStart(GameData *game_data) {
     
     game_data->light_dir = (Vec3){0.67f, -0.67f, 0.1f};
     game_data->camera.position = (Vec3){0.0f, 1.7f, 0.0f};
@@ -110,13 +131,13 @@ void GameStart(GameData *game_data) {
 }
 
 /// Do deallocation here
-void GameEnd(GameData *game_data) {
+DLL_EXPORT void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
     
     //DestroyAnimation(&game_data->anim);
 }
 
-void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
+internal void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     f32 look_speed = 0.01f;
     
     if(input->mouse_delta_x != 0) {
@@ -178,7 +199,7 @@ void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
 }
 
 // Called every frame
-void GameLoop(float delta_time, GameData *game_data, Input *input) {
+DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // ----------
     // Input
     
@@ -282,7 +303,7 @@ void GameLoop(float delta_time, GameData *game_data, Input *input) {
     }
     
     if(game_data->show_shadowmap)
-        UIPushTexture(global_renderer, global_renderer->shadowmap_pass.texture, 0, 0, 500, 500);
+        UIPushTexture(global_renderer, global_renderer->backend.shadowmap_pass.texture, 0, 0, 500, 500);
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

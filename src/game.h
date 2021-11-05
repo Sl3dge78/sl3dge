@@ -1,12 +1,4 @@
-#ifndef MAIN_H
-#define MAIN_H
-
-#include "utils/sl3dge.h"
-
-#include "game_api.h"
-#include "renderer/renderer.h"
-#include "console.h"
-#include "event.h"
+#pragma once
 
 typedef struct Camera {
     Vec3 position;
@@ -49,10 +41,3 @@ typedef struct GameData {
     
 } GameData;
 
-DLL_EXPORT GameGetSize_t GameGetSize;
-DLL_EXPORT GameStart_t GameStart;
-DLL_EXPORT GameLoop_t GameLoop;
-DLL_EXPORT GameLoad_t GameLoad;
-DLL_EXPORT GameEnd_t GameEnd;
-
-#endif // MAIN_H

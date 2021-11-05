@@ -44,11 +44,15 @@ float get_shadow(float bias) {
 void main() {
     float NdotL = dot(-Normal, light_dir);
 	NdotL = clamp(NdotL, 0.0, 1.0);
-    vec3 base_color = texture(diffuse, TexCoord).rgb * diffuse_color * NdotL;
+    vec3 base_color = texture(diffuse, TexCoord).rgb * diffuse_color;
 	
-    float bias = 0.005 * tan(acos(NdotL));
+    float bias = 0.003 * tan(acos(NdotL));
 	bias = clamp(bias, 0.0, 0.01);
     float shadow = get_shadow(bias);
+	
+	// This allows us to get a nice blend between shadows and ndotl, avoids the double darkness that we can get sometimes...
+	shadow *= NdotL;
+	shadow = clamp(shadow, 0.1, 1.0);
 
     FragColor = vec4(shadow * base_color, 1.0);
     //FragColor = vec4(shadow, shadow, shadow, 1.0);

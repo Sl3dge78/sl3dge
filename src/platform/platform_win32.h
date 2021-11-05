@@ -1,7 +1,4 @@
-#ifndef PLATFORM_WIN32_H
-#define PLATFORM_WIN32_H
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#pragma once
 
 typedef struct PlatformWindow {
     HWND hwnd;
@@ -11,5 +8,3 @@ typedef struct PlatformWindow {
     u32 w;
     u32 h;
 } PlatformWindow;
-
-#endif

@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <GL/GL.h>
+
 #include "utils/sl3dge.h"
 
 typedef enum GLTFAccessorType {
