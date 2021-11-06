@@ -80,6 +80,11 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->cylinder_xform = RendererAllocateTransforms(global_renderer, 1);
     game_data->cylinder_xform->translation.x = 0.0f;
     
+    game_data->cube = RendererLoadCube(global_renderer);
+    game_data->cube_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->cube_xform->scale = (Vec3){1.0f, 5.0f, 10.0f};
+    game_data->cube_xform->translation.x = 10.0f;
+    
     game_data->interact_sphere_diameter = 1.0f;
     
 #if 0
@@ -293,6 +298,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     }
 #endif
     
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
     //PushMesh(global_renderer, game_data->cylinder_mesh, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
     PushSkin(&global_renderer->scene_pushbuffer, game_data->cylinder_mesh, game_data->cylinder_skin, game_data->cylinder_xform, (Vec3){1.0f, 1.0f, 1.0f});

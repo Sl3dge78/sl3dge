@@ -33,6 +33,9 @@ typedef struct GameData {
     Mesh *cylinder_mesh;
     Skin *cylinder_skin;
     
+    Transform *cube_xform;
+    Mesh *cube;
+    
     f32 anim_time;
     Animation anim;
     Animation anim_t;
