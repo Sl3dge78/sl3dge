@@ -1,37 +1,41 @@
+------------
 -- ENGINE --
-
-TODO
-	P0
-		[ ] Renderer destroy transform
-		[ ] Shader refactoring
-			[ ] Load all shader uniform locations at the start
-			[ ] Use pipelines for the other shaders?
-		[ ] Renderer refactoring > Do this if you're bored
-			[ ] just move functions around, create new files, delete others and stop worrying about that legacy of vulkan. 
-
-	P1
-		[ ] Skin & Animate the character
-		[ ] Sky diffraction
-		[ ] Volumetric clouds
-		[ ] Audio	
-		[ ] Once we have a full scene graph: Flagging as dirty should add the node in a special array that wiil compute the global matrices for it and its' children
-
-	P2
-		[ ] Figure out how to handle freeing meshes/transforms from our dyntables
-			[ ] Flag some spaces as free, maybe have a table that lists all the free spots.
-			[ ] Make it cleanup itself on its own
-		[ ] Figure out multithreading
-		[ ] Fix hot reloading
-			[ ] Basically we need to store what was loaded and reload it. 
-			[ ] Restructure the two big structs (GameData & Renderer)
-				[ ] Renderer fetches what it needs from GameData upon reload. 
-				[ ] Everything is stored as ptrs in GameData so we need to overwrite these guys upon reloading
-		[ ] Memory allocator?
-		[ ] Profiling
-        [ ] Handle multiple primitives in single gltf
+------------
 
 --------
-DOING
+ TODO
+
+	[ ] Renderer destroy transform	
+	[ ] Shader refactoring
+		[ ] Load all shader uniform locations at the start
+		[ ] Use pipelines for the other shaders?
+	[ ] BLENDER - Skin & Animate the character
+	[ ] Sky diffraction
+		[ ] Where to do it ? Volumetric pass? Or new skybox pass?
+	[ ] Volumetric clouds
+	[ ] Audio	
+	[ ] Scene Graph
+		[ ] Flagging as dirty should add the node in a special array that will compute the global matrices for it and its' children
+	[ ] Figure out how to handle freeing meshes/transforms from our dyntables
+		[ ] Flag some spaces as free, maybe have a table that lists all the free spots?
+		[ ] Make it cleanup itself on its own?
+	[ ] Figure out multithreading
+	[ ] Memory allocator
+		[ ] Remove all memory allocations from game
+			[ ] PushUIFmt & PushUIText
+			[ ] EventPush
+			[ ] GLTF
+			[ ] Must be some in Renderer too
+		[ ] Replace by our own
+			[ ] Allocate mega chunk at the start
+			[ ] Suballocate from it
+			[ ] Handle freeing
+			[ ] Maybe have multiple type of memories? For example: static (kept through frames), temp (erased between frames)
+	[ ] Profiling
+	[ ] SIMD
+      
+--------
+ DOING
 	
 	[ ] Refactor mesh loading
 		[ ] Make our own gltf parser
@@ -41,6 +45,7 @@ DOING
 			[X] Buffers
 			[X] Meshes
 				[X] Primitives
+				[ ] Multiple primitives
 			[ ] Nodes
 			[X] Skins
 			[ ] Animations
@@ -51,23 +56,26 @@ DOING
 		[ ] Import in engine
 			[X] Mesh
 			[ ] Nodes
-			[ ] Skin
+			[X] Skin
 			[ ] Animations
 			[ ] Material
 		[ ] Give flags to a function? A struct with all possible results and it fills it based on the flags
 
 --------
-DONE
+ DONE
 
+	[X] Fix hot reloading
+	[X] Renderer refactoring
 	[X] Log to the console AND the game
 	[X] Skinned meshes
 	[X] Cleanup utils
 	[X] Transforms
 	[X] Animations
 
---------        
 
+-----------------        
 -- GAME DESIGN --
+-----------------
 
 TODO
 	[ ] Dialog
@@ -156,7 +164,3 @@ VULKAN RENDERER:
     MAJOR:
         - If we have multiple meshes that use the same primitve, right now we just duplicate it
         - Read embedded glb
-    BACKLOG:
-    IMPROVEMENTS:
-    IDEAS:
-        - This is our last dependency. It looks super annoying to handle.

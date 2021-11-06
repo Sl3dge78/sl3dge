@@ -267,8 +267,7 @@ internal void BeginVolumetricRenderPass(Renderer *renderer, VolumetricRenderPass
 // ---------------
 // Renderer
 
-DLL_EXPORT void BackendRendererInit(OpenGLRenderer *renderer, PlatformAPI *platform_api, PlatformWindow *window) {
-    
+void BackendRendererInit(OpenGLRenderer *renderer, PlatformAPI *platform_api, PlatformWindow *window) {
     PlatformCreateorUpdateOpenGLContext(renderer, window);
     GLLoadFunctions();
     
@@ -733,6 +732,7 @@ DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_a
     UpdateCameraProj(renderer);
 }
 
+/*
 void RendererReloadShaders(Renderer *renderer, PlatformAPI *platform_api) {
     // TODO(Guigui): This won't work now. We need to reload the shader programs too
     DestroyShadowmapRenderPass(&renderer->backend->shadowmap_pass);
@@ -745,5 +745,5 @@ void RendererReloadShaders(Renderer *renderer, PlatformAPI *platform_api) {
     CreateVolumetricRenderPass(platform_api, &renderer->backend->vol_pass);
 }
 
-
+*/
 

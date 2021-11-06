@@ -17,7 +17,7 @@ internal void EventPush(EventQueue *event_queue, EventType new) {
             return;
         }
     }
-
+    
     event_queue->queue[event_queue->size++] = new;
 }
 

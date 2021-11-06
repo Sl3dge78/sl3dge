@@ -10,6 +10,7 @@ typedef void PlatformReadBinary_t(const char *path, i64 *file_size, u32 *content
 typedef void PlatformGetInstanceExtensions_t(u32 *count, const char **extensions);
 typedef void PlatformSetCaptureMouse_t(bool val);
 typedef void PlatformRequestExit_t();
+typedef void PlatformRequestReload_t();
 
 typedef struct PlatformAPI {
     PlatformReadBinary_t *ReadBinary;
@@ -17,6 +18,7 @@ typedef struct PlatformAPI {
     PlatformGetWindowSize_t *GetWindowSize;
     PlatformSetCaptureMouse_t *SetCaptureMouse;
     PlatformRequestExit_t *RequestExit;
+    PlatformRequestReload_t *RequestReload;
     void *DebugInfo;
 } PlatformAPI;
 

@@ -23,15 +23,17 @@ typedef struct ShaderCode {
 
 global HANDLE stderrHandle;
 global bool mouse_captured; // @TODO this probably shouldn't be a global
-global Renderer *renderer;  //Global to have it in the window proc
+global Renderer *renderer;  // Global to have it in the window proc
 global PlatformWindow global_window;
 global PlatformAPI platform_api;
+global GameData *game_data;
 global bool running;
+global Module game_module = {0};
 
 /* FUNCTIONS */
 void Win32GameLoadFunctions(Module *dll) {
     pfn_GameGetSize = (GameGetSize_t *)GetProcAddress(dll->dll, "GameGetSize");
-    pfn_GameLoad = (GameLoad_t *)GetProcAddress(dll->dll, "GameLoad");
+    pfn_GameInit = (GameInit_t *)GetProcAddress(dll->dll, "GameInit");
     pfn_GameStart = (GameStart_t *)GetProcAddress(dll->dll, "GameStart");
     pfn_GameEnd = (GameEnd_t *)GetProcAddress(dll->dll, "GameEnd");
     pfn_GameLoop = (GameLoop_t *)GetProcAddress(dll->dll, "GameLoop");
@@ -41,6 +43,8 @@ void Win32GameLoadFunctions(Module *dll) {
 void Win32RendererLoadFunctions(Module *dll) {
     pfn_GetRendererSize = (GetRendererSize_t *)GetProcAddress(dll->dll, "GetRendererSize");
     pfn_RendererInit = (RendererInit_t *)GetProcAddress(dll->dll, "RendererInit");
+    pfn_RendererInitBackend = (RendererInitBackend_t *)GetProcAddress(dll->dll, "RendererInitBackend");
+    pfn_RendererDestroyBackend = (RendererDestroyBackend_t *)GetProcAddress(dll->dll, "RendererDestroyBackend");
     pfn_RendererDrawFrame = (RendererDrawFrame_t *)GetProcAddress(dll->dll, "RendererDrawFrame");
     pfn_RendererDestroy = (RendererDestroy_t *)GetProcAddress(dll->dll, "RendererDestroy");
     pfn_RendererUpdateWindow = (RendererUpdateWindow_t *)GetProcAddress(dll->dll, "RendererUpdateWindow");
@@ -53,6 +57,16 @@ void Win32LoadFunctions(Module *dll) {
 
 void PlatformRequestExit() {
     running = false;
+}
+
+void PlatformRequestReload() {
+    pfn_RendererDestroyBackend(renderer);
+    Win32CloseModule(&game_module);
+    Win32LoadModule(&game_module, "game");
+    Win32LoadFunctions(&game_module);
+    pfn_GameInit(game_data, renderer, &platform_api);
+    pfn_RendererInitBackend(renderer, &platform_api);
+    sLog("Game reloaded");
 }
 
 i64 PlatformGetTicks() {
@@ -179,17 +193,7 @@ bool Win32CreateWindow(HINSTANCE instance, PlatformWindow *window) {
     
     window->w = 1280;
     window->h = 720;
-    HWND hwnd = CreateWindow("Vulkan",
-                             "Vulkan",
-                             WS_OVERLAPPEDWINDOW,
-                             CW_USEDEFAULT,
-                             CW_USEDEFAULT,
-                             window->w,
-                             window->h,
-                             NULL,
-                             NULL,
-                             instance,
-                             NULL);
+    HWND hwnd = CreateWindow("Vulkan", "Vulkan", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, window->w, window->h, NULL, NULL, instance, NULL);
     if(hwnd == NULL) {
         DWORD error = GetLastError();
         sError("WIN32 : Unable to create window. Error : %d", error);
@@ -220,17 +224,17 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
     platform_api.ReadWholeFile = &PlatformReadWholeFile;
     platform_api.SetCaptureMouse = &PlatformSetCaptureMouse;
     platform_api.RequestExit = &PlatformRequestExit;
+    platform_api.RequestReload = &PlatformRequestReload;
     platform_api.DebugInfo = Leak_GetList();
     
-    Module game_module = {0};
     Win32LoadModule(&game_module, "game");
     Win32LoadFunctions(&game_module);
     
-    GameData *game_data = sCalloc(1, pfn_GameGetSize());
+    game_data = sCalloc(1, pfn_GameGetSize());
     renderer = sCalloc(1, pfn_GetRendererSize());
     Input *input = sCalloc(1, sizeof(Input));
     
-    pfn_GameLoad(game_data, renderer, &platform_api);
+    pfn_GameInit(game_data, renderer, &platform_api);
     pfn_RendererInit(renderer, &platform_api, &global_window);
     
     ShowWindow(global_window.hwnd, cmd_show);
@@ -249,20 +253,12 @@ i32 WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, PSTR cmd_line, I
             frame_start = time;
         }
         
-#if 0
         { 
             // Hot Reloading
             if(Win32ShouldReloadModule(&game_module)) {
-                pfn_RendererDestroy(renderer);
-                Win32CloseModule(&game_module);
-                Win32LoadModule(&game_module, "game");
-                Win32LoadFunctions(&game_module);
-                pfn_GameLoad(game_data, renderer, &platform_api);
-                pfn_RendererInit(renderer, &platform_api, &global_window);
-                sLog("Game code reloaded");
+                PlatformRequestReload();
             }
         }
-#endif
         
         RECT window_size;
         GetClientRect(global_window.hwnd, &window_size);

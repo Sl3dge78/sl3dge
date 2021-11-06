@@ -66,8 +66,7 @@ void GLLoadFunctions() {
 
 void PlatformCreateorUpdateOpenGLContext(OpenGLRenderer *renderer, PlatformWindow *window) {
     if(window->opengl_rc != 0) {
-        wglDeleteContext(window->opengl_rc);
-        window->opengl_rc = 0;
+        return;
     }
     
     PIXELFORMATDESCRIPTOR desired_pixel_fmt = {0};

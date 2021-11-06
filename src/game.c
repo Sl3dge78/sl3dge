@@ -29,7 +29,6 @@
 
 #include "renderer/renderer.c"
 
-
 global Renderer *global_renderer;
 global PlatformAPI *platform;
 
@@ -47,11 +46,9 @@ DLL_EXPORT u32 GameGetSize() {
 // Exported functions
 
 /// This is called when the game is (re)loaded
-DLL_EXPORT void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
+DLL_EXPORT void GameInit(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
     global_renderer = renderer;
     platform = platform_api;
-    
-    GLLoadFunctions();
     
     ConsoleInit(&game_data->console);
     global_console = &game_data->console;
@@ -60,7 +57,7 @@ DLL_EXPORT void GameLoad(GameData *game_data, Renderer *renderer, PlatformAPI *p
     Leak_SetList(platform_api->DebugInfo);
 }
 
-/// This is called ONCE before the first frame
+/// This is called ONCE before the first frame. Won't be called upon reloading.
 DLL_EXPORT void GameStart(GameData *game_data) {
     
     game_data->light_dir = (Vec3){0.67f, -0.67f, 0.1f};
@@ -200,7 +197,7 @@ internal void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     RendererSetCamera(global_renderer, cam, camera->position);
 }
 
-// Called every frame
+/// Called every frame
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // ----------
     // Input
@@ -241,8 +238,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
             if(game_data->cos > 2.0f * PI) {
                 game_data->cos = 0.0f;
             }
-            RendererSetSunDirection(
-                                    global_renderer, game_data->light_dir);
+            RendererSetSunDirection(global_renderer, game_data->light_dir);
         }
         
         if(input->keyboard[SCANCODE_O]) {
@@ -276,8 +272,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
             case(EVENT_TYPE_RESTART): {
                 GameStart(game_data);
             } break;
-            case(EVENT_TYPE_RELOADSHADERS): {
-                RendererReloadShaders(global_renderer, platform);
+            case(EVENT_TYPE_RELOAD): {
+                platform->RequestReload();
             } break;
             default:
             

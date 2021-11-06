@@ -18,12 +18,12 @@ void CommandFreeCam(ConsoleArgs *args, GameData *game_data) {
 
 void CommandRestart(ConsoleArgs *args, GameData *game_data) {
     EventPush(&game_data->event_queue, EVENT_TYPE_RESTART);
-    sLog("Reloading the game");
+    sLog("Restarting the game");
 }
 
-void CommandReloadShaders(ConsoleArgs *args, GameData *game_data) {
-    EventPush(&game_data->event_queue, EVENT_TYPE_RELOADSHADERS);
-    sLog("Reloading shaders");
+void CommandReloadRenderer(ConsoleArgs *args, GameData *game_data) {
+    EventPush(&game_data->event_queue, EVENT_TYPE_RELOAD);
+    sLog("Reloading Game");
 }
 
 void CommandShadowMap(ConsoleArgs *args, GameData *game_data){
@@ -35,7 +35,7 @@ void ConsoleInit(Console *console) {
     console->commands[0] = (ConsoleCommand){"exit", &CommandExit};
     console->commands[1] = (ConsoleCommand){"freecam", &CommandFreeCam};
     console->commands[2] = (ConsoleCommand){"restart", &CommandRestart};
-    console->commands[3] = (ConsoleCommand){"reload_shaders", &CommandReloadShaders};
+    console->commands[3] = (ConsoleCommand){"reload", &CommandReloadRenderer};
     console->commands[4] = (ConsoleCommand){"shadowmap", &CommandShadowMap};
     
     console->command_count = ARRAY_SIZE(console->commands);

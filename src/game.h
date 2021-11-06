@@ -26,12 +26,12 @@ typedef struct GameData {
     Vec3 interact_sphere_pos;
     f32 interact_sphere_diameter;
     
-    MeshHandle simple_skinning;
+    Mesh *simple_skinning;
     Transform *simple_skinning_root;
     
     Transform *cylinder_xform;
-    MeshHandle cylinder_mesh;
-    SkinHandle cylinder_skin;
+    Mesh *cylinder_mesh;
+    Skin *cylinder_skin;
     
     f32 anim_time;
     Animation anim;

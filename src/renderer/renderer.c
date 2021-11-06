@@ -74,6 +74,13 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     BackendRendererInit(renderer->backend, platform_api, window);
 }
 
+DLL_EXPORT void RendererDestroyBackend(Renderer *renderer) {
+    BackendRendererDestroy(renderer->backend);
+}
+DLL_EXPORT void RendererInitBackend(Renderer *renderer, PlatformAPI *platform_api) {
+    BackendRendererInit(renderer->backend, platform_api, renderer->window);
+}
+
 DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     
     BackendRendererDestroy(renderer->backend);
