@@ -258,6 +258,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
         if(input->keyboard[SCANCODE_U]) {
             game_data->cylinder_skin->joints[2].rotation = quat_from_axis((Vec3){1.0f, 0.0f, 0.0f}, 90.f);
         }
+        
     }
     
     // --------------

@@ -161,6 +161,14 @@ LRESULT CALLBACK Win32WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpar
             pfn_RendererUpdateWindow(renderer, &platform_api, rect.right, rect.bottom);
             return 0;
         }
+        case WM_KILLFOCUS: {
+            PlatformSetCaptureMouse(false);
+            return 0;
+        }
+        case WM_SETFOCUS: {
+            PlatformSetCaptureMouse(true);
+            return 0;
+        }
         default: return DefWindowProc(hwnd, msg, wparam, lparam);
     }
 }
