@@ -91,20 +91,6 @@ typedef struct Renderer {
     Array animations;
     Array transforms;
     
-    /*
-    Skin *skins;
-    u32 skin_capacity;
-    u32 skin_count;
-    
-    Animation *animations;
-    u32 animation_capacity;
-    u32 animation_count;
-    
-    Transform *transforms;
-    u32 transform_capacity;
-    u32 transform_count;
-    */
-    
     // Uniform data
     Mat4 camera_proj;
     Mat4 camera_proj_inverse;
@@ -122,26 +108,23 @@ void UpdateCameraProj(Renderer *renderer);
 Transform *AllocateTransforms(Renderer *renderer, const u32 count);
 void DestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
 
+Mesh *LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
+void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, Mesh **mesh, Skin **skin, Animation **animation);
+Mesh *LoadQuad(Renderer *renderer);
+Mesh *LoadCube(Renderer *renderer);
+
 void LoadAnimation(Animation *result, const GLTF *gltf);
 void DestroyAnimation(Animation *anim);
-
-
-
-/*
-// Game functions
-MeshHandle RendererLoadMesh(Renderer *renderer, const char *path);
-MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
-
-Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count);
-
+void AnimationEvaluate(Transform *joints, u32 count, Animation *a, f32 time);
 
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
 
+void PushMesh(PushBuffer *push_buffer, Mesh *mesh, Transform *transform, Vec3 diffuse_color);
+void PushSkin(PushBuffer *push_buffer, Mesh *mesh, Skin *skin, Transform *xform, Vec3 diffuse_color);
+void PushBone(PushBuffer *push_buffer, Mat4 bone_matrix);
+void PushUIQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
+void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color);
+void PushUIFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...);
+void PushUITexture(PushBuffer *push_buffer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h);
 
-internal void UIPushQuad(Renderer *renderer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
-internal void UIPushText(Renderer *renderer, const char *text, const u32 x, const u32 y, const Vec4 color);
-internal void PushMesh(Renderer *renderer, MeshHandle mesh, Transform *transform, Vec3 diffuse_color);
-internal void PushSkin(Renderer *renderer, MeshHandle mesh, SkinHandle skin, Transform *transform, Vec3 diffuse_color);
-
-*/

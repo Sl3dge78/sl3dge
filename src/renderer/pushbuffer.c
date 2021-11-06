@@ -1,5 +1,5 @@
 
-internal void PushUIQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
+ void PushUIQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryUIQuad) < push_buffer->max_size);
     PushBufferEntryUIQuad *entry = (PushBufferEntryUIQuad *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_UIQuad;
@@ -12,7 +12,7 @@ internal void PushUIQuad(PushBuffer *push_buffer, const u32 x, const u32 y, cons
 }
 
 // TODO(Guigui): Maybe remove the memallocs ??
-internal void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
+void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
@@ -25,7 +25,7 @@ internal void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x,
     push_buffer->size += sizeof(PushBufferEntryText);
 }
 
-internal void PushUIFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...) {
+void PushUIFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
@@ -40,7 +40,7 @@ internal void PushUIFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const
     push_buffer->size += sizeof(PushBufferEntryText);
 }
 
-internal void PushUITexture(PushBuffer *push_buffer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h) {
+void PushUITexture(PushBuffer *push_buffer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryTexture) < push_buffer->max_size);
     PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Texture;
@@ -54,7 +54,7 @@ internal void PushUITexture(PushBuffer *push_buffer, const u32 texture, const u3
 
 /// Adds a mesh to the scene draw calls
 /// The transform pointer needs to be alive until drawing happens
-internal void PushMesh(PushBuffer *push_buffer, Mesh *mesh, Transform *transform, Vec3 diffuse_color) {
+void PushMesh(PushBuffer *push_buffer, Mesh *mesh, Transform *transform, Vec3 diffuse_color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryMesh) < push_buffer->max_size);
     PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Mesh;
@@ -65,7 +65,7 @@ internal void PushMesh(PushBuffer *push_buffer, Mesh *mesh, Transform *transform
     push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
-internal void PushSkin(PushBuffer *push_buffer, Mesh *mesh, Skin *skin, Transform *xform, Vec3 diffuse_color) {
+void PushSkin(PushBuffer *push_buffer, Mesh *mesh, Skin *skin, Transform *xform, Vec3 diffuse_color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntrySkin) < push_buffer->max_size);
     PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Skin;
@@ -79,7 +79,7 @@ internal void PushSkin(PushBuffer *push_buffer, Mesh *mesh, Skin *skin, Transfor
 
 /// Adds a bone to the scene draw calls
 /// The matrix needs to be local
-internal void PushBone(PushBuffer *push_buffer, Mat4 bone_matrix) {
+void PushBone(PushBuffer *push_buffer, Mat4 bone_matrix) {
     
     ASSERT(push_buffer->size + sizeof(PushBufferEntryBone) < push_buffer->max_size);
     PushBufferEntryBone *entry = (PushBufferEntryBone *)(push_buffer->buf + push_buffer->size);
