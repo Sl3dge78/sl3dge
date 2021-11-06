@@ -72,6 +72,7 @@ typedef struct Animation {
     AnimationTrack *tracks;
 } Animation;
 
+
 // --------
 // Renderer
 typedef struct Renderer {
@@ -82,18 +83,27 @@ typedef struct Renderer {
     u32 height;
     
     PushBuffer scene_pushbuffer;
+    PushBuffer ui_pushbuffer;
+    PushBuffer debug_pushbuffer;
     
-    Mesh *meshes;
-    u32 mesh_capacity;
-    u32 mesh_count;
+    Array meshes;
+    Array skins;
+    Array animations;
+    Array transforms;
     
+    /*
     Skin *skins;
     u32 skin_capacity;
     u32 skin_count;
     
+    Animation *animations;
+    u32 animation_capacity;
+    u32 animation_count;
+    
     Transform *transforms;
     u32 transform_capacity;
     u32 transform_count;
+    */
     
     // Uniform data
     Mat4 camera_proj;
@@ -104,21 +114,17 @@ typedef struct Renderer {
     Vec3 camera_pos;
     Mat4 light_matrix;
     Vec3 light_dir;
-    
-    PushBuffer ui_pushbuffer;
-    
-    PushBuffer debug_pushbuffer;
-    
 } Renderer;
 
 void CalcChildXform(u32 joint, Skin *skin);
 void UpdateCameraProj(Renderer *renderer);
 
-Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count);
-void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
+Transform *AllocateTransforms(Renderer *renderer, const u32 count);
+void DestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
 
+void LoadAnimation(Animation *result, const GLTF *gltf);
 void DestroyAnimation(Animation *anim);
-void LoadAnimation(Renderer *renderer, Animation *result, GLTF *gltf);
+
 
 
 /*

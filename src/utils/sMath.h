@@ -8,6 +8,7 @@
 
 #define PI 3.1415926535897932384626433f
 #define MAX(x, y) x > y ? x : y
+#define MIN(x, y) x < y ? x : y
 
 typedef struct Rect {
     i32 x;

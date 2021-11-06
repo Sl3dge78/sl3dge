@@ -9,3 +9,4 @@
 #include "sPerf.h"
 #include "sString.h"
 #include "sTests.h"
+#include "sArray.h"

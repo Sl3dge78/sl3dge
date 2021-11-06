@@ -65,18 +65,18 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     //LoadFromGLTF("resources/3d/character/character.gltf", global_renderer, platform, &game_data->character, 0, 0);
     LoadFromGLTF("resources/3d/skintest.gltf", global_renderer, platform, &game_data->cylinder_mesh, &game_data->cylinder_skin, &game_data->anim);
     
-    game_data->floor = RendererLoadQuad(global_renderer);
-    game_data->floor_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->floor = LoadQuad(global_renderer);
+    game_data->floor_xform = AllocateTransforms(global_renderer, 1);
     game_data->floor_xform->scale = (Vec3){100.0f, 1.0f, 100.0f};
     
-    game_data->npc_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->npc_xform = AllocateTransforms(global_renderer, 1);
     game_data->npc_xform->translation.z = 5.0f;
     
-    game_data->cylinder_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->cylinder_xform = AllocateTransforms(global_renderer, 1);
     game_data->cylinder_xform->translation.x = 0.0f;
     
-    game_data->cube = RendererLoadCube(global_renderer);
-    game_data->cube_xform = RendererAllocateTransforms(global_renderer, 1);
+    game_data->cube = LoadCube(global_renderer);
+    game_data->cube_xform = AllocateTransforms(global_renderer, 1);
     game_data->cube_xform->scale = (Vec3){1.0f, 5.0f, 10.0f};
     game_data->cube_xform->translation.x = 10.0f;
     
@@ -132,8 +132,6 @@ DLL_EXPORT void GameStart(GameData *game_data) {
 /// Do deallocation here
 DLL_EXPORT void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
-    
-    DestroyAnimation(&game_data->anim);
 }
 
 internal void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
@@ -288,8 +286,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     DrawConsole(&game_data->console, game_data);
     
     { // Animation
-        game_data->anim_time = fmod(game_data->anim_time + delta_time, game_data->anim.length);
-        AnimationEvaluate(game_data->cylinder_skin->joints, &game_data->anim, game_data->anim_time);
+        game_data->anim_time = fmod(game_data->anim_time + delta_time, game_data->anim->length);
+        AnimationEvaluate(game_data->cylinder_skin->joints, game_data->cylinder_skin->joint_count, game_data->anim, game_data->anim_time);
     }
     
     PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube_xform, (Vec3){0.5f, 0.5f, 0.5f});

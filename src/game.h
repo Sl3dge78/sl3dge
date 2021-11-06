@@ -37,7 +37,7 @@ typedef struct GameData {
     Mesh *cube;
     
     f32 anim_time;
-    Animation anim;
+    Animation *anim;
     
     bool show_shadowmap;
     

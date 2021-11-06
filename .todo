@@ -15,7 +15,15 @@
 	[ ] Volumetric clouds
 	[ ] Audio	
 	[ ] Scene Graph
+		[ ] Load all nodes from gltf
 		[ ] Flagging as dirty should add the node in a special array that will compute the global matrices for it and its' children
+		[ ] Animations take an array of transforms to apply to. How do we handle that?
+	[ ] GLTF V1.1
+		[ ] Nodes
+		[ ] Materials
+		[ ] Textures
+		[ ] Multiple Primitives
+		[ ] Scene
 	[ ] Figure out how to handle freeing meshes/transforms from our dyntables
 		[ ] Flag some spaces as free, maybe have a table that lists all the free spots?
 		[ ] Make it cleanup itself on its own?
@@ -37,33 +45,12 @@
 --------
  DOING
 	
-	[ ] Refactor mesh loading
-		[ ] Make our own gltf parser
-			[X] Open file
-			[X] Accessors
-			[X] Buffer Views
-			[X] Buffers
-			[X] Meshes
-				[X] Primitives
-				[ ] Multiple primitives
-			[ ] Nodes
-			[X] Skins
-			[X] Animations
-			[X] Images
-			[ ] Materials
-			[ ] Textures
-			[ ] Scene
-		[ ] Import in engine
-			[X] Mesh
-			[ ] Nodes
-			[X] Skin
-			[X] Animations
-			[ ] Material
-		[ ] Give flags to a function? A struct with all possible results and it fills it based on the flags
+
 
 --------
  DONE
 
+	[X] Refactor Mesh loading
 	[X] Fix hot reloading
 	[X] Renderer refactoring
 	[X] Log to the console AND the game

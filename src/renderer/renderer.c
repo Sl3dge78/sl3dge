@@ -41,17 +41,10 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     renderer->window = window;
     
     // Arrays
-    renderer->mesh_count = 0;
-    renderer->mesh_capacity = 8;
-    renderer->meshes = sCalloc(renderer->mesh_capacity, sizeof(Mesh));
-    
-    renderer->skin_count = 0;
-    renderer->skin_capacity = 8;
-    renderer->skins = sCalloc(renderer->skin_capacity, sizeof(Skin));
-    
-    renderer->transform_count = 0;
-    renderer->transform_capacity = 16;
-    renderer->transforms = sCalloc(renderer->transform_capacity, sizeof(Transform));
+    renderer->meshes     = ArrayCreate(8, sizeof(Mesh));
+    renderer->skins      = ArrayCreate(1, sizeof(Skin));
+    renderer->transforms = ArrayCreate(8, sizeof(Transform));
+    renderer->animations = ArrayCreate(1, sizeof(Animation));
     
     // Init push buffers
     renderer->ui_pushbuffer.size = 0;
@@ -91,22 +84,28 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     sFree(renderer->debug_pushbuffer.buf);
     
     // Meshes
-    for(u32 i = 0; i < renderer->mesh_count; i++) {
-        RendererDestroyMesh(&renderer->meshes[i]);
+    for(u32 i = 0; i < renderer->meshes.count; i++) {
+        DestroyMesh((Mesh *)ArrayGetElementAt(renderer->meshes, i));
     }
-    sFree(renderer->meshes);
+    ArrayDestroy(renderer->meshes);
     
-    for(u32 i = 0; i < renderer->skin_count; i++) {
-        RendererDestroySkin(renderer, &renderer->skins[i]);
+    // Skins
+    for(u32 i = 0; i < renderer->skins.count; i++) {
+        DestroySkin(renderer, (Skin *)ArrayGetElementAt(renderer->skins, i));
     }
+    ArrayDestroy(renderer->skins);
     
-    sFree(renderer->skins);
+    // Transforms
+    ArrayDestroy(renderer->transforms);
     
-    
-    sFree(renderer->transforms);
+    // Animations
+    for(u32 i = 0; i < renderer->animations.count; i++) {
+        DestroyAnimation((Animation *)ArrayGetElementAt(renderer->animations, i));
+    }
+    ArrayDestroy(renderer->animations);
 }
 
-Mesh *RendererLoadQuad(Renderer *renderer) {
+Mesh *LoadQuad(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
@@ -114,10 +113,10 @@ Mesh *RendererLoadQuad(Renderer *renderer) {
         {{.5f, 0.0f, .5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}}};
     const u32 indices[] = {0, 1, 2, 1, 2, 3};
     
-    return RendererLoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
+    return LoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
-Mesh *RendererLoadCube(Renderer *renderer) {
+Mesh *LoadCube(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
@@ -132,25 +131,18 @@ Mesh *RendererLoadCube(Renderer *renderer) {
     };
     const u32 indices[] = {0, 1, 2, 1, 3, 2, 0, 4, 1, 4, 5, 1, 4, 2, 6, 4, 0, 2, 5, 6, 7, 5, 4, 6, 1, 7, 3, 1, 5, 7, 2, 3, 6, 7, 6, 3};
     
-    return RendererLoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
+    return LoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
-Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count) {
-    u32 new_xform_count = count + renderer->transform_count;
-    while(renderer->transform_capacity < new_xform_count) {
-        renderer->transform_capacity *= 2;
-        Transform *ptr = sRealloc(renderer->transforms, renderer->transform_capacity);
-        ASSERT(ptr);
-        renderer->transforms = ptr;
+Transform *AllocateTransforms(Renderer *renderer, const u32 count) {
+    Transform *result = (Transform *)ArrayGetNewElements(&renderer->transforms, count);
+    for(u32 i = 0; i < count; i ++) {
+        transform_identity(&result[i]);
     }
-    
-    Transform *result = &renderer->transforms[renderer->transform_count];
-    renderer->transform_count = new_xform_count;
-    transform_identity(result);
-    return (result);
+    return result;
 }
 
-void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms) {
+void DestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms) {
     // TODO(Guigui): 
     return;
 }
