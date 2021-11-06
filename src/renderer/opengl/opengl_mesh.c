@@ -1,4 +1,5 @@
-internal MeshHandle RendererGetNewMesh(Renderer *renderer) {
+
+internal Mesh *RendererGetNewMesh(Renderer *renderer) {
     if(renderer->mesh_count == renderer->mesh_capacity) {
         u32 new_capacity;
         if (renderer->mesh_capacity <= 0) 
@@ -16,7 +17,7 @@ internal MeshHandle RendererGetNewMesh(Renderer *renderer) {
     return &renderer->meshes[renderer->mesh_count-1];
 }
 
-internal SkinHandle RendererGetNewSkin(Renderer *renderer) {
+internal Skin *RendererGetNewSkin(Renderer *renderer) {
     if(renderer->skin_count == renderer->skin_capacity) {
         u32 new_capacity;
         if (renderer->skin_capacity <= 0) 
@@ -34,7 +35,7 @@ internal SkinHandle RendererGetNewSkin(Renderer *renderer) {
     return &renderer->skins[renderer->skin_count-1];
 }
 
-MeshHandle RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
+Mesh *RendererLoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
     sLog("LOAD - Vertices - Vertices: %d, Indices: %d", vertex_count, index_count);
     Mesh *mesh = RendererGetNewMesh(renderer);
     
@@ -162,7 +163,7 @@ internal void LoadVertexBuffers(Mesh *mesh, const GLTF *gltf) {
     
 }
 
-void LoadSkin(Renderer *renderer, SkinHandle skin, GLTF *gltf) {
+void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
     
     ASSERT_MSG(gltf->skin_count == 1, "ASSERT: More than one skin in gltf, this isn't handled yet.");
     GLTFSkin *src_skin = &gltf->skins[0];
@@ -196,7 +197,7 @@ void LoadSkin(Renderer *renderer, SkinHandle skin, GLTF *gltf) {
     }
 }
 
-void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinHandle *skin, Animation *animation) {
+void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, Mesh **mesh, Skin **skin, Animation *animation) {
     GLTF *gltf = LoadGLTF(path, platform);
     
     if(mesh != NULL) {
@@ -206,20 +207,25 @@ void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, M
     }
     
     if(skin != NULL) {
-        sLog("LOAD - SKIN - %s", gltf->path);
+        sLog("LOAD - Skin - %s", gltf->path);
         *skin = RendererGetNewSkin(renderer);
         LoadSkin(renderer, *skin, gltf);
+    }
+    
+    if(animation != NULL) {
+        sLog("LOAD - Animation - %s", gltf->path);
+        LoadAnimation(renderer, animation, gltf);
     }
     
     DestroyGLTF(gltf);
 }
 
-void RendererDestroyMesh(MeshHandle mesh) {
+void RendererDestroyMesh(Mesh *mesh) {
     glDeleteBuffers(1, &mesh->index_buffer);
     glDeleteBuffers(1, &mesh->vertex_buffer);
 }
 
-void RendererDestroySkin(Renderer *renderer, SkinHandle skin) {
+void RendererDestroySkin(Renderer *renderer, Skin *skin) {
     
     for(u32 i = 0; i < skin->joint_count; i++) {
         if(skin->joint_child_count[i] > 0) {
@@ -237,6 +243,7 @@ void RendererDestroySkin(Renderer *renderer, SkinHandle skin) {
 
 
 // Returns a mesh pointer and keeps ownership
+// -------------------------------------------------
 #if 0
 
 // Returns a mesh pointer and keeps ownership

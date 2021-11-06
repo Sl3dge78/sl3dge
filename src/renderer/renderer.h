@@ -27,8 +27,6 @@ typedef struct Mesh {
     u32 index_count;
 } Mesh;
 
-typedef Mesh *MeshHandle;
-
 typedef struct Skin {
     u32 joint_count;
     
@@ -42,8 +40,6 @@ typedef struct Skin {
     Mat4 *inverse_bind_matrices;
 } Skin;
 
-typedef Skin *SkinHandle;
-
 // --------
 // Animation
 
@@ -51,15 +47,23 @@ typedef enum AnimationType {
     ANIM_TYPE_QUATERNION,
     ANIM_TYPE_VEC3,
     ANIM_TYPE_FLOAT,
-    ANIM_TYPE_TRANSFORM,
 } AnimationType;
+
+typedef enum AnimationTarget {
+    ANIM_TARGET_TRANSLATION,
+    ANIM_TARGET_ROTATION,
+    ANIM_TARGET_SCALE,
+} AnimationTarget;
 
 typedef struct AnimationTrack {
     AnimationType type;
     u32 key_count;
     f32 *key_times;
     void *keys;
-    void *target;
+    
+    u32 target_node;
+    AnimationTarget target;
+    
 } AnimationTrack;
 
 typedef struct Animation {
@@ -112,6 +116,10 @@ void UpdateCameraProj(Renderer *renderer);
 
 Transform *RendererAllocateTransforms(Renderer *renderer, const u32 count);
 void RendererDestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
+
+void DestroyAnimation(Animation *anim);
+void LoadAnimation(Renderer *renderer, Animation *result, GLTF *gltf);
+
 
 /*
 // Game functions

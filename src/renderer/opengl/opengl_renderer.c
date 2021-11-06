@@ -121,6 +121,7 @@ internal u32 CreateProgram(PlatformAPI *platform, const char *name) {
     }
     return result;
 }
+
 // ---------------
 // Shadowmap
 
@@ -420,7 +421,7 @@ internal void DrawScene(OpenGLRenderer *renderer, PushBuffer *pushb, const u32 p
                 transform_to_mat4(entry->transform, &mesh_transform);
                 
                 // Skin calc
-                SkinHandle skin = entry->skin;
+                Skin *skin = entry->skin;
                 
                 // Calculate bone xforms
                 Mat4 *joint_mats = sCalloc(skin->joint_count, sizeof(Mat4));
@@ -684,6 +685,7 @@ internal void DrawDebug(OpenGLRenderer *renderer, PushBuffer *pushb, Mat4 camera
 DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     // ------------------
     // Uniforms
+    
     OpenGLRenderer *backend = frontend->backend;
     mat4_mul(frontend->camera_proj, frontend->camera_view, frontend->camera_vp);
     glProgramUniformMatrix4fv(backend->static_mesh_vtx_shader, glGetUniformLocation(backend->static_mesh_vtx_shader, "light_matrix"), 1, GL_FALSE, frontend->light_matrix);
@@ -692,6 +694,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     
     // ------------------
     // Shadow map
+    
     BeginShadowmapRenderPass(&backend->shadowmap_pass);
     glProgramUniformMatrix4fv(backend->static_mesh_vtx_shader, glGetUniformLocation(backend->static_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->light_matrix);
     glProgramUniformMatrix4fv(backend->skinned_mesh_vtx_shader, glGetUniformLocation(backend->skinned_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->light_matrix);
@@ -699,6 +702,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     
     // ------------------
     // Color pass
+    
     BeginColorRenderPass(backend, &backend->color_pass);
     glProgramUniformMatrix4fv(backend->static_mesh_vtx_shader, glGetUniformLocation(backend->static_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->camera_vp);
     glProgramUniformMatrix4fv(backend->skinned_mesh_vtx_shader, glGetUniformLocation(backend->skinned_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->camera_vp);
@@ -706,6 +710,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     
     // ---------------
     // Post process
+    
     BeginVolumetricRenderPass(frontend, &backend->vol_pass);
     DrawScreenQuad(backend);
     
@@ -731,19 +736,3 @@ DLL_EXPORT void RendererUpdateWindow(Renderer *renderer, PlatformAPI *platform_a
     CreateColorRenderPass(width, height, &renderer->backend->color_pass, renderer->backend->color_fragment_shader);
     UpdateCameraProj(renderer);
 }
-
-/*
-void RendererReloadShaders(Renderer *renderer, PlatformAPI *platform_api) {
-    // TODO(Guigui): This won't work now. We need to reload the shader programs too
-    DestroyShadowmapRenderPass(&renderer->backend->shadowmap_pass);
-    CreateShadowmapRenderPass(&renderer->backend->shadowmap_pass);
-    
-    DestroyColorRenderPass(&renderer->backend->color_pass);
-    CreateColorRenderPass(renderer->width, renderer->height, &renderer->backend->color_pass, renderer->backend->color_fragment_shader);
-    
-    DestroyVolumetricRenderPass(&renderer->backend->vol_pass);
-    CreateVolumetricRenderPass(platform_api, &renderer->backend->vol_pass);
-}
-
-*/
-

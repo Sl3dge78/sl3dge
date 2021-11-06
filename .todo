@@ -48,7 +48,7 @@
 				[ ] Multiple primitives
 			[ ] Nodes
 			[X] Skins
-			[ ] Animations
+			[X] Animations
 			[X] Images
 			[ ] Materials
 			[ ] Textures
@@ -57,7 +57,7 @@
 			[X] Mesh
 			[ ] Nodes
 			[X] Skin
-			[ ] Animations
+			[X] Animations
 			[ ] Material
 		[ ] Give flags to a function? A struct with all possible results and it fills it based on the flags
 

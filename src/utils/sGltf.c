@@ -88,6 +88,41 @@ typedef struct GLTFNode {
     
 } GLTFNode;
 
+typedef enum GLTFAnimationPath {
+    ANIMATION_PATH_TRANSLATION,
+    ANIMATION_PATH_ROTATION,
+    ANIMATION_PATH_SCALE,
+}  GLTFAnimationPath;
+
+typedef struct GLTFChannel {
+    u32 sampler;
+    u32 target_node;
+    GLTFAnimationPath path;
+    
+} GLTFChannel;
+
+typedef enum GLTFInterpolationType {
+    INTERPOLATION_LINEAR,
+} GLTFInterpolationType;
+
+typedef struct GLTFSampler {
+    u32 input;
+    GLTFInterpolationType interpolation;
+    u32 output;
+    
+} GLTFSampler;
+
+typedef struct GLTFAnimation {
+    u32 channel_count;
+    GLTFChannel *channels;
+    
+    char *name;
+    
+    u32 sampler_count;
+    GLTFSampler *samplers;
+    
+} GLTFAnimation;
+
 typedef struct GLTF {
     const char* path;
     
@@ -111,6 +146,9 @@ typedef struct GLTF {
     
     u32 node_count;
     GLTFNode *nodes;
+    
+    u32 animation_count;
+    GLTFAnimation *animations;
     
 } GLTF;
 
@@ -176,7 +214,7 @@ u32 JsonCountArray(char *ptr) {
             
         }
     }
-    return (count+1);
+    return (count + 1);
 }
 
 char *JsonEatColon(char *ptr) {
@@ -771,6 +809,217 @@ char *GLTFParseNodes(char *ptr, GLTFNode **nodes, u32 *count) {
     return (ptr);
 }
 
+char *GLTFParseChannels(char *ptr, GLTFChannel **channels, u32 *count) {
+    sTrace("GLTF: Reading Channels");
+    
+    u32 array_count = JsonCountArray(ptr);
+    *count = array_count;
+    *channels = sCalloc(array_count, sizeof(GLTFChannel));
+    ptr++; // '['
+    ptr = EatSpaces(ptr);
+    
+    for(u32 i = 0; i < array_count; i++) {
+        ASSERT(*ptr == '{');
+        ptr++;
+        ptr = EatSpaces(ptr);
+        GLTFChannel *channel = &(*channels)[i];
+        
+        for(;;) {
+            if(*ptr == '}') {
+                ptr++; // '}'
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                break;
+            }
+            
+            char key[32];
+            ptr = JsonParseString(ptr, key);
+            ptr = JsonEatColon(ptr);
+            
+            if(strcmp(key, "sampler") == 0) {
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseU32(ptr, &channel->sampler);
+            } else if (strcmp(key, "target") == 0) {
+                ptr = EatSpaces(ptr);
+                ptr++; // '{'
+                ptr = EatSpaces(ptr);
+                for(;;) {
+                    
+                    if(*ptr == '}') {
+                        ptr++; // '}'
+                        ptr++; // ','
+                        ptr = EatSpaces(ptr);
+                        break;
+                    }
+                    
+                    ptr = EatSpaces(ptr);
+                    ptr = JsonParseString(ptr, key);
+                    ptr = JsonEatColon(ptr);
+                    
+                    if(strcmp(key, "node") == 0) {
+                        ptr = EatSpaces(ptr);
+                        ptr = JsonParseU32(ptr, &channel->target_node);
+                        ptr = EatSpaces(ptr);
+                    } else if(strcmp(key,"path") == 0) {
+                        char path[32];
+                        ptr = EatSpaces(ptr);
+                        ptr = JsonParseString(ptr, path);
+                        if(strcmp(path, "translation") == 0) {
+                            channel->path = ANIMATION_PATH_TRANSLATION;
+                        } else if(strcmp(path, "rotation") == 0) {
+                            channel->path = ANIMATION_PATH_ROTATION;
+                        } else if(strcmp(path, "scale") == 0) {
+                            channel->path = ANIMATION_PATH_SCALE;
+                        } else {
+                            sTrace("JSON: Channel/Target > Unread value %s", key);
+                            ptr = JsonSkipValue(ptr);
+                        }
+                        ptr = EatSpaces(ptr);
+                    } else {
+                        sTrace("JSON: Unread value %s", key);
+                        ptr = JsonSkipValue(ptr);
+                    }
+                    
+                    if(*ptr == ',')
+                        ptr++;
+                }
+                
+            } else {
+                sTrace("JSON: Unread value %s", key);
+                ptr = JsonSkipValue(ptr);
+            }
+            
+            if(*ptr == ',')
+                ptr++;
+            ptr = EatSpaces(ptr);
+        }
+    }
+    
+    ASSERT(*ptr == ']');
+    ptr++;
+    
+    sTrace("GLTF: Read %d Channels", array_count);
+    return (ptr);
+}
+
+char *GLTFParseSamplers(char *ptr, GLTFSampler **samplers, u32 *count) {
+    sTrace("GLTF: Reading Channels");
+    
+    u32 array_count = JsonCountArray(ptr);
+    *count = array_count;
+    *samplers = sCalloc(array_count, sizeof(GLTFSampler));
+    ptr++; // '['
+    ptr = EatSpaces(ptr);
+    
+    for(u32 i = 0; i < array_count; i++) {
+        ASSERT(*ptr == '{');
+        ptr++;
+        ptr = EatSpaces(ptr);
+        GLTFSampler *sampler = &(*samplers)[i];
+        
+        for(;;) {
+            if(*ptr == '}') {
+                ptr++; // '}'
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                break;
+            }
+            
+            char key[32];
+            ptr = JsonParseString(ptr, key);
+            ptr = JsonEatColon(ptr);
+            
+            if(strcmp(key, "input") == 0) {
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseU32(ptr, &sampler->input);
+            } else if (strcmp(key, "output") == 0) {
+                ptr = EatSpaces(ptr);
+                ptr = JsonParseU32(ptr, &sampler->output);
+            } else if (strcmp(key, "interpolation") == 0) {
+                ptr = EatSpaces(ptr);
+                char interpolation[32] ;
+                ptr = JsonParseString(ptr, interpolation);
+                
+                if(strcmp(interpolation, "LINEAR") == 0) {
+                    sampler->interpolation = INTERPOLATION_LINEAR;
+                } else {
+                    sError("GLTF: Animation Sampler: Unknown interpolation type %s", interpolation);
+                    ASSERT(0);
+                }
+                
+            } else {
+                sTrace("JSON: Unread value %s", key);
+                ptr = JsonSkipValue(ptr);
+            }
+            
+            if(*ptr == ',')
+                ptr++;
+            ptr = EatSpaces(ptr);
+        }
+    }
+    
+    ASSERT(*ptr == ']');
+    ptr++;
+    
+    sTrace("GLTF: Read %d Channels", array_count);
+    return (ptr);
+}
+
+char *GLTFParseAnimations(char *ptr, GLTFAnimation **animations, u32 *count) {
+    sTrace("GLTF: Reading Animations");
+    u32 array_count = JsonCountArray(ptr);
+    *count = array_count;
+    *animations = sCalloc(array_count, sizeof(GLTFAnimation));
+    ptr++; // '['
+    ptr = EatSpaces(ptr);
+    
+    for(u32 i = 0; i < array_count; i++) {
+        ASSERT(*ptr == '{');
+        ptr++;
+        ptr = EatSpaces(ptr);
+        GLTFAnimation *animation = &(*animations)[i];
+        
+        for(;;) {
+            if(*ptr == '}') {
+                ptr++; // '}'
+                ptr++; // ','
+                ptr = EatSpaces(ptr);
+                break;
+            }
+            
+            char key[32];
+            ptr = JsonParseString(ptr, key);
+            ptr = JsonEatColon(ptr);
+            
+            if(strcmp(key, "name") == 0) {
+                u32 length = JsonGetStringLength(ptr);
+                animation->name = sCalloc(length, sizeof(char));
+                ptr = JsonParseString(ptr, animation->name);
+            } else if(strcmp(key, "channels") == 0) {
+                ptr = GLTFParseChannels(ptr, &animation->channels, &animation->channel_count);
+                ptr = EatSpaces(ptr);
+            } else if(strcmp(key, "samplers") == 0) {
+                ptr = GLTFParseSamplers(ptr, &animation->samplers, &animation->sampler_count);
+                ptr = EatSpaces(ptr);
+            } else {
+                sTrace("JSON: Unread value %s", key);
+                ptr = JsonSkipValue(ptr);
+            }
+            
+            if(*ptr == ',')
+                ptr++;
+            ptr = EatSpaces(ptr);
+        }
+    }
+    
+    ASSERT(*ptr == ']');
+    ptr++;
+    
+    sTrace("GLTF: Read %d Animations", array_count);
+    return (ptr);
+    
+}
+
 u32 GLTFGetBoneIDFromNode(const GLTF *gltf, const u32 node_id) {
     
     for(u32 i = 0; i < gltf->skins[0].joint_count; ++i) {
@@ -879,6 +1128,8 @@ GLTF *LoadGLTF(const char *path, PlatformAPI *platform) {
                         ptr = GLTFParseSkins(ptr, &gltf->skins, &gltf->skin_count);
                     else if (strcmp(key, "nodes") == 0)
                         ptr = GLTFParseNodes(ptr, &gltf->nodes, &gltf->node_count);
+                    else if (strcmp(key, "animations") == 0)
+                        ptr = GLTFParseAnimations(ptr, &gltf->animations, &gltf->animation_count);
                     else  {
                         sTrace("JSON: Unread value %s", key);
                         ptr = JsonSkipValue(ptr);
@@ -942,6 +1193,15 @@ void DestroyGLTF(GLTF *gltf) {
         }
         sFree(gltf->nodes);
     } 
+    
+    if(gltf->animation_count > 0) {
+        for(u32 i = 0; i < gltf->animation_count; i++) {
+            sFree(gltf->animations[i].channels);
+            sFree(gltf->animations[i].samplers);
+            sFree(gltf->animations[i].name);
+        }
+        sFree(gltf->animations);
+    }
     
     sFree(gltf);
 }

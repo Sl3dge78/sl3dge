@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include "utils/sl3dge.h"
-
 #include "platform/platform.h"
 
 #include "utils/sGltf.c"
@@ -10,6 +9,9 @@
 #include "renderer/pushbuffer.h"
 #include "renderer/renderer.h"
 
+#include "console.h"
+#include "event.h"
+#include "game.h"
 
 #ifdef RENDERER_VULKAN
 #include "renderer/vulkan/vulkan_renderer.c"
@@ -20,13 +22,8 @@
 #include "renderer/opengl/opengl_mesh.c"
 #endif
 
+#include "renderer/animation.c"
 #include "renderer/pushbuffer.c"
-
-
-#include "console.h"
-#include "event.h"
-#include "game.h"
-
 #include "renderer/renderer.c"
 
 global Renderer *global_renderer;
@@ -34,16 +31,14 @@ global PlatformAPI *platform;
 
 #include "console.c"
 #include "event.c"
-
 #include "collision.c"
+
+// ---------------
+// Exported functions
 
 DLL_EXPORT u32 GameGetSize() {
     return sizeof(GameData);
 }
-
-
-// ---------------
-// Exported functions
 
 /// This is called when the game is (re)loaded
 DLL_EXPORT void GameInit(GameData *game_data, Renderer *renderer, PlatformAPI *platform_api) {
@@ -68,7 +63,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     platform->SetCaptureMouse(true);
     
     //LoadFromGLTF("resources/3d/character/character.gltf", global_renderer, platform, &game_data->character, 0, 0);
-    LoadFromGLTF("resources/3d/skintest.gltf", global_renderer, platform, &game_data->cylinder_mesh, &game_data->cylinder_skin, 0);
+    LoadFromGLTF("resources/3d/skintest.gltf", global_renderer, platform, &game_data->cylinder_mesh, &game_data->cylinder_skin, &game_data->anim);
     
     game_data->floor = RendererLoadQuad(global_renderer);
     game_data->floor_xform = RendererAllocateTransforms(global_renderer, 1);
@@ -138,7 +133,7 @@ DLL_EXPORT void GameStart(GameData *game_data) {
 DLL_EXPORT void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
     
-    //DestroyAnimation(&game_data->anim);
+    DestroyAnimation(&game_data->anim);
 }
 
 internal void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
@@ -291,12 +286,11 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // Drawing
     
     DrawConsole(&game_data->console, game_data);
-#if 0
+    
     { // Animation
         game_data->anim_time = fmod(game_data->anim_time + delta_time, game_data->anim.length);
-        AnimationEvaluate(&game_data->anim, game_data->anim_time);
+        AnimationEvaluate(game_data->cylinder_skin->joints, &game_data->anim, game_data->anim_time);
     }
-#endif
     
     PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});

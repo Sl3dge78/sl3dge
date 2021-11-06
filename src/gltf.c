@@ -1,3 +1,4 @@
+#if 0
 #include "utils/sl3dge.h"
 
 #define CGLTF_IMPLEMENTATION
@@ -137,6 +138,7 @@ void GLTFGetNodeTransform(const cgltf_node *node, Transform *transform) {
         transform->scale = *(Vec3 *)(&node->scale);
     }
 }
+#endif // if 0
 
 /* // @TODO this is vulkan specific
 void GLTFLoadVertexAndIndexBuffer(cgltf_primitive *prim,

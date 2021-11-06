@@ -1,6 +1,5 @@
 #pragma once
 
-#include "utils/sl3dge.h"
 #include <stb_truetype.h>
 
 typedef struct ShadowmapRenderPass {
@@ -55,5 +54,3 @@ typedef struct RendererBackend {
 } RendererBackend;
 
 typedef RendererBackend OpenGLRenderer;
-
-void GLLoadFunctions();

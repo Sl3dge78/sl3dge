@@ -17,8 +17,8 @@ typedef struct GameData {
     Vec3 light_dir;
     f32 cos;
     
-    MeshHandle floor;
-    MeshHandle character;
+    Mesh *floor;
+    Mesh *character;
     
     Transform *floor_xform;
     Transform *npc_xform;
@@ -38,7 +38,6 @@ typedef struct GameData {
     
     f32 anim_time;
     Animation anim;
-    Animation anim_t;
     
     bool show_shadowmap;
     

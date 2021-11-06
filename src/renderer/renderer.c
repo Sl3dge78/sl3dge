@@ -106,7 +106,7 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     sFree(renderer->transforms);
 }
 
-MeshHandle RendererLoadQuad(Renderer *renderer) {
+Mesh *RendererLoadQuad(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
@@ -117,7 +117,7 @@ MeshHandle RendererLoadQuad(Renderer *renderer) {
     return RendererLoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
-MeshHandle RendererLoadCube(Renderer *renderer) {
+Mesh *RendererLoadCube(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
