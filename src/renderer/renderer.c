@@ -25,6 +25,8 @@ void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos) {
     renderer->camera_pos = pos;
     memcpy(renderer->camera_view, view, 16 * sizeof(f32));
     mat4_inverse(view, renderer->camera_view_inverse);
+    
+    //nocheckin
 }
 
 DLL_EXPORT u32 GetRendererSize() {
