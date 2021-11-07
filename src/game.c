@@ -62,29 +62,32 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     
     platform->SetCaptureMouse(true);
     
-    //LoadFromGLTF("resources/3d/character/character.gltf", global_renderer, platform, &game_data->character, 0, 0);
-    LoadFromGLTF("resources/3d/skintest.gltf", global_renderer, platform, &game_data->cylinder_mesh, &game_data->cylinder_skin, &game_data->anim);
-    
     game_data->floor = LoadQuad(global_renderer);
     game_data->floor_xform = AllocateTransforms(global_renderer, 1);
-    game_data->floor_xform->scale = (Vec3){100.0f, 1.0f, 100.0f};
-    
-    game_data->npc_xform = AllocateTransforms(global_renderer, 1);
-    game_data->npc_xform->translation.z = 5.0f;
-    
-    game_data->cylinder_xform = AllocateTransforms(global_renderer, 1);
-    game_data->cylinder_xform->translation.x = 0.0f;
+    Transform *f = ArrayGetElementAt(global_renderer->transforms, game_data->floor_xform);
+    f->scale = (Vec3){100.0f, 1.0f, 100.0f};
     
     game_data->cube = LoadCube(global_renderer);
     game_data->cube_xform = AllocateTransforms(global_renderer, 1);
-    game_data->cube_xform->scale = (Vec3){1.0f, 5.0f, 10.0f};
-    game_data->cube_xform->translation.x = 10.0f;
+    Transform *c = ArrayGetElementAt(global_renderer->transforms, game_data->cube_xform);
+    c->translation.x = 10.0f;
+    
+    
+    LoadFromGLTF("resources/3d/skintest.gltf", global_renderer, platform, &game_data->cylinder_mesh, &game_data->cylinder_skin, 0);
+    game_data->cylinder_xform = AllocateTransforms(global_renderer, 1);
+    Transform *cyl = ArrayGetElementAt(global_renderer->transforms, game_data->cylinder_xform);
+    cyl->translation.x = 0.0f;
+    
+    
+    LoadFromGLTF("resources/3d/character/walk.gltf", global_renderer, platform, &game_data->character, &game_data->character_skin, &game_data->walk);
+    game_data->character_xform = AllocateTransforms(global_renderer, 1);
+    Transform *ch = ArrayGetElementAt(global_renderer->transforms, game_data->character_xform);
+    ch->translation.z = 5.0f;
+    game_data->anim_time = 0.0f;
     
     game_data->interact_sphere_diameter = 1.0f;
     
 #if 0
-    game_data->anim_time = 0.0f;
-    
     
     {
         Animation *a = &game_data->anim;
@@ -195,6 +198,64 @@ internal void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
     RendererSetCamera(global_renderer, cam, camera->position);
 }
 
+void DrawAnimationUI(PushBuffer *ui, Animation *animation, f32 time, u32 bone, u32 key) {
+    u32 x = 10;
+    u32 y = global_renderer->height - 80;
+    u32 w = global_renderer->width - 40;
+    u32 h = 70;
+    
+    // Panel
+    PushUIQuad(ui, x, y, w, h, (Vec4){0.1f, 0.1f, 0.1f, 0.5f});
+    
+    // Text
+    PushUIFmt(ui, x + 5, y + 20, (Vec4){1.0f, 1.0f, 1.0f, 1.0f}, "Current Time: %.2f, Key: %d, Bone: %d", time, key, bone);
+    
+    // Timeline
+    PushUIQuad(ui, x + 5, y + 50, w - 10, 10, (Vec4){0.1f, 0.1f, 0.1f, 0.8f});
+    
+    AnimationTrack *track = &animation->tracks[0];
+    
+    // Keys
+    for(u32 i = 0; i < track->key_count; i++) {
+        f32 rel_t = track->key_times[i] / animation->length;
+        Vec4 color = (Vec4){1.0f, 0.5f, 0.5f, 1.0f};
+        if(key == i)
+            color.y = 0.0f;
+        PushUIQuad(ui, x + 5 + rel_t * (w - 10), y + 50, 1, 10, color);
+    }
+    
+    // Playhead
+    f32 rel_time = time / animation->length;
+    PushUIQuad(ui, x + 5 + rel_time * w, y + 45, 1, 20, (Vec4){0.9f, 0.9f, 0.9f, 1.0f});
+    
+    
+    Quat v1;
+    Quat v2;
+    u32 track_id = 0;
+    for(u32 i = 0; i < animation->track_count; i ++){
+        AnimationTrack *t = &animation->tracks[i];
+        if(t->target == ANIM_TARGET_ROTATION && t->target_node == bone) {
+            track_id = i;
+            Quat *keys = (Quat *)(t->keys);
+            v1 = keys[key];
+            v2 = keys[key + 1];
+            
+            /*
+            f32 time_between_keys = t->key_times[key + 1] - t->key_times[key];
+            f32 rel_t = time - track->key_times[key];
+            f32 norm_t = rel_t / time_between_keys;
+            
+            Quat q_lerp = quat_slerp(keys[key], keys[key + 1], norm_t);
+            quat_sprint(q_lerp, qlerp);
+            */
+            break;
+        }
+    }
+    PushUIFmt(ui, x + 5, y + 40, (Vec4){1.0f, 1.0f, 1.0f, 1.0f}, "%d 1: %f %f %f %f | 2: %f %f %f %f", track_id, v1.x, v1.y, v1.z, v1.w, v2.x, v2.y, v2.z, v2.w);
+    //PushUIFmt(ui, global_renderer->width / 2 - 200, y + 40, (Vec4){1.0f, 1.0f, 1.0f, 1.0f}, "   %s", qlerp);
+    
+}
+
 /// Called every frame
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // ----------
@@ -222,8 +283,10 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
         
         if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
-            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, game_data->npc_xform)) {
-                game_data->npc_xform->rotation.y += 1.0f;
+            Transform *x = ArrayGetElementAt(global_renderer->transforms, game_data->character_xform);
+            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, x)) {
+                
+                x->rotation.y += 1.0f;
             }
         }
         
@@ -250,13 +313,19 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
             RendererSetSunDirection(global_renderer, game_data->light_dir);
         }
         
-        if(input->keyboard[SCANCODE_Y]) {
-            game_data->cylinder_skin->joints[2].rotation = quat_identity();
-        }
-        if(input->keyboard[SCANCODE_U]) {
-            game_data->cylinder_skin->joints[2].rotation = quat_from_axis((Vec3){1.0f, 0.0f, 0.0f}, 90.f);
+        if(input->keyboard[SCANCODE_U]){
+            if(input->keyboard[SCANCODE_LSHIFT])
+                game_data->anim_time += delta_time;
+            else
+                game_data->anim_time += 0.001f;
         }
         
+        if(input->keyboard[SCANCODE_Y]){
+            if(input->keyboard[SCANCODE_LSHIFT])
+                game_data->anim_time -= delta_time;
+            else
+                game_data->anim_time -= 0.001f;
+        }
     }
     
     // --------------
@@ -286,18 +355,23 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     DrawConsole(&game_data->console, game_data);
     
     { // Animation
-        game_data->anim_time = fmod(game_data->anim_time + delta_time, game_data->anim->length);
-        AnimationEvaluate(game_data->cylinder_skin->joints, game_data->cylinder_skin->joint_count, game_data->anim, game_data->anim_time);
+        Skin *skin = ArrayGetElementAt(global_renderer->skins, game_data->character_skin);
+        //Animation *animation = ArrayGetElementAt(global_renderer->animations, game_data->walk);
+        
+        //DrawAnimationUI(&global_renderer->ui_pushbuffer, animation, game_data->anim_time, game_data->bone, game_data->key);
+        
+        // game_data->anim_time = fmod(game_data->anim_time + delta_time, animation->length);
+        AnimationEvaluate(global_renderer, skin->first_joint, skin->joint_count, game_data->walk, game_data->anim_time);
+        
+        for(u32 i = 0; i < skin->joint_count; i++) {
+            PushBone(&global_renderer->debug_pushbuffer, skin->global_joint_mats[i]);
+        }
     }
     
-    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube_xform, (Vec3){0.5f, 0.5f, 0.5f});
     PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
-    //PushMesh(global_renderer, game_data->cylinder_mesh, game_data->npc_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube_xform, (Vec3){1.0f, 1.0f, 1.0f});
     PushSkin(&global_renderer->scene_pushbuffer, game_data->cylinder_mesh, game_data->cylinder_skin, game_data->cylinder_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    
-    for (u32 i = 0; i < 4; i++) {
-        PushBone(&global_renderer->debug_pushbuffer, game_data->cylinder_skin->global_joint_mats[i]);
-    }
+    PushSkin(&global_renderer->scene_pushbuffer, game_data->character, game_data->character_skin, game_data->character_xform, (Vec3){1.0f, 1.0f, 1.0f});
     
     if(game_data->show_shadowmap)
         PushUITexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, 0, 500, 500);

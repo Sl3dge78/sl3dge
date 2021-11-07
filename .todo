@@ -4,12 +4,12 @@
 
 --------
  TODO
-
+	
+	[ ] Figure out a better way to handle meshes, skins and transforms. It is kind of annoying right now...
 	[ ] Renderer destroy transform	
 	[ ] Shader refactoring
 		[ ] Load all shader uniform locations at the start
 		[ ] Use pipelines for the other shaders?
-	[ ] BLENDER - Skin & Animate the character
 	[ ] Sky diffraction
 		[ ] Where to do it ? Volumetric pass? Or new skybox pass?
 	[ ] Volumetric clouds
@@ -45,6 +45,7 @@
 --------
  DOING
 	
+	[ ] BLENDER - Skin & Animate the character
 
 
 --------

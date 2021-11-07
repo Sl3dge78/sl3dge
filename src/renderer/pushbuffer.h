@@ -1,7 +1,8 @@
 #pragma once
 
-typedef struct Mesh Mesh;
-typedef struct Skin Skin;
+typedef u32 MeshHandle;
+typedef u32 SkinHandle;
+typedef u32 TransformHandle;
 
 // -----------
 // Push Buffer
@@ -36,16 +37,16 @@ typedef struct PushBufferEntryText {
 
 typedef struct PushBufferEntryMesh {
     PushBufferEntryType type;
-    Mesh *mesh;
-    Transform *transform;
+    MeshHandle mesh;
+    TransformHandle transform;
     Vec3 diffuse_color;
 } PushBufferEntryMesh;
 
 typedef struct PushBufferEntrySkin {
     PushBufferEntryType type;
-    Mesh *mesh;
-    Skin *skin;
-    Transform *transform;
+    MeshHandle mesh;
+    SkinHandle skin;
+    TransformHandle transform;
     Vec3 diffuse_color;
 } PushBufferEntrySkin;
 

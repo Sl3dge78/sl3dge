@@ -394,7 +394,7 @@ internal void DrawMesh(const u32 pipeline, const u32 vtx_shader, const u32 frag_
 }
 
 
-internal void DrawScene(OpenGLRenderer *renderer, PushBuffer *pushb, const u32 pipeline) {
+internal void DrawScene(Renderer *renderer, PushBuffer *pushb, const u32 pipeline) {
     glActiveTexture(GL_TEXTURE1);
     
     if(pushb->size == 0)
@@ -407,10 +407,13 @@ internal void DrawScene(OpenGLRenderer *renderer, PushBuffer *pushb, const u32 p
                 PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(pushb->buf + address);
                 
                 Mat4 mat;
-                transform_to_mat4(entry->transform, &mat);
-                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
+                Transform *xform = ArrayGetElementAt(renderer->transforms, entry->transform);
+                transform_to_mat4(xform, &mat);
+                glBindTexture(GL_TEXTURE_2D, renderer->backend->white_texture);
                 
-                DrawMesh(pipeline, renderer->static_mesh_vtx_shader, renderer->color_fragment_shader, entry->mesh, mat, entry->diffuse_color);
+                Mesh *mesh = ArrayGetElementAt(renderer->meshes, entry->mesh);
+                
+                DrawMesh(pipeline, renderer->backend->static_mesh_vtx_shader, renderer->backend->color_fragment_shader, mesh, mat, entry->diffuse_color);
                 
                 address += sizeof(PushBufferEntryMesh);
             } break;
@@ -418,10 +421,11 @@ internal void DrawScene(OpenGLRenderer *renderer, PushBuffer *pushb, const u32 p
                 PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(pushb->buf + address);
                 
                 Mat4 mesh_transform;
-                transform_to_mat4(entry->transform, &mesh_transform);
+                Transform *xform = ArrayGetElementAt(renderer->transforms, entry->transform);
+                transform_to_mat4(xform, &mesh_transform);
                 
                 // Skin calc
-                Skin *skin = entry->skin;
+                Skin *skin = ArrayGetElementAt(renderer->skins, entry->skin);
                 
                 // Calculate bone xforms
                 Mat4 *joint_mats = sCalloc(skin->joint_count, sizeof(Mat4));
@@ -438,20 +442,22 @@ internal void DrawScene(OpenGLRenderer *renderer, PushBuffer *pushb, const u32 p
                 }
                 
                 Mat4 tmp;
-                transform_to_mat4(&skin->joints[root], &tmp);
+                Transform *root_xform = ArrayGetElementAt(renderer->transforms, skin->first_joint + root);
+                transform_to_mat4(root_xform, &tmp);
                 mat4_mul(mesh_transform, tmp, skin->global_joint_mats[root]);
-                CalcChildXform(root, skin);
+                CalcChildXform(renderer, root, skin);
                 
                 for(u32 i = 0; i < skin->joint_count; i++) {
                     mat4_mul(skin->global_joint_mats[i], skin->inverse_bind_matrices[i], tmp); // Inverse Bind Matrix
                     mat4_mul(mesh_inverse, tmp, joint_mats[i]);
                 }
                 
-                glProgramUniformMatrix4fv(renderer->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->skinned_mesh_vtx_shader, "joint_matrices"), skin->joint_count, GL_FALSE, (f32*)joint_mats);
+                glProgramUniformMatrix4fv(renderer->backend->skinned_mesh_vtx_shader, glGetUniformLocation(renderer->backend->skinned_mesh_vtx_shader, "joint_matrices"), skin->joint_count, GL_FALSE, (f32*)joint_mats);
                 
                 // Mesh
-                glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
-                DrawMesh(pipeline, renderer->skinned_mesh_vtx_shader, renderer->color_fragment_shader, entry->mesh, mesh_transform, entry->diffuse_color);
+                glBindTexture(GL_TEXTURE_2D, renderer->backend->white_texture);
+                Mesh *mesh = ArrayGetElementAt(renderer->meshes, entry->mesh);
+                DrawMesh(pipeline, renderer->backend->skinned_mesh_vtx_shader, renderer->backend->color_fragment_shader, mesh, mesh_transform, entry->diffuse_color);
                 sFree(joint_mats);
                 
                 address += sizeof(PushBufferEntrySkin);
@@ -698,7 +704,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     BeginShadowmapRenderPass(&backend->shadowmap_pass);
     glProgramUniformMatrix4fv(backend->static_mesh_vtx_shader, glGetUniformLocation(backend->static_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->light_matrix);
     glProgramUniformMatrix4fv(backend->skinned_mesh_vtx_shader, glGetUniformLocation(backend->skinned_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->light_matrix);
-    DrawScene(backend, &frontend->scene_pushbuffer, backend->shadowmap_pass.pipeline);
+    DrawScene(frontend, &frontend->scene_pushbuffer, backend->shadowmap_pass.pipeline);
     
     // ------------------
     // Color pass
@@ -706,7 +712,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     BeginColorRenderPass(backend, &backend->color_pass);
     glProgramUniformMatrix4fv(backend->static_mesh_vtx_shader, glGetUniformLocation(backend->static_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->camera_vp);
     glProgramUniformMatrix4fv(backend->skinned_mesh_vtx_shader, glGetUniformLocation(backend->skinned_mesh_vtx_shader, "vp"), 1, GL_FALSE, frontend->camera_vp);
-    DrawScene(backend, &frontend->scene_pushbuffer, backend->color_pass.pipeline);
+    DrawScene(frontend, &frontend->scene_pushbuffer, backend->color_pass.pipeline);
     
     // ---------------
     // Post process

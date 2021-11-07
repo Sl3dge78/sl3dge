@@ -1,11 +1,12 @@
 
-void CalcChildXform(u32 joint, Skin *skin) {
+void CalcChildXform(Renderer *renderer, u32 joint, Skin *skin) {
     for(u32 i = 0; i < skin->joint_child_count[joint]; i++) {
         u32 child = skin->joint_children[joint][i];
         Mat4 tmp;
-        transform_to_mat4(&skin->joints[child], &tmp);
+        Transform *xform = ArrayGetElementAt(renderer->transforms, skin->first_joint + child);
+        transform_to_mat4(xform, &tmp);
         mat4_mul(skin->global_joint_mats[joint], tmp, skin->global_joint_mats[child]);
-        CalcChildXform(child, skin);
+        CalcChildXform(renderer, child, skin);
     }
 }
 
@@ -26,7 +27,7 @@ void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos) {
     memcpy(renderer->camera_view, view, 16 * sizeof(f32));
     mat4_inverse(view, renderer->camera_view_inverse);
     
-    //nocheckin
+    // nocheckin
 }
 
 DLL_EXPORT u32 GetRendererSize() {
@@ -45,7 +46,7 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     // Arrays
     renderer->meshes     = ArrayCreate(8, sizeof(Mesh));
     renderer->skins      = ArrayCreate(1, sizeof(Skin));
-    renderer->transforms = ArrayCreate(8, sizeof(Transform));
+    renderer->transforms = ArrayCreate(100, sizeof(Transform));
     renderer->animations = ArrayCreate(1, sizeof(Animation));
     
     // Init push buffers
@@ -60,7 +61,7 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     
     // Debug 
     renderer->debug_pushbuffer.size = 0;
-    renderer->debug_pushbuffer.max_size = sizeof(PushBufferEntryBone) * 20;
+    renderer->debug_pushbuffer.max_size = sizeof(PushBufferEntryBone) * 100;
     renderer->debug_pushbuffer.buf = sCalloc(renderer->debug_pushbuffer.max_size, 1);
     
     UpdateCameraProj(renderer);
@@ -107,7 +108,7 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     ArrayDestroy(renderer->animations);
 }
 
-Mesh *LoadQuad(Renderer *renderer) {
+MeshHandle LoadQuad(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
@@ -118,7 +119,7 @@ Mesh *LoadQuad(Renderer *renderer) {
     return LoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
-Mesh *LoadCube(Renderer *renderer) {
+MeshHandle LoadCube(Renderer *renderer) {
     const Vertex vertices[] = {
         {{-.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
         {{.5f, 0.0f, -.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
@@ -136,15 +137,16 @@ Mesh *LoadCube(Renderer *renderer) {
     return LoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
-Transform *AllocateTransforms(Renderer *renderer, const u32 count) {
-    Transform *result = (Transform *)ArrayGetNewElements(&renderer->transforms, count);
+TransformHandle AllocateTransforms(Renderer *renderer, const u32 count) {
+    TransformHandle result = (TransformHandle)ArrayGetNewElements(&renderer->transforms, count);
     for(u32 i = 0; i < count; i ++) {
-        transform_identity(&result[i]);
+        Transform *x = ArrayGetElementAt(renderer->transforms, result + i);
+        transform_identity(x);
     }
     return result;
 }
 
-void DestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms) {
+void DestroyTransforms(Renderer *renderer, const u32 count, const TransformHandle transforms) {
     // TODO(Guigui): 
     return;
 }

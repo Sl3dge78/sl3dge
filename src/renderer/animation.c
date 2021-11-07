@@ -66,22 +66,26 @@ void DestroyAnimation(Animation *anim) {
     sFree(anim->tracks);
 }
 
-void AnimationEvaluate(Transform *joints, u32 count, Animation *a, f32 time) {
+void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u32 count, const AnimationHandle animation, f32 time) {
+    
+    Animation *a = ArrayGetElementAt(renderer->animations, animation);
     
     // clamp time
     if (time > a->length)
         time = a->length;
+    if (time < 0)
+        time = 0;
     
     for(u32 i = 0; i < a->track_count; i++) {
         AnimationTrack *track = &a->tracks[i];
         
         u32 key_1 = 0; u32 key_2 = 0;
-        if(time > track->key_times[track->key_count - 1]) {
+        if(time >= track->key_times[track->key_count - 1]) {
             key_1 = key_2 = track->key_count - 1;
         }
         else {
             for(u32 i = 0; i < track->key_count; i ++) {
-                if(time > track->key_times[i] && time < track->key_times[i + 1]) {
+                if(time >= track->key_times[i] && time < track->key_times[i + 1]) {
                     key_1 = i;
                     key_2 = i + 1;
                     
@@ -97,7 +101,7 @@ void AnimationEvaluate(Transform *joints, u32 count, Animation *a, f32 time) {
         if(track->target_node >= count)
             continue;
         
-        Transform *target_xform = &joints[track->target_node];
+        Transform *target_xform = ArrayGetElementAt(renderer->transforms, first_joint + track->target_node);
         
         switch(track->target) {
             case ANIM_TARGET_TRANSLATION : {

@@ -4,6 +4,8 @@
 typedef struct GameData GameData;
 struct RendererBackend;
 
+typedef u32 TransformHandle;
+
 typedef struct Vertex {
     Vec3 pos;
     Vec3 normal;
@@ -27,10 +29,12 @@ typedef struct Mesh {
     u32 index_count;
 } Mesh;
 
+typedef u32 MeshHandle;
+
 typedef struct Skin {
     u32 joint_count;
     
-    Transform *joints;
+    TransformHandle first_joint;
     Mat4 *global_joint_mats;
     
     i32 *joint_parents;
@@ -39,6 +43,8 @@ typedef struct Skin {
     u32 **joint_children;
     Mat4 *inverse_bind_matrices;
 } Skin;
+
+typedef u32 SkinHandle;
 
 // --------
 // Animation
@@ -72,6 +78,10 @@ typedef struct Animation {
     AnimationTrack *tracks;
 } Animation;
 
+typedef u32 AnimationHandle;
+
+
+
 
 // --------
 // Renderer
@@ -102,26 +112,26 @@ typedef struct Renderer {
     Vec3 light_dir;
 } Renderer;
 
-void CalcChildXform(u32 joint, Skin *skin);
+void CalcChildXform(Renderer *renderer, u32 joint, Skin *skin);
 void UpdateCameraProj(Renderer *renderer);
 
-Transform *AllocateTransforms(Renderer *renderer, const u32 count);
-void DestroyTransforms(Renderer *renderer, const u32 count, const Transform *transforms);
+TransformHandle AllocateTransforms(Renderer *renderer, const u32 count);
+void DestroyTransforms(Renderer *renderer, const u32 count, const TransformHandle transforms);
 
-Mesh *LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
-void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, Mesh **mesh, Skin **skin, Animation **animation);
-Mesh *LoadQuad(Renderer *renderer);
-Mesh *LoadCube(Renderer *renderer);
+MeshHandle LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
+void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinHandle *skin, AnimationHandle *animation);
+MeshHandle LoadQuad(Renderer *renderer);
+MeshHandle LoadCube(Renderer *renderer);
 
-void LoadAnimation(Animation *result, const GLTF *gltf);
+void LoadAnimation(Animation *animation, const GLTF *gltf);
 void DestroyAnimation(Animation *anim);
-void AnimationEvaluate(Transform *joints, u32 count, Animation *a, f32 time);
+void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u32 count, const AnimationHandle animation, f32 time);
 
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
 
-void PushMesh(PushBuffer *push_buffer, Mesh *mesh, Transform *transform, Vec3 diffuse_color);
-void PushSkin(PushBuffer *push_buffer, Mesh *mesh, Skin *skin, Transform *xform, Vec3 diffuse_color);
+void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, TransformHandle transform, Vec3 diffuse_color);
+void PushSkin(PushBuffer *push_buffer, const MeshHandle mesh, const SkinHandle skin, TransformHandle xform, Vec3 diffuse_color);
 void PushBone(PushBuffer *push_buffer, Mat4 bone_matrix);
 void PushUIQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
 void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color);

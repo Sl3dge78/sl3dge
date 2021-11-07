@@ -54,7 +54,7 @@ void PushUITexture(PushBuffer *push_buffer, const u32 texture, const u32 x, cons
 
 /// Adds a mesh to the scene draw calls
 /// The transform pointer needs to be alive until drawing happens
-void PushMesh(PushBuffer *push_buffer, Mesh *mesh, Transform *transform, Vec3 diffuse_color) {
+void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, TransformHandle transform, Vec3 diffuse_color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryMesh) < push_buffer->max_size);
     PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Mesh;
@@ -65,7 +65,7 @@ void PushMesh(PushBuffer *push_buffer, Mesh *mesh, Transform *transform, Vec3 di
     push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
-void PushSkin(PushBuffer *push_buffer, Mesh *mesh, Skin *skin, Transform *xform, Vec3 diffuse_color) {
+void PushSkin(PushBuffer *push_buffer, MeshHandle mesh, SkinHandle skin, TransformHandle xform, Vec3 diffuse_color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntrySkin) < push_buffer->max_size);
     PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Skin;

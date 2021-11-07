@@ -13,7 +13,7 @@ out vec3 worldpos;
 uniform mat4 transform;
 uniform mat4 vp;
 uniform mat4 light_matrix;
-uniform mat4 joint_matrices[10];
+uniform mat4 joint_matrices[64];
 
 void main() {
 	mat4 skin_mat = weights.x * joint_matrices[int(joints.x)] + 

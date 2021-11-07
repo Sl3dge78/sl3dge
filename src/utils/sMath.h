@@ -107,6 +107,7 @@ Quat quat_identity();
 inline Quat quat_normalize(Quat q);
 Quat quat_nlerp(const Quat a, const Quat b, const f32 t);
 Quat quat_slerp(const Quat, const Quat, const f32);
+void quat_sprint(const Quat q, char *buf);
 
 // --------
 // TRANSFORM
@@ -795,30 +796,101 @@ Quat quat_nlerp(const Quat a, const Quat b, const f32 t) {
     return (quat_normalize(result));
 }
 
-Quat quat_slerp(const Quat a, const Quat b, const f32 t) {
+Quat quat_slerp(const Quat a, Quat b, const f32 t) {
     f32 dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
     
-    if(dot == 1) { // This means that the two quaternions are identical. So return either one.
+    if(dot >= 0.999999f) { // This means that the two quaternions are identical. So return either one.
         return a;
     }
     
+    if(dot < 0.0f) {
+        b.x = -b.x;
+        b.y = -b.y;
+        b.z = -b.z;
+        b.w = -b.w;
+        dot = -dot;
+    }
+    
     f32 theta = (f32) acos(dot);
-	if (theta<0.0) theta=-theta;
-	
+    
+    /* // Maybe useless ?
+        if (theta < 0.0)
+            theta = -theta;
+        */
+    
 	f32 st =  sin(theta);
-	f32 sut = (float) sin(t*theta);
-	f32 sout = (float) sin((1-t)*theta);
-	f32 coeff1 = sout/st;
-	f32 coeff2 = sut/st;
+	f32 sut = (f32) sin(t * theta);
+	f32 sout = (f32) sin((1-t) * theta);
+	f32 k0 = sout/st;
+	f32 k1 = sut/st;
     
     Quat result;
     
-	result.x = coeff1*a.x + coeff2*b.x;
-	result.y = coeff1*a.y + coeff2*b.y;
-	result.z = coeff1*a.z + coeff2*b.z;
-	result.w = coeff1*a.w + coeff2*b.w;
+	result.x = k0 * a.x + k1 * b.x;
+	result.y = k0 * a.y + k1 * b.y;
+	result.z = k0 * a.z + k1 * b.z;
+	result.w = k0 * a.w + k1 * b.w;
     
 	return(quat_normalize(result));
+}
+
+#if 0
+quaternion slerp(const quaternion& q0, const quaternion& q1, float t){
+	float cosOmega = dot_product(q0, q1);
+	// If negative dot, use –q1. Two quaternions q and –q	
+    // represent the same rotation, but may produce	
+    // different slerp. We chose q or –q to rotate using	
+    // the acute angle.	
+    float q1w = q1.w; 
+    float q1x = q1.x;	
+    float q1y = q1.y; 
+    float q1z = q1.z;	
+    if (cosOmega < 0.0f) {
+        q1w = -q1w;		
+        q1x = -q1x;		
+        q1y = -q1y;		
+        q1z = -q1z;		
+        cosOmega = -cosOmega;
+	}	
+    // We should have two unit quaternions, so dot should be <= 1.0	
+    // assert(cosOmega < 1.1f);	
+    // Compute interpolation fraction, checking for quaternions
+	// almost exactly the same	
+    float k0, k1;	
+    if (cosOmega > 0.9999f) {
+        // Very close - just use linear interpolation,
+        // which will protect againt a divide by zero
+        k0 = 1.0f - t;
+        k1 = t;
+	} else {		
+        // Compute the sin of the angle using the
+        // trig identity sin^2(omega) + cos^2(omega) = 1
+        
+        float sinOmega = sqrt(1.0f - cosOmega*cosOmega);
+        
+        // Compute the angle from its sin and cosine
+        float omega = atan2(sinOmega, cosOmega);
+        
+        // Compute inverse of denominator, so we only have
+        // to divide once
+        
+        float oneOverSinOmega = 1.0f / sinOmega;
+        // Compute interpolation parameters
+        k0 = sin((1.0f - t) * omega) * oneOverSinOmega;
+        k1 = sin(t * omega) * oneOverSinOmega;
+	}	
+    quaternion result;
+	result.x = k0*q0.x + k1*q1x;
+	result.y = k0*q0.y + k1*q1y;
+	result.z = k0*q0.z + k1*q1z;
+	result.w = k0*q0.w + k1*q1w;
+	return result;
+}
+#endif
+
+
+void quat_sprint(const Quat q, char *buf) {
+    sprintf(buf, "x: %.2f y: %.2f z: %.2f w: %.2f", q.x, q.y, q.w, q.w);
 }
 
 // --------
@@ -846,3 +918,4 @@ inline void mat4_to_transform(const Mat4 *mat, Transform *xform) {
 inline f32 lerp(f32 a, f32 b, f32 t) {
     return a + (t * (b - a));
 }
+

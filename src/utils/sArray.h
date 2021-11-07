@@ -24,7 +24,7 @@ void *ArrayGetElementAt(const Array array, const u32 id) {
     return (u8 *)array.ptr + (array.size * id);
 }
 
-void *ArrayGetNewElement(Array *array) {
+u32 ArrayGetNewElement(Array *array) {
     if(array->count == array->capacity) {
         u32 new_capacity;
         if (array->capacity <= 0) 
@@ -35,18 +35,18 @@ void *ArrayGetNewElement(Array *array) {
         void *ptr = sRealloc(array->ptr, array->size * new_capacity);
         ASSERT(ptr);
         if(ptr) {
+            array->capacity = new_capacity;
             array->ptr = ptr;
         }
     }
-    array->count ++;
-    return ArrayGetElementAt(*array, array->count - 1);
+    return array->count++;
 }
 
-void *ArrayGetNewElements(Array *array, const u32 nb) {
+u32 ArrayGetNewElements(Array *array, const u32 nb) {
     u32 new_count = array->count + nb;
     
     if(array->capacity < new_count) {
-        u32 new_capacity = MIN(new_count, array->capacity * 2);
+        u32 new_capacity = MAX(new_count, array->capacity * 2);
         void *ptr = sRealloc(array->ptr, array->size * new_capacity);
         ASSERT(ptr);
         if(ptr) {
@@ -55,7 +55,7 @@ void *ArrayGetNewElements(Array *array, const u32 nb) {
         array->capacity = new_capacity;
     }
     
-    void *result = (u8 *)array->ptr + (array->count * array->size);
+    u32 result = array->count;
     array->count = new_count;
     return result;
     

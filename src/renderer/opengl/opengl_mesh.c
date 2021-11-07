@@ -1,7 +1,9 @@
 
-Mesh *LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
+MeshHandle LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
     sLog("LOAD - Vertices - Vertices: %d, Indices: %d", vertex_count, index_count);
-    Mesh *mesh = (Mesh *)ArrayGetNewElement(&renderer->meshes);
+    MeshHandle handle = (MeshHandle)ArrayGetNewElement(&renderer->meshes);
+    
+    Mesh *mesh = ArrayGetElementAt(renderer->meshes, handle);
     
     mesh->index_count = index_count;
     mesh->vertex_count = vertex_count;
@@ -30,7 +32,7 @@ Mesh *LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32
     glObjectLabel(GL_BUFFER, mesh->index_buffer, -1, "GEN IDX BUFFER");
     glObjectLabel(GL_VERTEX_ARRAY, mesh->vertex_array, -1, "GEN ARRAY BUFFER");
     
-    return mesh;
+    return handle;
 }
 
 internal void LoadVertexBuffers(Mesh *mesh, const GLTF *gltf) {
@@ -136,7 +138,7 @@ internal void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
     skin->inverse_bind_matrices = sCalloc(skin->joint_count, sizeof(Mat4));
     GLTFCopyAccessor(gltf, src_skin->inverse_bind_matrices, skin->inverse_bind_matrices, 0, sizeof(Mat4));
     
-    skin->joints = AllocateTransforms(renderer, skin->joint_count);
+    skin->first_joint = AllocateTransforms(renderer, skin->joint_count);
     skin->global_joint_mats = sCalloc(skin->joint_count, sizeof(Mat4));
     
     skin->joint_child_count = sCalloc(skin->joint_count, sizeof(u32));
@@ -147,7 +149,8 @@ internal void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
     for(u32 i = 0; i < skin->joint_count; ++i) {
         GLTFNode *node = &gltf->nodes[src_skin->joints[i]];
         
-        skin->joints[i] = node->xform;
+        Transform *joint = ArrayGetElementAt(renderer->transforms, skin->first_joint + i);
+        *joint = node->xform;
         skin->joint_child_count[i] = node->child_count;
         skin->joint_parents[i] = -1;
         if(node->child_count > 0) {
@@ -161,25 +164,25 @@ internal void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
     }
 }
 
-void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, Mesh **mesh, Skin **skin, Animation **animation) {
+void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinHandle *skin, AnimationHandle *animation) {
     GLTF *gltf = LoadGLTF(path, platform);
     
     if(mesh != NULL) {
         sLog("LOAD - Mesh - %s", gltf->path);
-        *mesh = (Mesh *)ArrayGetNewElement(&renderer->meshes);
-        LoadVertexBuffers(*mesh, gltf);
+        *mesh = (MeshHandle)ArrayGetNewElement(&renderer->meshes);
+        LoadVertexBuffers(ArrayGetElementAt(renderer->meshes, *mesh), gltf);
     }
     
     if(skin != NULL) {
         sLog("LOAD - Skin - %s", gltf->path);
-        *skin = (Skin *)ArrayGetNewElement(&renderer->skins);
-        LoadSkin(renderer, *skin, gltf);
+        *skin = (SkinHandle)ArrayGetNewElement(&renderer->skins);
+        LoadSkin(renderer, ArrayGetElementAt(renderer->skins, *skin), gltf);
     }
     
     if(animation != NULL) {
         sLog("LOAD - Animation - %s", gltf->path);
-        *animation = (Animation *)ArrayGetNewElement(&renderer->animations);
-        LoadAnimation(*animation, gltf);
+        *animation = (AnimationHandle)ArrayGetNewElement(&renderer->animations);
+        LoadAnimation(ArrayGetElementAt(renderer->animations, *animation), gltf);
     }
     
     DestroyGLTF(gltf);
@@ -201,7 +204,7 @@ void DestroySkin(Renderer *renderer, Skin *skin) {
     sFree(skin->joint_children);
     sFree(skin->joint_child_count);
     sFree(skin->global_joint_mats);
-    DestroyTransforms(renderer, skin->joint_count, skin->joints);
+    DestroyTransforms(renderer, skin->joint_count, skin->first_joint);
     sFree(skin->inverse_bind_matrices);
 }
 
