@@ -20,7 +20,7 @@ void ArrayDestroy(Array array) {
     sFree(array.ptr);
 }
 
-void *ArrayGetElementAt(const Array array, const u32 id) {
+inline void *ArrayGetElementAt(const Array array, const u32 id) {
     return (u8 *)array.ptr + (array.size * id);
 }
 

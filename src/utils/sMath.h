@@ -401,19 +401,19 @@ void mat4_look_at(const Vec3 target, const Vec3 eye, const Vec3 up, f32 *mat) {
 }
 
 inline void trs_quat_to_mat4(const Vec3 *t, const Quat *r, const Vec3 *s, f32 *restrict dst) {
-    const float sqx = 2.0f * r->x * r->x;
-    const float sqy = 2.0f * r->y * r->y;
-    const float sqz = 2.0f * r->z * r->z;
+    const f32 sqx = 2.0f * r->x * r->x;
+    const f32 sqy = 2.0f * r->y * r->y;
+    const f32 sqz = 2.0f * r->z * r->z;
     //const float sqw = 2.0f * r->w * r->w; // @TODO This is unused, error ?
     
-    const float xy = r->x * r->y;
-    const float zw = r->z * r->w;
+    const f32 xy = r->x * r->y;
+    const f32 zw = r->z * r->w;
     
-    const float xz = r->x * r->z;
-    const float yw = r->y * r->w;
+    const f32 xz = r->x * r->z;
+    const f32 yw = r->y * r->w;
     
-    const float yz = r->y * r->z;
-    const float xw = r->x * r->w;
+    const f32 yz = r->y * r->z;
+    const f32 xw = r->x * r->w;
     
     dst[0] = (1 - sqy - sqz) * s->x;
     dst[1] = 2.0f * (xy + zw) * s->x;
@@ -614,17 +614,17 @@ void mat4_rotation_z(f32 *mat, const float radians) {
 }
 
 void mat4_rotate_euler(f32 *restrict mat, const Vec3 euler) {
-    const float cx = cos(euler.x);
-    const float sx = sin(euler.x);
-    const float cy = cos(euler.y);
-    const float sy = sin(euler.y);
-    const float cz = cos(euler.z);
-    const float sz = sin(euler.z);
+    const f32 cx = cos(euler.x);
+    const f32 sx = sin(euler.x);
+    const f32 cy = cos(euler.y);
+    const f32 sy = sin(euler.y);
+    const f32 cz = cos(euler.z);
+    const f32 sz = sin(euler.z);
     
-    const float t01 = -sz * cx;
-    const float t02 = sz * sx;
-    const float t11 = cz * cx;
-    const float t12 = cz * -sx;
+    const f32 t01 = -sz * cx;
+    const f32 t02 = sz * sx;
+    const f32 t11 = cz * cx;
+    const f32 t12 = cz * -sx;
     
     mat[0] = cz * cy + t02 * -sy;
     mat[1] = t01;
@@ -726,19 +726,19 @@ Quat mat4_get_rotation(f32 *mat) {
 }
 
 void quat_to_mat4(f32 *dst, const Quat *q) {
-    const float sqx = 2.0f * q->x * q->x;
-    const float sqy = 2.0f * q->y * q->y;
-    const float sqz = 2.0f * q->z * q->z;
+    const f32 sqx = 2.0f * q->x * q->x;
+    const f32 sqy = 2.0f * q->y * q->y;
+    const f32 sqz = 2.0f * q->z * q->z;
     //const float sqw = 2.0f * q->w * q->w; @TODO This is unused error ?
     
-    const float xy = q->x * q->y;
-    const float zw = q->z * q->w;
+    const f32 xy = q->x * q->y;
+    const f32 zw = q->z * q->w;
     
-    const float xz = q->x * q->z;
-    const float yw = q->y * q->w;
+    const f32 xz = q->x * q->z;
+    const f32 yw = q->y * q->w;
     
-    const float yz = q->y * q->z;
-    const float xw = q->x * q->w;
+    const f32 yz = q->y * q->z;
+    const f32 xw = q->x * q->w;
     
     // const float invs = 1.0f / (sqx + sqy + sqz + sqw);
     
@@ -771,6 +771,29 @@ Quat quat_from_axis(const Vec3 axis, const f32 angle) {
     result.z = axis.z * sine;
     result.w = cos(angle / 2.0f);
     return (result);
+}
+
+Quat quat_lookat(const Vec3 pos, const Vec3 dest, const Vec3 up) {
+    Vec3 look = vec3_normalize(vec3_sub(dest, pos));
+    Vec3 forw = (Vec3){0.0f, 0.0f, -1.0f};
+    Vec3 w = vec3_cross(look, forw);
+    vec3_print(&w);
+    return quat_normalize((Quat){1.0f + vec3_dot(look, forw), w.x, w.y, w.z});
+    /*
+    f32 dot = vec3_dot(z_axis, (Vec3){0.0f, 0.0f, 1.0f});
+    f32 angle = 0;
+    
+    if(fabs(dot - (1.0f)) < 0.000001f) {
+        angle = 180.0f;
+        
+    } else {
+        angle = acos(dot);
+    }
+    
+    sLog("dot:%f / angle: %f", dot, fabs(dot - (-1.0f)), angle);
+    
+    return quat_from_axis(y_axis, angle);
+*/
 }
 
 Quat quat_identity() {

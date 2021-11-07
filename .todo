@@ -45,12 +45,11 @@
 --------
  DOING
 	
-	[ ] BLENDER - Skin & Animate the character
-
 
 --------
  DONE
 
+	[X] BLENDER - Skin & Animate the character
 	[X] Refactor Mesh loading
 	[X] Fix hot reloading
 	[X] Renderer refactoring

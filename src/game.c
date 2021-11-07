@@ -67,28 +67,17 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     Transform *f = ArrayGetElementAt(global_renderer->transforms, game_data->floor_xform);
     f->scale = (Vec3){100.0f, 1.0f, 100.0f};
     
-    game_data->cube = LoadCube(global_renderer);
-    game_data->cube_xform = AllocateTransforms(global_renderer, 1);
-    Transform *c = ArrayGetElementAt(global_renderer->transforms, game_data->cube_xform);
-    c->translation.x = 10.0f;
-    
-    
-    LoadFromGLTF("resources/3d/skintest.gltf", global_renderer, platform, &game_data->cylinder_mesh, &game_data->cylinder_skin, 0);
-    game_data->cylinder_xform = AllocateTransforms(global_renderer, 1);
-    Transform *cyl = ArrayGetElementAt(global_renderer->transforms, game_data->cylinder_xform);
-    cyl->translation.x = 0.0f;
-    
-    
-    LoadFromGLTF("resources/3d/character/walk.gltf", global_renderer, platform, &game_data->character, &game_data->character_skin, &game_data->walk);
-    game_data->character_xform = AllocateTransforms(global_renderer, 1);
-    Transform *ch = ArrayGetElementAt(global_renderer->transforms, game_data->character_xform);
-    ch->translation.z = 5.0f;
-    game_data->anim_time = 0.0f;
+    { // NPC
+        NPC *npc = &game_data->npc;
+        LoadFromGLTF("resources/3d/character/walk.gltf", global_renderer, platform, &npc->mesh, &npc->skin, &npc->walk_animation);
+        npc->xform = AllocateTransforms(global_renderer, 1);
+        npc->anim_time = 0.0f;
+        npc->walk_speed = 1.0f;
+    }
     
     game_data->interact_sphere_diameter = 1.0f;
     
 #if 0
-    
     {
         Animation *a = &game_data->anim;
         a->track_count = 2;
@@ -282,14 +271,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
         // Interact sphere
         game_data->interact_sphere_pos = vec3_add(game_data->camera.position, game_data->camera.forward);
         
-        if(input->keyboard[SCANCODE_E] && !input->old_keyboard[SCANCODE_E]) {
-            Transform *x = ArrayGetElementAt(global_renderer->transforms, game_data->character_xform);
-            if(IsLineIntersectingBoundingBox(game_data->camera.position, game_data->interact_sphere_pos, x)) {
-                
-                x->rotation.y += 1.0f;
-            }
-        }
-        
         // Move the sun
         if(input->keyboard[SCANCODE_P]) {
             game_data->cos += delta_time;
@@ -311,20 +292,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
             }
             
             RendererSetSunDirection(global_renderer, game_data->light_dir);
-        }
-        
-        if(input->keyboard[SCANCODE_U]){
-            if(input->keyboard[SCANCODE_LSHIFT])
-                game_data->anim_time += delta_time;
-            else
-                game_data->anim_time += 0.001f;
-        }
-        
-        if(input->keyboard[SCANCODE_Y]){
-            if(input->keyboard[SCANCODE_LSHIFT])
-                game_data->anim_time -= delta_time;
-            else
-                game_data->anim_time -= 0.001f;
         }
     }
     
@@ -354,24 +321,53 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     DrawConsole(&game_data->console, game_data);
     
-    { // Animation
-        Skin *skin = ArrayGetElementAt(global_renderer->skins, game_data->character_skin);
-        //Animation *animation = ArrayGetElementAt(global_renderer->animations, game_data->walk);
+    
+    { // NPC
+        NPC *npc = &game_data->npc;
+        Skin *skin = ArrayGetElementAt(global_renderer->skins, npc->skin);
+        Animation *animation = ArrayGetElementAt(global_renderer->animations, npc->walk_animation);
+        Transform *xform = ArrayGetElementAt(global_renderer->transforms, npc->xform);
         
-        //DrawAnimationUI(&global_renderer->ui_pushbuffer, animation, game_data->anim_time, game_data->bone, game_data->key);
+        npc->anim_time = fmod(npc->anim_time + delta_time, animation->length);
+        AnimationEvaluate(global_renderer, skin->first_joint, skin->joint_count, npc->walk_animation, npc->anim_time);
         
-        // game_data->anim_time = fmod(game_data->anim_time + delta_time, animation->length);
-        AnimationEvaluate(global_renderer, skin->first_joint, skin->joint_count, game_data->walk, game_data->anim_time);
+        Vec3 diff = vec3_sub(npc->destination, xform->translation);
+        npc->distance_to_dest = vec3_length(diff);
         
-        for(u32 i = 0; i < skin->joint_count; i++) {
-            PushBone(&global_renderer->debug_pushbuffer, skin->global_joint_mats[i]);
+        npc->walk_speed = 1.3f;
+        
+        if(npc->distance_to_dest > 0.1f) {
+            Vec3 dir = vec3_normalize(diff);
+            xform->translation = vec3_add(vec3_fmul(dir, npc->walk_speed * delta_time), xform->translation);
+            
+        } else {
+            // Get new dest
+            static u32 i = 0;
+            
+            if(i == 0) {
+                npc->destination = (Vec3) {0.0f, 0.0f, 0.0f};
+                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                i++;
+            } else if(i == 1) {
+                npc->destination = (Vec3) {5.0f, 0.0f, 0.0f};
+                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                i++;
+            } else if(i == 2) {
+                npc->destination = (Vec3) {5.0f, 0.0f, 5.0f};
+                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                i++;
+            } else if (i == 3) {
+                npc->destination = (Vec3) {0.0f, 0.0f, 5.0f};
+                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                i = 0;
+            }
         }
+        PushSkin(&global_renderer->scene_pushbuffer, npc->mesh, npc->skin, npc->xform, (Vec3){1.0f, 1.0f, 1.0f});
+        
+        PushUIFmt(&global_renderer->ui_pushbuffer, 0, 20, (Vec4) {1.0f, 1.0f, 1.0f, 1.0f}, "POS: %f, %f, %f | DEST: %f, %f, %f | DIST: %f", xform->translation.x, xform->translation.y, xform->translation.z, npc->destination.x, npc->destination.y, npc->destination.z, npc->distance_to_dest);
     }
     
     PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
-    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushSkin(&global_renderer->scene_pushbuffer, game_data->cylinder_mesh, game_data->cylinder_skin, game_data->cylinder_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushSkin(&global_renderer->scene_pushbuffer, game_data->character, game_data->character_skin, game_data->character_xform, (Vec3){1.0f, 1.0f, 1.0f});
     
     if(game_data->show_shadowmap)
         PushUITexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, 0, 500, 500);

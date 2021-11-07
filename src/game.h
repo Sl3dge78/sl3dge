@@ -6,6 +6,21 @@ typedef struct Camera {
     Vec3 forward;
 } Camera;
 
+typedef struct NPC {
+    
+    TransformHandle xform;
+    MeshHandle mesh;
+    SkinHandle skin;
+    AnimationHandle walk_animation;
+    
+    f32 anim_time;
+    
+    Vec3 destination;
+    f32 walk_speed;
+    f32 distance_to_dest;
+    
+} NPC;
+
 typedef struct GameData {
     // System stuff
     Console console;
@@ -19,10 +34,7 @@ typedef struct GameData {
     
     MeshHandle floor;
     
-    TransformHandle character_xform;
-    MeshHandle character;
-    SkinHandle character_skin;
-    AnimationHandle walk;
+    NPC npc;
     
     TransformHandle floor_xform;
     
@@ -31,15 +43,6 @@ typedef struct GameData {
     
     MeshHandle simple_skinning;
     TransformHandle simple_skinning_root;
-    
-    TransformHandle cylinder_xform;
-    MeshHandle cylinder_mesh;
-    SkinHandle cylinder_skin;
-    
-    TransformHandle cube_xform;
-    MeshHandle cube;
-    
-    f32 anim_time;
     
     bool show_anim_ui;
     bool show_shadowmap;
