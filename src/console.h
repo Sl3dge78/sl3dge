@@ -34,4 +34,3 @@ typedef struct Console {
     u32 history_size;
 } Console;
 
-void DrawConsole(Console *console, struct GameData *game_data);

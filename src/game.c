@@ -261,15 +261,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     // Console
     if(input->keyboard[SCANCODE_TILDE] && !input->old_keyboard[SCANCODE_TILDE]) {
-        if(game_data->console.console_target <= 0) { // Console is closed, open it
-            game_data->console.console_target = 300;
-            input->read_text_input = true;
-            platform->SetCaptureMouse(false);
-        } else { // Console is opened, close it
-            game_data->console.console_target = 0;
-            input->read_text_input = false;
-            platform->SetCaptureMouse(true);
-        }
+        ToggleConsole(&game_data->console, input, platform);
     }
     
     if(game_data->console.console_open) {
@@ -380,7 +372,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube2_xform, (Vec3){1.0f, 1.0f, 1.0f});
     
     if(game_data->show_shadowmap)
-        PushUITexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, 0, 500, 500);
+        PushUITexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, global_renderer->height - 200, 200, 200);
     
     RendererSetSunDirection(global_renderer, game_data->light_dir);
 }

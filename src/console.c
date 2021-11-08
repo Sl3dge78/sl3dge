@@ -107,6 +107,25 @@ internal void ConsoleParseMessage(const char *message, GameData *game_data) {
     ConsoleCallCommand(&args, game_data);
 }
 
+internal void EmptyInput(Console *console) {
+    memset(console->current_command, '\0', 128);
+    console->current_char = 0;
+    console->history_browser = 0;
+}
+
+void ToggleConsole(Console *console, Input *input, PlatformAPI *platform) {
+    if(console->console_target <= 0) { // Console is closed, open it
+        console->console_target = 300;
+        input->read_text_input = true;
+        platform->SetCaptureMouse(false);
+    } else { // Console is opened, close it
+        console->console_target = 0;
+        input->read_text_input = false;
+        platform->SetCaptureMouse(true);
+        EmptyInput(console);
+    }
+}
+
 void DrawConsole(Console *console, GameData *game_data) {
     if(console->console_open < console->console_target) {
         console->console_open += 20;
@@ -155,9 +174,7 @@ void InputConsole(Console *console, Input *input, GameData *game_data) {
                 case(13): // return
                 ConsoleLogMessage(console->current_command, LOG_LEVEL_LOG);
                 ConsoleParseMessage(console->current_command, game_data);
-                memset(console->current_command, '\0', 128);
-                console->current_char = 0;
-                console->history_browser = 0;
+                EmptyInput(console);
                 break;
                 default:
                 //sLog("%d", c);
