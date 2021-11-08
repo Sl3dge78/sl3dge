@@ -4,7 +4,9 @@
 
 --------
  TODO
-	[ ] Add function ptrs to renderer to access transforms, meshes, etc
+	[ ] Improve sArray
+		[ ] Add function ptrs to renderer to access transforms, meshes, etc
+		[ ] Get a ptr directly to the thing upon alloc
 	[ ] Figure out a better way to handle meshes, skins and transforms. It is kind of annoying right now...
 	[ ] Renderer destroy transform	
 	[ ] Shader refactoring
