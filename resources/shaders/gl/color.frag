@@ -32,6 +32,9 @@ float get_shadow(float bias) {
         for(int y = -samples; y <= samples; ++y) {
             vec2 uv = proj_coords.xy + vec2(x, y) * tex_dim; 
             float closest_depth = texture(shadow_map, uv).r;
+			if(closest_depth > 0.9999999) {
+				return 1.0;
+			}
             shadow += closest_depth > current_depth - bias ? 1.0 : 0.1;
             count ++;
         }
