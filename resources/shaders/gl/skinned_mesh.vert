@@ -23,7 +23,9 @@ void main() {
 
     vec4 pos = transform * skin_mat * vec4(aPos, 1.0);
     worldpos = pos.xyz;
-    Normal = aNormal;
+
+	mat4 inv_skin = inverse(transform * skin_mat);
+    Normal = vec4(vec4(aNormal, 1.0) * inv_skin).xyz;
     TexCoord = aTexCoord;
     shadow_map_texcoord = light_matrix * pos;
 
