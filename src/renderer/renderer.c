@@ -12,7 +12,7 @@ void CalcChildXform(Renderer *renderer, u32 joint, Skin *skin) {
 
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     Mat4 ortho;
-    mat4_ortho_zoom_gl(1.0f, 10.0f, -10.0f, 10.0f, ortho);
+    mat4_ortho_zoom_gl(1.0f, 50.0f, -100.0f, 100.0f, ortho);
     Mat4 look;
     mat4_look_at(vec3_add(direction, renderer->camera_pos),
                  renderer->camera_pos,

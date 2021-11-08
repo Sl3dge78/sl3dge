@@ -32,11 +32,14 @@ typedef struct GameData {
     Vec3 light_dir;
     f32 cos;
     
+    TransformHandle floor_xform;
     MeshHandle floor;
     
     NPC npc;
     
-    TransformHandle floor_xform;
+    TransformHandle cube1_xform;
+    TransformHandle cube2_xform;
+    MeshHandle cube;
     
     Vec3 interact_sphere_pos;
     f32 interact_sphere_diameter;

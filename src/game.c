@@ -67,6 +67,15 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     Transform *f = ArrayGetElementAt(global_renderer->transforms, game_data->floor_xform);
     f->scale = (Vec3){100.0f, 1.0f, 100.0f};
     
+    game_data->cube = LoadCube(global_renderer);
+    game_data->cube1_xform = AllocateTransforms(global_renderer, 1);
+    game_data->cube2_xform = AllocateTransforms(global_renderer, 1);
+    Transform *c = ArrayGetElementAt(global_renderer->transforms, game_data->cube1_xform);
+    c->scale = (Vec3){1.0f, 10.0f, 10.0f};
+    Transform *c2 = ArrayGetElementAt(global_renderer->transforms, game_data->cube2_xform);
+    c2->scale = (Vec3){1.0f, 10.0f, 10.0f};
+    c2->translation = (Vec3){0.0f, 14.0f, 0.0f};
+    
     { // NPC
         NPC *npc = &game_data->npc;
         LoadFromGLTF("resources/3d/character/walk.gltf", global_renderer, platform, &npc->mesh, &npc->skin, &npc->walk_animation);
@@ -367,6 +376,8 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     }
     
     PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.5f, 0.5f, 0.5f});
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube1_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->cube2_xform, (Vec3){1.0f, 1.0f, 1.0f});
     
     if(game_data->show_shadowmap)
         PushUITexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, 0, 500, 500);
