@@ -775,25 +775,9 @@ Quat quat_from_axis(const Vec3 axis, const f32 angle) {
 
 Quat quat_lookat(const Vec3 pos, const Vec3 dest, const Vec3 up) {
     Vec3 look = vec3_normalize(vec3_sub(dest, pos));
-    Vec3 forw = (Vec3){0.0f, 0.0f, -1.0f};
-    Vec3 w = vec3_cross(look, forw);
-    vec3_print(&w);
-    return quat_normalize((Quat){1.0f + vec3_dot(look, forw), w.x, w.y, w.z});
-    /*
-    f32 dot = vec3_dot(z_axis, (Vec3){0.0f, 0.0f, 1.0f});
-    f32 angle = 0;
-    
-    if(fabs(dot - (1.0f)) < 0.000001f) {
-        angle = 180.0f;
-        
-    } else {
-        angle = acos(dot);
-    }
-    
-    sLog("dot:%f / angle: %f", dot, fabs(dot - (-1.0f)), angle);
-    
-    return quat_from_axis(y_axis, angle);
-*/
+    Vec3 forw = vec3_normalize((Vec3){0.0f, 0.0f, 1.0f});
+    Vec3 w = vec3_cross(forw, look);
+    return quat_normalize((Quat){w.x, w.y, w.z, 1.0f + vec3_dot(look, forw)});
 }
 
 Quat quat_identity() {
@@ -856,61 +840,6 @@ Quat quat_slerp(const Quat a, Quat b, const f32 t) {
     
 	return(quat_normalize(result));
 }
-
-#if 0
-quaternion slerp(const quaternion& q0, const quaternion& q1, float t){
-	float cosOmega = dot_product(q0, q1);
-	// If negative dot, use –q1. Two quaternions q and –q	
-    // represent the same rotation, but may produce	
-    // different slerp. We chose q or –q to rotate using	
-    // the acute angle.	
-    float q1w = q1.w; 
-    float q1x = q1.x;	
-    float q1y = q1.y; 
-    float q1z = q1.z;	
-    if (cosOmega < 0.0f) {
-        q1w = -q1w;		
-        q1x = -q1x;		
-        q1y = -q1y;		
-        q1z = -q1z;		
-        cosOmega = -cosOmega;
-	}	
-    // We should have two unit quaternions, so dot should be <= 1.0	
-    // assert(cosOmega < 1.1f);	
-    // Compute interpolation fraction, checking for quaternions
-	// almost exactly the same	
-    float k0, k1;	
-    if (cosOmega > 0.9999f) {
-        // Very close - just use linear interpolation,
-        // which will protect againt a divide by zero
-        k0 = 1.0f - t;
-        k1 = t;
-	} else {		
-        // Compute the sin of the angle using the
-        // trig identity sin^2(omega) + cos^2(omega) = 1
-        
-        float sinOmega = sqrt(1.0f - cosOmega*cosOmega);
-        
-        // Compute the angle from its sin and cosine
-        float omega = atan2(sinOmega, cosOmega);
-        
-        // Compute inverse of denominator, so we only have
-        // to divide once
-        
-        float oneOverSinOmega = 1.0f / sinOmega;
-        // Compute interpolation parameters
-        k0 = sin((1.0f - t) * omega) * oneOverSinOmega;
-        k1 = sin(t * omega) * oneOverSinOmega;
-	}	
-    quaternion result;
-	result.x = k0*q0.x + k1*q1x;
-	result.y = k0*q0.y + k1*q1y;
-	result.z = k0*q0.z + k1*q1z;
-	result.w = k0*q0.w + k1*q1w;
-	return result;
-}
-#endif
-
 
 void quat_sprint(const Quat q, char *buf) {
     sprintf(buf, "x: %.2f y: %.2f z: %.2f w: %.2f", q.x, q.y, q.w, q.w);

@@ -343,22 +343,21 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
         } else {
             // Get new dest
             static u32 i = 0;
-            
             if(i == 0) {
                 npc->destination = (Vec3) {0.0f, 0.0f, 0.0f};
                 xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i++;
             } else if(i == 1) {
                 npc->destination = (Vec3) {5.0f, 0.0f, 0.0f};
-                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                xform->rotation = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i++;
             } else if(i == 2) {
-                npc->destination = (Vec3) {5.0f, 0.0f, 5.0f};
-                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                npc->destination = (Vec3) {5.0f, 0.0f, -5.0f};
+                xform->rotation  = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i++;
             } else if (i == 3) {
-                npc->destination = (Vec3) {0.0f, 0.0f, 5.0f};
-                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                npc->destination = (Vec3) {0.0f, 0.0f, -5.0f};
+                xform->rotation = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i = 0;
             }
         }
