@@ -1,9 +1,17 @@
 
+
+#define GetValue(renderer, value) _Generic((value), \
+TransformHandle : ArrayGetElementAt(renderer->transforms, value),\
+MeshHandle : ArrayGetElementAt(renderer->meshes, value),\
+AnimationHandle : ArrayGetElementAt(renderer->animations, value),\
+SkinHandle: ArrayGetElementAt(renderer->skins, value), \
+default: assert(0))
+
 void CalcChildXform(Renderer *renderer, u32 joint, Skin *skin) {
     for(u32 i = 0; i < skin->joint_child_count[joint]; i++) {
         u32 child = skin->joint_children[joint][i];
         Mat4 tmp;
-        Transform *xform = ArrayGetElementAt(renderer->transforms, skin->first_joint + child);
+        Transform *xform = sArrayGet(renderer->transforms, skin->first_joint + child);
         transform_to_mat4(xform, &tmp);
         mat4_mul(skin->global_joint_mats[joint], tmp, skin->global_joint_mats[child]);
         CalcChildXform(renderer, child, skin);
@@ -44,10 +52,10 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     renderer->window = window;
     
     // Arrays
-    renderer->meshes     = ArrayCreate(8, sizeof(Mesh));
-    renderer->skins      = ArrayCreate(1, sizeof(Skin));
-    renderer->transforms = ArrayCreate(100, sizeof(Transform));
-    renderer->animations = ArrayCreate(1, sizeof(Animation));
+    renderer->meshes     = sArrayCreate(8, sizeof(Mesh));
+    renderer->skins      = sArrayCreate(1, sizeof(Skin));
+    renderer->transforms = sArrayCreate(100, sizeof(Transform));
+    renderer->animations = sArrayCreate(1, sizeof(Animation));
     
     // Init push buffers
     renderer->ui_pushbuffer.size = 0;
@@ -88,24 +96,24 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     
     // Meshes
     for(u32 i = 0; i < renderer->meshes.count; i++) {
-        DestroyMesh((Mesh *)ArrayGetElementAt(renderer->meshes, i));
+        DestroyMesh((Mesh *)sArrayGet(renderer->meshes, i));
     }
-    ArrayDestroy(renderer->meshes);
+    sArrayDestroy(renderer->meshes);
     
     // Skins
     for(u32 i = 0; i < renderer->skins.count; i++) {
-        DestroySkin(renderer, (Skin *)ArrayGetElementAt(renderer->skins, i));
+        DestroySkin(renderer, (Skin *)sArrayGet(renderer->skins, i));
     }
-    ArrayDestroy(renderer->skins);
+    sArrayDestroy(renderer->skins);
     
     // Transforms
-    ArrayDestroy(renderer->transforms);
+    sArrayDestroy(renderer->transforms);
     
     // Animations
     for(u32 i = 0; i < renderer->animations.count; i++) {
-        DestroyAnimation((Animation *)ArrayGetElementAt(renderer->animations, i));
+        DestroyAnimation((Animation *)sArrayGet(renderer->animations, i));
     }
-    ArrayDestroy(renderer->animations);
+    sArrayDestroy(renderer->animations);
 }
 
 MeshHandle LoadQuad(Renderer *renderer) {
@@ -138,9 +146,9 @@ MeshHandle LoadCube(Renderer *renderer) {
 }
 
 TransformHandle AllocateTransforms(Renderer *renderer, const u32 count) {
-    TransformHandle result = (TransformHandle)ArrayGetNewElements(&renderer->transforms, count);
+    TransformHandle result = (TransformHandle)sArrayAddMultiple(&renderer->transforms, count);
     for(u32 i = 0; i < count; i ++) {
-        Transform *x = ArrayGetElementAt(renderer->transforms, result + i);
+        Transform *x = sArrayGet(renderer->transforms, result + i);
         transform_identity(x);
     }
     return result;

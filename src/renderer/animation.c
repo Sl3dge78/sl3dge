@@ -68,7 +68,7 @@ void DestroyAnimation(Animation *anim) {
 
 void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u32 count, const AnimationHandle animation, f32 time) {
     
-    Animation *a = ArrayGetElementAt(renderer->animations, animation);
+    Animation *a = sArrayGet(renderer->animations, animation);
     
     // clamp time
     if (time > a->length)
@@ -101,7 +101,7 @@ void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u3
         if(track->target_node >= count)
             continue;
         
-        Transform *target_xform = ArrayGetElementAt(renderer->transforms, first_joint + track->target_node);
+        Transform *target_xform = sArrayGet(renderer->transforms, first_joint + track->target_node);
         
         switch(track->target) {
             case ANIM_TARGET_TRANSLATION : {

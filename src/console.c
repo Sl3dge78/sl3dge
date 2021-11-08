@@ -81,7 +81,7 @@ DLL_EXPORT void ConsoleLogMessage(const char *message, const u8 level) {
 }
 
 internal void ConsoleParseMessage(const char *message, GameData *game_data) {
-    // TEMPORARY : 5 args max
+    // @HardCoded : 5 args max
     
     const char *head = message;
     u32 length = strlen(message);

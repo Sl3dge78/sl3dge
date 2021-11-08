@@ -1,9 +1,9 @@
 
 MeshHandle LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count) {
     sLog("LOAD - Vertices - Vertices: %d, Indices: %d", vertex_count, index_count);
-    MeshHandle handle = (MeshHandle)ArrayGetNewElement(&renderer->meshes);
+    MeshHandle handle = sArrayAdd(&renderer->meshes);
     
-    Mesh *mesh = ArrayGetElementAt(renderer->meshes, handle);
+    Mesh *mesh = sArrayGet(renderer->meshes, handle);
     
     mesh->index_count = index_count;
     mesh->vertex_count = vertex_count;
@@ -149,7 +149,7 @@ internal void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
     for(u32 i = 0; i < skin->joint_count; ++i) {
         GLTFNode *node = &gltf->nodes[src_skin->joints[i]];
         
-        Transform *joint = ArrayGetElementAt(renderer->transforms, skin->first_joint + i);
+        Transform *joint = sArrayGet(renderer->transforms, skin->first_joint + i);
         *joint = node->xform;
         skin->joint_child_count[i] = node->child_count;
         skin->joint_parents[i] = -1;
@@ -169,20 +169,20 @@ void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, M
     
     if(mesh != NULL) {
         sLog("LOAD - Mesh - %s", gltf->path);
-        *mesh = (MeshHandle)ArrayGetNewElement(&renderer->meshes);
-        LoadVertexBuffers(ArrayGetElementAt(renderer->meshes, *mesh), gltf);
+        *mesh = sArrayAdd(&renderer->meshes);
+        LoadVertexBuffers(sArrayGet(renderer->meshes, *mesh), gltf);
     }
     
     if(skin != NULL) {
         sLog("LOAD - Skin - %s", gltf->path);
-        *skin = (SkinHandle)ArrayGetNewElement(&renderer->skins);
-        LoadSkin(renderer, ArrayGetElementAt(renderer->skins, *skin), gltf);
+        *skin = sArrayAdd(&renderer->skins);
+        LoadSkin(renderer, sArrayGet(renderer->skins, *skin), gltf);
     }
     
     if(animation != NULL) {
         sLog("LOAD - Animation - %s", gltf->path);
-        *animation = (AnimationHandle)ArrayGetNewElement(&renderer->animations);
-        LoadAnimation(ArrayGetElementAt(renderer->animations, *animation), gltf);
+        *animation = sArrayAdd(&renderer->animations);
+        LoadAnimation(sArrayGet(renderer->animations, *animation), gltf);
     }
     
     DestroyGLTF(gltf);

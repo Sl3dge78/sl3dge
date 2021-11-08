@@ -4,7 +4,7 @@
 
 --------
  TODO
-	
+	[ ] Add function ptrs to renderer to access transforms, meshes, etc
 	[ ] Figure out a better way to handle meshes, skins and transforms. It is kind of annoying right now...
 	[ ] Renderer destroy transform	
 	[ ] Shader refactoring
@@ -48,7 +48,7 @@
 
 --------
  DONE
-
+	[X] Fix shadows and normals
 	[X] BLENDER - Skin & Animate the character
 	[X] Refactor Mesh loading
 	[X] Fix hot reloading

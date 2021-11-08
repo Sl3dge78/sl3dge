@@ -1,14 +1,14 @@
 #pragma once
 
-typedef struct Array {
+typedef struct sArray {
     void *ptr;
     u32 count;
     u32 capacity;
     u32 size;
-} Array;
+} sArray;
 
-Array ArrayCreate(const u32 initial_capacity, const u32 element_size) {
-    Array array;
+sArray sArrayCreate(const u32 initial_capacity, const u32 element_size) {
+    sArray array;
     array.capacity = initial_capacity;
     array.count = 0;
     array.size = element_size;
@@ -16,15 +16,15 @@ Array ArrayCreate(const u32 initial_capacity, const u32 element_size) {
     return array;
 }
 
-void ArrayDestroy(Array array) {
+void sArrayDestroy(sArray array) {
     sFree(array.ptr);
 }
 
-inline void *ArrayGetElementAt(const Array array, const u32 id) {
+inline void *sArrayGet(const sArray array, const u32 id) {
     return (u8 *)array.ptr + (array.size * id);
 }
 
-u32 ArrayGetNewElement(Array *array) {
+u32 sArrayAdd(sArray *array) {
     if(array->count == array->capacity) {
         u32 new_capacity;
         if (array->capacity <= 0) 
@@ -42,7 +42,7 @@ u32 ArrayGetNewElement(Array *array) {
     return array->count++;
 }
 
-u32 ArrayGetNewElements(Array *array, const u32 nb) {
+u32 sArrayAddMultiple(sArray *array, const u32 nb) {
     u32 new_count = array->count + nb;
     
     if(array->capacity < new_count) {

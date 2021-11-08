@@ -407,11 +407,11 @@ internal void DrawScene(Renderer *renderer, PushBuffer *pushb, const u32 pipelin
                 PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(pushb->buf + address);
                 
                 Mat4 mat;
-                Transform *xform = ArrayGetElementAt(renderer->transforms, entry->transform);
+                Transform *xform = sArrayGet(renderer->transforms, entry->transform);
                 transform_to_mat4(xform, &mat);
                 glBindTexture(GL_TEXTURE_2D, renderer->backend->white_texture);
                 
-                Mesh *mesh = ArrayGetElementAt(renderer->meshes, entry->mesh);
+                Mesh *mesh = sArrayGet(renderer->meshes, entry->mesh);
                 
                 DrawMesh(pipeline, renderer->backend->static_mesh_vtx_shader, renderer->backend->color_fragment_shader, mesh, mat, entry->diffuse_color);
                 
@@ -421,11 +421,11 @@ internal void DrawScene(Renderer *renderer, PushBuffer *pushb, const u32 pipelin
                 PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(pushb->buf + address);
                 
                 Mat4 mesh_transform;
-                Transform *xform = ArrayGetElementAt(renderer->transforms, entry->transform);
+                Transform *xform = sArrayGet(renderer->transforms, entry->transform);
                 transform_to_mat4(xform, &mesh_transform);
                 
                 // Skin calc
-                Skin *skin = ArrayGetElementAt(renderer->skins, entry->skin);
+                Skin *skin = sArrayGet(renderer->skins, entry->skin);
                 
                 // Calculate bone xforms
                 Mat4 *joint_mats = sCalloc(skin->joint_count, sizeof(Mat4));
@@ -442,7 +442,7 @@ internal void DrawScene(Renderer *renderer, PushBuffer *pushb, const u32 pipelin
                 }
                 
                 Mat4 tmp;
-                Transform *root_xform = ArrayGetElementAt(renderer->transforms, skin->first_joint + root);
+                Transform *root_xform = sArrayGet(renderer->transforms, skin->first_joint + root);
                 transform_to_mat4(root_xform, &tmp);
                 mat4_mul(mesh_transform, tmp, skin->global_joint_mats[root]);
                 CalcChildXform(renderer, root, skin);
@@ -456,7 +456,7 @@ internal void DrawScene(Renderer *renderer, PushBuffer *pushb, const u32 pipelin
                 
                 // Mesh
                 glBindTexture(GL_TEXTURE_2D, renderer->backend->white_texture);
-                Mesh *mesh = ArrayGetElementAt(renderer->meshes, entry->mesh);
+                Mesh *mesh = sArrayGet(renderer->meshes, entry->mesh);
                 DrawMesh(pipeline, renderer->backend->skinned_mesh_vtx_shader, renderer->backend->color_fragment_shader, mesh, mesh_transform, entry->diffuse_color);
                 sFree(joint_mats);
                 

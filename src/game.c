@@ -64,15 +64,15 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     
     game_data->floor = LoadQuad(global_renderer);
     game_data->floor_xform = AllocateTransforms(global_renderer, 1);
-    Transform *f = ArrayGetElementAt(global_renderer->transforms, game_data->floor_xform);
+    Transform *f = sArrayGet(global_renderer->transforms, game_data->floor_xform);
     f->scale = (Vec3){100.0f, 1.0f, 100.0f};
     
     game_data->cube = LoadCube(global_renderer);
     game_data->cube1_xform = AllocateTransforms(global_renderer, 1);
     game_data->cube2_xform = AllocateTransforms(global_renderer, 1);
-    Transform *c = ArrayGetElementAt(global_renderer->transforms, game_data->cube1_xform);
+    Transform *c = sArrayGet(global_renderer->transforms, game_data->cube1_xform);
     c->scale = (Vec3){1.0f, 10.0f, 10.0f};
-    Transform *c2 = ArrayGetElementAt(global_renderer->transforms, game_data->cube2_xform);
+    Transform *c2 = sArrayGet(global_renderer->transforms, game_data->cube2_xform);
     c2->scale = (Vec3){1.0f, 10.0f, 10.0f};
     c2->translation = (Vec3){0.0f, 14.0f, 0.0f};
     
@@ -325,9 +325,9 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     { // NPC
         NPC *npc = &game_data->npc;
-        Skin *skin = ArrayGetElementAt(global_renderer->skins, npc->skin);
-        Animation *animation = ArrayGetElementAt(global_renderer->animations, npc->walk_animation);
-        Transform *xform = ArrayGetElementAt(global_renderer->transforms, npc->xform);
+        Skin *skin = sArrayGet(global_renderer->skins, npc->skin);
+        Animation *animation = sArrayGet(global_renderer->animations, npc->walk_animation);
+        Transform *xform = sArrayGet(global_renderer->transforms, npc->xform);
         
         npc->anim_time = fmod(npc->anim_time + delta_time, animation->length);
         AnimationEvaluate(global_renderer, skin->first_joint, skin->joint_count, npc->walk_animation, npc->anim_time);

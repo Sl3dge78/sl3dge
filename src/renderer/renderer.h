@@ -96,10 +96,10 @@ typedef struct Renderer {
     PushBuffer ui_pushbuffer;
     PushBuffer debug_pushbuffer;
     
-    Array meshes;
-    Array skins;
-    Array animations;
-    Array transforms;
+    sArray meshes;
+    sArray skins;
+    sArray animations;
+    sArray transforms;
     
     // Uniform data
     Mat4 camera_proj;
