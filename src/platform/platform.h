@@ -26,7 +26,7 @@ typedef struct PlatformAPI {
 #define MOUSE_MIDDLE 2
 #define MOUSE_RIGHT 4
 
-enum ScanCodes {
+typedef enum Scancode {
     SCANCODE_Q = 0x10,
     SCANCODE_W = 0x11,
     SCANCODE_E = 0x12,
@@ -56,7 +56,7 @@ enum ScanCodes {
     SCANCODE_DOWN = 0x50,
     SCANCODE_LEFT = 0x4B,
     SCANCODE_RIGHT = 0x4D,
-};
+} Scancode;
 
 typedef u8 Keyboard[256];
 
@@ -71,5 +71,9 @@ typedef struct Input {
     char text_input;
     bool read_text_input;
 } Input;
+
+inline bool InputKeyPressed(Input *input, Scancode scancode) {
+    return (input->keyboard[scancode] && !input->old_keyboard[scancode]);
+}
 
 #endif

@@ -21,13 +21,20 @@ typedef struct NPC {
     
 } NPC;
 
+typedef enum Direction {
+    DIRECTION_UP,
+    DIRECTION_DOWN,
+    DIRECTION_LEFT,
+    DIRECTION_RIGHT,
+} Direction;
+
 typedef struct GameData {
     // System stuff
     Console console;
     EventQueue event_queue;
     
-    bool is_free_cam;
     Camera camera;
+    bool is_free_cam;
     
     Vec3 light_dir;
     f32 cos;
@@ -37,13 +44,21 @@ typedef struct GameData {
     
     NPC npc;
     
-    TransformHandle cube1_xform;
-    TransformHandle cube2_xform;
     MeshHandle cube;
+
+    TransformHandle char_xform;
+    MeshHandle sword;
+    TransformHandle sword_xform;
+
+    Direction player_direction;
+    f32 attack_time;
+
+    Quat sword_start_rot;
+    Quat sword_end_rot;
+    Vec3 sword_offset;
     
-    Vec3 interact_sphere_pos;
-    f32 interact_sphere_diameter;
-    
+    TransformHandle ennemy_xform;
+
     MeshHandle simple_skinning;
     TransformHandle simple_skinning_root;
     

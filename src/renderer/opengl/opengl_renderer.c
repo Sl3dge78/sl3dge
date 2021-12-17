@@ -161,7 +161,7 @@ internal void BeginShadowmapRenderPass(ShadowmapRenderPass *pass) {
     glClear(GL_DEPTH_BUFFER_BIT);
     glUseProgram(0);
     glBindProgramPipeline(pass->pipeline);
-    glCullFace(GL_BACK); 
+    //glCullFace(GL_FRONT); 
 }
 
 // -------------
@@ -214,7 +214,7 @@ internal void DestroyColorRenderPass(ColorRenderPass *pass) {
 internal void BeginColorRenderPass(OpenGLRenderer *renderer, ColorRenderPass *pass) {
     glEnable(GL_DEPTH_TEST);
     glViewport(0, 0, pass->width, pass->height);
-    
+    glCullFace(GL_BACK); 
     glBindFramebuffer(GL_FRAMEBUFFER, pass->framebuffer);
     glClearColor(0.43f, 0.77f, 0.91f, 0.0f);
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
@@ -275,7 +275,8 @@ void BackendRendererInit(OpenGLRenderer *renderer, PlatformAPI *platform_api, Pl
     // Global init
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(GLMessageCallback, 0);
-    glDisable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
     
     // Shaders
     renderer->static_mesh_vtx_shader = CreateSeparableProgram(platform_api,"resources/shaders/gl/static_mesh.vert", GL_VERTEX_SHADER);
@@ -301,7 +302,11 @@ void BackendRendererInit(OpenGLRenderer *renderer, PlatformAPI *platform_api, Pl
     glBindVertexArray(renderer->screen_quad);
     glGenBuffers(1, &renderer->screen_quad_vbuffer);
     glBindBuffer(GL_ARRAY_BUFFER, renderer->screen_quad_vbuffer);
-    const f32 quad[] = {-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+    const f32 quad[] = {
+        -1.0f, -1.0f, 0.0f, 0.0f,  
+         1.0f, -1.0f, 1.0f, 0.0f,
+        -1.0f,  1.0f, 0.0f, 1.0f,
+         1.0f,  1.0f, 1.0f, 1.0f};
     glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(f32), 0);
     glEnableVertexAttribArray(0);
@@ -466,8 +471,6 @@ internal void DrawScene(Renderer *renderer, PushBuffer *pushb, const u32 pipelin
                 ASSERT(0);
             }
         };
-        
-        
     }
 }
 
@@ -501,22 +504,10 @@ internal void DrawUI(Renderer *frontend, PushBuffer *push_buffer) {
                 PushBufferEntryUIQuad *entry = (PushBufferEntryUIQuad *)(push_buffer->buf + address);
                 
                 const f32 vtx[] = {
-                    entry->l,
-                    entry->t,
-                    0.0f,
-                    1.0f, // UL
-                    entry->r,
-                    entry->t,
-                    1.0f,
-                    1.0f, // UR
-                    entry->l,
-                    entry->b,
-                    0.0f,
-                    0.0f, // LL
-                    entry->r,
-                    entry->b,
-                    1.0f,
-                    0.0f, // LR
+                    entry->r, entry->t, 1.0f, 1.0f, // UR
+                    entry->l, entry->t, 0.0f, 1.0f, // UL
+                    entry->r, entry->b, 1.0f, 0.0f, // LR
+                    entry->l, entry->b, 0.0f, 0.0f, // LL
                 };
                 glUniform4f(
                             color_uniform, entry->colour.x, entry->colour.y, entry->colour.z, entry->colour.w);
@@ -547,30 +538,14 @@ internal void DrawUI(Renderer *frontend, PushBuffer *push_buffer) {
                         stbtt_aligned_quad q;
                         stbtt_GetBakedQuad(renderer->char_data, 512, 512, *txt - 32, &x, &y, &q, 1);
                         
-                        f32 vtx[] = {
-                            q.x0,
-                            q.y0,
-                            q.s0,
-                            q.t0, // 0, 0
-                            q.x1,
-                            q.y0,
-                            q.s1,
-                            q.t0, // 1, 0
-                            q.x0,
-                            q.y1,
-                            q.s0,
-                            q.t1, // 0, 1
-                            q.x1,
-                            q.y1,
-                            q.s1,
-                            q.t1, // 1, 1
+                        f32 vtx[] = { 
+                            q.x1, q.y0, q.s1, q.t0, // 1, 0
+                            q.x0, q.y0, q.s0, q.t0, // 0, 0
+                            q.x1, q.y1, q.s1, q.t1, // 1, 1
+                            q.x0, q.y1, q.s0, q.t1, // 0, 1
                         };
                         
-                        glUniform4f(color_uniform,
-                                    entry->colour.x,
-                                    entry->colour.y,
-                                    entry->colour.z,
-                                    entry->colour.w);
+                        glUniform4f(color_uniform, entry->colour.x, entry->colour.y, entry->colour.z, entry->colour.w);
                         glBufferData(GL_ARRAY_BUFFER, sizeof(vtx), vtx, GL_DYNAMIC_DRAW);
                         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
                     }
@@ -583,26 +558,13 @@ internal void DrawUI(Renderer *frontend, PushBuffer *push_buffer) {
             case PushBufferEntryType_Texture: {
                 PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + address);
                 
-                const f32 vtx[] = {
-                    entry->l,
-                    entry->t,
-                    0.0f,
-                    1.0f, // UL
-                    entry->r,
-                    entry->t,
-                    1.0f,
-                    1.0f, // UR
-                    entry->l,
-                    entry->b,
-                    0.0f,
-                    0.0f, // LL
-                    entry->r,
-                    entry->b,
-                    1.0f,
-                    0.0f, // LR
+                const f32 vtx[] = { 
+                    entry->r, entry->t, 1.0f, 1.0f, // UR
+                    entry->l, entry->t, 0.0f, 1.0f, // UL
+                    entry->r, entry->b, 1.0f, 0.0f, // LR
+                    entry->l, entry->b, 0.0f, 0.0f, // LL
                 };
-                glUniform4f(
-                            color_uniform, 1.0f, 1.0f, 1.0f, 1.0f);
+                glUniform4f(color_uniform, 1.0f, 1.0f, 1.0f, 1.0f);
                 glActiveTexture(GL_TEXTURE0); // Alpha map
                 glBindTexture(GL_TEXTURE_2D, renderer->white_texture);
                 glActiveTexture(GL_TEXTURE1); // Color map
@@ -658,19 +620,12 @@ internal void DrawDebug(OpenGLRenderer *renderer, PushBuffer *pushb, Mat4 camera
                 const Vec3 g = (Vec3){0.0f, 1.0F, 0.0F};
                 const Vec3 b = (Vec3){0.0f, 0.0F, 1.0F};
                 
-                Vec3 buf[] = {
-                    entry->line[0],
-                    r,
-                    entry->line[1],
-                    r,
-                    entry->line[0],
-                    g,
-                    entry->line[2],
-                    g,
-                    entry->line[0],
-                    b,
-                    entry->line[3],
-                    b
+                Vec3 buf[] = { entry->line[0], r,
+                    entry->line[1], r,
+                    entry->line[0], g,
+                    entry->line[2], g,
+                    entry->line[0], b,
+                    entry->line[3], b
                 };
                 
                 glBufferData(GL_ARRAY_BUFFER, sizeof(buf), &buf, GL_STREAM_DRAW);
@@ -721,7 +676,7 @@ DLL_EXPORT void RendererDrawFrame(Renderer *frontend) {
     DrawScreenQuad(backend);
     
     DrawDebug(backend, &frontend->debug_pushbuffer, frontend->camera_proj, frontend->camera_view);
-    
+  
     DrawUI(frontend, &frontend->ui_pushbuffer);
     
     PlatformSwapBuffers(frontend->window);

@@ -13,7 +13,7 @@ uniform vec3 diffuse_color;
 uniform sampler2D shadow_map;
 uniform vec3 light_dir;
 
-float get_shadow(float bias) {
+float get_shadow(double bias) {
 
     float shadow = 0.0;
     vec3 proj_coords = shadow_map_texcoord.xyz / shadow_map_texcoord.w;
@@ -45,19 +45,18 @@ float get_shadow(float bias) {
 }
 
 void main() {
-    float NdotL = dot(-Normal, light_dir);
+    float NdotL = dot(Normal, -light_dir);
 	NdotL = clamp(NdotL, 0.0, 1.0);
     vec3 base_color = texture(diffuse, TexCoord).rgb * diffuse_color;
 	
-    float bias = 0.003 * tan(acos(NdotL));
-	bias = clamp(bias, 0.0, 0.01);
+    double bias = 0.003 * tan(acos(NdotL));
+	bias = clamp(bias, 0.0, 0.0005);
     float shadow = get_shadow(bias);
 	
 	// This allows us to get a nice blend between shadows and ndotl, avoids the double darkness that we can get sometimes...
 	shadow *= NdotL;
 	shadow = clamp(shadow, 0.1, 1.0);
 
-    FragColor = vec4(shadow * base_color, 1.0);
-    //FragColor = vec4(shadow, shadow, shadow, 1.0);
-
+    float ambient = 0.5;
+    FragColor = vec4((shadow + ambient) * base_color, 1.0);
 }

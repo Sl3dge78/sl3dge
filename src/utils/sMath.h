@@ -7,6 +7,7 @@
 #include "sLogging.h"
 
 #define PI 3.1415926535897932384626433f
+#define HALF_PI 1.57079632679489f
 #define MAX(x, y) x > y ? x : y
 #define MIN(x, y) x < y ? x : y
 

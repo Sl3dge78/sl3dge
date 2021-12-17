@@ -128,7 +128,7 @@ void DestroyAnimation(Animation *anim);
 void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u32 count, const AnimationHandle animation, f32 time);
 
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
-void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
+void RendererSetSunDirection(Renderer *renderer, const Vec3 direction, const Vec3 center);
 
 void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, TransformHandle transform, Vec3 diffuse_color);
 void PushSkin(PushBuffer *push_buffer, const MeshHandle mesh, const SkinHandle skin, TransformHandle xform, Vec3 diffuse_color);
