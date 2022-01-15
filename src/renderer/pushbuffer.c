@@ -1,5 +1,5 @@
 
- void PushUIQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
+ void UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryUIQuad) < push_buffer->max_size);
     PushBufferEntryUIQuad *entry = (PushBufferEntryUIQuad *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_UIQuad;
@@ -12,7 +12,7 @@
 }
 
 // TODO(Guigui): Maybe remove the memallocs ??
-void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
+void UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
@@ -25,7 +25,7 @@ void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x, const u3
     push_buffer->size += sizeof(PushBufferEntryText);
 }
 
-void PushUIFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...) {
+void UIPushFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryText) < push_buffer->max_size);
     PushBufferEntryText *entry = (PushBufferEntryText *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Text;
@@ -40,7 +40,7 @@ void PushUIFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 col
     push_buffer->size += sizeof(PushBufferEntryText);
 }
 
-void PushUITexture(PushBuffer *push_buffer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h) {
+void UIPushTexture(PushBuffer *push_buffer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryTexture) < push_buffer->max_size);
     PushBufferEntryTexture *entry = (PushBufferEntryTexture *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Texture;
@@ -79,17 +79,29 @@ void PushSkin(PushBuffer *push_buffer, MeshHandle mesh, SkinHandle skin, Transfo
 
 /// Adds a bone to the scene draw calls
 /// The matrix needs to be local
-void PushBone(PushBuffer *push_buffer, Mat4 bone_matrix) {
+void DebugPushMatrix(PushBuffer *push_buffer, Mat4 matrix) {
     
-    ASSERT(push_buffer->size + sizeof(PushBufferEntryBone) < push_buffer->max_size);
-    PushBufferEntryBone *entry = (PushBufferEntryBone *)(push_buffer->buf + push_buffer->size);
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryAxisGizmo) < push_buffer->max_size);
+    PushBufferEntryAxisGizmo *entry = (PushBufferEntryAxisGizmo *)(push_buffer->buf + push_buffer->size);
     
-    entry->type = PushBufferEntryType_Bone;
-    entry->line[0] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.0f, 0.0f});
-    entry->line[1] = mat4_mul_vec3(bone_matrix, (Vec3){0.1f, 0.0f, 0.0f});
-    entry->line[2] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.1f, 0.0f});
-    entry->line[3] = mat4_mul_vec3(bone_matrix, (Vec3){0.0f, 0.0f, 0.1f});
+    entry->type = PushBufferEntryType_AxisGizmo;
+    entry->line[0] = mat4_mul_vec3(matrix, (Vec3){0.0f, 0.0f, 0.0f});
+    entry->line[1] = mat4_mul_vec3(matrix, (Vec3){0.1f, 0.0f, 0.0f});
+    entry->line[2] = mat4_mul_vec3(matrix, (Vec3){0.0f, 0.1f, 0.0f});
+    entry->line[3] = mat4_mul_vec3(matrix, (Vec3){0.0f, 0.0f, 0.1f});
     
-    push_buffer->size += sizeof(PushBufferEntryBone);
+    push_buffer->size += sizeof(PushBufferEntryAxisGizmo);
+}
+
+void DebugPushPosition(PushBuffer *push_buffer, Vec3 position) {
+    ASSERT(push_buffer->size + sizeof(PushBufferEntryAxisGizmo) < push_buffer->max_size);
+    PushBufferEntryAxisGizmo *entry = (PushBufferEntryAxisGizmo *)(push_buffer->buf + push_buffer->size);
     
+    entry->type = PushBufferEntryType_AxisGizmo;
+    entry->line[0] = position;
+    entry->line[1] = vec3_add(position, VEC3_RIGHT);
+    entry->line[2] = vec3_add(position, VEC3_UP);
+    entry->line[3] = vec3_add(position, VEC3_FORWARD);
+    
+    push_buffer->size += sizeof(PushBufferEntryAxisGizmo);
 }

@@ -39,10 +39,18 @@ typedef struct Vec4 {
 } Vec4;
 
 typedef struct Quat {
-    f32 x;
-    f32 y;
-    f32 z;
-    f32 w;
+    union {
+        struct {
+            f32 x;
+            f32 y;
+            f32 z;
+            f32 w;
+        };
+        struct {
+            Vec3 xyz;
+            f32 DISCARD1;
+        };
+    };
 } Quat;
 
 typedef struct Transform {
@@ -61,6 +69,14 @@ typedef f32 Mat4[16];
 // GENERAL
 
 inline f32 lerp(f32 a, f32 b, f32 t);
+
+static const Vec3 VEC3_FORWARD  = (Vec3){0.0f, 0.0f, 1.0f};
+static const Vec3 VEC3_BACKWARD = (Vec3){0.0f, 0.0f, -1.0f};
+static const Vec3 VEC3_UP       = (Vec3){0.0f, 1.0f, 0.0f};
+static const Vec3 VEC3_DOWN     = (Vec3){0.0f, -1.0f, 0.0f};
+static const Vec3 VEC3_LEFT     = (Vec3){-1.0f, 0.0f, 0.0f};
+static const Vec3 VEC3_RIGHT    = (Vec3){1.0f, 0.0f, 0.0f};
+Vec3 vec3_rotate(const Vec3 v, const Quat q);
 
 // --------
 // MAT4
@@ -87,6 +103,7 @@ Vec3 mat4_get_translation(const Mat4 mat);
 inline void mat4_translateby(f32 *mat, const Vec3 vec);
 inline void mat4_set_position(f32 *mat, const Vec3 vec);
 
+Quat mat4_get_rotation(f32 *mat);
 void mat4_rotation_x(f32 *mat, const float radians);
 void mat4_rotation_y(f32 *mat, const float radians);
 void mat4_rotation_z(f32 *mat, const float radians);
@@ -100,8 +117,7 @@ void mat4_print(const f32 *const mat);
 // --------
 // QUAT
 
-
-Quat mat4_get_rotation(f32 *mat);
+Quat quat(f32 x, f32 y, f32 z, f32 w) { return (Quat){{{x, y, z, w}}};}
 void quat_to_mat4(f32 *dst, const Quat *q);
 Quat quat_from_axis(const Vec3 axis, const f32 angle);
 Quat quat_identity();
@@ -113,7 +129,7 @@ void quat_sprint(const Quat q, char *buf);
 // --------
 // TRANSFORM
 
-inline void transform_identity(Transform *xform) ;
+inline void transform_identity(Transform *xform);
 inline void transform_to_mat4(const Transform *xform, Mat4* mat);
 inline void mat4_to_transform(const Mat4 *mat, Transform *xform) ;
 
@@ -778,11 +794,11 @@ Quat quat_lookat(const Vec3 pos, const Vec3 dest, const Vec3 up) {
     Vec3 look = vec3_normalize(vec3_sub(dest, pos));
     Vec3 forw = vec3_normalize((Vec3){0.0f, 0.0f, 1.0f});
     Vec3 w = vec3_cross(forw, look);
-    return quat_normalize((Quat){w.x, w.y, w.z, 1.0f + vec3_dot(look, forw)});
+    return quat_normalize(quat(w.x, w.y, w.z, 1.0f + vec3_dot(look, forw)));
 }
 
 Quat quat_identity() {
-    return (Quat){0.0f, 0.0f, 0.0f, 1.0f};
+    return quat(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 inline Quat quat_normalize(Quat q) {
@@ -846,12 +862,22 @@ void quat_sprint(const Quat q, char *buf) {
     sprintf(buf, "x: %.2f y: %.2f z: %.2f w: %.2f", q.x, q.y, q.w, q.w);
 }
 
+Vec3 vec3_rotate(const Vec3 v, const Quat q) {
+    Vec3 t = vec3_cross(q.xyz, v);
+    t = vec3_fmul(t, 2.0f);
+    Vec3 cross = vec3_cross(q.xyz, t);
+    Vec3 scaled = vec3_fmul(t, q.w);
+    Vec3 result = vec3_add(v, scaled);
+    result = vec3_add(result, cross);
+    return result;
+}
+
 // --------
 // TRANSFORM
 
 inline void transform_identity(Transform *xform) {
     xform->translation = (Vec3){0, 0, 0};
-    xform->rotation = (Quat){0, 0, 0, 1};
+    xform->rotation = quat(0, 0, 0, 1);
     xform->scale = (Vec3){1, 1, 1};
 }
 

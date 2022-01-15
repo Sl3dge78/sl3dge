@@ -3,12 +3,14 @@
 internal void EventPush(EventQueue *event_queue, EventType new) {
     if(event_queue->size == event_queue->capacity) {
         u32 new_capacity = event_queue->capacity;
+        void *new_queue;
         if(event_queue->capacity == 0) {
             new_capacity = 2;
+            new_queue = sCalloc(new_capacity, sizeof(EventType));
         } else {
             new_capacity *= 2;
+            new_queue = sRealloc(event_queue->queue, sizeof(EventType) * new_capacity);
         }
-        void *new_queue = sRealloc(event_queue->queue, sizeof(EventType) * new_capacity);
         if(new_queue) {
             event_queue->queue = new_queue;
             event_queue->capacity = new_capacity;

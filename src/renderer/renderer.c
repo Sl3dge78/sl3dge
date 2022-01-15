@@ -67,7 +67,7 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     
     // Debug 
     renderer->debug_pushbuffer.size = 0;
-    renderer->debug_pushbuffer.max_size = sizeof(PushBufferEntryBone) * 100;
+    renderer->debug_pushbuffer.max_size = sizeof(PushBufferEntryAxisGizmo) * 100;
     renderer->debug_pushbuffer.buf = sCalloc(renderer->debug_pushbuffer.max_size, 1);
     
     UpdateCameraProj(renderer);

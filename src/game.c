@@ -52,48 +52,49 @@ DLL_EXPORT void GameInit(GameData *game_data, Renderer *renderer, PlatformAPI *p
     Leak_SetList(platform_api->DebugInfo);
 }
 
-MeshHandle LoadSword() {
+MeshHandle MakeCuboid(Vec3 min, Vec3 max) {
 
     const Vertex vertices[] = {
-        {{1.0f, 0.4f, -.1f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, // +z  //  0
-        {{2.0f, 0.4f, -.1f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},        //  1
-        {{1.0f, 0.6f, -.1f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},        //  2
-        {{2.0f, 0.6f, -.1f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},        //  3
+        {{min.x, max.y, max.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, // +z  //  0
+        {{max.x, max.y, max.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},        //  1
+        {{min.x, min.y, max.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},        //  2
+        {{max.x, min.y, max.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},        //  3
         
-        {{1.0f, 0.4f, .1f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, // -z  //  4
-        {{2.0f, 0.4f, .1f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},        //  5
-        {{1.0f, 0.6f, .1f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},        //  6
-        {{1.0f, 0.6f, .1f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},        //  7
+        {{max.x, max.y, min.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, // -z  //  4
+        {{min.x, max.y, min.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},        //  5
+        {{max.x, min.y, min.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},        //  6
+        {{min.x, min.y, min.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},        //  7
         
-        {{1.0f, 0.6f, -.1f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}, // +y  //  8
-        {{2.0f, 0.6f, -.1f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},        //  9
-        {{1.0f, 0.6f, .1f}, {0.0f, 1.0f, -0.0f}, {0.0f, 1.0f}},        // 10
-        {{2.0f, 0.6f, .1f}, {0.0f, 1.0f, -0.0f}, {1.0f, 1.0f}},        // 11 
+        {{min.x, max.y, max.z}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}, // +y  //  8
+        {{max.x, max.y, max.z}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},        //  9
+        {{min.x, max.y, min.z}, {0.0f, 1.0f, -0.0f}, {0.0f, 1.0f}},        // 10
+        {{max.x, max.y, min.z}, {0.0f, 1.0f, -0.0f}, {1.0f, 1.0f}},        // 11 
 
-        {{1.0f, 0.4f, -.1f}, {0.0f, -1.0f,  0.0f}, {0.0f, 1.0f}}, //-y // 12
-        {{2.0f, 0.4f, -.1f}, {0.0f, -1.0f,  0.0f}, {1.0f, 1.0f}},      // 13
-        {{1.0f, 0.4f,  .1f}, {0.0f, -1.0f, -0.0f}, {0.0f, 1.0f}},      // 14
-        {{2.0f, 0.4f,  .1f}, {0.0f, -1.0f, -0.0f}, {1.0f, 1.0f}},      // 15
+        {{min.x, min.y, max.z}, {0.0f, -1.0f,  0.0f}, {0.0f, 1.0f}}, //-y // 12
+        {{max.x, min.y, max.z}, {0.0f, -1.0f,  0.0f}, {1.0f, 1.0f}},      // 13
+        {{min.x, min.y, min.z}, {0.0f, -1.0f, -0.0f}, {0.0f, 1.0f}},      // 14
+        {{max.x, min.y, min.z}, {0.0f, -1.0f, -0.0f}, {1.0f, 1.0f}},      // 15
 
-        {{2.f, 0.4f, -.1f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // +x   // 16
-        {{2.f, 0.6f, -.1f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},         // 17
-        {{2.f, 0.4f,  .1f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},         // 18
-        {{2.f, 0.6f,  .1f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},         // 19
+        {{max.x, max.y, max.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // +x   // 16
+        {{max.x, max.y, min.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},         // 17
+        {{max.x, min.y, max.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},         // 18
+        {{max.x, min.y, min.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},         // 19
 
-        {{1.0f, 0.4f, -.1f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // -x // 20
-        {{1.0f, 0.6f, -.1f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},       // 21
-        {{1.0f, 0.4f,  .1f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},       // 22
-        {{1.0f, 0.6f,  .1f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},       // 23
+        {{min.x, min.y, min.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // -x // 20
+        {{min.x, max.y, max.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},       // 21
+        {{min.x, min.y, min.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},       // 22
+        {{min.x, max.y, max.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},       // 23
     };
     const u32 indices[] = {
-        2, 1, 0, 2, 3, 1, // +z
-        4, 5, 6, 5, 7, 6, // -z
-        10, 9, 8, 11, 9, 10, // +y 
-        12, 13, 14, 13, 15, 14, // -y
-        16, 17, 18, 17, 19, 18, // +x
-        22, 21, 20, 22, 23, 21};// -x
+        0,1,2,    2,3,1, // +z
+        4,5,6,    5,7,6, // -z
+        8,9,10,   9,11,10, // +y
+        12,13,14, 13,15,14, // -y
+        16,17,18, 17,19,18, // +x
+        20,21,22, 21,23,22}; // -x
     
     return LoadMeshFromVertices(global_renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
+
 }
 
 /// This is called ONCE before the first frame. Won't be called upon reloading.
@@ -112,11 +113,12 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     
     game_data->cube = LoadCube(global_renderer);
     game_data->char_xform = AllocateTransforms(global_renderer, 1);
-    game_data->ennemy_xform = AllocateTransforms(global_renderer, 1);
+    game_data->enemy_xform = AllocateTransforms(global_renderer, 1);
 
+    game_data->enemy_health = 10;
 
     // Sword
-    game_data->sword = LoadSword();
+    game_data->sword = MakeCuboid((Vec3){-.1f, -.1f, .2f}, (Vec3){.1f, .1f, 1.f});
     game_data->sword_xform = AllocateTransforms(global_renderer, 1);
 
     { // NPC
@@ -196,6 +198,27 @@ internal void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
 
 /// Called every frame
 DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
+    // --------------
+    // Event
+    
+    EventType e;
+    while(EventConsume(&game_data->event_queue, &e)) {
+        switch(e) {
+            case(EVENT_TYPE_QUIT): {
+                platform->RequestExit();
+            } break;
+            case(EVENT_TYPE_RESTART): {
+                GameStart(game_data);
+            } break;
+            case(EVENT_TYPE_RELOAD): {
+                platform->RequestReload();
+            } break;
+            default:
+            
+            break;
+        };
+    }
+    
     // ----------
     // Input
     
@@ -250,24 +273,24 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
                 game_data->attack_time = 0.1f;
                 switch(game_data->player_direction) {
                     case DIRECTION_UP: {
-                        game_data->sword_start_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, HALF_PI); 
-                        game_data->sword_end_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, PI); 
-                        game_data->sword_offset = (Vec3) {0.5f, 0.0f, 0.0f};
-                    } break;
-                    case DIRECTION_DOWN: {
-                        game_data->sword_start_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, -HALF_PI); 
-                        game_data->sword_end_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, 0.0f); 
-                        game_data->sword_offset = (Vec3) {-0.5f, 0.0f, 0.0f};
-                    } break;
-                    case DIRECTION_LEFT: {
                         game_data->sword_start_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, PI); 
                         game_data->sword_end_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, -HALF_PI); 
-                        game_data->sword_offset = (Vec3) {0.0f, 0.0f, -0.5f};
+                        game_data->sword_offset = (Vec3) {0.5f, 0.5f, 0.0f};
                     } break;
-                    case DIRECTION_RIGHT: {
+                    case DIRECTION_DOWN: {
                         game_data->sword_start_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, 0.0f); 
                         game_data->sword_end_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, HALF_PI); 
-                        game_data->sword_offset = (Vec3) {0.5f, 0.0f, 0.5f};
+                        game_data->sword_offset = (Vec3) {-0.5f, 0.5f, 0.5f};
+                    } break;
+                    case DIRECTION_LEFT: {
+                        game_data->sword_start_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, -HALF_PI); 
+                        game_data->sword_end_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, 0.0f); 
+                        game_data->sword_offset = (Vec3) {-0.5f, 0.5f, -0.5f};
+                    } break;
+                    case DIRECTION_RIGHT: {
+                        game_data->sword_start_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, HALF_PI); 
+                        game_data->sword_end_rot = quat_from_axis((Vec3){0.0f, 1.0f, 0.0f}, PI); 
+                        game_data->sword_offset = (Vec3) {0.5f, 0.5f, 0.5f};
                     } break;
                 }
             }
@@ -277,7 +300,25 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
                 Transform *sword_xform = sArrayGet(global_renderer->transforms, game_data->sword_xform);
                 sword_xform->rotation = quat_slerp(game_data->sword_end_rot, game_data->sword_start_rot, game_data->attack_time / 0.1f ); 
                 sword_xform->translation = vec3_add(player_xform->translation, game_data->sword_offset);
+                Vec3 forward = vec3_fmul(VEC3_FORWARD, 1.0f);
+                forward = vec3_rotate(forward, sword_xform->rotation); 
+                Vec3 sword_tip = vec3_add(forward, sword_xform->translation); 
+                DebugPushPosition(&global_renderer->debug_pushbuffer, sword_tip); 
+                DebugPushPosition(&global_renderer->debug_pushbuffer, sword_xform->translation); 
                 PushMesh(&global_renderer->scene_pushbuffer, game_data->sword, game_data->sword_xform, (Vec3){0.0f, 0.0f, 0.0f});
+                Transform *enemy_xform = sArrayGet(global_renderer->transforms, game_data->enemy_xform);
+                
+                if(game_data->enemy_health > 0) {
+                    if(IsLineIntersectingBoundingBox(sword_xform->translation, sword_tip, enemy_xform)) { 
+                        if(!game_data->enemy_collided) {
+                            game_data->enemy_collided = true;
+                            game_data->enemy_health--;
+                            sLog("Aie %d", game_data->enemy_health);
+                        }
+                    } else {
+                        game_data->enemy_collided = false;
+                    }
+                }
             }
 
         } else {
@@ -306,26 +347,6 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
         RendererSetSunDirection(global_renderer, game_data->light_dir, vec3_add(player_xform->translation, (Vec3){0.0f, 0.0f, -7.0f}));
     }
     
-    // --------------
-    // Event
-    
-    EventType e;
-    while(EventConsume(&game_data->event_queue, &e)) {
-        switch(e) {
-            case(EVENT_TYPE_QUIT): {
-                platform->RequestExit();
-            } break;
-            case(EVENT_TYPE_RESTART): {
-                GameStart(game_data);
-            } break;
-            case(EVENT_TYPE_RELOAD): {
-                platform->RequestReload();
-            } break;
-            default:
-            
-            break;
-        };
-    }
     
     // -------------
     // Drawing
@@ -375,11 +396,16 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
         
     }
     
+    // Floor
     PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.8f, 0.8f, 0.8f});
+    // Player
     PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->char_xform, (Vec3){1.0f, 1.0f, 1.0f});
-    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->ennemy_xform, (Vec3){1.0f, 0.0f, 0.0f});
+    // Enemy
+    if(game_data->enemy_health > 0) {
+        PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->enemy_xform, (Vec3){1.0f, 0.0f, 0.0f});
+    }
     
     if(game_data->show_shadowmap)
-        PushUITexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, global_renderer->height - 200, 200, 200);
+        UIPushTexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, global_renderer->height - 200, 200, 200);
     
 }

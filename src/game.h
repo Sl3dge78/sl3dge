@@ -57,7 +57,9 @@ typedef struct GameData {
     Quat sword_end_rot;
     Vec3 sword_offset;
     
-    TransformHandle ennemy_xform;
+    bool enemy_collided;
+    u32 enemy_health;
+    TransformHandle enemy_xform;
 
     MeshHandle simple_skinning;
     TransformHandle simple_skinning_root;

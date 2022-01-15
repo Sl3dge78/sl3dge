@@ -130,11 +130,4 @@ void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u3
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction, const Vec3 center);
 
-void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, TransformHandle transform, Vec3 diffuse_color);
-void PushSkin(PushBuffer *push_buffer, const MeshHandle mesh, const SkinHandle skin, TransformHandle xform, Vec3 diffuse_color);
-void PushBone(PushBuffer *push_buffer, Mat4 bone_matrix);
-void PushUIQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
-void PushUIText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color);
-void PushUIFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...);
-void PushUITexture(PushBuffer *push_buffer, const u32 texture, const u32 x, const u32 y, const u32 w, const u32 h);
 

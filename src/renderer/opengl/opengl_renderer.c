@@ -599,9 +599,9 @@ internal void DrawDebug(OpenGLRenderer *renderer, PushBuffer *pushb, Mat4 camera
         PushBufferEntryType *type = (PushBufferEntryType *)(pushb->buf + address);
         
         switch (*type) {
-            case PushBufferEntryType_Bone: {
+            case PushBufferEntryType_AxisGizmo: {
                 
-                PushBufferEntryBone *entry = (PushBufferEntryBone *)(pushb->buf + address);
+                PushBufferEntryAxisGizmo *entry = (PushBufferEntryAxisGizmo *)(pushb->buf + address);
                 u32 vao;
                 u32 vbo;
                 glGenVertexArrays(1, &vao);
@@ -633,7 +633,7 @@ internal void DrawDebug(OpenGLRenderer *renderer, PushBuffer *pushb, Mat4 camera
                 glDrawArrays(GL_LINES, 0, 6);
                 glDeleteBuffers(1, &vbo);
                 glDeleteVertexArrays(1, &vao);
-                address += sizeof(PushBufferEntryBone);
+                address += sizeof(PushBufferEntryAxisGizmo);
                 continue;
             } break;
             default :{
