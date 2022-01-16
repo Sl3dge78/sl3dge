@@ -54,7 +54,7 @@ void UIPushTexture(PushBuffer *push_buffer, const u32 texture, const u32 x, cons
 
 /// Adds a mesh to the scene draw calls
 /// The transform pointer needs to be alive until drawing happens
-void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, TransformHandle transform, Vec3 diffuse_color) {
+void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, Transform *transform, Vec3 diffuse_color) {
     ASSERT(push_buffer->size + sizeof(PushBufferEntryMesh) < push_buffer->max_size);
     PushBufferEntryMesh *entry = (PushBufferEntryMesh *)(push_buffer->buf + push_buffer->size);
     entry->type = PushBufferEntryType_Mesh;
@@ -65,16 +65,16 @@ void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, TransformHandle tr
     push_buffer->size += sizeof(PushBufferEntryMesh);
 }
 
-void PushSkin(PushBuffer *push_buffer, MeshHandle mesh, SkinHandle skin, TransformHandle xform, Vec3 diffuse_color) {
-    ASSERT(push_buffer->size + sizeof(PushBufferEntrySkin) < push_buffer->max_size);
-    PushBufferEntrySkin *entry = (PushBufferEntrySkin *)(push_buffer->buf + push_buffer->size);
-    entry->type = PushBufferEntryType_Skin;
-    entry->mesh = mesh;
+void PushSkinnedMesh(PushBuffer *push_buffer, SkinnedMeshHandle skin, Transform *root, Transform *skeleton, Vec3 diffuse_color) {
+    ASSERT(push_buffer->size + sizeof(PushBufferEntrySkinnedMesh) < push_buffer->max_size);
+    PushBufferEntrySkinnedMesh *entry = (PushBufferEntrySkinnedMesh *)(push_buffer->buf + push_buffer->size);
+    entry->type = PushBufferEntryType_SkinnedMesh;
     entry->skin = skin;
-    entry->transform = xform;
+    entry->transform = root;
+    entry->skeleton = skeleton;
     entry->diffuse_color = diffuse_color;
     
-    push_buffer->size += sizeof(PushBufferEntrySkin);
+    push_buffer->size += sizeof(PushBufferEntrySkinnedMesh);
 }
 
 /// Adds a bone to the scene draw calls

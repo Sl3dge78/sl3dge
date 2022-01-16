@@ -4,8 +4,6 @@
 typedef struct GameData GameData;
 struct RendererBackend;
 
-typedef u32 TransformHandle;
-
 typedef struct Vertex {
     Vec3 pos;
     Vec3 normal;
@@ -31,10 +29,16 @@ typedef struct Mesh {
 
 typedef u32 MeshHandle;
 
-typedef struct Skin {
+typedef struct SkinnedMesh {
+    Mesh mesh;
+
     u32 joint_count;
     
-    TransformHandle first_joint;
+    // Le skin stocke les transforms de chaque joint.
+    // Il faut ensuite les dupliquer dans une nouvelle hiérarchie pour obtenir une instance de squelette complet
+    // C'est sur ce nouveau skelette qu'il faudra influer et non sur celui-ci.
+    // Il est read only.
+    Transform *joint_xforms;
     Mat4 *global_joint_mats;
     
     i32 *joint_parents;
@@ -42,9 +46,9 @@ typedef struct Skin {
     u32 *joint_child_count;
     u32 **joint_children;
     Mat4 *inverse_bind_matrices;
-} Skin;
+} SkinnedMesh;
 
-typedef u32 SkinHandle;
+typedef u32 SkinnedMeshHandle;
 
 // --------
 // Animation
@@ -80,9 +84,6 @@ typedef struct Animation {
 
 typedef u32 AnimationHandle;
 
-
-
-
 // --------
 // Renderer
 typedef struct Renderer {
@@ -99,7 +100,7 @@ typedef struct Renderer {
     sArray meshes;
     sArray skins;
     sArray animations;
-    sArray transforms;
+    //sArray transforms;
     
     // Uniform data
     Mat4 camera_proj;
@@ -112,20 +113,17 @@ typedef struct Renderer {
     Vec3 light_dir;
 } Renderer;
 
-void CalcChildXform(Renderer *renderer, u32 joint, Skin *skin);
+void SkinCalcChildXform(u32 joint_id, SkinnedMesh *skin, Transform *skeleton);
 void UpdateCameraProj(Renderer *renderer);
 
-TransformHandle AllocateTransforms(Renderer *renderer, const u32 count);
-void DestroyTransforms(Renderer *renderer, const u32 count, const TransformHandle transforms);
-
 MeshHandle LoadMeshFromVertices(Renderer *renderer, const Vertex *vertices, const u32 vertex_count, const u32 *indices, const u32 index_count);
-void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinHandle *skin, AnimationHandle *animation);
+void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinnedMeshHandle *skin, Animation *animation);
 MeshHandle LoadQuad(Renderer *renderer);
 MeshHandle LoadCube(Renderer *renderer);
 
 void LoadAnimation(Animation *animation, const GLTF *gltf);
 void DestroyAnimation(Animation *anim);
-void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u32 count, const AnimationHandle animation, f32 time);
+void AnimationEvaluate(const Animation *animation, Transform *target, f32 time);
 
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
 void RendererSetSunDirection(Renderer *renderer, const Vec3 direction, const Vec3 center);

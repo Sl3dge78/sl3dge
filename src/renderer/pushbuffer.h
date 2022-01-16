@@ -1,8 +1,7 @@
 #pragma once
 
 typedef u32 MeshHandle;
-typedef u32 SkinHandle;
-typedef u32 TransformHandle;
+typedef u32 SkinnedMeshHandle;
 
 // -----------
 // Push Buffer
@@ -17,7 +16,7 @@ typedef enum PushBufferEntryType {
     PushBufferEntryType_UIQuad,
     PushBufferEntryType_Text,
     PushBufferEntryType_Mesh,
-    PushBufferEntryType_Skin,
+    PushBufferEntryType_SkinnedMesh,
     PushBufferEntryType_Texture,
     PushBufferEntryType_AxisGizmo,
 } PushBufferEntryType;
@@ -38,17 +37,17 @@ typedef struct PushBufferEntryText {
 typedef struct PushBufferEntryMesh {
     PushBufferEntryType type;
     MeshHandle mesh;
-    TransformHandle transform;
+    Transform* transform;
     Vec3 diffuse_color;
 } PushBufferEntryMesh;
 
-typedef struct PushBufferEntrySkin {
+typedef struct PushBufferEntrySkinnedMesh {
     PushBufferEntryType type;
-    MeshHandle mesh;
-    SkinHandle skin;
-    TransformHandle transform;
+    SkinnedMeshHandle skin;
+    Transform* transform;
+    Transform* skeleton;
     Vec3 diffuse_color;
-} PushBufferEntrySkin;
+} PushBufferEntrySkinnedMesh;
 
 typedef struct PushBufferEntryAxisGizmo {
     PushBufferEntryType type;
@@ -61,8 +60,8 @@ typedef struct PushBufferEntryTexture {
     u32 texture;
 } PushBufferEntryTexture;
 
-void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, TransformHandle transform, Vec3 diffuse_color);
-void PushSkin(PushBuffer *push_buffer, const MeshHandle mesh, const SkinHandle skin, TransformHandle xform, Vec3 diffuse_color);
+void PushMesh(PushBuffer *push_buffer, const MeshHandle mesh, Transform *transform, Vec3 diffuse_color);
+void PushSkinnedMesh(PushBuffer *push_buffer, const SkinnedMeshHandle skinned_mesh, Transform *root, Transform *skeleton_root, Vec3 diffuse_color);
 void UIPushQuad(PushBuffer *push_buffer, const u32 x, const u32 y, const u32 w, const u32 h, const Vec4 color);
 void UIPushText(PushBuffer *push_buffer, const char *text, const u32 x, const u32 y, const Vec4 color);
 void UIPushFmt(PushBuffer *push_buffer, const u32 x, const u32 y, const Vec4 color, const char *fmt, ...);

@@ -7,14 +7,14 @@ AnimationHandle : ArrayGetElementAt(renderer->animations, value),\
 SkinHandle: ArrayGetElementAt(renderer->skins, value), \
 default: assert(0))
 
-void CalcChildXform(Renderer *renderer, u32 joint, Skin *skin) {
+void SkinCalcChildXform(u32 joint, SkinnedMesh *skin, Transform *skeleton) {
     for(u32 i = 0; i < skin->joint_child_count[joint]; i++) {
         u32 child = skin->joint_children[joint][i];
         Mat4 tmp;
-        Transform *xform = sArrayGet(renderer->transforms, skin->first_joint + child);
+        Transform *xform = &skeleton[child];
         transform_to_mat4(xform, &tmp);
         mat4_mul(skin->global_joint_mats[joint], tmp, skin->global_joint_mats[child]);
-        CalcChildXform(renderer, child, skin);
+        SkinCalcChildXform(child, skin, skeleton);
     }
 }
 
@@ -51,8 +51,7 @@ DLL_EXPORT void RendererInit(Renderer *renderer, PlatformAPI *platform_api, Plat
     
     // Arrays
     renderer->meshes     = sArrayCreate(8, sizeof(Mesh));
-    renderer->skins      = sArrayCreate(1, sizeof(Skin));
-    renderer->transforms = sArrayCreate(100, sizeof(Transform));
+    renderer->skins      = sArrayCreate(1, sizeof(SkinnedMesh));
     renderer->animations = sArrayCreate(1, sizeof(Animation));
     
     // Init push buffers
@@ -100,12 +99,9 @@ DLL_EXPORT void RendererDestroy(Renderer *renderer) {
     
     // Skins
     for(u32 i = 0; i < renderer->skins.count; i++) {
-        DestroySkin(renderer, (Skin *)sArrayGet(renderer->skins, i));
+        DestroySkin(renderer, (SkinnedMesh *)sArrayGet(renderer->skins, i));
     }
     sArrayDestroy(renderer->skins);
-    
-    // Transforms
-    sArrayDestroy(renderer->transforms);
     
     // Animations
     for(u32 i = 0; i < renderer->animations.count; i++) {
@@ -168,6 +164,60 @@ MeshHandle LoadCube(Renderer *renderer) {
     return LoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
 }
 
+MeshHandle MakeCuboid(Renderer *renderer, Vec3 min, Vec3 max) {
+    const Vertex vertices[] = {
+        {{min.x, max.y, max.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, // +z  //  0
+        {{max.x, max.y, max.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},        //  1
+        {{min.x, min.y, max.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},        //  2
+        {{max.x, min.y, max.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},        //  3
+        
+        {{max.x, max.y, min.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, // -z  //  4
+        {{min.x, max.y, min.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},        //  5
+        {{max.x, min.y, min.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},        //  6
+        {{min.x, min.y, min.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},        //  7
+        
+        {{min.x, max.y, max.z}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}, // +y  //  8
+        {{max.x, max.y, max.z}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},        //  9
+        {{min.x, max.y, min.z}, {0.0f, 1.0f, -0.0f}, {0.0f, 1.0f}},        // 10
+        {{max.x, max.y, min.z}, {0.0f, 1.0f, -0.0f}, {1.0f, 1.0f}},        // 11 
+
+        {{min.x, min.y, max.z}, {0.0f, -1.0f,  0.0f}, {0.0f, 1.0f}}, //-y // 12
+        {{max.x, min.y, max.z}, {0.0f, -1.0f,  0.0f}, {1.0f, 1.0f}},      // 13
+        {{min.x, min.y, min.z}, {0.0f, -1.0f, -0.0f}, {0.0f, 1.0f}},      // 14
+        {{max.x, min.y, min.z}, {0.0f, -1.0f, -0.0f}, {1.0f, 1.0f}},      // 15
+
+        {{max.x, max.y, max.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // +x   // 16
+        {{max.x, max.y, min.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},         // 17
+        {{max.x, min.y, max.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},         // 18
+        {{max.x, min.y, min.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},         // 19
+
+        {{min.x, min.y, min.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // -x // 20
+        {{min.x, max.y, max.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},       // 21
+        {{min.x, min.y, min.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},       // 22
+        {{min.x, max.y, max.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},       // 23
+    };
+    const u32 indices[] = {
+        0,1,2,    2,3,1, // +z
+        4,5,6,    5,7,6, // -z
+        8,9,10,   9,11,10, // +y
+        12,13,14, 13,15,14, // -y
+        16,17,18, 17,19,18, // +x
+        20,21,22, 21,23,22}; // -x
+    
+    return LoadMeshFromVertices(renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
+}
+
+EntityID InstantiateSkin(Renderer *renderer, World *world, SkinnedMeshHandle skinned_mesh) {
+    Entity *entity;
+    EntityID result = WorldCreateAndGetEntity(world, &entity);
+
+    entity->skinned_mesh = skinned_mesh;
+    SkinnedMesh *skin = sArrayGet(renderer->skins, skinned_mesh);
+    entity->skeleton = sCalloc(skin->joint_count, sizeof(Transform));
+    return result;
+}
+
+/*
 TransformHandle AllocateTransforms(Renderer *renderer, const u32 count) {
     TransformHandle result = (TransformHandle)sArrayAddMultiple(&renderer->transforms, count);
     for(u32 i = 0; i < count; i ++) {
@@ -181,3 +231,4 @@ void DestroyTransforms(Renderer *renderer, const u32 count, const TransformHandl
     // TODO(Guigui): 
     return;
 }
+*/

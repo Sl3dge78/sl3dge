@@ -66,9 +66,8 @@ void DestroyAnimation(Animation *anim) {
     sFree(anim->tracks);
 }
 
-void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u32 count, const AnimationHandle animation, f32 time) {
-    
-    Animation *a = sArrayGet(renderer->animations, animation);
+// Joints need to be in the same order as defined in the loaded Skin
+void AnimationEvaluate(const Animation *a, Transform *target, f32 time) {
     
     // clamp time
     if (time > a->length)
@@ -98,10 +97,7 @@ void AnimationEvaluate(Renderer *renderer, TransformHandle first_joint, const u3
         f32 rel_t = time - track->key_times[key_1];
         f32 norm_t = rel_t / time_between_keys;
         
-        if(track->target_node >= count)
-            continue;
-        
-        Transform *target_xform = sArrayGet(renderer->transforms, first_joint + track->target_node);
+        Transform *target_xform = target + track->target_node;
         
         switch(track->target) {
             case ANIM_TARGET_TRANSLATION : {

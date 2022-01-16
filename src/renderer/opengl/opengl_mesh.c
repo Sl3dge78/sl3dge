@@ -129,7 +129,7 @@ internal void LoadVertexBuffers(Mesh *mesh, const GLTF *gltf) {
     
 }
 
-internal void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
+internal void LoadSkin(Renderer *renderer, SkinnedMesh *skin, GLTF *gltf) {
     
     ASSERT_MSG(gltf->skin_count == 1, "ASSERT: More than one skin in gltf, this isn't handled yet.");
     GLTFSkin *src_skin = &gltf->skins[0];
@@ -138,19 +138,18 @@ internal void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
     skin->inverse_bind_matrices = sCalloc(skin->joint_count, sizeof(Mat4));
     GLTFCopyAccessor(gltf, src_skin->inverse_bind_matrices, skin->inverse_bind_matrices, 0, sizeof(Mat4));
     
-    skin->first_joint = AllocateTransforms(renderer, skin->joint_count);
     skin->global_joint_mats = sCalloc(skin->joint_count, sizeof(Mat4));
     
     skin->joint_child_count = sCalloc(skin->joint_count, sizeof(u32));
     skin->joint_children = sCalloc(skin->joint_count, sizeof(u32 *));
     
     skin->joint_parents = sCalloc(skin->joint_count, sizeof(u32));
+    skin->joint_xforms  = sCalloc(skin->joint_count, sizeof(Transform));
     
     for(u32 i = 0; i < skin->joint_count; ++i) {
         GLTFNode *node = &gltf->nodes[src_skin->joints[i]];
         
-        Transform *joint = sArrayGet(renderer->transforms, skin->first_joint + i);
-        *joint = node->xform;
+        skin->joint_xforms[i] = node->xform;
         skin->joint_child_count[i] = node->child_count;
         skin->joint_parents[i] = -1;
         if(node->child_count > 0) {
@@ -164,7 +163,7 @@ internal void LoadSkin(Renderer *renderer, Skin *skin, GLTF *gltf) {
     }
 }
 
-void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinHandle *skin, AnimationHandle *animation) {
+void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, MeshHandle *mesh, SkinnedMeshHandle *skin, Animation *animation) {
     GLTF *gltf = LoadGLTF(path, platform);
     
     if(mesh != NULL) {
@@ -174,15 +173,16 @@ void LoadFromGLTF(const char *path, Renderer *renderer, PlatformAPI *platform, M
     }
     
     if(skin != NULL) {
-        sLog("LOAD - Skin - %s", gltf->path);
         *skin = sArrayAdd(&renderer->skins);
-        LoadSkin(renderer, sArrayGet(renderer->skins, *skin), gltf);
+        sLog("LOAD - Skin - %s - %d", gltf->path, *skin);
+        SkinnedMesh *skinned_mesh = sArrayGet(renderer->skins, *skin);
+        LoadVertexBuffers(&skinned_mesh->mesh, gltf);
+        LoadSkin(renderer, skinned_mesh, gltf);
     }
     
     if(animation != NULL) {
         sLog("LOAD - Animation - %s", gltf->path);
-        *animation = sArrayAdd(&renderer->animations);
-        LoadAnimation(sArrayGet(renderer->animations, *animation), gltf);
+        LoadAnimation(animation, gltf);
     }
     
     DestroyGLTF(gltf);
@@ -193,7 +193,7 @@ void DestroyMesh(Mesh *mesh) {
     glDeleteBuffers(1, &mesh->vertex_buffer);
 }
 
-void DestroySkin(Renderer *renderer, Skin *skin) {
+void DestroySkin(Renderer *renderer, SkinnedMesh *skin) {
     
     for(u32 i = 0; i < skin->joint_count; i++) {
         if(skin->joint_child_count[i] > 0) {
@@ -204,7 +204,7 @@ void DestroySkin(Renderer *renderer, Skin *skin) {
     sFree(skin->joint_children);
     sFree(skin->joint_child_count);
     sFree(skin->global_joint_mats);
-    DestroyTransforms(renderer, skin->joint_count, skin->first_joint);
+    sFree(skin->joint_xforms);
     sFree(skin->inverse_bind_matrices);
 }
 

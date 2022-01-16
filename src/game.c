@@ -11,6 +11,8 @@
 
 #include "console.h"
 #include "event.h"
+#include "enemy.h"
+#include "world.h"
 #include "game.h"
 
 #ifdef RENDERER_VULKAN
@@ -50,51 +52,7 @@ DLL_EXPORT void GameInit(GameData *game_data, Renderer *renderer, PlatformAPI *p
     sLogSetCallback(&ConsoleLogMessage);
     
     Leak_SetList(platform_api->DebugInfo);
-}
-
-MeshHandle MakeCuboid(Vec3 min, Vec3 max) {
-
-    const Vertex vertices[] = {
-        {{min.x, max.y, max.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, // +z  //  0
-        {{max.x, max.y, max.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},        //  1
-        {{min.x, min.y, max.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},        //  2
-        {{max.x, min.y, max.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},        //  3
-        
-        {{max.x, max.y, min.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, // -z  //  4
-        {{min.x, max.y, min.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},        //  5
-        {{max.x, min.y, min.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},        //  6
-        {{min.x, min.y, min.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},        //  7
-        
-        {{min.x, max.y, max.z}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}, // +y  //  8
-        {{max.x, max.y, max.z}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},        //  9
-        {{min.x, max.y, min.z}, {0.0f, 1.0f, -0.0f}, {0.0f, 1.0f}},        // 10
-        {{max.x, max.y, min.z}, {0.0f, 1.0f, -0.0f}, {1.0f, 1.0f}},        // 11 
-
-        {{min.x, min.y, max.z}, {0.0f, -1.0f,  0.0f}, {0.0f, 1.0f}}, //-y // 12
-        {{max.x, min.y, max.z}, {0.0f, -1.0f,  0.0f}, {1.0f, 1.0f}},      // 13
-        {{min.x, min.y, min.z}, {0.0f, -1.0f, -0.0f}, {0.0f, 1.0f}},      // 14
-        {{max.x, min.y, min.z}, {0.0f, -1.0f, -0.0f}, {1.0f, 1.0f}},      // 15
-
-        {{max.x, max.y, max.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // +x   // 16
-        {{max.x, max.y, min.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},         // 17
-        {{max.x, min.y, max.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},         // 18
-        {{max.x, min.y, min.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},         // 19
-
-        {{min.x, min.y, min.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // -x // 20
-        {{min.x, max.y, max.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},       // 21
-        {{min.x, min.y, min.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},       // 22
-        {{min.x, max.y, max.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},       // 23
-    };
-    const u32 indices[] = {
-        0,1,2,    2,3,1, // +z
-        4,5,6,    5,7,6, // -z
-        8,9,10,   9,11,10, // +y
-        12,13,14, 13,15,14, // -y
-        16,17,18, 17,19,18, // +x
-        20,21,22, 21,23,22}; // -x
-    
-    return LoadMeshFromVertices(global_renderer, vertices, ARRAY_SIZE(vertices), indices, ARRAY_SIZE(indices));
-
+    WorldInit(&game_data->world, 128);
 }
 
 /// This is called ONCE before the first frame. Won't be called upon reloading.
@@ -106,25 +64,29 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     
     platform->SetCaptureMouse(true);
     
-    game_data->floor = LoadQuad(global_renderer);
-    game_data->floor_xform = AllocateTransforms(global_renderer, 1);
-    Transform *f = sArrayGet(global_renderer->transforms, game_data->floor_xform);
-    f->scale = (Vec3){100.0f, 1.0f, 100.0f};
-    
-    game_data->cube = LoadCube(global_renderer);
-    game_data->char_xform = AllocateTransforms(global_renderer, 1);
-    game_data->enemy_xform = AllocateTransforms(global_renderer, 1);
+    game_data->mesh_quad = LoadQuad(global_renderer);
+    game_data->mesh_cube = LoadCube(global_renderer);
 
+    Entity *floor_entity;
+    game_data->ground = WorldCreateAndGetEntity(&game_data->world, &floor_entity);
+    floor_entity->transform.scale = (Vec3){100.0f, 1.0f, 100.0f};
+    floor_entity->static_mesh = game_data->mesh_quad;
+
+    game_data->player = WorldCreateEntity(&game_data->world);
+
+    game_data->enemy = WorldCreateEntity(&game_data->world);
     game_data->enemy_health = 10;
 
     // Sword
-    game_data->sword = MakeCuboid((Vec3){-.1f, -.1f, .2f}, (Vec3){.1f, .1f, 1.f});
-    game_data->sword_xform = AllocateTransforms(global_renderer, 1);
+    Entity *sword_entity;
+    game_data->sword = WorldCreateAndGetEntity(&game_data->world, &sword_entity);
+    sword_entity->static_mesh = MakeCuboid(global_renderer, (Vec3){-.1f, -.1f, .2f}, (Vec3){.1f, .1f, 1.f});
 
     { // NPC
         NPC *npc = &game_data->npc;
-        LoadFromGLTF("resources/3d/character/walk.gltf", global_renderer, platform, &npc->mesh, &npc->skin, &npc->walk_animation);
-        npc->xform = AllocateTransforms(global_renderer, 1);
+        SkinnedMeshHandle sk;
+        LoadFromGLTF("resources/3d/character/walk.gltf", global_renderer, platform, NULL, &sk, &npc->walk_animation);
+        npc->entity = InstantiateSkin(global_renderer, &game_data->world, sk);
         npc->anim_time = 0.0f;
         npc->walk_speed = 1.0f;
     }
@@ -133,6 +95,8 @@ DLL_EXPORT void GameStart(GameData *game_data) {
 /// Do deallocation here
 DLL_EXPORT void GameEnd(GameData *game_data) {
     sFree(game_data->event_queue.queue);
+    WorldDestroy(&game_data->world);
+    DestroyAnimation(&game_data->npc.walk_animation);
 }
 
 internal void FPSCamera(Camera *camera, Input *input, bool is_free_cam) {
@@ -201,22 +165,22 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     // --------------
     // Event
     
-    EventType e;
-    while(EventConsume(&game_data->event_queue, &e)) {
-        switch(e) {
-            case(EVENT_TYPE_QUIT): {
-                platform->RequestExit();
-            } break;
-            case(EVENT_TYPE_RESTART): {
-                GameStart(game_data);
-            } break;
-            case(EVENT_TYPE_RELOAD): {
-                platform->RequestReload();
-            } break;
-            default:
-            
-            break;
-        };
+    {
+        EventType e;
+        while(EventConsume(&game_data->event_queue, &e)) {
+            switch(e) {
+                case(EVENT_TYPE_QUIT): {
+                    platform->RequestExit();
+                } break;
+                case(EVENT_TYPE_RESTART): {
+                    GameStart(game_data);
+                } break;
+                case(EVENT_TYPE_RELOAD): {
+                    platform->RequestReload();
+                } break;
+                default: break;
+            };
+        }
     }
     
     // ----------
@@ -230,7 +194,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     if(game_data->console.console_open) {
         InputConsole(&game_data->console, input, game_data);
     } else {
-        Transform *player_xform = sArrayGet(global_renderer->transforms, game_data->char_xform);
+        Entity *player = WorldGetEntity(&game_data->world, game_data->player);
         if(!game_data->is_free_cam) {
             // Move the character
             f32 move_speed = 10.0f;
@@ -257,14 +221,14 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
             }
 
             movement = vec3_fmul(movement, delta_time * move_speed);
-            player_xform->translation = vec3_add(player_xform->translation, movement);
+            player->transform.translation = vec3_add(player->transform.translation, movement);
         
             // Move the cam
             Mat4 cam;
             Vec3 camera_offset = {0.0f, 10.0f, 5.0f};
-            game_data->camera.position = vec3_add(player_xform->translation, camera_offset);
-            game_data->camera.forward  = vec3_normalize(vec3_sub(game_data->camera.position, player_xform->translation));
-            mat4_look_at(player_xform->translation, game_data->camera.position, (Vec3){0.0f, 1.0f, 0.0f}, cam);
+            game_data->camera.position = vec3_add(player->transform.translation, camera_offset);
+            game_data->camera.forward  = vec3_normalize(vec3_sub(game_data->camera.position, player->transform.translation));
+            mat4_look_at(player->transform.translation, game_data->camera.position, (Vec3){0.0f, 1.0f, 0.0f}, cam);
             RendererSetCamera(global_renderer, cam, game_data->camera.position);
 
             // Attack
@@ -297,19 +261,19 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
 
             if(game_data->attack_time > 0.0f) {
                 game_data->attack_time -= delta_time;
-                Transform *sword_xform = sArrayGet(global_renderer->transforms, game_data->sword_xform);
-                sword_xform->rotation = quat_slerp(game_data->sword_end_rot, game_data->sword_start_rot, game_data->attack_time / 0.1f ); 
-                sword_xform->translation = vec3_add(player_xform->translation, game_data->sword_offset);
+                Entity *sword = WorldGetEntity(&game_data->world, game_data->sword);
+                sword->transform.rotation = quat_slerp(game_data->sword_end_rot, game_data->sword_start_rot, game_data->attack_time / 0.1f ); 
+                sword->transform.translation = vec3_add(player->transform.translation, game_data->sword_offset);
                 Vec3 forward = vec3_fmul(VEC3_FORWARD, 1.0f);
-                forward = vec3_rotate(forward, sword_xform->rotation); 
-                Vec3 sword_tip = vec3_add(forward, sword_xform->translation); 
+                forward = vec3_rotate(forward, sword->transform.rotation); 
+                Vec3 sword_tip = vec3_add(forward, sword->transform.translation); 
                 DebugPushPosition(&global_renderer->debug_pushbuffer, sword_tip); 
-                DebugPushPosition(&global_renderer->debug_pushbuffer, sword_xform->translation); 
-                PushMesh(&global_renderer->scene_pushbuffer, game_data->sword, game_data->sword_xform, (Vec3){0.0f, 0.0f, 0.0f});
-                Transform *enemy_xform = sArrayGet(global_renderer->transforms, game_data->enemy_xform);
-                
+                DebugPushPosition(&global_renderer->debug_pushbuffer, sword->transform.translation); 
+                PushMesh(&global_renderer->scene_pushbuffer, sword->static_mesh, &sword->transform, (Vec3){0.0f, 0.0f, 0.0f});
+
+                Entity *enemy = WorldGetEntity(&game_data->world, game_data->enemy);
                 if(game_data->enemy_health > 0) {
-                    if(IsLineIntersectingBoundingBox(sword_xform->translation, sword_tip, enemy_xform)) { 
+                    if(IsLineIntersectingBoundingBox(sword->transform.translation, sword_tip, &enemy->transform)) { 
                         if(!game_data->enemy_collided) {
                             game_data->enemy_collided = true;
                             game_data->enemy_health--;
@@ -344,7 +308,7 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
                 game_data->cos = 2.0f * PI;
             }
         }
-        RendererSetSunDirection(global_renderer, game_data->light_dir, vec3_add(player_xform->translation, (Vec3){0.0f, 0.0f, -7.0f}));
+        RendererSetSunDirection(global_renderer, game_data->light_dir, vec3_add(player->transform.translation, (Vec3){0.0f, 0.0f, -7.0f}));
     }
     
     
@@ -355,56 +319,55 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     { // NPC
         NPC *npc = &game_data->npc;
-        Skin *skin = sArrayGet(global_renderer->skins, npc->skin);
-        Animation *animation = sArrayGet(global_renderer->animations, npc->walk_animation);
-        Transform *xform = sArrayGet(global_renderer->transforms, npc->xform);
+        Entity *e = WorldGetEntity(&game_data->world, npc->entity);
         
-        npc->anim_time = fmod(npc->anim_time + delta_time, animation->length);
-        AnimationEvaluate(global_renderer, skin->first_joint, skin->joint_count, npc->walk_animation, npc->anim_time);
+        npc->anim_time = fmod(npc->anim_time + delta_time, npc->walk_animation.length);
+        AnimationEvaluate(&npc->walk_animation, e->skeleton, npc->anim_time);
         
-        Vec3 diff = vec3_sub(npc->destination, xform->translation);
+        Vec3 diff = vec3_sub(npc->destination, e->transform.translation);
         npc->distance_to_dest = vec3_length(diff);
         
         npc->walk_speed = 1.3f;
         
         if(npc->distance_to_dest > 0.1f) {
             Vec3 dir = vec3_normalize(diff);
-            xform->translation = vec3_add(vec3_fmul(dir, npc->walk_speed * delta_time), xform->translation);
+            e->transform.translation = vec3_add(vec3_fmul(dir, npc->walk_speed * delta_time), e->transform.translation);
             
         } else {
             // Get new dest
             static u32 i = 0;
             if(i == 0) {
                 npc->destination = (Vec3) {0.0f, 0.0f, 0.0f};
-                xform->rotation    = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i++;
             } else if(i == 1) {
                 npc->destination = (Vec3) {5.0f, 0.0f, 0.0f};
-                xform->rotation = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i++;
             } else if(i == 2) {
                 npc->destination = (Vec3) {5.0f, 0.0f, -5.0f};
-                xform->rotation  = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i++;
             } else if (i == 3) {
                 npc->destination = (Vec3) {0.0f, 0.0f, -5.0f};
-                xform->rotation = quat_lookat(xform->translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
+                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
                 i = 0;
             }
         }
-        PushSkin(&global_renderer->scene_pushbuffer, npc->mesh, npc->skin, npc->xform, (Vec3){1.0f, 1.0f, 1.0f});
+        PushSkinnedMesh(&global_renderer->scene_pushbuffer, e->skinned_mesh, &e->transform, e->skeleton, (Vec3){1.0f, 1.0f, 1.0f});
         
     }
     
     // Floor
-    PushMesh(&global_renderer->scene_pushbuffer, game_data->floor, game_data->floor_xform, (Vec3){0.8f, 0.8f, 0.8f});
+    Entity *e = WorldGetEntity(&game_data->world, game_data->ground);
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->mesh_quad, &e->transform, (Vec3){0.8f, 0.8f, 0.8f});
     // Player
-    PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->char_xform, (Vec3){1.0f, 1.0f, 1.0f});
+    e = WorldGetEntity(&game_data->world, game_data->player);
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->mesh_cube, &e->transform, (Vec3){1.0f, 1.0f, 1.0f});
     // Enemy
-    if(game_data->enemy_health > 0) {
-        PushMesh(&global_renderer->scene_pushbuffer, game_data->cube, game_data->enemy_xform, (Vec3){1.0f, 0.0f, 0.0f});
-    }
-    
+    e = WorldGetEntity(&game_data->world, game_data->enemy);
+    PushMesh(&global_renderer->scene_pushbuffer, game_data->mesh_cube, &e->transform, (Vec3){1.0f, 0.0f, 0.0f});
+
     if(game_data->show_shadowmap)
         UIPushTexture(&global_renderer->ui_pushbuffer, global_renderer->backend->shadowmap_pass.texture, 0, global_renderer->height - 200, 200, 200);
     
