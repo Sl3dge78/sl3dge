@@ -54,12 +54,12 @@ DLL_EXPORT void GameInit(GameData *game_data, Renderer *renderer, PlatformAPI *p
     sLogSetCallback(&ConsoleLogMessage);
     
     Leak_SetList(platform_api->DebugInfo);
-    WorldInit(&game_data->world, 128);
 }
 
 /// This is called ONCE before the first frame. Won't be called upon reloading.
 DLL_EXPORT void GameStart(GameData *game_data) {
     
+    WorldInit(&game_data->world, 128);
     game_data->light_dir = (Vec3){0.67f, -0.67f, 0.1f};
     game_data->cos = 0;
     RendererSetSunDirection(global_renderer, vec3_normalize(vec3_fmul(game_data->light_dir, -1.0)));
@@ -78,30 +78,19 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     floor_entity->flags |= EntityFlag_Sleeping;
     
     game_data->player = CreatePlayer(&game_data->world, game_data->mesh_cube);
-    game_data->enemy = CreateEnemy(&game_data->world, game_data->mesh_cube);
-
-    // Sword
-    Entity *sword_entity;
-    game_data->sword = WorldCreateAndGetEntity(&game_data->world, &sword_entity);
-    sword_entity->color = (Vec3){0.0f, 0.0f, 0.0f};
-    sword_entity->static_mesh = MakeCuboid(global_renderer, (Vec3){-.1f, -.1f, .2f}, (Vec3){.1f, .1f, 1.f});
-    sword_entity->flags |= EntityFlag_Hidden;
-    sword_entity->type = EntityType_Sword;
-
-    { // NPC
-        NPC *npc = &game_data->npc;
-        SkinnedMeshHandle sk;
-        LoadFromGLTF("resources/3d/character/walk.gltf", global_renderer, platform, NULL, &sk, &npc->walk_animation);
-        npc->entity = InstantiateSkin(global_renderer, &game_data->world, sk);
-        Entity *npc_e = WorldGetEntity(&game_data->world, npc->entity);
-        npc_e->type = EntityType_NPC;
-        npc->anim_time = 0.0f;
-        npc->walk_speed = 1.0f;
+    game_data->enemy_count = 5;
+    game_data->enemies = sCalloc(game_data->enemy_count, sizeof(EntityID));
+    for(u32 i = 0; i < game_data->enemy_count; i++) {
+        game_data->enemies[i] = CreateEnemy(&game_data->world, game_data->mesh_cube);
     }
+    game_data->sword = CreateSword(&game_data->world);
+
+    CreateNPC(&game_data->world, global_renderer, platform, &game_data->npc);
 }
 
 /// Do deallocation here
 DLL_EXPORT void GameEnd(GameData *game_data) {
+    sFree(game_data->enemies);
     if(game_data->event_queue.queue) {
         sFree(game_data->event_queue.queue);
     }
@@ -206,52 +195,12 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     
     DrawConsole(&game_data->console, game_data);
     
-    { // NPC
-        NPC *npc = &game_data->npc;
-        Entity *e = WorldGetEntity(&game_data->world, npc->entity);
-        
-        npc->anim_time = fmod(npc->anim_time + delta_time, npc->walk_animation.length);
-        AnimationEvaluate(&npc->walk_animation, e->skeleton, npc->anim_time);
-        
-        Vec3 diff = vec3_sub(npc->destination, e->transform.translation);
-        npc->distance_to_dest = vec3_length(diff);
-        
-        npc->walk_speed = 1.3f;
-        
-        if(npc->distance_to_dest > 0.1f) {
-            Vec3 dir = vec3_normalize(diff);
-            e->transform.translation = vec3_add(vec3_fmul(dir, npc->walk_speed * delta_time), e->transform.translation);
-            
-        } else {
-            // Get new dest
-            static u32 i = 0;
-            if(i == 0) {
-                npc->destination = (Vec3) {0.0f, 0.0f, 0.0f};
-                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
-                i++;
-            } else if(i == 1) {
-                npc->destination = (Vec3) {5.0f, 0.0f, 0.0f};
-                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
-                i++;
-            } else if(i == 2) {
-                npc->destination = (Vec3) {5.0f, 0.0f, -5.0f};
-                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
-                i++;
-            } else if (i == 3) {
-                npc->destination = (Vec3) {0.0f, 0.0f, -5.0f};
-                e->transform.rotation = quat_lookat(e->transform.translation, npc->destination, (Vec3){0.0f, 1.0f, 0.0f});
-                i = 0;
-            }
-        }
-        //PushSkinnedMesh(&global_renderer->scene_pushbuffer, e->skinned_mesh, &e->transform, e->skeleton, (Vec3){1.0f, 1.0f, 1.0f});
-        
-    }
-    
     Input *given_input = NULL;
     if(game_data->console.console_open) {
         InputConsole(&game_data->console, input, game_data);
     } else {
-        given_input = input;
+        if(!game_data->is_free_cam)
+            given_input = input;
         // Move the sun
         if(input->keyboard[SCANCODE_P]) {
             game_data->cos += delta_time;
@@ -277,17 +226,19 @@ DLL_EXPORT void GameLoop(float delta_time, GameData *game_data, Input *input) {
     UpdateAndDrawEntities(game_data, &game_data->world, given_input, global_renderer, delta_time);
 
     // Camera
-    if(!game_data->is_free_cam) {
-        Entity *player = WorldGetEntity(&game_data->world, game_data->player);
-        Mat4 cam;
-        Vec3 camera_offset = {0.0f, 10.0f, 5.0f};
-        game_data->camera.position = vec3_add(player->transform.translation, camera_offset);
-        game_data->camera.forward  = vec3_normalize(vec3_sub(game_data->camera.position, player->transform.translation));
-        mat4_look_at(player->transform.translation, game_data->camera.position, (Vec3){0.0f, 1.0f, 0.0f}, cam);
-        RendererSetCamera(global_renderer, cam, game_data->camera.position);
-    } else {
-        FPSCamera(&game_data->camera, input, true);
-    }
+    if(!game_data->console.console_open) {
+        if(!game_data->is_free_cam) {
+            Entity *player = WorldGetEntity(&game_data->world, game_data->player);
+            Mat4 cam;
+            Vec3 camera_offset = {0.0f, 10.0f, 5.0f};
+            game_data->camera.position = vec3_add(player->transform.translation, camera_offset);
+            game_data->camera.forward  = vec3_normalize(vec3_sub(game_data->camera.position, player->transform.translation));
+            mat4_look_at(player->transform.translation, game_data->camera.position, (Vec3){0.0f, 1.0f, 0.0f}, cam);
+            RendererSetCamera(global_renderer, cam, game_data->camera.position);
+        } else {
+            FPSCamera(&game_data->camera, input, true);
+        }
+    }   
 
 
     if(game_data->show_shadowmap)

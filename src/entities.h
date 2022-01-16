@@ -48,8 +48,6 @@ typedef struct Entity {
 
     Direction direction;
     i32 health;
-    bool on_collider_enter;
-    bool on_collider_exit;
-    EntityType collider_type;
+    bool collided;
 } Entity;
 

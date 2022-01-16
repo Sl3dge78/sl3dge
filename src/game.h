@@ -34,8 +34,10 @@ typedef struct GameData {
 
     EntityID ground;
     EntityID player;
-    EntityID enemy;
     EntityID sword;
+
+    u32 enemy_count;
+    EntityID *enemies;
 
     NPC npc;
     

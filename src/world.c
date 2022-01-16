@@ -45,9 +45,15 @@ void UpdateAndDrawEntities(GameData *game_data, World *world, Input *input, Rend
                 case (EntityType_Player): {
                     UpdatePlayer(game_data, input, e, delta_time);
                 } break;
-                case (EntityType_Enemy): {
-                    UpdateEnemy(e);    
+                case (EntityType_Sword): {
+                    UpdateSword(game_data, e);
                 } break;
+                case (EntityType_Enemy): {
+                    UpdateEnemy(game_data, e);    
+                } break;
+                case (EntityType_NPC): {
+                    UpdateNPC(world, &game_data->npc, delta_time);
+                }
                 default : break;
             }
         }
