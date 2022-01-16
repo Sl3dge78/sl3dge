@@ -1,11 +1,11 @@
 
 void WorldInit(World *world, u32 size) {
     world->entities = sCalloc(size, sizeof(Entity));
-    world->size = size;
+    world->entities_size = size;
 }
 
 EntityID WorldCreateEntity(World *world) {
-    ASSERT(world->entity_count < world->size); // Entity limit
+    ASSERT(world->entity_count < world->entities_size); // Entity limit
     Entity *e = &world->entities[world->entity_count];
     *e = (Entity){0};
     e->id = world->entity_count;
@@ -36,7 +36,6 @@ void WorldDestroy(World *world) {
 }
 
 void UpdateAndDrawEntities(GameData *game_data, World *world, Input *input, Renderer *renderer, f32 delta_time) {
-
     for(u32 id = 0; id < world->entity_count; id++) {
         Entity *e = WorldGetEntity(world, id);
         if(!(e->flags & EntityFlag_Sleeping)) {

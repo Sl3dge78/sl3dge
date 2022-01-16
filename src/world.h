@@ -3,7 +3,12 @@
 typedef struct World {
     Entity *entities;
     u32 entity_count;
-    u32 size;
+    u32 entities_size;
+
+    Entity *static_entities;
+    u32 static_entity_count;
+    u32 static_entities_size;
+
 } World;
 
 

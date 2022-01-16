@@ -70,14 +70,20 @@ DLL_EXPORT void GameStart(GameData *game_data) {
     game_data->mesh_cube = LoadCube(global_renderer);
 
     // @Todo : maybe this shouldn't be an entity?
-    Entity *floor_entity;
-    game_data->ground = WorldCreateAndGetEntity(&game_data->world, &floor_entity);
-    floor_entity->transform.scale = (Vec3){100.0f, 1.0f, 100.0f};
-    floor_entity->static_mesh = game_data->mesh_quad;
-    floor_entity->color = (Vec3){0.5f, 0.7f, 0.5f};
-    floor_entity->flags |= EntityFlag_Sleeping;
+    for(i32 x = -5; x < 5; x++) {
+        for(i32 y = -5; y < 5; y++) {
+            Entity *floor_entity;
+            game_data->ground = WorldCreateAndGetEntity(&game_data->world, &floor_entity);
+            floor_entity->transform.scale = (Vec3){0.9f, 1.0f, 0.9f};
+            floor_entity->transform.translation = (Vec3){x, 0.0f, y};
+            floor_entity->static_mesh = game_data->mesh_quad;
+            floor_entity->color = (Vec3){0.5f, 0.7f, 0.5f};
+            floor_entity->flags |= EntityFlag_Sleeping;
+        }
+    }
     
     game_data->player = CreatePlayer(&game_data->world, game_data->mesh_cube);
+
     game_data->enemy_count = 5;
     game_data->enemies = sCalloc(game_data->enemy_count, sizeof(EntityID));
     for(u32 i = 0; i < game_data->enemy_count; i++) {
