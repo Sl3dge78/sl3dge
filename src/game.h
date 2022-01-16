@@ -1,6 +1,5 @@
 #pragma once
 
-
 typedef struct Camera {
     Vec3 position;
     Vec2f spherical_coordinates;
@@ -16,15 +15,7 @@ typedef struct NPC {
     Vec3 destination;
     f32 walk_speed;
     f32 distance_to_dest;
-    
 } NPC;
-
-typedef enum Direction {
-    DIRECTION_UP,
-    DIRECTION_DOWN,
-    DIRECTION_LEFT,
-    DIRECTION_RIGHT,
-} Direction;
 
 typedef struct GameData {
     // System stuff
@@ -46,20 +37,13 @@ typedef struct GameData {
     EntityID enemy;
     EntityID sword;
 
-    i32 enemy_health;
-    bool enemy_collided;
-    
     NPC npc;
     
-    Direction player_direction;
     f32 attack_time;
 
     Quat sword_start_rot;
     Quat sword_end_rot;
     Vec3 sword_offset;
-    
-    MeshHandle simple_skinning;
-    //TransformHandle simple_skinning_root;
     
     bool show_anim_ui;
     bool show_shadowmap;

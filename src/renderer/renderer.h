@@ -126,6 +126,6 @@ void DestroyAnimation(Animation *anim);
 void AnimationEvaluate(const Animation *animation, Transform *target, f32 time);
 
 void RendererSetCamera(Renderer *renderer, const Mat4 view, const Vec3 pos);
-void RendererSetSunDirection(Renderer *renderer, const Vec3 direction, const Vec3 center);
+void RendererSetSunDirection(Renderer *renderer, const Vec3 direction);
 
 

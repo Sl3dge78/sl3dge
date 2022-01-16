@@ -18,12 +18,13 @@ void SkinCalcChildXform(u32 joint, SkinnedMesh *skin, Transform *skeleton) {
     }
 }
 
-void RendererSetSunDirection(Renderer *renderer, const Vec3 direction, const Vec3 center) {
+void RendererSetSunDirection(Renderer *renderer, const Vec3 direction) {
     Mat4 ortho;
     mat4_ortho_zoom_gl(1.0f, 17.0f, -100.0f, 100.0f, ortho);
-    Vec3 eye = vec3_add(center, vec3_fmul(direction, -1.0f));
+    //Vec3 eye = vec3_add(center, vec3_fmul(direction, -1.0f));
+    Vec3 eye = vec3_add(renderer->camera_pos, vec3_fmul(direction, -1.0f));
     Mat4 look;
-    mat4_look_at(center, eye, (Vec3){0.0f, 1.0f, 0.0f}, look);
+    mat4_look_at(renderer->camera_pos, eye, (Vec3){0.0f, 1.0f, 0.0f}, look);
     mat4_mul(ortho, look, renderer->light_matrix);
     //renderer->light_dir = vec3_fmul(direction, -1.0f);
     renderer->light_dir = direction;
@@ -214,6 +215,7 @@ EntityID InstantiateSkin(Renderer *renderer, World *world, SkinnedMeshHandle ski
     entity->skinned_mesh = skinned_mesh;
     SkinnedMesh *skin = sArrayGet(renderer->skins, skinned_mesh);
     entity->skeleton = sCalloc(skin->joint_count, sizeof(Transform));
+    entity->render_type = RenderingType_SkinnedMesh;
     return result;
 }
 
